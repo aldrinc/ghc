@@ -29,9 +29,10 @@ from app.db.models import (
     DesignSystem,
     Funnel,
     FunnelEvent,
-    FunnelPublication,
     FunnelPage,
     FunnelPageVersion,
+    FunnelPublication,
+    FunnelPublicationPage,
     PreparedFunnelCheckout,
     Product,
     ProductVariant,
@@ -3631,6 +3632,46 @@ def _resolve_public_event_client_ip(request: Request) -> str | None:
     return _normalize_public_event_client_ip(request.client.host if request.client else None)
 
 
+def _validate_public_event_page_membership(
+    *,
+    session: Session,
+    publication: FunnelPublication,
+    event: Any,
+) -> str:
+    try:
+        page_uuid = UUID(str(event.pageId))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pageId must be a valid UUID.",
+        ) from exc
+
+    published_page_id = session.scalars(
+        select(FunnelPublicationPage.page_id).where(
+            FunnelPublicationPage.publication_id == publication.id,
+            FunnelPublicationPage.page_id == page_uuid,
+        )
+    ).first()
+    if published_page_id:
+        return str(page_uuid)
+
+    page = session.scalars(select(FunnelPage).where(FunnelPage.id == page_uuid)).first()
+    if not page:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pageId does not exist.",
+        )
+    if str(page.funnel_id) != str(publication.funnel_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pageId does not belong to this funnel.",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="pageId does not belong to this publication.",
+    )
+
+
 @router.post("/events")
 def ingest_public_events(
     payload: PublicEventsIngestRequest,
@@ -3717,6 +3758,11 @@ def ingest_public_events(
             continue
         if event_id and event_id in seen_event_ids:
             continue
+        page_id = _validate_public_event_page_membership(
+            session=session,
+            publication=publication,
+            event=ev,
+        )
         if event_id:
             seen_event_ids.add(event_id)
         event_props = dict(ev.props or {})
@@ -3727,7 +3773,7 @@ def ingest_public_events(
             {
                 "event_id": event_id,
                 "occurred_at": occurred_at,
-                "page_id": ev.pageId,
+                "page_id": page_id,
                 "event_type": event_type,
                 "visitor_id": ev.visitorId,
                 "session_id": ev.sessionId,

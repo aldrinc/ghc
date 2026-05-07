@@ -370,6 +370,49 @@ def _extract_runtime_block(script_text: str) -> str:
     raise AssertionError("Runtime injection script did not contain a block assignment.")
 
 
+def test_funnel_artifact_site_writes_release_manifest():
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document="<html><body><a id='main-cta' href='#'>Buy</a></body></html>",
+    )
+    app.source_ref.artifact_id = "artifact-123"
+    app.source_ref.artifact_version = 7
+    app.source_ref.release_metadata = {
+        "deployJobId": "publish-job-1",
+        "sourceCommit": "abc123",
+        "staticScan": {"status": "passed"},
+    }
+    app.source_ref.artifact["meta"]["identityAudit"] = {"status": "passed"}
+    app.source_ref.artifact["meta"]["publicationOverrides"] = [
+        {"funnelId": "funnel-1", "publicationId": "pub-1"}
+    ]
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    manifest = json.loads(
+        uploaded["/opt/apps/landing-artifact/site/mos-release-manifest.json"]
+    )
+    assert manifest["deployJobId"] == "publish-job-1"
+    assert manifest["sourceCommit"] == "abc123"
+    assert manifest["artifactId"] == "artifact-123"
+    assert manifest["artifactVersion"] == 7
+    assert manifest["renderMode"] == "standalone_imported_html"
+    assert manifest["defaultRoute"]["policy"] == "entry_page"
+    assert manifest["defaultRoute"]["path"] == "/example-product/example-funnel/presales/"
+    assert manifest["upstreamApiOriginHost"] == "api.moshq.app"
+    assert manifest["tracking"] == {"posthog": True, "metaPixel": True}
+    assert manifest["bridge"]["version"] == "inline-standalone-bridge-v1"
+    assert manifest["staticScan"] == {"status": "passed"}
+    assert manifest["identityAudit"] == {"status": "passed"}
+    assert manifest["publicationOverrides"] == [
+        {"funnelId": "funnel-1", "publicationId": "pub-1"}
+    ]
+    assert manifest["funnels"][0]["pages"] == [
+        {"pageId": "page-1", "slug": "presales", "stage": "sales"}
+    ]
+
+
 class _FakeRemoteFile:
     def __init__(self, *, sftp, path: str) -> None:
         self._sftp = sftp
@@ -913,6 +956,7 @@ def test_standalone_imported_html_rewrites_upstream_public_asset_urls_to_artifac
         html_document=html_document,
         workspace_server_names=["shop.example.com"],
     )
+    app.source_ref.default_route_policy = "prefer_sales"
     deployer, uploaded, _commands = _stub_deployer()
 
     def fail_remote_image_fetch(**kwargs):
@@ -971,7 +1015,8 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
     assert 'nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);' in entry_html
     assert "element.href = buildInternalNavigationUrl(targetPath, {" in entry_html
     assert "await waitForTrackingNavigationFlush();" in entry_html
-    assert "window.location.href = buildInternalNavigationUrl(targetPath, {" in entry_html
+    assert "const destinationUrl = buildInternalNavigationUrl(targetPath, {" in entry_html
+    assert "window.location.href = destinationUrl;" in entry_html
     assert '"EnteredSales"' in entry_html
     assert '"/example-product/example-funnel/sales-page/"' in entry_html
 
@@ -2155,6 +2200,7 @@ def test_funnel_artifact_site_root_redirect_prefers_sales_page_when_available():
         html_document=html_document,
         workspace_server_names=["shop.example.com"],
     )
+    app.source_ref.default_route_policy = "prefer_sales"
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["pages"]["sales-page"] = {
         **json.loads(json.dumps(funnel_payload["pages"]["presales"])),
@@ -2578,6 +2624,7 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
 
 def test_funnel_artifact_site_prefers_sales_page_for_default_route_and_preload():
     app = _artifact_app()
+    app.source_ref.default_route_policy = "prefer_sales"
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["pages"]["sales-page"] = {
         **json.loads(json.dumps(funnel_payload["pages"]["presales"])),
@@ -2645,6 +2692,7 @@ def test_funnel_artifact_site_prefers_updated_from_funnel_for_runtime_config():
 
 def test_funnel_artifact_site_only_inlines_non_entry_pages_in_runtime_config():
     app = _artifact_app()
+    app.source_ref.default_route_policy = "prefer_sales"
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["pages"]["sales-page"] = {
         "funnelId": "funnel-1",

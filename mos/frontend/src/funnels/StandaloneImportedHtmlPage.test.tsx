@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StandaloneImportedHtmlPage } from "@/funnels/StandaloneImportedHtmlPage";
 import type { PublicCommerceVariant } from "@/types/commerce";
-import type { ImportedHtmlInstrumentationManifest, PublicFunnelPage } from "@/types/funnels";
+import type { ImportedHtmlInstrumentationManifest, PublicFunnelPage, PublicFunnelStage } from "@/types/funnels";
 
 function buildPage(overrides?: Partial<PublicFunnelPage>): PublicFunnelPage {
   return {
@@ -78,6 +78,8 @@ async function captureInjectedDocument(options?: {
   instrumentationManifest?: ImportedHtmlInstrumentationManifest;
   variants?: PublicCommerceVariant[];
   page?: Partial<PublicFunnelPage>;
+  pagePathById?: Record<string, string>;
+  pageStageById?: Record<string, PublicFunnelStage>;
 }) {
   const documentOpenSpy = vi.spyOn(document, "open").mockImplementation(() => document);
   const documentWriteSpy = vi.spyOn(document, "write").mockImplementation(() => undefined);
@@ -93,8 +95,8 @@ async function captureInjectedDocument(options?: {
       htmlDocument={options?.htmlDocument ?? "<html><body><button>Buy now</button></body></html>"}
       instrumentationManifest={options?.instrumentationManifest ?? buildInstrumentationManifest()}
       variants={options?.variants ?? buildVariants()}
-      pagePathById={{ "page-1": "/example-product/example-funnel/sales-page" }}
-      pageStageById={{ "page-1": "sales" }}
+      pagePathById={options?.pagePathById ?? { "page-1": "/example-product/example-funnel/sales-page" }}
+      pageStageById={options?.pageStageById ?? { "page-1": "sales" }}
     />,
   );
 
@@ -761,7 +763,7 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(injectedDocument).toContain('src="/gallery.jpg" alt="Gallery" loading="lazy" decoding="async" fetchpriority="low"');
   });
 
-  it("tracks EnteredSales for standalone sales pages", async () => {
+  it("tracks ViewContent for direct standalone sales pages", async () => {
     const { injectedDocument } = await captureInjectedDocument({
       htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
       page: {
@@ -808,17 +810,90 @@ describe("StandaloneImportedHtmlPage", () => {
           expect.objectContaining({ eventID: expect.any(String) }),
         ],
         [
-          "trackCustom",
-          "EnteredSales",
+          "track",
+          "ViewContent",
           expect.objectContaining({ page_stage: "sales", external_id: "visitor-1" }),
           expect.objectContaining({ eventID: expect.any(String) }),
         ],
       ]),
     );
-    expect(fbqQueue.some((entry) => entry[0] === "track" && entry[1] === "ViewContent")).toBe(false);
+    expect(fbqQueue.some((entry) => entry[0] === "trackCustom" && entry[1] === "EnteredSales")).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/public/events"),
       expect.objectContaining({ method: "POST" }),
+    );
+
+    dom.window.close();
+  });
+
+  it("maps standalone add-to-cart and checkout-started events to Meta commerce events", async () => {
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
+      page: {
+        tracking: {
+          provider: "meta",
+          metaPixelId: "970868055499017",
+        },
+      },
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM("<html><body><button id=\"main-cta\">Buy now</button></body></html>", {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/sales-page",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/public/events")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+    dom.window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof dom.window.requestAnimationFrame;
+
+    dom.window.eval(runtimeScript);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const analytics = (dom.window as typeof dom.window & {
+      MOSStandaloneAnalytics?: {
+        trackEvent: (eventType: string, props?: Record<string, unknown>) => void;
+      };
+    }).MOSStandaloneAnalytics;
+    analytics?.trackEvent("sales_to_checkout_click", { variantId: "variant-3x-watermelon" });
+    analytics?.trackEvent("checkout_started", { variantId: "variant-3x-watermelon" });
+
+    const fbqQueue = dom.window.fbq?.queue ?? [];
+    expect(fbqQueue).toEqual(
+      expect.arrayContaining([
+        [
+          "track",
+          "AddToCart",
+          expect.objectContaining({
+            content_ids: ["variant-3x-watermelon"],
+            content_type: "product",
+            num_items: 1,
+          }),
+          expect.objectContaining({ eventID: expect.any(String) }),
+        ],
+        [
+          "track",
+          "InitiateCheckout",
+          expect.objectContaining({
+            content_ids: ["variant-3x-watermelon"],
+            content_type: "product",
+            num_items: 1,
+          }),
+          expect.objectContaining({ eventID: expect.any(String) }),
+        ],
+      ]),
     );
 
     dom.window.close();
@@ -983,6 +1058,30 @@ describe("StandaloneImportedHtmlPage", () => {
           ],
           [
             "capture",
+            "sales_page_view",
+            expect.objectContaining({
+              productSlug: "example-product",
+              product_slug: "example-product",
+              funnelSlug: "example-funnel",
+              funnel_slug: "example-funnel",
+              publicationId: "publication-1",
+              publication_id: "publication-1",
+              pageId: "page-1",
+              page_id: "page-1",
+              pageSlug: "sales-page",
+              page_slug: "sales-page",
+              pageStage: "sales",
+              page_stage: "sales",
+              internal_event_type: "sales_page_view",
+              canonical_event_type: "sales_page_view",
+              posthog_event_role: "canonical",
+              content_category: "sales_page",
+              from_presale: false,
+              $event_id: expect.any(String),
+            }),
+          ],
+          [
+            "capture",
             "PageView",
             expect.objectContaining({
               productSlug: "example-product",
@@ -1014,7 +1113,7 @@ describe("StandaloneImportedHtmlPage", () => {
           ],
           [
             "capture",
-            "EnteredSales",
+            "ViewContent",
             expect.objectContaining({
               productSlug: "example-product",
               funnelSlug: "example-funnel",
@@ -1029,7 +1128,7 @@ describe("StandaloneImportedHtmlPage", () => {
               internal_event_type: "sales_page_view",
               content_category: "sales_page",
               from_presale: false,
-              meta_event_name: "EnteredSales",
+              meta_event_name: "ViewContent",
               meta_event_id: expect.any(String),
               action_source: "website",
               fbp: "fb.1.1710000000.browser",
@@ -1049,6 +1148,201 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/public/events"),
       expect.objectContaining({ method: "POST" }),
+    );
+
+    dom.window.close();
+  });
+
+  it("queues RMBC PostHog events and CTA props for standalone presales pages", async () => {
+    const htmlDocument = `
+      <html>
+        <body>
+          <section id="hero">
+            <a id="to-sales" href="#">Try it now</a>
+          </section>
+          <section id="proof">Clinically backed proof</section>
+        </body>
+      </html>
+    `;
+    const instrumentationManifest: ImportedHtmlInstrumentationManifest = {
+      schemaVersion: "imported-html-instrumentation-v1",
+      pageStage: "pre_sales",
+      sections: [{ id: "hero", selector: "#hero", label: "Hero" }],
+      proofs: [{ id: "proof", selector: "#proof", proofType: "clinical", sectionId: "hero" }],
+      ctas: [{ id: "primary-cta", selector: "#to-sales", ctaPosition: 1 }],
+      bindings: [
+        {
+          id: "primary-cta",
+          type: "internal_navigation",
+          event: "click",
+          selector: "#to-sales",
+          targetPageId: "page-sales",
+          trackEventType: "pre_sales_to_sales_click",
+        },
+      ],
+    };
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument,
+      instrumentationManifest,
+      variants: [],
+      page: {
+        stage: "pre_sales",
+        slug: "10-reasons-glp",
+        pageMap: {
+          "page-1": "10-reasons-glp",
+          "page-sales": "sales-page",
+        },
+        pageStageMap: {
+          "page-1": "pre_sales",
+          "page-sales": "sales",
+        },
+        tracking: {
+          provider: "posthog",
+          mode: "public_funnel_runtime",
+          posthogProjectApiKey: "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+          posthogApiHost: "https://us.i.posthog.com",
+          posthogUiHost: "https://us.posthog.com",
+          posthogDefaults: "2026-01-30",
+          posthogPersonProfiles: "identified_only",
+        },
+      },
+      pagePathById: {
+        "page-1": "/example-product/example-funnel/10-reasons-glp",
+        "page-sales": "/example-product/example-funnel/sales-page",
+      },
+      pageStageById: {
+        "page-1": "pre_sales",
+        "page-sales": "sales",
+      },
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM(htmlDocument, {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/10-reasons-glp",
+    });
+    dom.window.document.cookie = "_fbp=fb.1.1710000000.browser";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/public/events")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+    dom.window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof dom.window.requestAnimationFrame;
+    class ImmediateIntersectionObserver {
+      private readonly callback: IntersectionObserverCallback;
+
+      constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+      }
+
+      observe(element: Element) {
+        this.callback(
+          [
+            {
+              isIntersecting: true,
+              intersectionRatio: 1,
+              target: element,
+            } as IntersectionObserverEntry,
+          ],
+          this as unknown as IntersectionObserver,
+        );
+      }
+
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    }
+    dom.window.IntersectionObserver = ImmediateIntersectionObserver as typeof dom.window.IntersectionObserver;
+
+    dom.window.eval(runtimeScript);
+    const posthogRoot = dom.window.posthog as {
+      mosFunnel?: unknown[] & { __loaded?: true };
+    };
+    if (posthogRoot.mosFunnel) {
+      posthogRoot.mosFunnel.__loaded = true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    dom.window.document.querySelector<HTMLAnchorElement>("#to-sales")?.click();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(posthogRoot.mosFunnel).toEqual(
+      expect.arrayContaining([
+        [
+          "capture",
+          "pre_sales_page_view",
+          expect.objectContaining({
+            internal_event_type: "pre_sales_page_view",
+            canonical_event_type: "pre_sales_page_view",
+            posthog_event_role: "canonical",
+            content_category: "pre_sales_page",
+          }),
+        ],
+        [
+          "capture",
+          "presell_page_view",
+          expect.objectContaining({
+            internal_event_type: "pre_sales_page_view",
+            canonical_event_type: "presell_page_view",
+            posthog_event_role: "rmbc_alias",
+          }),
+        ],
+        [
+          "capture",
+          "section_view",
+          expect.objectContaining({
+            sectionId: "hero",
+            section_id: "hero",
+            depth_pct: expect.any(Number),
+          }),
+        ],
+        [
+          "capture",
+          "proof_view",
+          expect.objectContaining({
+            proofId: "proof",
+            proof_id: "proof",
+            proofType: "clinical",
+            proof_type: "clinical",
+          }),
+        ],
+        [
+          "capture",
+          "cta_view",
+          expect.objectContaining({
+            ctaId: "primary-cta",
+            cta_id: "primary-cta",
+            ctaPosition: 1,
+            cta_position: 1,
+          }),
+        ],
+        [
+          "capture",
+          "cta_click",
+          expect.objectContaining({
+            internal_event_type: "pre_sales_to_sales_click",
+            canonical_event_type: "cta_click",
+            posthog_event_role: "rmbc_alias",
+            ctaId: "primary-cta",
+            cta_id: "primary-cta",
+            ctaPosition: 1,
+            cta_position: 1,
+            destinationUrl: expect.stringContaining("/sales-page"),
+            destination_url: expect.stringContaining("/sales-page"),
+          }),
+        ],
+      ]),
     );
 
     dom.window.close();

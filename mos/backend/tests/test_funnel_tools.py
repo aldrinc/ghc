@@ -340,7 +340,17 @@ def test_draft_generate_page_imported_html_mode_preserves_copy_but_keeps_runtime
     saved_component = result.ui_details["puckData"]["content"][0]
     assert saved_component["type"] == "ImportedHtmlDocument"
     assert saved_component["props"]["htmlDocument"] == reference_html
-    assert saved_component["props"]["instrumentationManifest"] == instrumentation_manifest
+    assert saved_component["props"]["instrumentationManifest"] == {
+        **instrumentation_manifest,
+        "sections": [],
+        "proofs": [],
+        "ctas": [],
+        "offerStacks": [],
+        "valueStacks": [],
+        "priceReveals": [],
+        "guarantees": [],
+        "trustElements": [],
+    }
     assert "textReplacements requirements" in captured["prompt"]
     assert "- Return an empty array." in captured["prompt"]
     assert "Preserve the existing copy exactly as provided." in captured["prompt"]

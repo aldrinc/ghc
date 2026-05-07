@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import copy
+from contextlib import ExitStack, contextmanager
 import hashlib
 import io
 import json
@@ -14,13 +15,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlsplit
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 from uuid import UUID, uuid4
 
 import httpx
 from sqlalchemy import select
 
 from app.config import settings
+from app.services.deploy_locks import DeployLockConflict, acquire_deploy_lock
 from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services import namecheap_dns as namecheap_dns_service
@@ -339,6 +341,49 @@ def _assert_under_cloudhand(path: Path) -> Path:
     if not resolved.is_relative_to(ch_dir):
         raise DeployError("plan_path must be inside the deploy plan directory (DEPLOY_ROOT_DIR).")
     return resolved
+
+
+def _deploy_locks_dir() -> Path:
+    return _cloudhand_dir() / "locks"
+
+
+def _normalize_deploy_lock_workload_names(workload_names: list[str] | set[str] | None) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_name in workload_names or []:
+        workload_name = str(raw_name or "").strip()
+        if not workload_name or workload_name in seen:
+            continue
+        seen.add(workload_name)
+        normalized.append(workload_name)
+    return sorted(normalized) if normalized else ["*"]
+
+
+@contextmanager
+def _deploy_workload_locks(
+    *,
+    plan_path: str,
+    workload_names: list[str] | set[str] | None,
+    org_id: str | None = None,
+    user_id: str | None = None,
+    job_id: str | None = None,
+) -> Iterator[None]:
+    try:
+        with ExitStack() as stack:
+            for workload_name in _normalize_deploy_lock_workload_names(workload_names):
+                stack.enter_context(
+                    acquire_deploy_lock(
+                        lock_root=_deploy_locks_dir(),
+                        plan_path=plan_path,
+                        workload_name=workload_name,
+                        job_id=job_id,
+                        org_id=org_id,
+                        user_id=user_id,
+                    )
+                )
+            yield
+    except DeployLockConflict as exc:
+        raise DeployError(str(exc)) from exc
 
 
 def _utc_now_iso() -> str:
@@ -770,6 +815,8 @@ def build_funnel_publication_workload_patch(
     https: bool,
     destination_path: str,
     artifact_render_mode: str = _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
+    default_route_policy: str = "entry_page",
+    default_page_slug: str | None = None,
 ) -> dict[str, Any]:
     name = workload_name.strip()
     if not name:
@@ -812,6 +859,14 @@ def build_funnel_publication_workload_patch(
 
     if normalized_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
         api_base_root = _require_standalone_upstream_api_origin(upstream_api_base_url=api_base_root)
+    normalized_default_route_policy = (default_route_policy or "entry_page").strip().lower()
+    if normalized_default_route_policy not in {"entry_page", "prefer_sales", "explicit_slug", "none"}:
+        raise DeployError(
+            "Deploy defaultRoutePolicy must be one of: entry_page, prefer_sales, explicit_slug, none."
+        )
+    normalized_default_page_slug = str(default_page_slug or "").strip()
+    if normalized_default_route_policy == "explicit_slug" and not normalized_default_page_slug:
+        raise DeployError("Deploy defaultPageSlug is required when defaultRoutePolicy is explicit_slug.")
 
     https_enabled = https and bool(normalized_server_names)
 
@@ -819,6 +874,8 @@ def build_funnel_publication_workload_patch(
         "client_id": resolved_client_id,
         "upstream_api_base_root": api_base_root,
         "artifact_render_mode": normalized_render_mode,
+        "default_route_policy": normalized_default_route_policy,
+        "default_page_slug": normalized_default_page_slug or None,
         "artifact": {
             "meta": {
                 "clientId": resolved_client_id,
@@ -861,6 +918,8 @@ def build_funnel_artifact_workload_patch(
     https: bool,
     destination_path: str,
     artifact_render_mode: str = _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
+    default_route_policy: str = "entry_page",
+    default_page_slug: str | None = None,
 ) -> dict[str, Any]:
     return build_funnel_publication_workload_patch(
         workload_name=workload_name,
@@ -871,6 +930,8 @@ def build_funnel_artifact_workload_patch(
         https=https,
         destination_path=destination_path,
         artifact_render_mode=artifact_render_mode,
+        default_route_policy=default_route_policy,
+        default_page_slug=default_page_slug,
     )
 
 
@@ -1448,6 +1509,10 @@ def build_client_funnel_runtime_artifact_payload(
         for raw_funnel_id, raw_publication_id in (publication_id_overrides or {}).items()
         if str(raw_funnel_id or "").strip() and str(raw_publication_id or "").strip()
     }
+    publication_override_manifest = [
+        {"funnelId": funnel_id, "publicationId": publication_id}
+        for funnel_id, publication_id in sorted(normalized_publication_overrides.items())
+    ]
 
     for client_funnel in client_funnels:
         if not client_funnel.product_id:
@@ -1699,12 +1764,190 @@ def build_client_funnel_runtime_artifact_payload(
             "clientId": str(client_id),
             "updatedFromFunnelId": updated_from_funnel_id,
             "updatedFromPublicationId": updated_from_publication_id,
+            "publicationOverrides": publication_override_manifest,
         },
         "products": products_payload,
         "assets": {
             "totalBytes": total_embedded_asset_bytes,
             "items": embedded_assets,
         },
+    }
+
+
+def _parse_artifact_uuid(value: Any, *, label: str) -> UUID:
+    try:
+        return UUID(str(value or "").strip())
+    except ValueError as exc:
+        raise DeployError(f"Artifact identity audit found invalid {label}: '{value}'.") from exc
+
+
+def validate_funnel_artifact_identity(
+    *,
+    session: Any,
+    org_id: str,
+    artifact_payload: dict[str, Any],
+) -> dict[str, Any]:
+    from app.db.models import Funnel, FunnelPage, FunnelPublication, FunnelPublicationPage
+
+    products = artifact_payload.get("products")
+    if not isinstance(products, dict) or not products:
+        raise DeployError("Artifact identity audit requires a non-empty products object.")
+
+    audited_funnels: list[dict[str, Any]] = []
+    for product_slug, product_payload in products.items():
+        if not isinstance(product_payload, dict):
+            raise DeployError(
+                f"Artifact identity audit product '{product_slug}' must be an object."
+            )
+        funnels = product_payload.get("funnels")
+        if not isinstance(funnels, dict) or not funnels:
+            raise DeployError(
+                f"Artifact identity audit product '{product_slug}' must include funnels."
+            )
+        for funnel_token, funnel_payload in funnels.items():
+            if not isinstance(funnel_payload, dict):
+                raise DeployError(
+                    f"Artifact identity audit funnel '{product_slug}/{funnel_token}' must be an object."
+                )
+            funnel_meta = funnel_payload.get("meta")
+            if not isinstance(funnel_meta, dict):
+                raise DeployError(
+                    f"Artifact identity audit funnel '{product_slug}/{funnel_token}' is missing meta."
+                )
+            funnel_id = str(funnel_meta.get("funnelId") or funnel_payload.get("funnelId") or "").strip()
+            publication_id = str(
+                funnel_meta.get("publicationId") or funnel_payload.get("publicationId") or ""
+            ).strip()
+            funnel_uuid = _parse_artifact_uuid(funnel_id, label="funnelId")
+            publication_uuid = _parse_artifact_uuid(publication_id, label="publicationId")
+
+            funnel = session.scalars(
+                select(Funnel).where(Funnel.id == funnel_uuid, Funnel.org_id == org_id)
+            ).first()
+            if not funnel:
+                raise DeployError(
+                    f"Artifact identity audit failed: funnel '{funnel_id}' was not found in this org."
+                )
+
+            publication = session.scalars(
+                select(FunnelPublication).where(FunnelPublication.id == publication_uuid)
+            ).first()
+            if not publication:
+                raise DeployError(
+                    f"Artifact identity audit failed: publication '{publication_id}' was not found."
+                )
+            if str(publication.funnel_id) != str(funnel.id):
+                raise DeployError(
+                    f"Artifact identity audit failed: publication '{publication_id}' does not belong to funnel '{funnel_id}'."
+                )
+
+            publication_page_rows = list(
+                session.execute(
+                    select(FunnelPublicationPage.page_id, FunnelPublicationPage.slug_at_publish).where(
+                        FunnelPublicationPage.publication_id == publication_uuid
+                    )
+                ).all()
+            )
+            publication_page_ids = {str(row[0]) for row in publication_page_rows}
+            if not publication_page_ids:
+                raise DeployError(
+                    f"Artifact identity audit failed: publication '{publication_id}' contains no pages."
+                )
+
+            page_funnel_rows = list(
+                session.execute(
+                    select(FunnelPage.id, FunnelPage.funnel_id).where(
+                        FunnelPage.id.in_([_parse_artifact_uuid(page_id, label="pageId") for page_id in publication_page_ids])
+                    )
+                ).all()
+            )
+            page_funnel_ids = {str(page_id): str(page_funnel_id) for page_id, page_funnel_id in page_funnel_rows}
+            for page_id in sorted(publication_page_ids):
+                if page_funnel_ids.get(page_id) != str(funnel.id):
+                    raise DeployError(
+                        f"Artifact identity audit failed: publication page '{page_id}' does not belong to funnel '{funnel_id}'."
+                    )
+
+            pages = funnel_payload.get("pages")
+            if not isinstance(pages, dict) or not pages:
+                raise DeployError(
+                    f"Artifact identity audit funnel '{product_slug}/{funnel_token}' must include pages."
+                )
+
+            audited_pages: list[dict[str, str]] = []
+            for page_slug, page_payload in pages.items():
+                if not isinstance(page_payload, dict):
+                    raise DeployError(
+                        f"Artifact identity audit page '{product_slug}/{funnel_token}/{page_slug}' must be an object."
+                    )
+                page_id = str(page_payload.get("pageId") or "").strip()
+                if page_id not in publication_page_ids:
+                    raise DeployError(
+                        f"Artifact identity audit failed: page '{page_id}' is not in publication '{publication_id}'."
+                    )
+                if str(page_payload.get("publicationId") or "").strip() != publication_id:
+                    raise DeployError(
+                        f"Artifact identity audit failed: page '{page_id}' has publicationId that does not match funnel publication '{publication_id}'."
+                    )
+                if str(page_payload.get("funnelId") or "").strip() != funnel_id:
+                    raise DeployError(
+                        f"Artifact identity audit failed: page '{page_id}' has funnelId that does not match funnel '{funnel_id}'."
+                    )
+                page_map = page_payload.get("pageMap")
+                page_stage_map = page_payload.get("pageStageMap")
+                if not isinstance(page_map, dict) or not page_map:
+                    raise DeployError(
+                        f"Artifact identity audit failed: page '{page_id}' is missing pageMap."
+                    )
+                if not isinstance(page_stage_map, dict) or not page_stage_map:
+                    raise DeployError(
+                        f"Artifact identity audit failed: page '{page_id}' is missing pageStageMap."
+                    )
+                page_map_ids = {str(key or "").strip() for key in page_map if str(key or "").strip()}
+                page_stage_map_ids = {
+                    str(key or "").strip() for key in page_stage_map if str(key or "").strip()
+                }
+                if page_map_ids != publication_page_ids:
+                    missing = sorted(publication_page_ids - page_map_ids)
+                    extra = sorted(page_map_ids - publication_page_ids)
+                    raise DeployError(
+                        "Artifact identity audit failed: pageMap does not match publication pages "
+                        f"for publication '{publication_id}' (missing={missing}, extra={extra})."
+                    )
+                if page_stage_map_ids != page_map_ids:
+                    missing = sorted(page_map_ids - page_stage_map_ids)
+                    extra = sorted(page_stage_map_ids - page_map_ids)
+                    raise DeployError(
+                        "Artifact identity audit failed: pageStageMap keys differ from pageMap keys "
+                        f"for publication '{publication_id}' (missing={missing}, extra={extra})."
+                    )
+                mapped_slug = str(page_map.get(page_id) or "").strip()
+                if mapped_slug != str(page_slug):
+                    raise DeployError(
+                        f"Artifact identity audit failed: pageMap maps page '{page_id}' to '{mapped_slug}', expected '{page_slug}'."
+                    )
+                audited_pages.append(
+                    {
+                        "pageId": page_id,
+                        "slug": str(page_slug),
+                        "stage": str(page_payload.get("stage") or page_stage_map.get(page_id) or "custom"),
+                    }
+                )
+
+            audited_funnels.append(
+                {
+                    "productSlug": str(product_slug),
+                    "funnelToken": str(funnel_token),
+                    "funnelId": funnel_id,
+                    "publicationId": publication_id,
+                    "pages": audited_pages,
+                }
+            )
+
+    return {
+        "status": "passed",
+        "checkedAt": _utc_now_iso(),
+        "funnels": audited_funnels,
     }
 
 
@@ -1736,6 +1979,11 @@ def persist_client_funnel_runtime_artifact(
         updated_from_funnel_id=str(funnel.id),
         updated_from_publication_id=publication_id,
         publication_id_overrides={str(funnel.id): publication_id},
+    )
+    payload.setdefault("meta", {})["identityAudit"] = validate_funnel_artifact_identity(
+        session=session,
+        org_id=org_id,
+        artifact_payload=payload,
     )
 
     artifacts_repo = ArtifactsRepository(session)
@@ -2071,6 +2319,7 @@ def _extract_checkout_targets(*, sales_manifest: dict[str, Any]) -> list[dict[st
             {
                 "selector": selector,
                 "mode": mode,
+                "track_event_type": str(binding.get("trackEventType") or "sales_to_checkout_click").strip(),
                 "external_urls": _extract_external_checkout_urls(
                     checkout_config=checkout_config
                 ),
@@ -2214,38 +2463,68 @@ def _extract_funnel_tracking_page_entries(
     }
 
 
-def _build_expected_tracking_events(*, has_pre_sales: bool, has_checkout: bool) -> dict[str, list[str]]:
+def _build_expected_tracking_events(
+    *,
+    has_pre_sales: bool,
+    checkout_event_types: list[str],
+) -> dict[str, list[str]]:
     internal_events = ["Entered Funnel"]
     if has_pre_sales:
         internal_events.extend(
             [
                 "pre_sales_page_view",
+                "presell_page_view",
                 "pre_sales_to_sales_click",
                 "sales_page_view",
+                "offer_page_view",
             ]
         )
-        provider_events = [
+        meta_events = [
             "Entered Funnel",
             "PageView",
+            "EnteredPresales",
             "PreSalesToSalesClick",
             "PageView",
             "EnteredSales",
         ]
+        posthog_events = [
+            "pre_sales_page_view",
+            "presell_page_view",
+            "pre_sales_to_sales_click",
+            "cta_click",
+            "sales_page_view",
+            "offer_page_view",
+        ]
     else:
         internal_events.append("sales_page_view")
-        provider_events = [
+        internal_events.append("offer_page_view")
+        meta_events = [
             "Entered Funnel",
             "PageView",
             "ViewContent",
         ]
+        posthog_events = [
+            "sales_page_view",
+            "offer_page_view",
+        ]
 
-    if has_checkout:
+    checkout_event_type_set = {
+        str(event_type or "").strip() or "sales_to_checkout_click"
+        for event_type in checkout_event_types
+    }
+    if "sales_to_checkout_click" in checkout_event_type_set:
         internal_events.append("sales_to_checkout_click")
-        provider_events.append("AddToCart")
+        meta_events.append("AddToCart")
+        posthog_events.append("sales_to_checkout_click")
+    if "checkout_started" in checkout_event_type_set:
+        internal_events.append("checkout_started")
+        meta_events.append("InitiateCheckout")
+        posthog_events.append("checkout_started")
 
     return {
         "internal": internal_events,
-        "provider": provider_events,
+        "meta": meta_events,
+        "posthog": posthog_events,
     }
 
 
@@ -2265,7 +2544,11 @@ def _build_tracking_path_plan(
     )
     expected = _build_expected_tracking_events(
         has_pre_sales=has_pre_sales,
-        has_checkout=bool(checkout_targets),
+        checkout_event_types=[
+            str(target.get("track_event_type") or "sales_to_checkout_click")
+            for target in checkout_targets
+            if isinstance(target, dict)
+        ],
     )
     return {
         "start_page": start_page,
@@ -2274,9 +2557,9 @@ def _build_tracking_path_plan(
         "checkout_targets": checkout_targets,
         "tracking": tracking,
         "expected_internal_events": expected["internal"],
-        "expected_meta_events": expected["provider"] if _tracking_config_has_meta(tracking) else [],
+        "expected_meta_events": expected["meta"] if _tracking_config_has_meta(tracking) else [],
         "expected_posthog_events": (
-            expected["provider"] if _tracking_config_has_posthog(tracking) else []
+            expected["posthog"] if _tracking_config_has_posthog(tracking) else []
         ),
     }
 
@@ -3168,6 +3451,40 @@ def patch_workload_in_plan(
     create_if_missing: bool = False,
     in_place: bool = False,
 ) -> dict[str, Any]:
+    name = (workload_patch.get("name") or "").strip()
+    if not name:
+        raise DeployError("Workload patch must include a non-empty 'name' field.")
+    resolved_org_id = (org_id or "").strip()
+    if not resolved_org_id:
+        raise DeployError("org_id is required when patching a workload.")
+    base_plan_path = _assert_under_cloudhand(Path(plan_path)) if plan_path else _find_latest_plan()
+    if not base_plan_path or not base_plan_path.exists():
+        raise DeployError("No plan found.")
+
+    with _deploy_workload_locks(
+        plan_path=str(base_plan_path),
+        workload_names=[name],
+        org_id=resolved_org_id,
+    ):
+        return _patch_workload_in_plan_unlocked(
+            org_id=org_id,
+            workload_patch=workload_patch,
+            plan_path=str(base_plan_path),
+            instance_name=instance_name,
+            create_if_missing=create_if_missing,
+            in_place=in_place,
+        )
+
+
+def _patch_workload_in_plan_unlocked(
+    *,
+    org_id: str,
+    workload_patch: dict[str, Any],
+    plan_path: str | None = None,
+    instance_name: str | None = None,
+    create_if_missing: bool = False,
+    in_place: bool = False,
+) -> dict[str, Any]:
     from cloudhand.models import ApplicationSpec
 
     name = (workload_patch.get("name") or "").strip()
@@ -3694,6 +4011,36 @@ def _materialize_funnel_artifacts_for_apply(
 
 
 async def apply_plan(
+    *, plan_path: str | None = None, workload_names: list[str] | None = None
+) -> dict[str, Any]:
+    if plan_path:
+        plan_file = _assert_under_cloudhand(Path(plan_path))
+    else:
+        plan_file = _find_latest_plan()
+
+    if not plan_file or not plan_file.exists():
+        raise DeployError("No plan found.")
+
+    normalized_workload_names: list[str] = []
+    selected_workload_names: set[str] = set()
+    for raw_name in workload_names or []:
+        workload_name = str(raw_name or "").strip()
+        if not workload_name or workload_name in selected_workload_names:
+            continue
+        selected_workload_names.add(workload_name)
+        normalized_workload_names.append(workload_name)
+
+    with _deploy_workload_locks(
+        plan_path=str(plan_file),
+        workload_names=normalized_workload_names,
+    ):
+        return await _apply_plan_unlocked(
+            plan_path=str(plan_file),
+            workload_names=normalized_workload_names,
+        )
+
+
+async def _apply_plan_unlocked(
     *, plan_path: str | None = None, workload_names: list[str] | None = None
 ) -> dict[str, Any]:
     """
@@ -4912,6 +5259,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
     hydrated_artifact_payload: dict[str, Any] | None = None
     hydrated_artifact_render_mode = ""
     publication_id = ""
+    deploy_lock_stack: ExitStack | None = None
 
     if not org_id or not user_id or not funnel_id:
         job["status"] = "failed"
@@ -4979,6 +5327,19 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         hydrated_source_ref.get("artifact_render_mode") or ""
                     ).strip()
                     hydrated_artifact_render_mode = resolved_render_mode
+                    release_metadata = (
+                        dict(hydrated_source_ref.get("release_metadata"))
+                        if isinstance(hydrated_source_ref.get("release_metadata"), dict)
+                        else {}
+                    )
+                    release_metadata["deployJobId"] = job_id
+                    source_commit = str(
+                        os.getenv("GITHUB_SHA") or os.getenv("SOURCE_COMMIT") or ""
+                    ).strip()
+                    if source_commit:
+                        release_metadata["sourceCommit"] = source_commit
+                    hydrated_source_ref["release_metadata"] = release_metadata
+                    workload_patch["source_ref"] = hydrated_source_ref
                     runtime_artifact_payload: dict[str, Any] = {
                         "id": artifact_id,
                         "clientId": client_id,
@@ -5004,6 +5365,19 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     workload_patch=workload_patch,
                     plan_path=deploy_request.get("plan_path"),
                     instance_name=deploy_request.get("instance_name"),
+                )
+                workload_name_for_lock = str(workload_patch.get("name") or "").strip()
+                if not workload_name_for_lock:
+                    raise DeployError("Publish deploy workload patch is missing workload name.")
+                deploy_lock_stack = ExitStack()
+                deploy_lock_stack.enter_context(
+                    _deploy_workload_locks(
+                        plan_path=plan_resolution["plan_path"],
+                        workload_names=[workload_name_for_lock],
+                        org_id=org_id,
+                        user_id=user_id,
+                        job_id=job_id,
+                    )
                 )
 
                 patch_result = patch_workload_in_plan(
@@ -5149,6 +5523,8 @@ async def _run_funnel_publish_job(job_id: str) -> None:
 
                 result_payload["deploy"] = deploy_response
         finally:
+            if deploy_lock_stack is not None:
+                deploy_lock_stack.close()
             session.close()
 
         job["result"] = result_payload

@@ -77,6 +77,7 @@ export type PublicFunnelStage = "pre_sales" | "sales" | "checkout" | "thank_you"
 export type ImportedHtmlTrackEventType =
   | "pre_sales_to_sales_click"
   | "sales_to_checkout_click"
+  | "checkout_started"
   | "custom_page_click";
 
 export type ImportedHtmlOptionSelector = {
@@ -134,10 +135,27 @@ export type ImportedHtmlInstrumentationBinding =
       trackEventType: ImportedHtmlTrackEventType;
     };
 
+export type ImportedHtmlViewTarget = {
+  id: string;
+  selector: string;
+  label?: string | null;
+  proofType?: string | null;
+  sectionId?: string | null;
+  ctaPosition?: number | null;
+};
+
 export type ImportedHtmlInstrumentationManifest = {
   schemaVersion: "imported-html-instrumentation-v1";
   pageStage: PublicFunnelStage;
   bindings: ImportedHtmlInstrumentationBinding[];
+  sections?: ImportedHtmlViewTarget[];
+  proofs?: ImportedHtmlViewTarget[];
+  ctas?: ImportedHtmlViewTarget[];
+  offerStacks?: ImportedHtmlViewTarget[];
+  valueStacks?: ImportedHtmlViewTarget[];
+  priceReveals?: ImportedHtmlViewTarget[];
+  guarantees?: ImportedHtmlViewTarget[];
+  trustElements?: ImportedHtmlViewTarget[];
 };
 
 // Site page types for commerce experiences

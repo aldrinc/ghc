@@ -68,6 +68,55 @@ def test_validate_imported_html_document_manifest_accepts_sales_checkout_binding
     assert normalized["bindings"][0]["checkout"]["variantResolver"]["variantId"] == "variant-1"
 
 
+def test_validate_imported_html_document_manifest_accepts_checkout_started_binding():
+    html_document = """
+    <!doctype html>
+    <html>
+      <body>
+        <button id="secure-checkout">Secure checkout</button>
+      </body>
+    </html>
+    """
+    variant = ProductVariant(
+        product_id="product-1",
+        title="Default",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+    )
+    variant.id = "variant-1"
+    manifest = {
+        "schemaVersion": "imported-html-instrumentation-v1",
+        "pageStage": "sales",
+        "bindings": [
+            {
+                "id": "secure-checkout",
+                "type": "checkout",
+                "selector": "#secure-checkout",
+                "event": "click",
+                "trackEventType": "checkout_started",
+                "checkout": {
+                    "mode": "public_checkout",
+                    "variantResolver": {"type": "fixed", "variantId": "variant-1"},
+                },
+            }
+        ],
+    }
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=html_document,
+        instrumentation_manifest=manifest,
+        current_page_stage="sales",
+        current_page_id="page-sales",
+        available_target_page_ids={"page-sales"},
+        checkout_ready_variants=[variant],
+        require_stage_bindings=True,
+    )
+
+    assert normalized["bindings"][0]["trackEventType"] == "checkout_started"
+
+
 def test_validate_imported_html_document_manifest_accepts_checkout_binding_matching_multiple_ctas():
     html_document = """
     <!doctype html>
@@ -116,6 +165,55 @@ def test_validate_imported_html_document_manifest_accepts_checkout_binding_match
     )
 
     assert normalized["bindings"][0]["selector"] == "a.buy-cta"
+
+
+def test_validate_imported_html_document_manifest_accepts_rmbc_view_targets():
+    html_document = """
+    <!doctype html>
+    <html>
+      <body>
+        <section id="hero"><a id="hero-cta" href="#">Try it now</a></section>
+        <section id="proof">1,000+ reviews</section>
+      </body>
+    </html>
+    """
+    manifest = {
+        "schemaVersion": "imported-html-instrumentation-v1",
+        "pageStage": "pre_sales",
+        "sections": [
+            {"id": "hero", "selector": "#hero", "label": "Hero"},
+        ],
+        "proofs": [
+            {"id": "reviews", "selector": "#proof", "proofType": "social_proof", "sectionId": "hero"},
+        ],
+        "ctas": [
+            {"id": "hero-cta", "selector": "#hero-cta", "ctaPosition": 1},
+        ],
+        "bindings": [
+            {
+                "id": "hero-to-sales",
+                "type": "internal_navigation",
+                "selector": "#hero-cta",
+                "event": "click",
+                "targetPageId": "page-sales",
+                "trackEventType": "pre_sales_to_sales_click",
+            }
+        ],
+    }
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=html_document,
+        instrumentation_manifest=manifest,
+        current_page_stage="pre_sales",
+        current_page_id="page-presales",
+        available_target_page_ids={"page-sales"},
+        checkout_ready_variants=[],
+        require_stage_bindings=True,
+    )
+
+    assert normalized["sections"][0]["id"] == "hero"
+    assert normalized["proofs"][0]["proofType"] == "social_proof"
+    assert normalized["ctas"][0]["ctaPosition"] == 1
 
 
 def test_validate_imported_html_document_manifest_allows_purchase_mode_checkout_context():

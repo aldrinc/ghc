@@ -287,25 +287,45 @@ function buildStandaloneImportedHtmlRuntimeScript({
     const experimentId = resolveExperimentId();
     const externalId = resolveMetaExternalId();
     const emailHash = readStoredMetaEmailHash();
+    const pageType = resolvePageType(pageStage);
+    const pageVariant = cleanText(config.pageSlug);
+    const visitorId = cleanText(config.visitorId);
+    const sessionId = cleanText(config.sessionId);
+    const deviceType = resolveDeviceType();
+    const clickAttribution = resolveClickAttribution();
     return {
       productSlug: cleanText(config.productSlug),
+      product_slug: cleanText(config.productSlug),
       funnelSlug: cleanText(config.funnelSlug),
+      funnel_slug: cleanText(config.funnelSlug),
       publicationId: cleanText(config.publicationId),
+      publication_id: cleanText(config.publicationId),
       pageId: cleanText(config.pageId),
+      page_id: cleanText(config.pageId),
       pageSlug: cleanText(config.pageSlug),
+      page_slug: cleanText(config.pageSlug),
       pageStage,
-      pageType: resolvePageType(pageStage),
-      pageVariant: cleanText(config.pageSlug),
-      visitorId: cleanText(config.visitorId),
-      sessionId: cleanText(config.sessionId),
+      page_stage: pageStage,
+      pageType,
+      page_type: pageType,
+      pageVariant,
+      page_variant: pageVariant,
+      visitorId,
+      visitor_id: visitorId,
+      sessionId,
+      session_id: sessionId,
       path: window.location.pathname + window.location.search,
       referrer: document.referrer || undefined,
-      deviceType: resolveDeviceType(),
+      deviceType,
+      device_type: deviceType,
       browserUserAgent: window.navigator && window.navigator.userAgent,
+      browser_user_agent: window.navigator && window.navigator.userAgent,
       ...(externalId ? { external_id: externalId } : {}),
       ...(emailHash ? { em: emailHash } : {}),
-      ...(experimentId ? { experimentId } : {}),
-      ...resolveClickAttribution(),
+      ...(experimentId ? { experimentId, experiment_id: experimentId } : {}),
+      ...clickAttribution,
+      ...(clickAttribution.clickId ? { click_id: clickAttribution.clickId } : {}),
+      ...(clickAttribution.clickIdType ? { click_id_type: clickAttribution.clickIdType } : {}),
     };
   };
 
@@ -649,6 +669,18 @@ function buildStandaloneImportedHtmlRuntimeScript({
     window.fbq(method, eventName);
   };
 
+  const resolveProductMetaParams = (props) => {
+    const params = {
+      content_type: "product",
+      num_items: 1,
+    };
+    const variantId = cleanText(props && props.variantId);
+    if (variantId) {
+      params.content_ids = [variantId];
+    }
+    return params;
+  };
+
   const resolveMappedMetaEvents = (eventType, props) => {
     const pageStage = resolveMetaPixelPageStage(props);
     const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
@@ -656,9 +688,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
     }
     if (eventType === "sales_page_view") {
+      const fromPresale = props && props.fromPresale === true;
       return [
         { method: "track", eventName: "PageView", params: pageViewParams },
-        { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams },
+        fromPresale
+          ? { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams }
+          : { method: "track", eventName: "ViewContent", params: pageViewParams },
       ];
     }
     if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
@@ -675,13 +710,34 @@ function buildStandaloneImportedHtmlRuntimeScript({
       }];
     }
     if (eventType === "sales_to_checkout_click") {
-      return [{
-        method: "trackCustom",
-        eventName: "SalesToCheckoutClick",
-        params: {
-          from_stage: "sales",
-          to_stage: "checkout",
+      const variantId = cleanText(props && props.variantId);
+      return [
+        ...(variantId
+          ? [{
+              method: "track",
+              eventName: "AddToCart",
+              params: {
+                content_ids: [variantId],
+                content_type: "product",
+                num_items: 1,
+              },
+            }]
+          : []),
+        {
+          method: "trackCustom",
+          eventName: "SalesToCheckoutClick",
+          params: {
+            from_stage: "sales",
+            to_stage: "checkout",
+          },
         },
+      ];
+    }
+    if (eventType === "checkout_started") {
+      return [{
+        method: "track",
+        eventName: "InitiateCheckout",
+        params: resolveProductMetaParams(props),
       }];
     }
     if (eventType === "presell_page_view") {
@@ -690,38 +746,40 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return [];
   };
 
+  const resolveCanonicalPostHogEventNames = (eventType) => {
+    const normalized = cleanText(eventType);
+    if (!normalized) return [];
+    const names = [normalized];
+    if (normalized === "pre_sales_page_view") {
+      names.push("presell_page_view");
+    }
+    if (normalized === "pre_sales_to_sales_click") {
+      names.push("cta_click");
+    }
+    return names;
+  };
+
   const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {
     const sanitizedProps = sanitizePostHogProps(props);
     const canonicalEventId = cleanText(props && props.eventId);
     const pageStage = cleanText((props && props.pageStage) || config.pageStage);
     const contentCategory = resolvePostHogContentCategory(pageStage);
+    const attributionProps = resolveMetaAttributionProps(eventSourceUrl);
+    const canonicalEventNames = resolveCanonicalPostHogEventNames(eventType);
     const mappedCaptures = Array.isArray(providedMappedCaptures)
       ? providedMappedCaptures
       : resolveMappedMetaEvents(eventType, props);
-    if (!mappedCaptures.length) {
-      return [{
-        eventName: eventType,
-        eventProps: {
-          ...baseEventProps,
-          ...sanitizedProps,
-          internal_event_type: eventType,
-          ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
-          $event_id: canonicalEventId || buildPostHogEventId(eventType, eventType, 0),
-        },
-      }];
-    }
-    return mappedCaptures.map((capture, index) => {
-      const metaEventId = cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index);
+    const buildEventProps = (eventName, role, eventId, extraProps) => {
       const eventProps = {
         ...baseEventProps,
         ...sanitizedProps,
-        ...(isRecord(capture.params) ? capture.params : {}),
+        ...(isRecord(extraProps) ? extraProps : {}),
         internal_event_type: eventType,
+        canonical_event_type: role === "platform_alias" ? eventType : eventName,
+        posthog_event_role: role,
         ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
-        ...resolveMetaAttributionProps(eventSourceUrl),
-        meta_event_name: capture.eventName,
-        meta_event_id: metaEventId,
-        $event_id: metaEventId,
+        ...attributionProps,
+        $event_id: eventId,
       };
       if (contentCategory) {
         eventProps.content_category = contentCategory;
@@ -729,11 +787,33 @@ function buildStandaloneImportedHtmlRuntimeScript({
       if (eventType === "sales_page_view") {
         eventProps.from_presale = props && props.fromPresale === true;
       }
+      return eventProps;
+    };
+    const captures = canonicalEventNames.map((eventName, index) => {
+      const eventId = index === 0 && canonicalEventId
+        ? canonicalEventId
+        : buildPostHogEventId(eventName, eventType, index);
       return {
-        eventName: capture.eventName,
-        eventProps,
+        eventName,
+        eventProps: buildEventProps(eventName, index === 0 ? "canonical" : "rmbc_alias", eventId),
       };
     });
+    mappedCaptures.forEach((capture, index) => {
+      if (canonicalEventNames.includes(capture.eventName)) {
+        return;
+      }
+      const metaEventId = cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index);
+      captures.push({
+        eventName: capture.eventName,
+        eventProps: {
+          ...buildEventProps(capture.eventName, "platform_alias", metaEventId, capture.params),
+          canonical_event_type: eventType,
+          meta_event_name: capture.eventName,
+          meta_event_id: metaEventId,
+        },
+      });
+    });
+    return captures;
   };
 
   const trackMetaPixelCaptures = (mappedCaptures) => {
@@ -1102,10 +1182,14 @@ function buildStandaloneImportedHtmlRuntimeScript({
         id,
         selector,
         label: cleanText(target.label),
+        proofType: cleanText(target.proofType),
+        sectionId: cleanText(target.sectionId),
+        ctaPosition: Number.isFinite(Number(target.ctaPosition)) ? Number(target.ctaPosition) : undefined,
       });
     };
 
     const manifest = config.manifest || {};
+    const hasExplicitCtaTargets = Array.isArray(manifest.ctas) && manifest.ctas.length > 0;
     if (Array.isArray(manifest.sections)) {
       manifest.sections.forEach((target) => addTarget("section_view", "section", target));
     }
@@ -1130,7 +1214,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (Array.isArray(manifest.trustElements)) {
       manifest.trustElements.forEach((target) => addTarget("trust_element_view", "trust_element", target));
     }
-    if (Array.isArray(manifest.bindings)) {
+    if (!hasExplicitCtaTargets && Array.isArray(manifest.bindings)) {
       manifest.bindings.forEach((binding) => {
         if (!binding || typeof binding !== "object") return;
         const id = cleanText(binding.id);
@@ -1163,9 +1247,32 @@ function buildStandaloneImportedHtmlRuntimeScript({
       text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
       activeTimeMs: Math.round(currentActiveTimeMs()),
       maxScrollDepthPct,
-      ...(target.kind === "cta" ? { ctaId: target.id } : {}),
-      ...(target.kind === "section" ? { sectionId: target.id } : {}),
-      ...(target.kind === "proof" ? { proofId: target.id } : {}),
+      depthPct: maxScrollDepthPct,
+      depth_pct: maxScrollDepthPct,
+      ...(target.kind === "cta"
+        ? {
+            ctaId: target.id,
+            cta_id: target.id,
+            ctaPosition: target.ctaPosition || index + 1,
+            cta_position: target.ctaPosition || index + 1,
+          }
+        : {}),
+      ...(target.kind === "section"
+        ? {
+            sectionId: target.sectionId || target.id,
+            section_id: target.sectionId || target.id,
+          }
+        : {}),
+      ...(target.kind === "proof"
+        ? {
+            proofId: target.id,
+            proof_id: target.id,
+            proofType: target.proofType || undefined,
+            proof_type: target.proofType || undefined,
+            sectionId: target.sectionId || undefined,
+            section_id: target.sectionId || undefined,
+          }
+        : {}),
       ...(target.kind === "offer_stack" ? { offerStackId: target.id, offer_id: target.id } : {}),
       ...(target.kind === "value_stack" ? { valueStackId: target.id } : {}),
       ...(target.kind === "price_reveal" ? { priceRevealId: target.id } : {}),
@@ -2719,7 +2826,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
         continue;
       }
 
-      for (const element of matches) {
+      for (const [matchIndex, element] of matches.entries()) {
         if (!(element instanceof HTMLElement)) {
           continue;
         }
@@ -2771,29 +2878,47 @@ function buildStandaloneImportedHtmlRuntimeScript({
               if (!targetPath) {
                 throw new Error("Target page path is missing for binding '" + String(binding.id || "unknown") + "'.");
               }
+              const destinationUrl = buildInternalNavigationUrl(targetPath, {
+                fromStage: config.pageStage,
+                toStage: targetStage || "custom",
+              });
+              const ctaPosition = matchIndex + 1;
               trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",
                 targetPageId: binding.targetPageId,
+                bindingId: binding.id,
+                ctaId: binding.id,
+                cta_id: binding.id,
+                ctaPosition,
+                cta_position: ctaPosition,
+                ctaText: buttonText || undefined,
+                cta_text: buttonText || undefined,
                 buttonText: buttonText || undefined,
+                destinationUrl,
+                destination_url: destinationUrl,
               });
               if (isPresaleToSalesNavigation(config.pageStage, targetStage || "custom")) {
                 markPresaleAttribution();
               }
               await waitForTrackingNavigationFlush();
-              window.location.href = buildInternalNavigationUrl(targetPath, {
-                fromStage: config.pageStage,
-                toStage: targetStage || "custom",
-              });
+              window.location.href = destinationUrl;
               return;
             }
 
             if (binding.type === "track_only") {
+              const ctaPosition = matchIndex + 1;
               trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 pageId: config.pageId,
                 buttonText: buttonText || undefined,
                 bindingId: binding.id,
+                ctaId: binding.id,
+                cta_id: binding.id,
+                ctaPosition,
+                cta_position: ctaPosition,
+                ctaText: buttonText || undefined,
+                cta_text: buttonText || undefined,
               });
               return;
             }
@@ -2831,10 +2956,14 @@ function buildStandaloneImportedHtmlRuntimeScript({
             };
 
             void trackEvent("checkout_click", checkoutEventProps);
-            void trackEvent(
-              binding.trackEventType || "sales_to_checkout_click",
-              checkoutEventProps,
-            );
+            const checkoutTrackEventType =
+              cleanText(window.__mosCheckoutTrackEventTypeOverride) ||
+              binding.trackEventType ||
+              "sales_to_checkout_click";
+            if (cleanText(window.__mosCheckoutTrackEventTypeOverride)) {
+              window.__mosCheckoutTrackEventTypeOverride = "";
+            }
+            void trackEvent(checkoutTrackEventType, checkoutEventProps);
 
             if (binding.checkout.mode === "external_checkout_url") {
               const checkoutUrl = resolveExternalCheckoutUrlForVariant(

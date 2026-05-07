@@ -9,6 +9,7 @@ export type RuntimeTrackingEvent =
   | { eventType: "custom_page_view"; props?: Record<string, unknown> }
   | { eventType: "pre_sales_to_sales_click"; props?: Record<string, unknown> }
   | { eventType: "sales_to_checkout_click"; props?: Record<string, unknown> }
+  | { eventType: "checkout_started"; props?: Record<string, unknown> }
   | { eventType: "checkout_click"; props?: Record<string, unknown> }
   | { eventType: "checkout_redirect_started"; props?: Record<string, unknown> }
   | { eventType: "checkout_pagehide"; props?: Record<string, unknown> }

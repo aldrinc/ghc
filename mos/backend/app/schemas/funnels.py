@@ -49,6 +49,8 @@ class FunnelPublishDeployRequest(BaseModel):
     upstreamBaseUrl: Optional[str] = None
     upstreamApiBaseUrl: Optional[str] = None
     renderMode: Optional[Literal["runtime_bundle", "standalone_imported_html"]] = None
+    defaultRoutePolicy: Literal["entry_page", "prefer_sales", "explicit_slug", "none"] = "entry_page"
+    defaultPageSlug: Optional[str] = None
 
 
 class FunnelPublishRequest(BaseModel):

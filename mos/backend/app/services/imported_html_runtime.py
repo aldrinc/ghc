@@ -17,7 +17,12 @@ from app.services.paid_ads_qa import clean_optional_text
 IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = "imported-html-instrumentation-v1"
 ImportedHtmlPageStage = Literal["pre_sales", "sales", "checkout", "thank_you", "custom"]
 ImportedHtmlBindingEvent = Literal["click"]
-ImportedHtmlTrackEventType = Literal["pre_sales_to_sales_click", "sales_to_checkout_click", "custom_page_click"]
+ImportedHtmlTrackEventType = Literal[
+    "pre_sales_to_sales_click",
+    "sales_to_checkout_click",
+    "checkout_started",
+    "custom_page_click",
+]
 
 _IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
 _TAG_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
@@ -225,12 +230,31 @@ ImportedHtmlBinding = (
 )
 
 
+class ImportedHtmlViewTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=120)
+    selector: str = Field(min_length=1, max_length=300)
+    label: str | None = Field(default=None, max_length=240)
+    proofType: str | None = Field(default=None, max_length=80)
+    sectionId: str | None = Field(default=None, max_length=120)
+    ctaPosition: int | None = Field(default=None, ge=1)
+
+
 class ImportedHtmlInstrumentationManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schemaVersion: Literal[IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION]
     pageStage: ImportedHtmlPageStage
     bindings: list[ImportedHtmlBinding] = Field(default_factory=list)
+    sections: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    proofs: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    ctas: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    offerStacks: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    valueStacks: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    priceReveals: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    guarantees: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    trustElements: list[ImportedHtmlViewTarget] = Field(default_factory=list)
 
 
 class ImportedHtmlRuntimeValidationError(ValueError):
@@ -314,12 +338,38 @@ def validate_imported_html_document_manifest(
     navigation_count = 0
     checkout_count = 0
 
+    view_target_groups = (
+        ("section", manifest.sections),
+        ("proof", manifest.proofs),
+        ("cta", manifest.ctas),
+        ("offer_stack", manifest.offerStacks),
+        ("value_stack", manifest.valueStacks),
+        ("price_reveal", manifest.priceReveals),
+        ("guarantee", manifest.guarantees),
+        ("trust_element", manifest.trustElements),
+    )
+    for target_group_name, targets in view_target_groups:
+        for target in targets:
+            target_key = f"{target_group_name}:{target.id}"
+            if target_key in seen_ids:
+                raise ImportedHtmlRuntimeValidationError(
+                    f"instrumentationManifest contains duplicate view target id '{target.id}' in '{target_group_name}'."
+                )
+            seen_ids.add(target_key)
+            _validate_selector_match_count(
+                html_root=root,
+                selector=target.selector,
+                context_label=f"{target_group_name} target '{target.id}'",
+                min_matches=1,
+            )
+
     for binding in manifest.bindings:
-        if binding.id in seen_ids:
+        binding_key = f"binding:{binding.id}"
+        if binding_key in seen_ids:
             raise ImportedHtmlRuntimeValidationError(
                 f"instrumentationManifest contains duplicate binding id '{binding.id}'."
             )
-        seen_ids.add(binding.id)
+        seen_ids.add(binding_key)
         _validate_selector_match_count(
             html_root=root,
             selector=binding.selector,
@@ -347,7 +397,7 @@ def validate_imported_html_document_manifest(
                 )
         elif binding.type == "checkout":
             checkout_count += 1
-            if binding.trackEventType not in {"sales_to_checkout_click", "custom_page_click"}:
+            if binding.trackEventType not in {"sales_to_checkout_click", "checkout_started", "custom_page_click"}:
                 raise ImportedHtmlRuntimeValidationError(
                     f"Binding '{binding.id}' has unsupported checkout trackEventType '{binding.trackEventType}'."
                 )

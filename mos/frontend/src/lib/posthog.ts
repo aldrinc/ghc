@@ -181,6 +181,7 @@ function isRuntimeTrackingEventType(value: string): value is RuntimeTrackingEven
     || value === "custom_page_view"
     || value === "pre_sales_to_sales_click"
     || value === "sales_to_checkout_click"
+    || value === "checkout_started"
     || value === "custom_page_click"
     || value === "qualified_session"
     || value === "scroll_depth"

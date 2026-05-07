@@ -430,6 +430,8 @@ export function FunnelDetailPage() {
         upstreamBaseUrl?: string;
         upstreamApiBaseUrl?: string;
         renderMode?: "runtime_bundle" | "standalone_imported_html";
+        defaultRoutePolicy?: "entry_page" | "prefer_sales" | "explicit_slug" | "none";
+        defaultPageSlug?: string;
       };
     } = {
       deploy: {
@@ -438,6 +440,7 @@ export function FunnelDetailPage() {
         applyPlan: true,
         bunnyPullZone: true,
         renderMode: "standalone_imported_html",
+        defaultRoutePolicy: "entry_page",
       },
     };
 

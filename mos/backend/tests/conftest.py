@@ -164,7 +164,12 @@ def db_session():
 
 @pytest.fixture()
 def auth_context() -> AuthContext:
-    return AuthContext(user_id="test-user", org_id=str(TEST_ORG_ID))
+    return AuthContext(
+        user_id="test-user",
+        org_id=str(TEST_ORG_ID),
+        org_role="org:admin",
+        permissions=("deploy:apply",),
+    )
 
 
 @pytest.fixture()

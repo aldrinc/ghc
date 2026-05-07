@@ -7,7 +7,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, sta
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import AuthContext, get_current_user
+from app.auth.dependencies import (
+    AuthContext,
+    require_deploy_apply_operator,
+    require_deploy_operator,
+)
 from app.db.deps import get_session
 from app.db.repositories.org_deploy_domains import (
     LEGACY_DEPLOY_DOMAIN_SCOPE_ERROR,
@@ -99,7 +103,7 @@ def _extract_workspace_server_names(workload: dict[str, Any]) -> list[str] | Non
 @router.get("/plans/latest")
 async def latest_plan(
     request: Request,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_operator),
 ):
     _require_internal_proxy(request)
     try:
@@ -112,7 +116,7 @@ async def latest_plan(
 async def save_plan(
     request: Request,
     body: PlanUpdate,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_operator),
 ):
     _require_internal_proxy(request)
     try:
@@ -131,7 +135,7 @@ async def patch_workload(
     in_place: bool = Query(default=False),
     configure_bunny_pull_zone: bool = Query(default=False),
     bunny_pull_zone_origin_ip: Optional[str] = Query(default=None),
-    auth: AuthContext = Depends(get_current_user),
+    auth: AuthContext = Depends(require_deploy_operator),
     session: Session = Depends(get_session),
 ):
     _require_internal_proxy(request)
@@ -193,7 +197,7 @@ async def get_workload_domains(
     plan_path: Optional[str] = Query(default=None),
     instance_name: Optional[str] = Query(default=None),
     workspace_id: Optional[str] = Query(default=None),
-    auth: AuthContext = Depends(get_current_user),
+    auth: AuthContext = Depends(require_deploy_operator),
     session: Session = Depends(get_session),
 ):
     _require_internal_proxy(request)
@@ -260,7 +264,7 @@ async def get_workload_domains(
 async def apply_plan(
     request: Request,
     payload: Optional[ApplyPayload] = None,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_apply_operator),
 ):
     _require_internal_proxy(request)
     try:
@@ -276,7 +280,7 @@ async def apply_plan(
 async def apply_latest_plan_alias(
     request: Request,
     payload: Optional[ApplyPayload] = None,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_apply_operator),
 ):
     """
     Backwards-compatible alias for /deploy/plans/apply.
@@ -288,7 +292,7 @@ async def apply_latest_plan_alias(
 async def apply_plan_async(
     request: Request,
     payload: Optional[ApplyPayload] = None,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_apply_operator),
 ):
     _require_internal_proxy(request)
     try:
@@ -311,7 +315,7 @@ async def apply_plan_async(
 async def apply_latest_plan_async_alias(
     request: Request,
     payload: Optional[ApplyPayload] = None,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_apply_operator),
 ):
     return await apply_plan_async(request=request, payload=payload, _auth=_auth)
 
@@ -320,7 +324,7 @@ async def apply_latest_plan_async_alias(
 async def get_apply_plan_job(
     request: Request,
     job_id: str,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_operator),
 ):
     _require_internal_proxy(request)
     try:
@@ -333,6 +337,6 @@ async def get_apply_plan_job(
 async def get_apply_plan_job_alias(
     request: Request,
     job_id: str,
-    _auth: AuthContext = Depends(get_current_user),
+    _auth: AuthContext = Depends(require_deploy_operator),
 ):
     return await get_apply_plan_job(request=request, job_id=job_id, _auth=_auth)

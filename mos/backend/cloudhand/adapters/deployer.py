@@ -43,6 +43,7 @@ _NGINX_APP_CLIENT_MAX_BODY_SIZE = "250m"
 _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
 _FUNNEL_ARTIFACT_RELEASES_DIRNAME = "site-releases"
 _FUNNEL_ARTIFACT_LIVE_DIRNAME = "site"
+_STANDALONE_IMPORTED_HTML_BRIDGE_VERSION = "inline-standalone-bridge-v1"
 _SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
 _ENTRY_PRELOAD_COMPONENT_TYPES = {
     "PreSalesHero",
@@ -4334,6 +4335,8 @@ WantedBy=multi-user.target
         *,
         funnel_meta: Dict[str, Any],
         funnel_payload: Dict[str, Any],
+        default_route_policy: str = "entry_page",
+        default_page_slug: str | None = None,
     ) -> str:
         entry_slug = self._canonical_funnel_artifact_page_slug(funnel_meta.get("entrySlug"))
         if not entry_slug:
@@ -4358,6 +4361,27 @@ WantedBy=multi-user.target
                 )
                 if canonical_page_slug:
                     available_page_slugs.add(canonical_page_slug)
+
+        policy = str(default_route_policy or "entry_page").strip().lower()
+        if policy == "none":
+            return ""
+        if policy == "entry_page":
+            return entry_slug
+        if policy == "explicit_slug":
+            explicit_slug = self._canonical_funnel_artifact_page_slug(default_page_slug)
+            if not explicit_slug:
+                raise ValueError(
+                    "source_ref.default_page_slug is required when default_route_policy='explicit_slug'."
+                )
+            if explicit_slug not in available_page_slugs:
+                raise ValueError(
+                    f"source_ref.default_page_slug '{explicit_slug}' was not found in artifact pages."
+                )
+            return explicit_slug
+        if policy != "prefer_sales":
+            raise ValueError(
+                "source_ref.default_route_policy must be one of: entry_page, prefer_sales, explicit_slug, none."
+            )
 
         for candidate_slug in ("sales-page", "sales"):
             if candidate_slug in available_page_slugs:
@@ -4396,6 +4420,8 @@ WantedBy=multi-user.target
                 default_page_slug = self._resolve_funnel_artifact_default_page_slug(
                     funnel_meta=funnel_meta,
                     funnel_payload=funnel_payload,
+                    default_route_policy=source.default_route_policy,
+                    default_page_slug=source.default_page_slug,
                 )
                 if not default_page_slug:
                     continue
@@ -4706,6 +4732,8 @@ WantedBy=multi-user.target
                     "defaultPageSlug": self._resolve_funnel_artifact_default_page_slug(
                         funnel_meta=canonical_funnel_meta,
                         funnel_payload=funnel_payload,
+                        default_route_policy=source.default_route_policy,
+                        default_page_slug=source.default_page_slug,
                     ),
                     "funnelMeta": canonical_funnel_meta,
                     "funnelPayload": funnel_payload,
@@ -5886,25 +5914,45 @@ WantedBy=multi-user.target
     const experimentId = resolveExperimentId();
     const externalId = resolveMetaExternalId();
     const emailHash = readStoredMetaEmailHash();
+    const pageType = resolvePageType(pageStage);
+    const pageVariant = cleanText(config.pageSlug);
+    const resolvedVisitorId = cleanText(visitorId);
+    const resolvedSessionId = cleanText(sessionId);
+    const deviceType = resolveDeviceType();
+    const clickAttribution = resolveClickAttribution();
     return {
       productSlug: cleanText(config.productSlug),
+      product_slug: cleanText(config.productSlug),
       funnelSlug: cleanText(config.funnelSlug),
+      funnel_slug: cleanText(config.funnelSlug),
       publicationId: cleanText(config.publicationId),
+      publication_id: cleanText(config.publicationId),
       pageId: cleanText(config.pageId),
+      page_id: cleanText(config.pageId),
       pageSlug: cleanText(config.pageSlug),
+      page_slug: cleanText(config.pageSlug),
       pageStage,
-      pageType: resolvePageType(pageStage),
-      pageVariant: cleanText(config.pageSlug),
-      visitorId: cleanText(visitorId),
-      sessionId: cleanText(sessionId),
+      page_stage: pageStage,
+      pageType,
+      page_type: pageType,
+      pageVariant,
+      page_variant: pageVariant,
+      visitorId: resolvedVisitorId,
+      visitor_id: resolvedVisitorId,
+      sessionId: resolvedSessionId,
+      session_id: resolvedSessionId,
       path: window.location.pathname + window.location.search,
       referrer: document.referrer || undefined,
-      deviceType: resolveDeviceType(),
+      deviceType,
+      device_type: deviceType,
       browserUserAgent: window.navigator && window.navigator.userAgent,
+      browser_user_agent: window.navigator && window.navigator.userAgent,
       ...(externalId ? { external_id: externalId } : {}),
       ...(emailHash ? { em: emailHash } : {}),
-      ...(experimentId ? { experimentId } : {}),
-      ...resolveClickAttribution(),
+      ...(experimentId ? { experimentId, experiment_id: experimentId } : {}),
+      ...clickAttribution,
+      ...(clickAttribution.clickId ? { click_id: clickAttribution.clickId } : {}),
+      ...(clickAttribution.clickIdType ? { click_id_type: clickAttribution.clickIdType } : {}),
     };
   };
   const posthogTrackingConfig = isRecord(config.tracking) ? config.tracking : null;
@@ -6315,6 +6363,17 @@ WantedBy=multi-user.target
     }
     window.fbq(method, eventName);
   };
+  const resolveProductMetaParams = (props) => {
+    const params = {
+      content_type: "product",
+      num_items: 1,
+    };
+    const variantId = cleanText(props && props.variantId);
+    if (variantId) {
+      params.content_ids = [variantId];
+    }
+    return params;
+  };
   const resolveMappedMetaEvents = (eventType, props) => {
     const pageStage = resolveMetaPixelPageStage(props);
     const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
@@ -6325,9 +6384,12 @@ WantedBy=multi-user.target
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
     }
     if (eventType === "sales_page_view") {
+      const fromPresale = props && props.fromPresale === true;
       return [
         { method: "track", eventName: "PageView", params: pageViewParams },
-        { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams },
+        fromPresale
+          ? { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams }
+          : { method: "track", eventName: "ViewContent", params: pageViewParams },
       ];
     }
     if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
@@ -6344,49 +6406,71 @@ WantedBy=multi-user.target
       }];
     }
     if (eventType === "sales_to_checkout_click") {
-      return [{
-        method: "trackCustom",
-        eventName: "SalesToCheckoutClick",
-        params: {
-          from_stage: "sales",
-          to_stage: "checkout",
+      const variantId = cleanText(props && props.variantId);
+      return [
+        ...(variantId
+          ? [{
+              method: "track",
+              eventName: "AddToCart",
+              params: {
+                content_ids: [variantId],
+                content_type: "product",
+                num_items: 1,
+              },
+            }]
+          : []),
+        {
+          method: "trackCustom",
+          eventName: "SalesToCheckoutClick",
+          params: {
+            from_stage: "sales",
+            to_stage: "checkout",
+          },
         },
+      ];
+    }
+    if (eventType === "checkout_started") {
+      return [{
+        method: "track",
+        eventName: "InitiateCheckout",
+        params: resolveProductMetaParams(props),
       }];
     }
     return [];
   };
-	  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {
+  const resolveCanonicalPostHogEventNames = (eventType) => {
+    const normalized = cleanText(eventType);
+    if (!normalized) return [];
+    const names = [normalized];
+    if (normalized === "pre_sales_page_view") {
+      names.push("presell_page_view");
+    }
+    if (normalized === "pre_sales_to_sales_click") {
+      names.push("cta_click");
+    }
+    return names;
+  };
+  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {
     const sanitizedProps = sanitizePostHogProps(props);
     const canonicalEventId = cleanText(props && props.eventId);
     const pageStage = cleanText((props && props.pageStage) || config.pageStage);
     const contentCategory = resolvePostHogContentCategory(pageStage);
+    const attributionProps = resolveMetaAttributionProps(eventSourceUrl);
+    const canonicalEventNames = resolveCanonicalPostHogEventNames(eventType);
     const mappedCaptures = Array.isArray(providedMappedCaptures)
       ? providedMappedCaptures
       : resolveMappedMetaEvents(eventType, props);
-    if (!mappedCaptures.length) {
-      return [{
-        eventName: eventType,
-        eventProps: {
-          ...baseEventProps,
-          ...sanitizedProps,
-          internal_event_type: eventType,
-          ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
-          $event_id: canonicalEventId || buildPostHogEventId(eventType, eventType, 0),
-        },
-      }];
-    }
-    return mappedCaptures.map((capture, index) => {
-      const metaEventId = cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index);
+    const buildEventProps = (eventName, role, eventId, extraProps) => {
       const eventProps = {
         ...baseEventProps,
         ...sanitizedProps,
-        ...(isRecord(capture.params) ? capture.params : {}),
+        ...(isRecord(extraProps) ? extraProps : {}),
         internal_event_type: eventType,
+        canonical_event_type: role === "platform_alias" ? eventType : eventName,
+        posthog_event_role: role,
         ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
-	        ...resolveMetaAttributionProps(eventSourceUrl),
-        meta_event_name: capture.eventName,
-        meta_event_id: metaEventId,
-        $event_id: metaEventId,
+        ...attributionProps,
+        $event_id: eventId,
       };
       if (contentCategory) {
         eventProps.content_category = contentCategory;
@@ -6394,11 +6478,33 @@ WantedBy=multi-user.target
       if (eventType === "sales_page_view") {
         eventProps.from_presale = props && props.fromPresale === true;
       }
+      return eventProps;
+    };
+    const captures = canonicalEventNames.map((eventName, index) => {
+      const eventId = index === 0 && canonicalEventId
+        ? canonicalEventId
+        : buildPostHogEventId(eventName, eventType, index);
       return {
-        eventName: capture.eventName,
-        eventProps,
+        eventName,
+        eventProps: buildEventProps(eventName, index === 0 ? "canonical" : "rmbc_alias", eventId),
       };
     });
+    mappedCaptures.forEach((capture, index) => {
+      if (canonicalEventNames.includes(capture.eventName)) {
+        return;
+      }
+      const metaEventId = cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index);
+      captures.push({
+        eventName: capture.eventName,
+        eventProps: {
+          ...buildEventProps(capture.eventName, "platform_alias", metaEventId, capture.params),
+          canonical_event_type: eventType,
+          meta_event_name: capture.eventName,
+          meta_event_id: metaEventId,
+        },
+      });
+    });
+    return captures;
   };
   const trackMetaPixelCaptures = (mappedCaptures) => {
     const pixelId = ensureMetaPixelBootstrap();
@@ -6901,9 +7007,13 @@ WantedBy=multi-user.target
         id,
         selector,
         label: cleanText(target.label),
+        proofType: cleanText(target.proofType),
+        sectionId: cleanText(target.sectionId),
+        ctaPosition: Number.isFinite(Number(target.ctaPosition)) ? Number(target.ctaPosition) : undefined,
       });
     };
     const manifest = config.manifest || {};
+    const hasExplicitCtaTargets = Array.isArray(manifest.ctas) && manifest.ctas.length > 0;
     if (Array.isArray(manifest.sections)) {
       manifest.sections.forEach((target) => addTarget("section_view", "section", target));
     }
@@ -6928,7 +7038,7 @@ WantedBy=multi-user.target
     if (Array.isArray(manifest.trustElements)) {
       manifest.trustElements.forEach((target) => addTarget("trust_element_view", "trust_element", target));
     }
-    if (Array.isArray(manifest.bindings)) {
+    if (!hasExplicitCtaTargets && Array.isArray(manifest.bindings)) {
       manifest.bindings.forEach((binding) => {
         if (!binding || typeof binding !== "object") return;
         const id = cleanText(binding.id);
@@ -6960,9 +7070,32 @@ WantedBy=multi-user.target
       text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
       activeTimeMs: Math.round(currentActiveTimeMs()),
       maxScrollDepthPct,
-      ...(target.kind === "cta" ? { ctaId: target.id } : {}),
-      ...(target.kind === "section" ? { sectionId: target.id } : {}),
-      ...(target.kind === "proof" ? { proofId: target.id } : {}),
+      depthPct: maxScrollDepthPct,
+      depth_pct: maxScrollDepthPct,
+      ...(target.kind === "cta"
+        ? {
+            ctaId: target.id,
+            cta_id: target.id,
+            ctaPosition: target.ctaPosition || index + 1,
+            cta_position: target.ctaPosition || index + 1,
+          }
+        : {}),
+      ...(target.kind === "section"
+        ? {
+            sectionId: target.sectionId || target.id,
+            section_id: target.sectionId || target.id,
+          }
+        : {}),
+      ...(target.kind === "proof"
+        ? {
+            proofId: target.id,
+            proof_id: target.id,
+            proofType: target.proofType || undefined,
+            proof_type: target.proofType || undefined,
+            sectionId: target.sectionId || undefined,
+            section_id: target.sectionId || undefined,
+          }
+        : {}),
       ...(target.kind === "offer_stack" ? { offerStackId: target.id, offer_id: target.id } : {}),
       ...(target.kind === "value_stack" ? { valueStackId: target.id } : {}),
       ...(target.kind === "price_reveal" ? { priceRevealId: target.id } : {}),
@@ -8069,7 +8202,7 @@ WantedBy=multi-user.target
         );
         continue;
       }
-      for (const element of matches) {
+      for (const [matchIndex, element] of matches.entries()) {
         if (!(element instanceof HTMLElement)) continue;
         if (element.dataset.mosStandaloneBridgeBound === "true") continue;
         element.dataset.mosStandaloneBridgeBound = "true";
@@ -8132,28 +8265,46 @@ WantedBy=multi-user.target
               if (!targetPath) {
                 throw new Error("Target page path is missing for binding '" + String(binding.id || "unknown") + "'.");
               }
+              const destinationUrl = buildInternalNavigationUrl(targetPath, {
+                fromStage: config.pageStage,
+                toStage: targetStage || "custom",
+              });
+              const ctaPosition = matchIndex + 1;
               trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",
                 targetPageId: binding.targetPageId,
+                bindingId: binding.id,
+                ctaId: binding.id,
+                cta_id: binding.id,
+                ctaPosition,
+                cta_position: ctaPosition,
+                ctaText: buttonText || undefined,
+                cta_text: buttonText || undefined,
                 buttonText: buttonText || undefined,
+                destinationUrl,
+                destination_url: destinationUrl,
               });
               if (isPresaleToSalesNavigation(config.pageStage, targetStage || "custom")) {
                 markPresaleAttribution();
               }
               await waitForTrackingNavigationFlush();
-              window.location.href = buildInternalNavigationUrl(targetPath, {
-                fromStage: config.pageStage,
-                toStage: targetStage || "custom",
-              });
+              window.location.href = destinationUrl;
               return;
             }
             if (binding.type === "track_only") {
+              const ctaPosition = matchIndex + 1;
               trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 pageId: config.pageId,
                 buttonText: buttonText || undefined,
                 bindingId: binding.id,
+                ctaId: binding.id,
+                cta_id: binding.id,
+                ctaPosition,
+                cta_position: ctaPosition,
+                ctaText: buttonText || undefined,
+                cta_text: buttonText || undefined,
               });
               return;
             }
@@ -8164,7 +8315,7 @@ WantedBy=multi-user.target
             const { variantId, variant, selection, cacheKey } = resolveCheckoutState(binding);
             const bindingId = String(binding.id || "unknown");
             const transitionId = buildCanonicalEventId("checkout_transition");
-            trackEvent(binding.trackEventType || "sales_to_checkout_click", {
+            const checkoutEventProps = {
               fromStage: config.pageStage,
               toStage: "checkout",
               bindingId,
@@ -8174,7 +8325,15 @@ WantedBy=multi-user.target
               ...(variantId ? { variantId } : {}),
               ...(variant && typeof variant.price === "number" ? { value: Math.round(variant.price) / 100 } : {}),
               ...(variant && variant.currency ? { currency: variant.currency } : {}),
-            });
+            };
+            const checkoutTrackEventType =
+              cleanText(window.__mosCheckoutTrackEventTypeOverride) ||
+              binding.trackEventType ||
+              "sales_to_checkout_click";
+            if (cleanText(window.__mosCheckoutTrackEventTypeOverride)) {
+              window.__mosCheckoutTrackEventTypeOverride = "";
+            }
+            trackEvent(checkoutTrackEventType, checkoutEventProps);
             if (binding.checkout.mode === "external_checkout_url") {
               const checkoutUrl = resolveExternalCheckoutUrlForVariant(
                 binding.checkout.externalUrlsByVariant || [],
@@ -8846,6 +9005,131 @@ WantedBy=multi-user.target
                         )
                         written_page_slugs.add(canonical_page_slug)
 
+    def _build_funnel_artifact_release_manifest(
+        self,
+        *,
+        app: ApplicationSpec,
+        source: FunnelArtifactSourceSpec,
+        render_mode: FunnelArtifactRenderMode,
+    ) -> Dict[str, Any]:
+        artifact = source.artifact if isinstance(source.artifact, dict) else {}
+        artifact_meta = artifact.get("meta") if isinstance(artifact.get("meta"), dict) else {}
+        products = artifact.get("products") if isinstance(artifact.get("products"), dict) else {}
+        default_route = self._resolve_funnel_artifact_default_route(source=source)
+        upstream_host = urlsplit(source.upstream_api_base_root.rstrip("/")).netloc
+        release_metadata = source.release_metadata if isinstance(source.release_metadata, dict) else {}
+
+        funnels_manifest: List[Dict[str, Any]] = []
+        has_posthog = False
+        has_meta_pixel = False
+        for product_slug, product_payload in products.items():
+            if not isinstance(product_payload, dict):
+                continue
+            funnels = product_payload.get("funnels")
+            if not isinstance(funnels, dict):
+                continue
+            for funnel_token, funnel_payload in funnels.items():
+                if not isinstance(funnel_payload, dict):
+                    continue
+                funnel_meta = funnel_payload.get("meta") if isinstance(funnel_payload.get("meta"), dict) else {}
+                pages = funnel_payload.get("pages") if isinstance(funnel_payload.get("pages"), dict) else {}
+                pages_manifest: List[Dict[str, Any]] = []
+                for page_slug, page_payload in pages.items():
+                    if not isinstance(page_payload, dict):
+                        continue
+                    tracking = page_payload.get("tracking")
+                    if isinstance(tracking, dict):
+                        has_posthog = has_posthog or bool(
+                            str(tracking.get("posthogProjectApiKey") or "").strip()
+                        )
+                        has_meta_pixel = has_meta_pixel or bool(
+                            str(tracking.get("metaPixelId") or "").strip()
+                        )
+                    pages_manifest.append(
+                        {
+                            "pageId": str(page_payload.get("pageId") or "").strip(),
+                            "slug": str(page_slug),
+                            "stage": str(page_payload.get("stage") or "").strip() or "custom",
+                        }
+                    )
+                funnels_manifest.append(
+                    {
+                        "productSlug": str(product_slug),
+                        "funnelToken": str(funnel_token),
+                        "funnelId": str(funnel_meta.get("funnelId") or "").strip(),
+                        "publicationId": str(funnel_meta.get("publicationId") or "").strip(),
+                        "entrySlug": str(funnel_meta.get("entrySlug") or "").strip(),
+                        "pages": pages_manifest,
+                    }
+                )
+
+        static_scan = release_metadata.get("staticScan")
+        if not isinstance(static_scan, dict):
+            static_scan = (
+                artifact_meta.get("staticScan")
+                if isinstance(artifact_meta.get("staticScan"), dict)
+                else {}
+            )
+        if not static_scan:
+            static_scan = {"status": "not_configured"}
+
+        manifest: Dict[str, Any] = {
+            "manifestVersion": 1,
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "deployJobId": str(release_metadata.get("deployJobId") or "").strip() or None,
+            "sourceCommit": str(release_metadata.get("sourceCommit") or "").strip() or None,
+            "artifactId": source.artifact_id or str(artifact_meta.get("artifactId") or "").strip() or None,
+            "artifactVersion": source.artifact_version,
+            "renderMode": render_mode.value if hasattr(render_mode, "value") else str(render_mode),
+            "workloadName": app.name,
+            "clientId": source.client_id,
+            "defaultRoute": {
+                "policy": source.default_route_policy,
+                "defaultPageSlug": source.default_page_slug,
+                "segments": default_route,
+                "path": "/" + "/".join(default_route) + "/" if default_route else None,
+            },
+            "upstreamApiOriginHost": upstream_host or None,
+            "tracking": {
+                "posthog": has_posthog,
+                "metaPixel": has_meta_pixel,
+            },
+            "bridge": {
+                "version": (
+                    _STANDALONE_IMPORTED_HTML_BRIDGE_VERSION
+                    if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML
+                    else None
+                )
+            },
+            "staticScan": static_scan,
+            "identityAudit": artifact_meta.get("identityAudit") if isinstance(artifact_meta, dict) else None,
+            "publicationOverrides": (
+                artifact_meta.get("publicationOverrides")
+                if isinstance(artifact_meta.get("publicationOverrides"), list)
+                else []
+            ),
+            "funnels": funnels_manifest,
+        }
+        return {key: value for key, value in manifest.items() if value is not None}
+
+    def _write_funnel_artifact_release_manifest(
+        self,
+        *,
+        site_dir: str,
+        app: ApplicationSpec,
+        source: FunnelArtifactSourceSpec,
+        render_mode: FunnelArtifactRenderMode,
+    ) -> None:
+        manifest = self._build_funnel_artifact_release_manifest(
+            app=app,
+            source=source,
+            render_mode=render_mode,
+        )
+        self.upload_file(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            f"{site_dir}/mos-release-manifest.json",
+        )
+
     def _configure_funnel_artifact_site(self, app: ApplicationSpec):
         source = app.source_ref
         if source is None:
@@ -8907,6 +9191,12 @@ WantedBy=multi-user.target
                 self.run(f"cp -R {cached_runtime_q}/. {site_dir_q}/")
             self._inject_funnel_runtime_config(site_dir=site_dir, source=source)
             self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
+            self._write_funnel_artifact_release_manifest(
+                site_dir=site_dir,
+                app=app,
+                source=source,
+                render_mode=render_mode,
+            )
             self._replace_api_base_tokens(
                 site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root
             )
@@ -8933,6 +9223,12 @@ WantedBy=multi-user.target
                 mirrored_target_paths=standalone_uploaded_target_paths,
                 standalone_served_assets=standalone_served_assets,
                 standalone_image_sources=standalone_image_sources,
+            )
+            self._write_funnel_artifact_release_manifest(
+                site_dir=build_site_dir,
+                app=app,
+                source=source,
+                render_mode=render_mode,
             )
             self._validate_funnel_artifact_site_output(
                 site_dir=build_site_dir,
