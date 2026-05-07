@@ -1679,7 +1679,7 @@ def _resolve_swipe_stage1_gemini_file_search_context(
     product_id: str,
     campaign_id: str | None,
     funnel_id: str | None,
-    selected_offer_id: str | None,
+    selected_offer_id: str | None = None,
     asset_brief_artifact_id: str,
 ) -> tuple[list[str], list[str], list[str], list[str]]:
     if not is_gemini_file_search_enabled():
