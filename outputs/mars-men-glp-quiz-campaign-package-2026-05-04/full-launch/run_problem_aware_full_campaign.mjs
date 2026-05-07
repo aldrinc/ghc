@@ -16,6 +16,12 @@ const OUT_DIR = path.join(FULL_LAUNCH_DIR, "problem-aware-full-campaign");
 const GENERATED_DIR = path.join(OUT_DIR, "generated");
 const REVIEW_DIR = path.join(OUT_DIR, "review");
 const AUTH_FILE = path.join(ROOT, ".env.mos-test-auth");
+const AUTH_STATE_CANDIDATES = [
+  path.join(ROOT, ".local/playwright-home/prod-moshq-auth-state.json"),
+  path.join(ROOT, ".local/playwright-home/mos-auth-state.json"),
+  path.join(ROOT, ".local/playwright-home/prod-mos-auth-state.json"),
+  path.join(ROOT, ".local/playwright-home/mos-prod-auth-state.json"),
+];
 const STATE_PATH = path.join(OUT_DIR, "campaign-state.json");
 const REVIEW_PATH = path.join(FULL_LAUNCH_DIR, "destination-congruence-review-v2.json");
 const MANIFEST_PATH = path.join(OUT_DIR, "problem-aware-full-manifest.json");
@@ -63,8 +69,16 @@ const QUIZ_PRESALE_URL = "https://shoptenorco.com/8b89a76d/daily-drive-essential
 const SALES_URL =
   "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039";
 const GENERATE_CONCURRENCY = Number(process.env.GENERATE_CONCURRENCY || "4");
+const GENERATE_MAX_PASSES = Number(process.env.GENERATE_MAX_PASSES || "1");
 const FORCE_NANOBANANA_FALLBACK_FOR_PENDING = process.env.FORCE_NANOBANANA_FALLBACK_FOR_PENDING === "1";
 const CONTINUE_ON_FAILURE = process.env.CONTINUE_ON_FAILURE === "1";
+const GENERATE_ASPECT_RATIO_PRIORITY = (process.env.GENERATE_ASPECT_RATIO_PRIORITY || "1:1,4:5,9:16")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const GENERATE_ASPECT_RATIO_PRIORITY_ORDER = new Map(
+  GENERATE_ASPECT_RATIO_PRIORITY.map((aspectRatio, index) => [aspectRatio, index]),
+);
 const TENOR_PRODUCT_REFERENCE_CREATIVE_IDS = new Set([
   "C005",
   "C006",
@@ -106,6 +120,8 @@ const NORMALIZED_OFFER = Object.freeze({
 });
 
 let cachedToken = null;
+let cachedTokenPromise = null;
+let providedTokenConsumed = false;
 
 function aspectRatioKey(aspectRatio) {
   return String(aspectRatio).replaceAll(":", "x");
@@ -211,25 +227,118 @@ function loadAuthEnv() {
   return env;
 }
 
+function decodeJwtPayload(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) return null;
+  return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+}
+
+function loadStoredClerkSession() {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  let best = null;
+  for (const authStatePath of AUTH_STATE_CANDIDATES) {
+    if (!existsSync(authStatePath)) continue;
+    let state;
+    try {
+      state = JSON.parse(readFileSync(authStatePath, "utf8"));
+    } catch {
+      continue;
+    }
+    const cookies = Array.isArray(state.cookies)
+      ? state.cookies.filter((cookie) => String(cookie.domain || "").includes("moshq.app"))
+      : [];
+    if (!cookies.length) continue;
+    const byName = Object.fromEntries(cookies.map((cookie) => [cookie.name, cookie.value]));
+    const sessionToken = byName.__session;
+    const dbJwt = byName.__clerk_db_jwt;
+    if (!sessionToken || !dbJwt) continue;
+    let sessionPayload;
+    try {
+      sessionPayload = decodeJwtPayload(sessionToken);
+    } catch {
+      continue;
+    }
+    const sessionId = sessionPayload?.sid;
+    const expiresAt = Number(sessionPayload?.exp || 0);
+    if (!sessionId || !Number.isFinite(expiresAt) || expiresAt <= nowSeconds + 60) continue;
+    const cookieHeader = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+    const candidate = {
+      authStatePath,
+      dbJwt,
+      sessionId,
+      expiresAt,
+      cookieHeader,
+    };
+    if (!best || candidate.expiresAt > best.expiresAt) {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
 async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-      ...(options.headers || {}),
-    },
-  });
-  const text = await response.text();
-  if (!response.ok) {
+  const isClerkRequest = url.startsWith(CLERK_BASE);
+  const maxAttempts = isClerkRequest ? 6 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        Accept: "application/json",
+        ...(options.headers || {}),
+      },
+    });
+    const text = await response.text();
+    if (response.ok) return text ? JSON.parse(text) : null;
+    if (isClerkRequest && response.status === 429 && attempt < maxAttempts) {
+      const retryAfterSeconds = Number(response.headers.get("retry-after") || "0");
+      const delayMs = retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : attempt * 5000;
+      console.warn(
+        `Clerk rate limit on attempt ${attempt}/${maxAttempts}; retrying in ${Math.ceil(delayMs / 1000)}s`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      continue;
+    }
     const error = new Error(`${options.method || "GET"} ${url} failed (${response.status}): ${text.slice(0, 4000)}`);
     error.status = response.status;
     error.body = text;
     throw error;
   }
-  return text ? JSON.parse(text) : null;
+  throw new Error(`Unhandled request retry state for ${url}`);
 }
 
 async function getBackendToken() {
+  const providedToken = String(process.env.MOS_BACKEND_BEARER_TOKEN || "").trim();
+  if (providedToken && !providedTokenConsumed) {
+    providedTokenConsumed = true;
+    cachedToken = providedToken;
+    return cachedToken;
+  }
+  if (cachedToken) return cachedToken;
+  if (cachedTokenPromise) return cachedTokenPromise;
+  cachedTokenPromise = (async () => {
+  const storedSession = loadStoredClerkSession();
+  if (storedSession) {
+    try {
+      const storedToken = await requestJson(
+        `${CLERK_BASE}/client/sessions/${storedSession.sessionId}/tokens/backend?${CLERK_QUERY}&__clerk_db_jwt=${storedSession.dbJwt}`,
+        {
+          method: "POST",
+          headers: {
+            ...ORIGIN_HEADERS,
+            Cookie: storedSession.cookieHeader,
+          },
+        },
+      );
+      if (storedToken?.jwt) {
+        cachedToken = storedToken.jwt;
+        return storedToken.jwt;
+      }
+    } catch (error) {
+      console.warn(
+        `Stored Clerk session token exchange failed for ${storedSession.authStatePath}: ${error?.message || String(error)}`,
+      );
+    }
+  }
   const auth = loadAuthEnv();
   const dev = await requestJson(`${CLERK_BASE}/dev_browser?${CLERK_QUERY}`, {
     method: "POST",
@@ -256,6 +365,12 @@ async function getBackendToken() {
   if (!token?.jwt) throw new Error("Clerk backend token response did not include jwt.");
   cachedToken = token.jwt;
   return token.jwt;
+  })();
+  try {
+    return await cachedTokenPromise;
+  } finally {
+    cachedTokenPromise = null;
+  }
 }
 
 async function authed(apiPath, options = {}) {
@@ -1196,12 +1311,35 @@ function validateManifest(manifest, { requireResults }) {
 async function generateOneEntry(manifest, entry, renderModelId = RENDER_MODEL_ID) {
   const payload = { ...entry.payload, renderModelId };
   validatePayload(payload);
-  const started = await authed("/swipes/generate-image-ad", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const detail = await waitForWorkflow(started.workflow_run_id);
+  let started = entry.workflow?.workflowRunId ? {
+    workflow_run_id: entry.workflow.workflowRunId,
+    temporal_workflow_id: entry.workflow.temporalWorkflowId || null,
+  } : null;
+  if (!started) {
+    started = await authed("/swipes/generate-image-ad", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    entry.workflow = {
+      workflowRunId: started.workflow_run_id,
+      temporalWorkflowId: started.temporal_workflow_id,
+      workflowUrl: `https://moshq.app/workflows/${started.workflow_run_id}`,
+    };
+    persistManifest(manifest);
+  }
+  let detail;
+  try {
+    detail = await waitForWorkflow(started.workflow_run_id);
+  } catch (error) {
+    const shouldPreserveWorkflow =
+      error?.status === 401 || /invalid token/i.test(`${error?.message || ""}\n${error?.body || ""}`);
+    if (!shouldPreserveWorkflow && entry.workflow?.workflowRunId === started.workflow_run_id) {
+      delete entry.workflow;
+      persistManifest(manifest);
+    }
+    throw error;
+  }
   const workflowPath = path.join(OUT_DIR, `workflow-${entry.key}.json`);
   writeFileSync(workflowPath, JSON.stringify(detail, null, 2) + "\n");
   const { assetId, payloadOut } = extractAssetId(detail);
@@ -1276,23 +1414,49 @@ function manifestNeedsRebuild(manifest) {
   return false;
 }
 
-async function generateAll() {
-  let manifest;
-  if (existsSync(MANIFEST_PATH)) {
-    manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
-  }
-  if (!manifest || manifestNeedsRebuild(manifest)) {
-    manifest = await buildManifest();
-  }
-  validateManifest(manifest, { requireResults: false });
+function generationPriorityForEntry(entry) {
+  const aspectRatio = entry?.payload?.aspectRatio || entry?.aspectRatio || "";
+  const aspectPriority = GENERATE_ASPECT_RATIO_PRIORITY_ORDER.get(aspectRatio) ?? Number.MAX_SAFE_INTEGER;
+  const destinationPriority = entry.destinationKey === "glp" ? 0 : 1;
+  return [aspectPriority, destinationPriority, entry.groupKey || entry.key || ""];
+}
 
+function compareGenerationPriority(left, right) {
+  const leftPriority = generationPriorityForEntry(left);
+  const rightPriority = generationPriorityForEntry(right);
+  for (let index = 0; index < leftPriority.length; index += 1) {
+    if (leftPriority[index] < rightPriority[index]) return -1;
+    if (leftPriority[index] > rightPriority[index]) return 1;
+  }
+  return 0;
+}
+
+function pendingEntriesForPass(manifest) {
+  return manifest.entries
+    .filter((entry) => !entry.result?.assetId)
+    .sort(compareGenerationPriority);
+}
+
+function summarizeFailures(failures) {
+  return failures
+    .map((failure) => `${failure.key}: ${failure.error?.message || String(failure.error)}`)
+    .join("; ");
+}
+
+async function runGeneratePass(manifest, passIndex, passCount) {
   const pending = manifest.entries.filter((entry) => !entry.result?.assetId);
+  const prioritizedPending = pendingEntriesForPass(manifest);
+  console.log(
+    `Starting generate pass ${passIndex}/${passCount} with ${prioritizedPending.length} pending ` +
+      `(priority=${GENERATE_ASPECT_RATIO_PRIORITY.join(" -> ")})`,
+  );
   let nextIndex = 0;
   const failures = [];
   let stopped = false;
+  let completedThisPass = 0;
   async function worker(workerIndex) {
     while (!stopped) {
-      const entry = pending[nextIndex];
+      const entry = prioritizedPending[nextIndex];
       nextIndex += 1;
       if (!entry) return;
       if (entry.result?.assetId) {
@@ -1323,6 +1487,7 @@ async function generateAll() {
           }
         }
         persistManifest(manifest);
+        completedThisPass += 1;
         console.log(`Completed ${entry.key} on worker ${workerIndex}.`);
       } catch (error) {
         failures.push({ key: entry.key, error });
@@ -1332,11 +1497,54 @@ async function generateAll() {
     }
   }
   await Promise.all(Array.from({ length: GENERATE_CONCURRENCY }, (_, index) => worker(index + 1)));
-  if (failures.length) {
-    const summary = failures
-      .map((failure) => `${failure.key}: ${failure.error?.message || String(failure.error)}`)
-      .join("; ");
-    throw new Error(`Generation failed for ${failures.length} asset variant(s): ${summary}`);
+  const pendingAfterPass = manifest.entries.filter((entry) => !entry.result?.assetId).length;
+  console.log(
+    `Finished generate pass ${passIndex}/${passCount}: completed=${completedThisPass}, ` +
+      `failures=${failures.length}, pending=${pendingAfterPass}`,
+  );
+  persistManifest(manifest);
+  return { completedThisPass, failures, pendingAfterPass };
+}
+
+async function generateAll() {
+  let manifest;
+  if (existsSync(MANIFEST_PATH)) {
+    manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+  }
+  if (!manifest || manifestNeedsRebuild(manifest)) {
+    manifest = await buildManifest();
+  }
+  validateManifest(manifest, { requireResults: false });
+  await getBackendToken();
+
+  let allFailures = [];
+  for (let passIndex = 1; passIndex <= GENERATE_MAX_PASSES; passIndex += 1) {
+    const pendingBeforePass = manifest.entries.filter((entry) => !entry.result?.assetId).length;
+    if (pendingBeforePass === 0) break;
+    const { completedThisPass, failures, pendingAfterPass } = await runGeneratePass(
+      manifest,
+      passIndex,
+      GENERATE_MAX_PASSES,
+    );
+    allFailures = failures;
+    if (pendingAfterPass === 0) break;
+    if (!CONTINUE_ON_FAILURE && failures.length) {
+      throw new Error(`Generation failed for ${failures.length} asset variant(s): ${summarizeFailures(failures)}`);
+    }
+    if (completedThisPass === 0) {
+      throw new Error(
+        `Generation made no progress on pass ${passIndex}; ${pendingAfterPass} asset variant(s) remain pending. ` +
+          `Latest failures: ${summarizeFailures(failures) || "none recorded"}`,
+      );
+    }
+  }
+
+  const remaining = manifest.entries.filter((entry) => !entry.result?.assetId);
+  if (remaining.length) {
+    throw new Error(
+      `Generation stopped with ${remaining.length} asset variant(s) still pending after ${GENERATE_MAX_PASSES} pass(es). ` +
+        `Latest failures: ${summarizeFailures(allFailures) || "none recorded"}`,
+    );
   }
   validateManifest(manifest, { requireResults: true });
   persistManifest(manifest);
@@ -1346,6 +1554,8 @@ async function generateAll() {
     logicalGroupCount: manifest.groups.length,
     rawAssetCount: manifest.entries.length,
     concurrency: GENERATE_CONCURRENCY,
+    passes: GENERATE_MAX_PASSES,
+    aspectRatioPriority: GENERATE_ASPECT_RATIO_PRIORITY,
   }, null, 2));
 }
 
