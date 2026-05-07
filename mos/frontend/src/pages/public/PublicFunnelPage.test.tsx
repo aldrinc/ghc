@@ -59,7 +59,8 @@ function buildImportedHtmlPage(): PublicFunnelPageType {
           props: {
             htmlDocument: "<html><body><main>Imported content</main></body></html>",
             instrumentationManifest: {
-              schemaVersion: "imported-html-instrumentation-v1",
+              schemaVersion: "html-deploy-v1",
+              htmlArtifactKind: "listicle",
               pageStage: "pre_sales",
               bindings: [],
             },
@@ -155,7 +156,7 @@ describe("PublicFunnelPage", () => {
     vi.clearAllMocks();
   });
 
-  it("renders standalone imported HTML without waiting for commerce", async () => {
+  it("renders HTML deploy without waiting for commerce", async () => {
     renderPage();
 
     await waitFor(() => {
@@ -167,7 +168,7 @@ describe("PublicFunnelPage", () => {
     expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining("/commerce"));
   });
 
-  it("builds standalone imported HTML page paths with the funnel slug", async () => {
+  it("builds HTML deploy page paths with the funnel slug", async () => {
     renderPage();
 
     await waitFor(() => {

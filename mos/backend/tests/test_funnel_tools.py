@@ -250,7 +250,8 @@ def test_draft_generate_page_imported_html_mode_preserves_copy_but_keeps_runtime
     )
     text_replacements: list[dict[str, str]] = []
     instrumentation_manifest = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "sales",
         "pageStage": "sales",
         "bindings": [
             {
@@ -340,7 +341,25 @@ def test_draft_generate_page_imported_html_mode_preserves_copy_but_keeps_runtime
     saved_component = result.ui_details["puckData"]["content"][0]
     assert saved_component["type"] == "ImportedHtmlDocument"
     assert saved_component["props"]["htmlDocument"] == reference_html
-    assert saved_component["props"]["instrumentationManifest"] == instrumentation_manifest
+    assert saved_component["props"]["instrumentationManifest"] == {
+        **instrumentation_manifest,
+        "sections": [],
+        "proofs": [],
+        "ctas": [],
+        "offerStacks": [],
+        "valueStacks": [],
+        "priceReveals": [],
+        "guarantees": [],
+        "trustElements": [],
+        "quizLeads": [],
+        "quizQuestions": [],
+        "quizOptions": [],
+        "quizResults": [],
+        "quizMechanisms": [],
+        "quizRecommendations": [],
+        "productDetails": [],
+        "selectors": [],
+    }
     assert "textReplacements requirements" in captured["prompt"]
     assert "- Return an empty array." in captured["prompt"]
     assert "Preserve the existing copy exactly as provided." in captured["prompt"]
@@ -419,7 +438,8 @@ def test_draft_validate_imported_html_uses_checkout_variant_context(db_session):
                             "title": "Imported HTML",
                             "htmlDocument": "<!doctype html><html><body><button id='buy-now'>Buy</button></body></html>",
                             "instrumentationManifest": {
-                                "schemaVersion": "imported-html-instrumentation-v1",
+                                "schemaVersion": "html-deploy-v1",
+                                "htmlArtifactKind": "sales",
                                 "pageStage": "sales",
                                 "bindings": [
                                     {

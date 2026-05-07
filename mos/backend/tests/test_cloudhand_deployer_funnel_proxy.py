@@ -199,7 +199,8 @@ def _artifact_app(
                             "sourceLabel": "sales-page.html",
                             "htmlDocument": html_document,
                             "instrumentationManifest": {
-                                "schemaVersion": "imported-html-instrumentation-v1",
+                                "schemaVersion": "html-deploy-v1",
+                                "htmlArtifactKind": "sales",
                                 "pageStage": "sales",
                                 "bindings": [
                                     {
@@ -248,7 +249,7 @@ def _artifact_app(
         "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         "upstream_api_base_root": (
             "https://api.moshq.app"
-            if render_mode == "standalone_imported_html"
+            if render_mode == "html_deploy"
             else "https://moshq.app/api"
         ),
         "artifact_render_mode": render_mode,
@@ -356,8 +357,8 @@ def _stub_deployer():
     deployer.run = fake_run
     deployer._path_exists = lambda path: True
     deployer._enable_https = lambda server_names: None
-    deployer._measure_standalone_imported_html_image_layouts = lambda **_: {}
-    deployer._validate_standalone_imported_html_visual_parity = lambda **_: None
+    deployer._measure_html_deploy_image_layouts = lambda **_: {}
+    deployer._validate_html_deploy_visual_parity = lambda **_: None
     deployer._validate_funnel_artifact_site_output = lambda **_: None
     return deployer, uploaded, commands
 
@@ -368,6 +369,55 @@ def _extract_runtime_block(script_text: str) -> str:
             continue
         return ast.literal_eval(line[len("block = ") :])
     raise AssertionError("Runtime injection script did not contain a block assignment.")
+
+
+def test_funnel_artifact_site_writes_release_manifest():
+    app = _artifact_app(
+        render_mode="html_deploy",
+        html_document="<html><body><a id='main-cta' href='#'>Buy</a></body></html>",
+    )
+    app.source_ref.artifact_id = "artifact-123"
+    app.source_ref.artifact_version = 7
+    app.source_ref.release_metadata = {
+        "deployJobId": "publish-job-1",
+        "sourceCommit": "abc123",
+        "staticScan": {"status": "passed"},
+    }
+    app.source_ref.artifact["meta"]["identityAudit"] = {"status": "passed"}
+    app.source_ref.artifact["meta"]["publicationOverrides"] = [
+        {"funnelId": "funnel-1", "publicationId": "pub-1"}
+    ]
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    manifest = json.loads(
+        uploaded["/opt/apps/landing-artifact/site/mos-release-manifest.json"]
+    )
+    assert manifest["deployJobId"] == "publish-job-1"
+    assert manifest["sourceCommit"] == "abc123"
+    assert manifest["artifactId"] == "artifact-123"
+    assert manifest["artifactVersion"] == 7
+    assert manifest["renderMode"] == "html_deploy"
+    assert manifest["defaultRoute"]["policy"] == "entry_page"
+    assert manifest["defaultRoute"]["path"] == "/example-product/example-funnel/presales/"
+    assert manifest["upstreamApiOriginHost"] == "api.moshq.app"
+    assert manifest["tracking"] == {"posthog": True, "metaPixel": True}
+    assert manifest["bridge"]["version"] == "inline-html-deploy-bridge-v1"
+    assert manifest["staticScan"] == {"status": "passed"}
+    assert manifest["identityAudit"] == {"status": "passed"}
+    assert manifest["publicationOverrides"] == [
+        {"funnelId": "funnel-1", "publicationId": "pub-1"}
+    ]
+    assert manifest["funnels"][0]["pages"] == [
+        {
+            "pageId": "page-1",
+            "slug": "presales",
+            "stage": "sales",
+            "htmlArtifactKind": "sales",
+            "htmlDeploySchemaVersion": "html-deploy-v1",
+        }
+    ]
 
 
 class _FakeRemoteFile:
@@ -771,7 +821,7 @@ def test_funnel_artifact_site_proxies_live_api_and_keeps_bundle_routes():
     assert "systemctl reload nginx" in commands
 
 
-def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_bundle():
+def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle():
     html_document = """<!DOCTYPE html>
 <html>
   <head>
@@ -787,7 +837,7 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -816,7 +866,7 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     alias_page_html = uploaded[alias_page_route_path]
 
     assert "<main id=\"app\">" in entry_html
-    assert "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" in entry_html
+    assert "MOS_HTML_DEPLOY_BRIDGE_START" in entry_html
     assert "\"apiBasePath\":\"/api\"" in entry_html
     assert 'rel="preload" as="image" fetchpriority="high" href="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
     assert 'src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero" loading="eager" decoding="async" fetchpriority="high"' in entry_html
@@ -828,7 +878,7 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert "pageLifecycleFinalizing = true;" in entry_html
     assert "/public/checkout" in entry_html
     assert "/public/checkout/prepare" in entry_html
-    assert "standalone_html" in entry_html
+    assert "html_deploy" in entry_html
     assert "web_vital_recorded" in entry_html
     assert "metricName" in entry_html
     assert "document.write" not in entry_html
@@ -878,7 +928,7 @@ def test_funnel_artifact_site_standalone_builds_release_before_live_activation()
   <body><a id="main-cta" href="#shop">Start</a></body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -891,7 +941,7 @@ def test_funnel_artifact_site_standalone_builds_release_before_live_activation()
     assert any("mv -Tf \"$next_link\" \"$live_site\"" in cmd for cmd in commands)
 
 
-def test_standalone_imported_html_rewrites_upstream_public_asset_urls_to_artifact_assets(monkeypatch):
+def test_html_deploy_rewrites_upstream_public_asset_urls_to_artifact_assets(monkeypatch):
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
@@ -909,10 +959,11 @@ def test_standalone_imported_html_rewrites_upstream_public_asset_urls_to_artifac
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         workspace_server_names=["shop.example.com"],
     )
+    app.source_ref.default_route_policy = "prefer_sales"
     deployer, uploaded, _commands = _stub_deployer()
 
     def fail_remote_image_fetch(**kwargs):
@@ -936,7 +987,7 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     page_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]["pages"][
         "presales"
     ]
@@ -944,7 +995,8 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
     page_payload["pageMap"] = {"page-1": "presales", "page-2": "sales-page"}
     page_payload["pageStageMap"] = {"page-1": "pre_sales", "page-2": "sales"}
     page_payload["puckData"]["content"][0]["props"]["instrumentationManifest"] = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "listicle",
         "pageStage": "pre_sales",
         "bindings": [
             {
@@ -971,7 +1023,8 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
     assert 'nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);' in entry_html
     assert "element.href = buildInternalNavigationUrl(targetPath, {" in entry_html
     assert "await waitForTrackingNavigationFlush();" in entry_html
-    assert "window.location.href = buildInternalNavigationUrl(targetPath, {" in entry_html
+    assert "const destinationUrl = buildInternalNavigationUrl(targetPath, {" in entry_html
+    assert "window.location.href = destinationUrl;" in entry_html
     assert '"EnteredSales"' in entry_html
     assert '"/example-product/example-funnel/sales-page/"' in entry_html
 
@@ -1008,7 +1061,7 @@ def test_funnel_artifact_site_standalone_export_scopes_to_preferred_funnel():
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     artifact = app.source_ref.artifact
     artifact["meta"]["updatedFromFunnelId"] = "funnel-1"
     product_payload = artifact["products"]["example-product"]
@@ -1071,7 +1124,7 @@ def test_funnel_artifact_site_standalone_export_scopes_to_preferred_funnel():
     assert "/opt/apps/landing-artifact/site/example-product/other-funnel/presales/index.html" not in uploaded
 
 
-def test_standalone_imported_html_bridge_uses_funnel_meta_publication_id():
+def test_html_deploy_bridge_uses_funnel_meta_publication_id():
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -1079,7 +1132,7 @@ def test_standalone_imported_html_bridge_uses_funnel_meta_publication_id():
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["meta"]["publicationId"] = "pub-2"
     funnel_payload["pages"]["presales"]["publicationId"] = "pub-1"
@@ -1095,7 +1148,7 @@ def test_standalone_imported_html_bridge_uses_funnel_meta_publication_id():
     assert '"publicationId":"pub-1"' not in entry_html
 
 
-def test_standalone_imported_html_bridge_augments_checkout_selection_with_purchase_mode():
+def test_html_deploy_bridge_augments_checkout_selection_with_purchase_mode():
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -1104,7 +1157,7 @@ def test_standalone_imported_html_bridge_augments_checkout_selection_with_purcha
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, _commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -1117,7 +1170,7 @@ def test_standalone_imported_html_bridge_augments_checkout_selection_with_purcha
     assert 'key.trim().toLowerCase() !== "purchasemode"' in entry_html
 
 
-def test_standalone_imported_html_local_relative_image_assets_are_written(monkeypatch, tmp_path):
+def test_html_deploy_local_relative_image_assets_are_written(monkeypatch, tmp_path):
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -1137,7 +1190,7 @@ def test_standalone_imported_html_local_relative_image_assets_are_written(monkey
         (tmp_path,),
     )
 
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, _commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -1161,7 +1214,7 @@ def test_funnel_artifact_site_prepares_imported_html_once_per_page_across_route_
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     uuid_funnel_id = "18ac0fe1-1e27-4579-ad94-9a1e6c9530fe"
     funnel_payload["meta"]["funnelId"] = uuid_funnel_id
@@ -1176,7 +1229,7 @@ def test_funnel_artifact_site_prepares_imported_html_once_per_page_across_route_
 
     monkeypatch.setattr(
         deployer,
-        "_prepare_standalone_imported_html_document",
+        "_prepare_html_deploy_document",
         fake_prepare,
     )
 
@@ -1223,14 +1276,14 @@ def test_funnel_artifact_site_compiles_tailwind_and_normalizes_public_asset_urls
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         server_names=["shop.example.com"],
     )
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(
         deployer,
-        "_compile_standalone_imported_html_tailwind_css",
+        "_compile_html_deploy_tailwind_css",
         lambda **_: ".bg-brand-primary{background-color:#C41423}.text-white{color:#fff}",
     )
     fontshare_400 = b"fontshare-400"
@@ -1370,7 +1423,7 @@ def test_configure_funnel_artifact_site_subsets_localized_text_fonts_to_used_uni
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         server_names=["shop.example.com"],
     )
@@ -1439,13 +1492,13 @@ def test_configure_funnel_artifact_site_subsets_localized_text_fonts_to_used_uni
     assert uploaded[f"/opt/apps/landing-artifact/site{latin_subset_route}"] == b"latin-subset-woff2"
 
 
-def test_replace_standalone_imported_html_tailwind_runtime_places_compiled_css_after_custom_styles(
+def test_replace_html_deploy_tailwind_runtime_places_compiled_css_after_custom_styles(
     monkeypatch,
 ):
     deployer, _uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(
         deployer,
-        "_compile_standalone_imported_html_tailwind_css",
+        "_compile_html_deploy_tailwind_css",
         lambda **_: ".text-\\[32px\\]{font-size:32px}",
     )
     html_document = """<!DOCTYPE html>
@@ -1469,7 +1522,7 @@ def test_replace_standalone_imported_html_tailwind_runtime_places_compiled_css_a
 </html>
 """
 
-    rewritten = deployer._replace_standalone_imported_html_tailwind_runtime(html_document=html_document)
+    rewritten = deployer._replace_html_deploy_tailwind_runtime(html_document=html_document)
 
     assert "https://cdn.tailwindcss.com" not in rewritten
     assert "tailwind.config" not in rewritten
@@ -1479,7 +1532,7 @@ def test_replace_standalone_imported_html_tailwind_runtime_places_compiled_css_a
     assert rewritten.index('data-mos-compiled-tailwind="true"') < rewritten.lower().rindex("</head>")
 
 
-def test_compile_standalone_imported_html_tailwind_css_uses_external_frontend_root(
+def test_compile_html_deploy_tailwind_css_uses_external_frontend_root(
     monkeypatch,
     tmp_path,
 ):
@@ -1524,7 +1577,7 @@ def test_compile_standalone_imported_html_tailwind_css_uses_external_frontend_ro
 
     monkeypatch.setattr(subprocess, "run", fake_subprocess_run)
 
-    compiled_css = deployer._compile_standalone_imported_html_tailwind_css(
+    compiled_css = deployer._compile_html_deploy_tailwind_css(
         html_document='<!DOCTYPE html><html><head><script src="https://cdn.tailwindcss.com"></script></head></html>'
     )
 
@@ -1589,14 +1642,14 @@ def test_funnel_artifact_site_mirrors_non_canonical_public_asset_urls_locally(mo
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         server_names=["shop.shopemberco.com"],
     )
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(
         deployer,
-        "_compile_standalone_imported_html_tailwind_css",
+        "_compile_html_deploy_tailwind_css",
         lambda **_: ".bg-brand-primary{background-color:#C41423}.text-white{color:#fff}",
     )
     monkeypatch.setattr(
@@ -1630,7 +1683,7 @@ def test_funnel_artifact_site_mirrors_extensionless_absolute_img_urls(monkeypatc
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         server_names=["shop.shopemberco.com"],
     )
@@ -1688,14 +1741,14 @@ def test_funnel_artifact_site_prioritizes_large_hero_image_over_decorative_icons
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         server_names=["shop.shopemberco.com"],
     )
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(
         deployer,
-        "_compile_standalone_imported_html_tailwind_css",
+        "_compile_html_deploy_tailwind_css",
         lambda **_: ".bg-brand-primary{background-color:#C41423}.text-white{color:#fff}",
     )
     mirrored_assets = {
@@ -1731,7 +1784,7 @@ def test_funnel_artifact_site_errors_when_mirroring_required_image_asset_fails(m
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         server_names=["shop.shopemberco.com"],
     )
@@ -1771,19 +1824,19 @@ def test_funnel_artifact_site_rewrites_tiny_reused_image_routes_when_safe(monkey
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 1)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES", 1)
     monkeypatch.setattr(
         deployer,
-        "_measure_standalone_imported_html_image_layouts",
+        "_measure_html_deploy_image_layouts",
         lambda **_: {0: {"desktop": 45, "mobile": 45}, 1: {"desktop": 0, "mobile": 0}},
     )
     monkeypatch.setattr(
         deployer,
-        "_validate_standalone_imported_html_visual_parity",
+        "_validate_html_deploy_visual_parity",
         lambda **_: None,
     )
 
@@ -1806,7 +1859,7 @@ def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_sa
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
     app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
         "contentType": "image/jpeg",
@@ -1819,7 +1872,7 @@ def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_sa
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
     monkeypatch.setattr(
         deployer,
-        "_validate_standalone_imported_html_visual_parity",
+        "_validate_html_deploy_visual_parity",
         lambda **_: None,
     )
 
@@ -1869,12 +1922,13 @@ def test_presales_responsive_rewrites_emit_webp_variants(monkeypatch):
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     page_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]["pages"]["presales"]
     page_payload["stage"] = "pre_sales"
     page_payload["pageStageMap"] = {"page-1": "pre_sales"}
     imported_block = page_payload["puckData"]["content"][0]
     imported_block["props"]["instrumentationManifest"]["pageStage"] = "pre_sales"
+    imported_block["props"]["instrumentationManifest"]["htmlArtifactKind"] = "listicle"
 
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
     app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
@@ -1889,12 +1943,12 @@ def test_presales_responsive_rewrites_emit_webp_variants(monkeypatch):
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
     monkeypatch.setattr(
         deployer,
-        "_measure_standalone_imported_html_image_layouts",
+        "_measure_html_deploy_image_layouts",
         lambda **_: {0: {"desktop": 400, "mobile": 200}},
     )
     monkeypatch.setattr(
         deployer,
-        "_validate_standalone_imported_html_visual_parity",
+        "_validate_html_deploy_visual_parity",
         lambda **_: None,
     )
 
@@ -1915,7 +1969,7 @@ def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
     app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
         "contentType": "image/jpeg",
@@ -1928,7 +1982,7 @@ def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
     monkeypatch.setattr(
         deployer,
-        "_measure_standalone_imported_html_image_layouts",
+        "_measure_html_deploy_image_layouts",
         lambda **_: {0: {"desktop": 400, "mobile": 200}},
     )
     recorded_validations: list[tuple[str, str]] = []
@@ -1938,7 +1992,7 @@ def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
 
     monkeypatch.setattr(
         deployer,
-        "_validate_standalone_imported_html_visual_parity",
+        "_validate_html_deploy_visual_parity",
         record_validate,
     )
 
@@ -1963,7 +2017,7 @@ def test_image_rewrites_revert_to_baseline_when_visual_parity_fails(monkeypatch)
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
     app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
         "contentType": "image/jpeg",
@@ -1976,7 +2030,7 @@ def test_image_rewrites_revert_to_baseline_when_visual_parity_fails(monkeypatch)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
     monkeypatch.setattr(
         deployer,
-        "_measure_standalone_imported_html_image_layouts",
+        "_measure_html_deploy_image_layouts",
         lambda **_: {0: {"desktop": 400, "mobile": 200}},
     )
 
@@ -1988,7 +2042,7 @@ def test_image_rewrites_revert_to_baseline_when_visual_parity_fails(monkeypatch)
 
     monkeypatch.setattr(
         deployer,
-        "_validate_standalone_imported_html_visual_parity",
+        "_validate_html_deploy_visual_parity",
         fail_validate,
     )
 
@@ -2015,11 +2069,11 @@ def test_funnel_artifact_site_keeps_exact_image_sources_when_responsive_rewrites
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
-    deployer._measure_standalone_imported_html_image_layouts = lambda **_: {
+    deployer._measure_html_deploy_image_layouts = lambda **_: {
         0: {"desktop": 720, "mobile": 390}
     }
 
@@ -2047,7 +2101,7 @@ def test_funnel_artifact_site_minifies_final_html_and_loads_meta_pixel_soon_afte
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
@@ -2094,7 +2148,7 @@ def test_funnel_artifact_site_injects_render_optimization_styles(monkeypatch):
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
@@ -2121,7 +2175,7 @@ def test_funnel_artifact_site_uses_canonical_domain_for_default_route_when_works
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         workspace_server_names=["shop.example.com"],
     )
@@ -2151,10 +2205,11 @@ def test_funnel_artifact_site_root_redirect_prefers_sales_page_when_available():
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         workspace_server_names=["shop.example.com"],
     )
+    app.source_ref.default_route_policy = "prefer_sales"
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["pages"]["sales-page"] = {
         **json.loads(json.dumps(funnel_payload["pages"]["presales"])),
@@ -2178,7 +2233,7 @@ def test_funnel_artifact_site_root_redirect_prefers_sales_page_when_available():
 
 
 def test_funnel_artifact_site_standalone_export_errors_on_unsupported_page_blocks():
-    app = _artifact_app(render_mode="standalone_imported_html")
+    app = _artifact_app(render_mode="html_deploy")
     deployer, _uploaded, _commands = _stub_deployer()
 
     with pytest.raises(ValueError, match="unsupported standalone page block type 'PreSalesPage'"):
@@ -2193,7 +2248,7 @@ def test_funnel_artifact_site_standalone_export_errors_when_manifest_is_missing(
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     props = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]["pages"]["presales"]["puckData"]["content"][0]["props"]
     props.pop("instrumentationManifest", None)
     deployer, _uploaded, _commands = _stub_deployer()
@@ -2228,7 +2283,7 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
 </html>
 """
     app = _artifact_app(
-        render_mode="standalone_imported_html",
+        render_mode="html_deploy",
         html_document=html_document,
         workspace_server_names=["shoptenorco.com"],
     )
@@ -2313,7 +2368,7 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
 
     compliance_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/terms-of-service/index.html"
     compliance_html = uploaded[compliance_route_path]
-    assert "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" not in compliance_html
+    assert "MOS_HTML_DEPLOY_BRIDGE_START" not in compliance_html
     assert 'id="mos-standalone-policy-content"' in compliance_html
     assert 'Loading policy content...' in compliance_html
     assert "/api/public/funnels/example-product/example-funnel/policy-pages/terms_of_service" in compliance_html
@@ -2337,7 +2392,7 @@ def test_funnel_artifact_site_standalone_export_uses_pathless_api_origin_for_pro
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     deployer, uploaded, _commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -2357,7 +2412,7 @@ def test_funnel_artifact_site_standalone_export_requires_origin_api_base_url():
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     app.source_ref.upstream_api_base_root = "https://moshq.app/api"
     deployer, _uploaded, _commands = _stub_deployer()
 
@@ -2366,12 +2421,12 @@ def test_funnel_artifact_site_standalone_export_requires_origin_api_base_url():
 
 
 def test_validate_funnel_artifact_site_output_requires_posthog_bootstrap_when_tracking_is_declared():
-    app = _artifact_app(render_mode="standalone_imported_html", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
+    app = _artifact_app(render_mode="html_deploy", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
     deployer = object.__new__(ServerDeployer)
     deployer._path_exists = lambda path: True
     deployer._funnel_artifact_declares_posthog_tracking = lambda *, source: True
     deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
-    deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START"
+    deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_HTML_DEPLOY_BRIDGE_START"
 
     with pytest.raises(ValueError, match="PostHog bootstrap"):
         deployer._validate_funnel_artifact_site_output(
@@ -2421,14 +2476,14 @@ def test_path_exists_handles_shell_sensitive_paths(tmp_path: Path):
 
 
 def test_validate_funnel_artifact_site_output_requires_posthog_web_analytics_capture_when_tracking_is_declared():
-    app = _artifact_app(render_mode="standalone_imported_html", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
+    app = _artifact_app(render_mode="html_deploy", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
     deployer = object.__new__(ServerDeployer)
     deployer._path_exists = lambda path: True
     deployer._funnel_artifact_declares_posthog_tracking = lambda *, source: True
     deployer._funnel_artifact_declares_meta_tracking = lambda *, source: False
     deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
     deployer._remote_tree_contains_text = lambda *, root_path, text: text in {
-        "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START",
+        "MOS_HTML_DEPLOY_BRIDGE_START",
         "window.posthog.init(",
         "capture_pageview: false",
     }
@@ -2442,13 +2497,13 @@ def test_validate_funnel_artifact_site_output_requires_posthog_web_analytics_cap
 
 
 def test_validate_funnel_artifact_site_output_requires_meta_pixel_bootstrap_when_tracking_is_declared():
-    app = _artifact_app(render_mode="standalone_imported_html", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
+    app = _artifact_app(render_mode="html_deploy", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
     deployer = object.__new__(ServerDeployer)
     deployer._path_exists = lambda path: True
     deployer._funnel_artifact_declares_posthog_tracking = lambda *, source: False
     deployer._funnel_artifact_declares_meta_tracking = lambda *, source: True
     deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
-    deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START"
+    deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_HTML_DEPLOY_BRIDGE_START"
 
     with pytest.raises(ValueError, match="direct Meta Pixel script"):
         deployer._validate_funnel_artifact_site_output(
@@ -2578,6 +2633,7 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
 
 def test_funnel_artifact_site_prefers_sales_page_for_default_route_and_preload():
     app = _artifact_app()
+    app.source_ref.default_route_policy = "prefer_sales"
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["pages"]["sales-page"] = {
         **json.loads(json.dumps(funnel_payload["pages"]["presales"])),
@@ -2645,6 +2701,7 @@ def test_funnel_artifact_site_prefers_updated_from_funnel_for_runtime_config():
 
 def test_funnel_artifact_site_only_inlines_non_entry_pages_in_runtime_config():
     app = _artifact_app()
+    app.source_ref.default_route_policy = "prefer_sales"
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["pages"]["sales-page"] = {
         "funnelId": "funnel-1",

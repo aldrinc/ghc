@@ -538,7 +538,10 @@ function normalizeImportedHtmlSelection(
 }
 
 function importedHtmlTrackingEventFromType(
-  eventType: ImportedHtmlRuntimeNavigateMessage["trackEventType"] | ImportedHtmlRuntimeTrackMessage["trackEventType"],
+  eventType:
+    | ImportedHtmlRuntimeNavigateMessage["trackEventType"]
+    | ImportedHtmlRuntimeTrackMessage["trackEventType"]
+    | ImportedHtmlRuntimeCheckoutMessage["trackEventType"],
   props?: Record<string, unknown>,
 ): RuntimeTrackingEvent {
   if (eventType === "pre_sales_to_sales_click") {
@@ -546,6 +549,9 @@ function importedHtmlTrackingEventFromType(
   }
   if (eventType === "sales_to_checkout_click") {
     return { eventType: "sales_to_checkout_click", props };
+  }
+  if (eventType === "checkout_started") {
+    return { eventType: "checkout_started", props };
   }
   if (eventType === "selector_interaction") {
     return { eventType: "selector_interaction", props };

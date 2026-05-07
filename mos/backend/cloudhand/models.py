@@ -66,7 +66,8 @@ class ApplicationSourceType(str, Enum):
 
 class FunnelArtifactRenderMode(str, Enum):
     RUNTIME_BUNDLE = "runtime_bundle"
-    STANDALONE_IMPORTED_HTML = "standalone_imported_html"
+    HTML_DEPLOY = "html_deploy"
+    STANDALONE_IMPORTED_HTML = "html_deploy"
 
 
 class FunnelPublicationSourceSpec(BaseModel):
@@ -80,6 +81,9 @@ class FunnelArtifactSourceSpec(BaseModel):
     product_id: Optional[str] = None
     artifact_id: Optional[str] = None
     artifact_version: Optional[int] = None
+    release_metadata: Dict[str, Any] = Field(default_factory=dict)
+    default_route_policy: str = "entry_page"
+    default_page_slug: Optional[str] = None
     upstream_api_base_root: str
     artifact_render_mode: FunnelArtifactRenderMode = FunnelArtifactRenderMode.RUNTIME_BUNDLE
     runtime_dist_path: str = "mos/frontend/dist"

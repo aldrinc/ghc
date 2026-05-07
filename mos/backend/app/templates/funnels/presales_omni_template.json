@@ -38,8 +38,21 @@
                 "trackEventType": "pre_sales_to_sales_click"
               }
             ],
+            "ctas": [
+              {
+                "id": "anchor-cta-links",
+                "selector": "a.btn-green[href=\"#\"]",
+                "ctaPosition": 1
+              },
+              {
+                "id": "button-cta",
+                "selector": "button.btn-primary",
+                "ctaPosition": 2
+              }
+            ],
+            "htmlArtifactKind": "listicle",
             "pageStage": "pre_sales",
-            "schemaVersion": "imported-html-instrumentation-v1"
+            "schemaVersion": "html-deploy-v1"
           }
         }
       }

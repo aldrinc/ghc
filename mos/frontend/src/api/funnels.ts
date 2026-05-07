@@ -35,7 +35,9 @@ type PublishFunnelDeployPayload = {
   destinationPath?: string;
   upstreamBaseUrl?: string;
   upstreamApiBaseUrl?: string;
-  renderMode?: "runtime_bundle" | "standalone_imported_html";
+  renderMode?: "runtime_bundle" | "html_deploy";
+  defaultRoutePolicy?: "entry_page" | "prefer_sales" | "explicit_slug" | "none";
+  defaultPageSlug?: string;
 };
 
 type PublishFunnelPayload = {

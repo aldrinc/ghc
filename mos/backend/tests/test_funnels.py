@@ -1,5 +1,5 @@
 import re
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -415,6 +415,157 @@ def test_public_events_reject_unsupported_event_type(api_client: TestClient):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Unsupported eventType: quiz_fake_event"
+
+
+def test_public_events_dedupe_repeated_event_ids_in_batch(api_client: TestClient, db_session):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Duplicate Public Event"
+    )
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+    publication_id = publish.json()["publicationId"]
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    page_id = meta.json()["pages"][0]["pageId"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventId": "duplicate-event-1",
+                    "eventType": "sales_page_view",
+                    "publicationId": publication_id,
+                    "pageId": page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                },
+                {
+                    "eventId": "duplicate-event-1",
+                    "eventType": "sales_page_view",
+                    "publicationId": publication_id,
+                    "pageId": page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ingested": 1}
+    events = db_session.scalars(
+        select(FunnelEvent).where(FunnelEvent.publication_id == publication_id)
+    ).all()
+    assert [event.event_id for event in events] == ["duplicate-event-1"]
+
+
+def test_public_events_reject_missing_page_id_before_fk_error(api_client: TestClient, db_session):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Missing Public Event Page"
+    )
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+    publication_id = publish.json()["publicationId"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventType": "sales_page_view",
+                    "publicationId": publication_id,
+                    "pageId": str(uuid4()),
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                    "path": f"/{product_slug}/{route_slug}/sales-page",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "pageId does not exist."
+    assert db_session.scalars(
+        select(FunnelEvent).where(FunnelEvent.publication_id == publication_id)
+    ).first() is None
+
+
+def test_public_events_reject_page_from_different_funnel(api_client: TestClient, db_session):
+    _funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Event Source Funnel"
+    )
+    source_publish = api_client.post(f"/funnels/{_funnel_id}/publish")
+    assert source_publish.status_code == 201
+    source_publication_id = source_publish.json()["publicationId"]
+
+    other_funnel_id, other_route_slug, _other_product_id, other_product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Event Other Funnel"
+    )
+    other_publish = api_client.post(f"/funnels/{other_funnel_id}/publish")
+    assert other_publish.status_code == 201
+    other_meta = api_client.get(f"/public/funnels/{other_product_slug}/{other_route_slug}/meta")
+    assert other_meta.status_code == 200
+    other_page_id = other_meta.json()["pages"][0]["pageId"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventType": "sales_page_view",
+                    "publicationId": source_publication_id,
+                    "pageId": other_page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "pageId does not belong to this funnel."
+    assert db_session.scalars(
+        select(FunnelEvent).where(FunnelEvent.publication_id == source_publication_id)
+    ).first() is None
+
+
+def test_public_events_reject_page_not_in_publication(api_client: TestClient, db_session):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Event Publication Page"
+    )
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+    publication_id = publish.json()["publicationId"]
+
+    new_page = api_client.post(f"/funnels/{funnel_id}/pages", json={"name": "Post Publish Page"})
+    assert new_page.status_code == 201
+    post_publish_page_id = new_page.json()["page"]["id"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventType": "sales_page_view",
+                    "publicationId": publication_id,
+                    "pageId": post_publish_page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "pageId does not belong to this publication."
+    assert db_session.scalars(
+        select(FunnelEvent).where(FunnelEvent.publication_id == publication_id)
+    ).first() is None
 
 
 def test_public_runtime_serves_b2c_site_preview_pages_and_policy_pages(
@@ -1365,7 +1516,7 @@ def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: 
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
                 "upstreamApiBaseUrl": "https://api.moshq.app",
-                "renderMode": "standalone_imported_html",
+                "renderMode": "html_deploy",
             }
         },
     )
@@ -1373,11 +1524,11 @@ def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: 
 
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
-    assert workload_patch["source_ref"]["artifact_render_mode"] == "standalone_imported_html"
+    assert workload_patch["source_ref"]["artifact_render_mode"] == "html_deploy"
     assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://api.moshq.app"
     assert "runtime_dist_path" not in workload_patch["source_ref"]
     assert deploy_request["artifact_render_mode_explicit"] is True
-    assert deploy_request["artifact_render_mode_requested"] == "standalone_imported_html"
+    assert deploy_request["artifact_render_mode_requested"] == "html_deploy"
 
 
 def test_publish_with_deploy_rejects_pathful_api_base_for_explicit_standalone(api_client: TestClient):
@@ -1393,7 +1544,7 @@ def test_publish_with_deploy_rejects_pathful_api_base_for_explicit_standalone(ap
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
                 "upstreamApiBaseUrl": "https://moshq.app/api",
-                "renderMode": "standalone_imported_html",
+                "renderMode": "html_deploy",
             }
         },
     )

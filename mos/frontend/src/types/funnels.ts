@@ -74,9 +74,14 @@ export type PublicFunnelMeta = {
 
 export type PublicFunnelStage = "pre_sales" | "sales" | "checkout" | "thank_you" | "custom";
 
+export type HtmlDeployArtifactKind = "listicle" | "listicle_hybrid" | "quiz" | "sales";
+
 export type ImportedHtmlTrackEventType =
   | "pre_sales_to_sales_click"
   | "sales_to_checkout_click"
+  | "checkout_started"
+  | "selector_interaction"
+  | "product_detail_interaction"
   | "custom_page_click";
 
 export type ImportedHtmlOptionSelector = {
@@ -134,10 +139,77 @@ export type ImportedHtmlInstrumentationBinding =
       trackEventType: ImportedHtmlTrackEventType;
     };
 
+export type ImportedHtmlViewTarget = {
+  id: string;
+  selector: string;
+  label?: string | null;
+  proofType?: string | null;
+  sectionId?: string | null;
+  ctaPosition?: number | null;
+  questionId?: string | null;
+  questionIndex?: number | null;
+  questionRole?: string | null;
+  optionId?: string | null;
+  optionRole?: string | null;
+  resultId?: string | null;
+  segmentId?: string | null;
+  recommendationId?: string | null;
+  offerId?: string | null;
+  sku?: string | null;
+  mechanismName?: string | null;
+  guaranteeType?: string | null;
+  interactionType?: string | null;
+  selectedValue?: string | null;
+  event?: "click" | "change" | "input" | null;
+  source?: "value" | "text" | "checked" | null;
+  quizId?: string | null;
+  quizVersion?: string | null;
+  quizVariant?: string | null;
+  answerPathId?: string | null;
+  angle?: string | null;
+  awarenessLevel?: string | null;
+  sophisticationLevel?: string | null;
+  angleFamily?: string | null;
+  hookId?: string | null;
+  promiseId?: string | null;
+  bundleId?: string | null;
+  pricePoint?: string | null;
+  guaranteeId?: string | null;
+  guaranteeDuration?: string | null;
+  valueTotal?: number | null;
+  actualPrice?: number | null;
+  valueRatio?: number | null;
+  clickType?: string | null;
+  targetOfferId?: string | null;
+  destinationUrl?: string | null;
+  elementId?: string | null;
+  subscriptionFlag?: boolean | null;
+};
+
 export type ImportedHtmlInstrumentationManifest = {
-  schemaVersion: "imported-html-instrumentation-v1";
+  schemaVersion: "html-deploy-v1";
+  htmlArtifactKind: HtmlDeployArtifactKind;
   pageStage: PublicFunnelStage;
+  quizId?: string | null;
+  quizVersion?: string | null;
+  quizVariant?: string | null;
   bindings: ImportedHtmlInstrumentationBinding[];
+  sections?: ImportedHtmlViewTarget[];
+  proofs?: ImportedHtmlViewTarget[];
+  ctas?: ImportedHtmlViewTarget[];
+  offerStacks?: ImportedHtmlViewTarget[];
+  valueStacks?: ImportedHtmlViewTarget[];
+  priceReveals?: ImportedHtmlViewTarget[];
+  guarantees?: ImportedHtmlViewTarget[];
+  trustElements?: ImportedHtmlViewTarget[];
+  quizLeads?: ImportedHtmlViewTarget[];
+  quizQuestions?: ImportedHtmlViewTarget[];
+  quizOptions?: ImportedHtmlViewTarget[];
+  quizResults?: ImportedHtmlViewTarget[];
+  quizMechanisms?: ImportedHtmlViewTarget[];
+  quizRecommendations?: ImportedHtmlViewTarget[];
+  productDetails?: ImportedHtmlViewTarget[];
+  selectors?: ImportedHtmlViewTarget[];
 };
 
 // Site page types for commerce experiences

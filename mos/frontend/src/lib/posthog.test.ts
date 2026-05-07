@@ -82,6 +82,14 @@ describe("capturePostHogEvent", () => {
             $event_id: expect.any(String),
           }),
         ],
+        [
+          "capture",
+          "Entered Sales Page",
+          expect.objectContaining({
+            internal_event_type: "sales_page_view",
+            posthog_event_role: "platform_alias",
+          }),
+        ],
       ]),
     );
   });
@@ -166,6 +174,65 @@ describe("capturePostHogEvent", () => {
             from_stage: "sales",
             to_stage: "checkout",
             $event_id: expect.any(String),
+          }),
+        ],
+        [
+          "capture",
+          "SalesToCheckoutClicked",
+          expect.objectContaining({
+            internal_event_type: "sales_to_checkout_click",
+            from_stage: "sales",
+            to_stage: "checkout",
+            $event_id: expect.any(String),
+          }),
+        ],
+      ]),
+    );
+  });
+
+  it("captures canonical and RMBC quiz aliases for quiz diagnostic events", () => {
+    capturePostHogEvent({
+      tracking,
+      distinctId: "visitor-1",
+      productSlug: "example-product",
+      funnelSlug: "example-funnel",
+      publicationId: "publication-1",
+      pageId: "page-quiz",
+      pageSlug: "quiz",
+      pageStage: "pre_sales",
+      sessionId: "session-1",
+      eventType: "quiz_question_viewed",
+      props: {
+        pageStage: "pre_sales",
+        quiz_id: "brain-quiz",
+        question_id: "q1",
+        question_index: 1,
+      },
+      utm: {},
+    });
+
+    const posthogRoot = window.posthog as {
+      mosFunnel?: unknown[];
+    };
+    expect(posthogRoot.mosFunnel).toEqual(
+      expect.arrayContaining([
+        [
+          "capture",
+          "quiz_question_viewed",
+          expect.objectContaining({
+            internal_event_type: "quiz_question_viewed",
+            posthog_event_role: "canonical",
+            quiz_id: "brain-quiz",
+            question_id: "q1",
+          }),
+        ],
+        [
+          "capture",
+          "QuizQuestionViewed",
+          expect.objectContaining({
+            internal_event_type: "quiz_question_viewed",
+            canonical_event_type: "QuizQuestionViewed",
+            posthog_event_role: "rmbc_alias",
           }),
         ],
       ]),

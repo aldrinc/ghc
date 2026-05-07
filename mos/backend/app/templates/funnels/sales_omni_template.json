@@ -72,8 +72,9 @@
                 "trackEventType": "sales_to_checkout_click"
               }
             ],
+            "htmlArtifactKind": "sales",
             "pageStage": "sales",
-            "schemaVersion": "imported-html-instrumentation-v1"
+            "schemaVersion": "html-deploy-v1"
           }
         }
       }
