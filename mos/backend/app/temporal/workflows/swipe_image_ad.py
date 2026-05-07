@@ -75,6 +75,6 @@ class SwipeImageAdWorkflow:
         return await workflow.execute_activity(
             generate_swipe_image_ad_activity,
             params,
-            schedule_to_close_timeout=timedelta(minutes=20),
+            schedule_to_close_timeout=timedelta(minutes=45),
             retry_policy=_SWIPE_IMAGE_AD_ACTIVITY_RETRY_POLICY,
         )

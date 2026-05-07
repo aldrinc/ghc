@@ -437,14 +437,27 @@ async function uploadSourceFile(filePath) {
   };
 }
 
-async function waitForWorkflow(workflowRunId, timeoutMs = 40 * 60 * 1000) {
+async function waitForWorkflow(workflowRunId, timeoutMs = 60 * 60 * 1000) {
   const started = Date.now();
+  let failedObservedAt = null;
   while (Date.now() - started < timeoutMs) {
     const detail = await authed(`/workflows/${encodeURIComponent(workflowRunId)}`);
     const status = detail?.run?.status;
+    const succeededSwipe = (detail?.logs || []).find(
+      (log) => log.step === "swipe_image_ad" && log.status === "succeeded",
+    );
+    if (succeededSwipe) return detail;
     if (status === "completed") return detail;
     if (status === "failed" || status === "cancelled") {
+      if (!failedObservedAt) failedObservedAt = Date.now();
       const errors = (detail?.logs || []).map((log) => log.error).filter(Boolean).join("\n");
+      if (!errors && Date.now() - failedObservedAt < 15 * 60 * 1000) {
+        console.warn(
+          `Workflow ${workflowRunId} is ${status} without error detail; waiting for a late swipe asset log before failing.`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+        continue;
+      }
       throw new Error(`Workflow ${workflowRunId} ended with ${status}: ${errors || "no error detail"}`);
     }
     console.log(`Workflow ${workflowRunId} is ${status}; waiting...`);
@@ -1346,12 +1359,6 @@ async function generateOneEntry(manifest, entry, renderModelId = RENDER_MODEL_ID
   try {
     detail = await waitForWorkflow(started.workflow_run_id);
   } catch (error) {
-    const shouldPreserveWorkflow =
-      error?.status === 401 || /invalid token/i.test(`${error?.message || ""}\n${error?.body || ""}`);
-    if (!shouldPreserveWorkflow && entry.workflow?.workflowRunId === started.workflow_run_id) {
-      delete entry.workflow;
-      persistManifest(manifest);
-    }
     throw error;
   }
   const workflowPath = path.join(OUT_DIR, `workflow-${entry.key}.json`);
