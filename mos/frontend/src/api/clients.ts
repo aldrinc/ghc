@@ -3,6 +3,8 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import { useApiClient, type ApiError } from "@/api/client";
 import type {
   Client,
+  ClientPosthogSettings,
+  ClientPosthogSettingsInput,
   GetHookdCredentials,
   GetHookdSyncFeed,
   GetHookdSyncFeedInput,
@@ -1174,6 +1176,54 @@ export function useClientGetHookdCredentials(clientId?: string) {
     queryKey: ["clients", "gethookd-credentials", clientId],
     queryFn: () => get(`/clients/${clientId}/gethookd/credentials`),
     enabled: Boolean(clientId),
+  });
+}
+
+export function useClientPosthogSettings(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<ClientPosthogSettings>({
+    queryKey: ["clients", "posthog-settings", clientId],
+    queryFn: () => get(`/clients/${clientId}/analytics/posthog`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useUpdateClientPosthogSettings(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ClientPosthogSettingsInput) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<ClientPosthogSettings>(`/clients/${clientId}/analytics/posthog`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Analytics settings saved");
+      queryClient.invalidateQueries({ queryKey: ["clients", "posthog-settings", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to save analytics settings";
+      toast.error(message);
+    },
+  });
+}
+
+export function useParseClientPosthogSnippet(clientId: string) {
+  const { request } = useApiClient();
+  return useMutation({
+    mutationFn: ({ snippet }: { snippet: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<ClientPosthogSettings>(`/clients/${clientId}/analytics/posthog/parse-snippet`, {
+        method: "POST",
+        body: JSON.stringify({ snippet }),
+      });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to parse PostHog snippet";
+      toast.error(message);
+    },
   });
 }
 

@@ -100,6 +100,8 @@ export function FunnelDetailPage() {
 
   const [isPageModalOpen, setIsPageModalOpen] = useState(false);
   const [pageName, setPageName] = useState("");
+  const [pageSlug, setPageSlug] = useState("");
+  const [pageNextPageId, setPageNextPageId] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [deployJob, setDeployJob] = useState<DeployJobState | null>(null);
   const [isEditingDeployDomains, setIsEditingDeployDomains] = useState(false);
@@ -111,6 +113,10 @@ export function FunnelDetailPage() {
   const pageOptions = useMemo(() => {
     return funnel?.pages?.map((p) => ({ label: `${p.name} (${p.slug})`, value: p.id })) || [];
   }, [funnel?.pages]);
+  const createPageNextPageOptions = useMemo(
+    () => [{ label: "No next page", value: "" }, ...pageOptions],
+    [pageOptions]
+  );
 
   const templateOptions = useMemo(() => {
     const groupedTemplates = (templates || []).map((tpl) => ({
@@ -156,12 +162,27 @@ export function FunnelDetailPage() {
   const handleCreatePage = async (e: FormEvent) => {
     e.preventDefault();
     if (!funnelId || !pageName.trim()) return;
-    const resp = await createPage.mutateAsync({ funnelId, name: pageName.trim(), templateId: templateId || undefined });
+    const resp = await createPage.mutateAsync({
+      funnelId,
+      name: pageName.trim(),
+      templateId: templateId || undefined,
+      slug: pageSlug.trim() || undefined,
+      nextPageId: pageNextPageId || null,
+    });
     setIsPageModalOpen(false);
     setPageName("");
+    setPageSlug("");
+    setPageNextPageId("");
     setTemplateId("");
     const page = resp.page;
     navigate(`/research/funnels/${funnelId}/pages/${page.id}`);
+  };
+
+  const resetNewPageForm = () => {
+    setPageName("");
+    setPageSlug("");
+    setPageNextPageId("");
+    setTemplateId("");
   };
 
   const productRouteSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
@@ -890,10 +911,20 @@ export function FunnelDetailPage() {
         </>
       )}
 
-      <DialogRoot open={isPageModalOpen} onOpenChange={setIsPageModalOpen}>
+      <DialogRoot
+        open={isPageModalOpen}
+        onOpenChange={(open) => {
+          setIsPageModalOpen(open);
+          if (!open) {
+            resetNewPageForm();
+          }
+        }}
+      >
         <DialogContent>
           <DialogTitle>New page</DialogTitle>
-          <DialogDescription>Add a page to this funnel. You can wire CTAs to other pages after saving.</DialogDescription>
+          <DialogDescription>
+            Add a page with an optional custom slug and an optional default next page.
+          </DialogDescription>
           <form className="space-y-3" onSubmit={handleCreatePage}>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-content">Page name</label>
@@ -903,6 +934,17 @@ export function FunnelDetailPage() {
                 onChange={(e) => setPageName(e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Slug</label>
+              <Input
+                placeholder="Optional. e.g. ember-brain-story-a"
+                value={pageSlug}
+                onChange={(e) => setPageSlug(e.target.value)}
+              />
+              <div className="text-xs text-content-muted">
+                Leave blank to auto-generate from the page name.
+              </div>
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-content">Template</label>
@@ -916,6 +958,17 @@ export function FunnelDetailPage() {
                   {(templates || []).find((tpl) => tpl.id === templateId)?.description || "Template selected"}
                 </div>
               ) : null}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Next page</label>
+              <Select
+                value={pageNextPageId}
+                onValueChange={setPageNextPageId}
+                options={createPageNextPageOptions}
+              />
+              <div className="text-xs text-content-muted">
+                Choose the default page this page should route to, or leave it unset.
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <DialogClose asChild>

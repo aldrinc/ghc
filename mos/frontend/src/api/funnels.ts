@@ -254,8 +254,25 @@ export function useCreateFunnelPage() {
   const { post } = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ funnelId, name, templateId }: { funnelId: string; name: string; templateId?: string }) =>
-      post<{ page: FunnelPage; draftVersion: FunnelPageVersion }>(`/funnels/${funnelId}/pages`, { name, templateId }),
+    mutationFn: ({
+      funnelId,
+      name,
+      templateId,
+      slug,
+      nextPageId,
+    }: {
+      funnelId: string;
+      name: string;
+      templateId?: string;
+      slug?: string;
+      nextPageId?: string | null;
+    }) =>
+      post<{ page: FunnelPage; draftVersion: FunnelPageVersion }>(`/funnels/${funnelId}/pages`, {
+        name,
+        templateId,
+        slug,
+        nextPageId,
+      }),
     onSuccess: (_data, vars) => {
       toast.success("Page created");
       queryClient.invalidateQueries({ queryKey: ["funnels", "detail", vars.funnelId] });

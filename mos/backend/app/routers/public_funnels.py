@@ -5,6 +5,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 from html import escape
+from ipaddress import ip_address
 from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
@@ -574,7 +575,7 @@ def _canonical_public_page_slug(
 ) -> str | None:
     raw_slug = clean_optional_text(slug)
     stage = _public_page_stage(slug=raw_slug, template_id=template_id, page_name=page_name)
-    if stage == "pre_sales":
+    if stage == "pre_sales" and raw_slug and raw_slug.lower() in {"pre-sales", "presales"}:
         return "presales"
     return raw_slug
 
@@ -736,7 +737,9 @@ def _public_site_meta_response(
     preview_pages = _public_site_preview_pages(session=session, site_id=str(site.id))
     if not site.entry_page_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
-    entry_page = next((page for page in preview_pages if str(page.id) == str(site.entry_page_id)), None)
+    entry_page = next(
+        (page for page in preview_pages if str(page.id) == str(site.entry_page_id)), None
+    )
     if not entry_page:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Entry page has no saved version"
@@ -787,7 +790,9 @@ def _public_site_page_response(
         page_rows = {
             str(page.id): page
             for page in session.scalars(
-                select(SitePage).where(SitePage.id.in_([item.page_id for item in publication_pages]))
+                select(SitePage).where(
+                    SitePage.id.in_([item.page_id for item in publication_pages])
+                )
             ).all()
         }
         page = page_rows.get(str(publication_page.page_id))
@@ -805,21 +810,27 @@ def _public_site_page_response(
         page_stage_map = {
             str(item.page_id): _public_page_stage(
                 slug=item.slug_at_publish,
-                template_id=page_rows.get(str(item.page_id)).template_id
-                if page_rows.get(str(item.page_id))
-                else None,
-                page_name=page_rows.get(str(item.page_id)).name
-                if page_rows.get(str(item.page_id))
-                else None,
+                template_id=(
+                    page_rows.get(str(item.page_id)).template_id
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
+                page_name=(
+                    page_rows.get(str(item.page_id)).name
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
             )
             for item in publication_pages
         }
         page_type_map = {
             str(item.page_id): _site_page_type(
                 slug=item.slug_at_publish,
-                template_id=page_rows.get(str(item.page_id)).template_id
-                if page_rows.get(str(item.page_id))
-                else None,
+                template_id=(
+                    page_rows.get(str(item.page_id)).template_id
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
                 page_type=item.page_type_at_publish
                 or (
                     page_rows.get(str(item.page_id)).page_type
@@ -1110,27 +1121,34 @@ def _serialize_prepared_checkout(
     return PublicPreparedCheckoutResponse(
         preparedCheckoutId=str(prepared_checkout.id),
         status=status_value,  # type: ignore[arg-type]
-        checkoutUrl=prepared_checkout.checkout_url
-        if status_value == _PREPARED_CHECKOUT_STATUS_READY
-        else None,
-        sessionId=prepared_checkout.checkout_session_id
-        if status_value == _PREPARED_CHECKOUT_STATUS_READY
-        else None,
-        error=prepared_checkout.error_detail
-        if status_value == _PREPARED_CHECKOUT_STATUS_FAILED
-        else None,
+        checkoutUrl=(
+            prepared_checkout.checkout_url
+            if status_value == _PREPARED_CHECKOUT_STATUS_READY
+            else None
+        ),
+        sessionId=(
+            prepared_checkout.checkout_session_id
+            if status_value == _PREPARED_CHECKOUT_STATUS_READY
+            else None
+        ),
+        error=(
+            prepared_checkout.error_detail
+            if status_value == _PREPARED_CHECKOUT_STATUS_FAILED
+            else None
+        ),
         expiresAt=prepared_checkout.expires_at,
-        pollAfterMs=_PREPARED_CHECKOUT_POLL_AFTER_MS
-        if status_value == _PREPARED_CHECKOUT_STATUS_PENDING
-        else None,
+        pollAfterMs=(
+            _PREPARED_CHECKOUT_POLL_AFTER_MS
+            if status_value == _PREPARED_CHECKOUT_STATUS_PENDING
+            else None
+        ),
     )
 
 
-async def _persist_checkout_started_event_async(
-    session: Session, payload: dict[str, Any]
-) -> None:
+async def _persist_checkout_started_event_async(session: Session, payload: dict[str, Any]) -> None:
     session.add(
         FunnelEvent(
+            event_id=payload.get("event_id"),
             occurred_at=_utcnow(),
             org_id=payload["org_id"],
             client_id=payload["client_id"],
@@ -1151,10 +1169,64 @@ async def _persist_checkout_started_event_async(
                 "variant_id": payload["variant_id"],
                 "offer_id": payload.get("offer_id"),
                 "quantity": payload["quantity"],
+                **dict(payload.get("checkout_props") or {}),
             },
         )
     )
     session.commit()
+
+
+def _checkout_tracking_props(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(metadata, dict):
+        return {}
+    allowed_keys = {
+        "click_id",
+        "click_id_type",
+        "fbp",
+        "fbc",
+        "event_source_url",
+        "page_variant",
+        "experiment_id",
+        "cta_id",
+        "transition_id",
+        "purchase_mode",
+    }
+    return {
+        key: value
+        for key, value in metadata.items()
+        if key in allowed_keys and value not in (None, "")
+    }
+
+
+def _shopify_checkout_attributes(metadata: dict[str, Any]) -> dict[str, Any]:
+    allowed_keys = {
+        "funnel_slug",
+        "funnel_id",
+        "offer_id",
+        "variant_id",
+        "price_point_id",
+        "page_id",
+        "visitor_id",
+        "session_id",
+        "selection",
+        "purchase_mode",
+        "utm",
+        "quantity",
+        "click_id",
+        "click_id_type",
+        "fbp",
+        "fbc",
+        "event_source_url",
+        "page_variant",
+        "experiment_id",
+        "cta_id",
+        "transition_id",
+    }
+    return {
+        key: value
+        for key, value in metadata.items()
+        if key in allowed_keys and value not in (None, "")
+    }
 
 
 def _schedule_checkout_started_event(
@@ -1171,14 +1243,18 @@ def _schedule_checkout_started_event(
     checkout_session_id: str,
     variant: ProductVariant,
     quantity: int,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     publication_id = funnel.active_publication_id
     if publication_id is None or not page_id:
         return
+    checkout_props = _checkout_tracking_props(metadata)
+    transition_id = clean_optional_text(checkout_props.get("transition_id"))
     background_tasks.add_task(
         _persist_checkout_started_event_async,
         session,
         {
+            "event_id": f"checkout_started:{transition_id}" if transition_id else None,
             "org_id": str(funnel.org_id),
             "client_id": str(funnel.client_id),
             "campaign_id": str(funnel.campaign_id) if funnel.campaign_id else None,
@@ -1196,9 +1272,9 @@ def _schedule_checkout_started_event(
             "variant_id": str(variant.id),
             "offer_id": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
             "quantity": quantity,
+            "checkout_props": checkout_props,
         },
     )
-
 
 
 def _preview_page_map(*, session: Session, funnel_id: str) -> dict[str, str]:
@@ -1233,10 +1309,12 @@ def public_funnel_meta(
     response: Response,
     session: Session = Depends(get_session),
 ):
-    target_kind, runtime_target, _product, resolved_product_slug = _get_public_runtime_target_or_404(
-        session=session,
-        product_slug=product_slug,
-        funnel_slug=funnel_slug,
+    target_kind, runtime_target, _product, resolved_product_slug = (
+        _get_public_runtime_target_or_404(
+            session=session,
+            product_slug=product_slug,
+            funnel_slug=funnel_slug,
+        )
     )
     if target_kind == "site":
         return _public_site_meta_response(
@@ -1300,12 +1378,16 @@ def public_funnel_meta(
                     "slug": (
                         _canonical_public_page_slug(
                             slug=pp.slug_at_publish,
-                            template_id=page_rows.get(str(pp.page_id)).template_id
-                            if page_rows.get(str(pp.page_id))
-                            else None,
-                            page_name=page_rows.get(str(pp.page_id)).name
-                            if page_rows.get(str(pp.page_id))
-                            else None,
+                            template_id=(
+                                page_rows.get(str(pp.page_id)).template_id
+                                if page_rows.get(str(pp.page_id))
+                                else None
+                            ),
+                            page_name=(
+                                page_rows.get(str(pp.page_id)).name
+                                if page_rows.get(str(pp.page_id))
+                                else None
+                            ),
                         )
                         or pp.slug_at_publish
                     ),
@@ -1365,10 +1447,12 @@ def public_funnel_page(
     response: Response,
     session: Session = Depends(get_session),
 ):
-    target_kind, runtime_target, _product, resolved_product_slug = _get_public_runtime_target_or_404(
-        session=session,
-        product_slug=product_slug,
-        funnel_slug=funnel_slug,
+    target_kind, runtime_target, _product, resolved_product_slug = (
+        _get_public_runtime_target_or_404(
+            session=session,
+            product_slug=product_slug,
+            funnel_slug=funnel_slug,
+        )
     )
     if target_kind == "site":
         return _public_site_page_response(
@@ -1433,9 +1517,9 @@ def public_funnel_page(
             page_id: (
                 _canonical_public_page_slug(
                     slug=slug_value,
-                    template_id=page_rows.get(page_id).template_id
-                    if page_rows.get(page_id)
-                    else None,
+                    template_id=(
+                        page_rows.get(page_id).template_id if page_rows.get(page_id) else None
+                    ),
                     page_name=page_rows.get(page_id).name if page_rows.get(page_id) else None,
                 )
                 or slug_value
@@ -1445,12 +1529,16 @@ def public_funnel_page(
         page_stage_map = {
             str(item.page_id): _public_page_stage(
                 slug=public_page_map[str(item.page_id)],
-                template_id=page_rows.get(str(item.page_id)).template_id
-                if page_rows.get(str(item.page_id))
-                else None,
-                page_name=page_rows.get(str(item.page_id)).name
-                if page_rows.get(str(item.page_id))
-                else None,
+                template_id=(
+                    page_rows.get(str(item.page_id)).template_id
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
+                page_name=(
+                    page_rows.get(str(item.page_id)).name
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
             )
             for item in publication_pages
         }
@@ -1458,12 +1546,16 @@ def public_funnel_page(
         page_type_map = {
             str(item.page_id): _site_page_type(
                 slug=public_page_map.get(str(item.page_id)),
-                template_id=page_rows.get(str(item.page_id)).template_id
-                if page_rows.get(str(item.page_id))
-                else None,
-                page_type=page_rows.get(str(item.page_id)).page_type
-                if page_rows.get(str(item.page_id))
-                else None,
+                template_id=(
+                    page_rows.get(str(item.page_id)).template_id
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
+                page_type=(
+                    page_rows.get(str(item.page_id)).page_type
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
             )
             for item in publication_pages
         }
@@ -1655,10 +1747,12 @@ def public_funnel_policy_page(
     support_email: str | None = None,
     session: Session = Depends(get_session),
 ):
-    target_kind, runtime_target, _product, _resolved_product_slug = _get_public_runtime_target_or_404(
-        session=session,
-        product_slug=product_slug,
-        funnel_slug=funnel_slug,
+    target_kind, runtime_target, _product, _resolved_product_slug = (
+        _get_public_runtime_target_or_404(
+            session=session,
+            product_slug=product_slug,
+            funnel_slug=funnel_slug,
+        )
     )
 
     if page_key not in set(list_policy_page_keys()):
@@ -1785,12 +1879,16 @@ def public_funnel_graph(
                     "slug": (
                         _canonical_public_page_slug(
                             slug=pp.slug_at_publish,
-                            template_id=page_rows.get(str(pp.page_id)).template_id
-                            if page_rows.get(str(pp.page_id))
-                            else None,
-                            page_name=page_rows.get(str(pp.page_id)).name
-                            if page_rows.get(str(pp.page_id))
-                            else None,
+                            template_id=(
+                                page_rows.get(str(pp.page_id)).template_id
+                                if page_rows.get(str(pp.page_id))
+                                else None
+                            ),
+                            page_name=(
+                                page_rows.get(str(pp.page_id)).name
+                                if page_rows.get(str(pp.page_id))
+                                else None
+                            ),
                         )
                         or pp.slug_at_publish
                     ),
@@ -1854,11 +1952,7 @@ def public_funnel_commerce(
         funnel_slug=funnel_slug,
     )
 
-    variants_query = (
-        select(ProductVariant)
-        .where(ProductVariant.product_id == product.id)
-        .order_by(ProductVariant.price.asc(), ProductVariant.title.asc())
-    )
+    variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
     if funnel.selected_offer_id:
         variants_query = variants_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
     variants = session.scalars(variants_query).all()
@@ -1916,8 +2010,6 @@ def _resolve_public_checkout_context(
             ProductVariant.id == payload.variantId,
             ProductVariant.product_id == funnel.product_id,
         )
-        if funnel.selected_offer_id:
-            variant_query = variant_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
         variant = session.scalars(variant_query).first()
         if not variant:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
@@ -1937,10 +2029,8 @@ def _resolve_public_checkout_context(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="selection is required when variantId is not provided.",
             )
-        candidates_query = (
-            select(ProductVariant)
-            .where(ProductVariant.product_id == funnel.product_id)
-            .order_by(ProductVariant.price.asc(), ProductVariant.title.asc())
+        candidates_query = select(ProductVariant).where(
+            ProductVariant.product_id == funnel.product_id
         )
         if funnel.selected_offer_id:
             candidates_query = candidates_query.where(
@@ -1955,7 +2045,9 @@ def _resolve_public_checkout_context(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="No checkout-ready variants are configured for this funnel product.",
             )
-        matches = [item for item in checkout_ready_candidates if item.option_values == variant_selection]
+        matches = [
+            item for item in checkout_ready_candidates if item.option_values == variant_selection
+        ]
         if len(matches) != 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1987,12 +2079,13 @@ def _resolve_public_checkout_context(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Subscribe & save is not configured for this selection.",
             )
+    resolved_offer_id = variant.offer_id or funnel.selected_offer_id
     metadata = {
         "funnel_slug": _metadata_value(payload.funnelSlug, "funnelSlug"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
-        "offer_id": _metadata_value(str(funnel.selected_offer_id), "offerId")
-        if funnel.selected_offer_id
-        else None,
+        "offer_id": (
+            _metadata_value(str(resolved_offer_id), "offerId") if resolved_offer_id else None
+        ),
         "variant_id": _metadata_value(str(variant.id), "variantId"),
         "price_point_id": _metadata_value(str(variant.id), "pricePointId"),
         "page_id": _metadata_value(payload.pageId, "pageId"),
@@ -2002,6 +2095,15 @@ def _resolve_public_checkout_context(
         "purchase_mode": _metadata_value(purchase_mode, "purchaseMode"),
         "utm": _metadata_value(payload.utm, "utm"),
         "quantity": _metadata_value(str(payload.quantity), "quantity"),
+        "click_id": _metadata_value(payload.clickId, "clickId"),
+        "click_id_type": _metadata_value(payload.clickIdType, "clickIdType"),
+        "fbp": _metadata_value(payload.fbp, "fbp"),
+        "fbc": _metadata_value(payload.fbc, "fbc"),
+        "event_source_url": _metadata_value(payload.eventSourceUrl, "eventSourceUrl"),
+        "page_variant": _metadata_value(payload.pageVariant, "pageVariant"),
+        "experiment_id": _metadata_value(payload.experimentId, "experimentId"),
+        "cta_id": _metadata_value(payload.ctaId, "ctaId"),
+        "transition_id": _metadata_value(payload.transitionId, "transitionId"),
     }
     metadata = {key: value for key, value in metadata.items() if value}
     return {
@@ -2009,7 +2111,9 @@ def _resolve_public_checkout_context(
         "variant": variant,
         "normalized_provider": normalized_provider,
         "external_price_id": external_price_id,
-        "shopify_selling_plan_id": shopify_selling_plan_id if purchase_mode == "subscribe" else None,
+        "shopify_selling_plan_id": (
+            shopify_selling_plan_id if purchase_mode == "subscribe" else None
+        ),
         "purchase_mode": purchase_mode,
         "metadata": metadata,
         "selection": prepared_selection,
@@ -2028,7 +2132,9 @@ def _load_prepared_checkout_or_404(
         ) from exc
     prepared_checkout = session.get(PreparedFunnelCheckout, prepared_uuid)
     if not prepared_checkout:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prepared checkout not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prepared checkout not found."
+        )
     return prepared_checkout
 
 
@@ -2144,15 +2250,11 @@ def _upsert_prepared_checkout(
     return prepared_checkout, should_enqueue_prepare
 
 
-async def _prepare_shopify_checkout_async(
-    session: Session, prepared_checkout_id: str
-) -> None:
+async def _prepare_shopify_checkout_async(session: Session, prepared_checkout_id: str) -> None:
     prepared_checkout = _load_prepared_checkout_or_404(
         session=session, prepared_checkout_id=prepared_checkout_id
     )
-    status_value = _prepared_checkout_status(
-        session=session, prepared_checkout=prepared_checkout
-    )
+    status_value = _prepared_checkout_status(session=session, prepared_checkout=prepared_checkout)
     if status_value != _PREPARED_CHECKOUT_STATUS_PENDING:
         return
     purchase_mode = _purchase_mode_from_checkout_selection(prepared_checkout.selection)
@@ -2169,7 +2271,9 @@ async def _prepare_shopify_checkout_async(
         selling_plan_id = str(variant.shopify_selling_plan_id or "").strip() or None
         if not selling_plan_id:
             prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_FAILED
-            prepared_checkout.error_detail = "Subscribe & save is not configured for this selection."
+            prepared_checkout.error_detail = (
+                "Subscribe & save is not configured for this selection."
+            )
             prepared_checkout.updated_at = _utcnow()
             session.add(prepared_checkout)
             session.commit()
@@ -2179,7 +2283,9 @@ async def _prepare_shopify_checkout_async(
             client_id=str(prepared_checkout.client_id),
             variant_gid=str(prepared_checkout.external_variant_id),
             quantity=int(prepared_checkout.quantity),
-            metadata=dict(prepared_checkout.checkout_metadata or {}),
+            metadata=_shopify_checkout_attributes(
+                dict(prepared_checkout.checkout_metadata or {})
+            ),
             selling_plan_id=selling_plan_id,
         )
     except HTTPException as exc:
@@ -2265,6 +2371,7 @@ def public_checkout(
             checkout_session_id=str(checkout_session.id),
             variant=variant,
             quantity=payload.quantity,
+            metadata=metadata,
         )
         return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
 
@@ -2278,7 +2385,7 @@ def public_checkout(
             client_id=str(funnel.client_id),
             variant_gid=external_price_id,
             quantity=payload.quantity,
-            metadata=metadata,
+            metadata=_shopify_checkout_attributes(metadata),
             selling_plan_id=shopify_selling_plan_id,
         )
         _schedule_checkout_started_event(
@@ -2294,6 +2401,7 @@ def public_checkout(
             checkout_session_id=str(checkout["cartId"]),
             variant=variant,
             quantity=payload.quantity,
+            metadata=metadata,
         )
         return {"checkoutUrl": checkout["checkoutUrl"], "sessionId": checkout["cartId"]}
 
@@ -2323,6 +2431,7 @@ def public_checkout(
             checkout_session_id=str(checkout["cartId"]),
             variant=variant,
             quantity=payload.quantity,
+            metadata=metadata,
         )
         return {"checkoutUrl": checkout["checkoutUrl"], "sessionId": checkout["cartId"]}
 
@@ -2364,12 +2473,12 @@ def prepare_public_checkout(
         background_tasks.add_task(
             _prepare_shopify_checkout_async, session, str(prepared_checkout.id)
         )
-    return _serialize_prepared_checkout(
-        session=session, prepared_checkout=prepared_checkout
-    )
+    return _serialize_prepared_checkout(session=session, prepared_checkout=prepared_checkout)
 
 
-@router.get("/checkout/prepare/{prepared_checkout_id}", response_model=PublicPreparedCheckoutResponse)
+@router.get(
+    "/checkout/prepare/{prepared_checkout_id}", response_model=PublicPreparedCheckoutResponse
+)
 def prepared_public_checkout_status(
     prepared_checkout_id: str,
     session: Session = Depends(get_session),
@@ -2390,9 +2499,7 @@ def consume_prepared_public_checkout(
     prepared_checkout = _load_prepared_checkout_or_404(
         session=session, prepared_checkout_id=prepared_checkout_id
     )
-    status_value = _prepared_checkout_status(
-        session=session, prepared_checkout=prepared_checkout
-    )
+    status_value = _prepared_checkout_status(session=session, prepared_checkout=prepared_checkout)
     if status_value != _PREPARED_CHECKOUT_STATUS_READY:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -2427,6 +2534,7 @@ def consume_prepared_public_checkout(
                 checkout_session_id=prepared_checkout.checkout_session_id,
                 variant=variant,
                 quantity=int(prepared_checkout.quantity),
+                metadata=dict(prepared_checkout.checkout_metadata or {}),
             )
 
     return {
@@ -2728,9 +2836,11 @@ def public_site_commerce(
                                         "prices": [
                                             {
                                                 "amount": local_var.price,
-                                                "currency_code": local_var.currency.upper()
-                                                if local_var.currency
-                                                else "USD",
+                                                "currency_code": (
+                                                    local_var.currency.upper()
+                                                    if local_var.currency
+                                                    else "USD"
+                                                ),
                                             }
                                         ],
                                     }
@@ -2745,9 +2855,11 @@ def public_site_commerce(
                                         "prices": [
                                             {
                                                 "amount": local_var.price,
-                                                "currency_code": local_var.currency.upper()
-                                                if local_var.currency
-                                                else "USD",
+                                                "currency_code": (
+                                                    local_var.currency.upper()
+                                                    if local_var.currency
+                                                    else "USD"
+                                                ),
                                             }
                                         ],
                                     }
@@ -3466,8 +3578,16 @@ async def _persist_public_events_async(
     events: list[dict[str, Any]],
 ) -> None:
     for ev in events:
+        event_id = clean_optional_text(ev.get("event_id"))
+        if event_id:
+            existing = session.scalars(
+                select(FunnelEvent.id).where(FunnelEvent.event_id == event_id)
+            ).first()
+            if existing:
+                continue
         session.add(
             FunnelEvent(
+                event_id=event_id,
                 occurred_at=ev["occurred_at"],
                 org_id=funnel_context["org_id"],
                 client_id=funnel_context["client_id"],
@@ -3485,7 +3605,30 @@ async def _persist_public_events_async(
                 props=ev.get("props") or {},
             )
         )
-    session.commit()
+        session.commit()
+
+
+def _normalize_public_event_client_ip(value: str | None) -> str | None:
+    candidate = clean_optional_text(value)
+    if not candidate:
+        return None
+    candidate = candidate.split(",", 1)[0].strip()
+    if candidate.startswith("[") and "]" in candidate:
+        candidate = candidate[1 : candidate.index("]")]
+    elif candidate.count(":") == 1 and "." in candidate:
+        candidate = candidate.rsplit(":", 1)[0]
+    try:
+        return str(ip_address(candidate))
+    except ValueError:
+        return None
+
+
+def _resolve_public_event_client_ip(request: Request) -> str | None:
+    for header_name in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
+        client_ip = _normalize_public_event_client_ip(request.headers.get(header_name))
+        if client_ip:
+            return client_ip
+    return _normalize_public_event_client_ip(request.client.host if request.client else None)
 
 
 @router.post("/events")
@@ -3524,7 +3667,8 @@ def ingest_public_events(
     if not funnel:
         site = session.scalars(
             select(Site).where(
-                (Site.active_site_publication_id == publication_uuid) | (Site.id == publication_uuid)
+                (Site.active_site_publication_id == publication_uuid)
+                | (Site.id == publication_uuid)
             )
         ).first()
         if site:
@@ -3541,15 +3685,47 @@ def ingest_public_events(
             return {"ingested": 0}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found")
 
+    event_ids = [
+        event_id
+        for event_id in (clean_optional_text(event.eventId) for event in payload.events)
+        if event_id
+    ]
+    existing_event_ids = (
+        set(
+            session.scalars(
+                select(FunnelEvent.event_id).where(FunnelEvent.event_id.in_(event_ids))
+            ).all()
+        )
+        if event_ids
+        else set()
+    )
+
+    client_ip_address = _resolve_public_event_client_ip(request)
     ingested_events: list[dict[str, Any]] = []
+    seen_event_ids: set[str] = set()
     for ev in payload.events:
         occurred_at = ev.occurredAt or datetime.now(timezone.utc)
         try:
             event_type = FunnelEventTypeEnum(ev.eventType)
         except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported eventType: {ev.eventType}",
+            )
+        event_id = clean_optional_text(ev.eventId)
+        if event_id and event_id in existing_event_ids:
             continue
+        if event_id and event_id in seen_event_ids:
+            continue
+        if event_id:
+            seen_event_ids.add(event_id)
+        event_props = dict(ev.props or {})
+        if client_ip_address:
+            event_props["client_ip_address"] = client_ip_address
+            event_props["$ip"] = client_ip_address
         ingested_events.append(
             {
+                "event_id": event_id,
                 "occurred_at": occurred_at,
                 "page_id": ev.pageId,
                 "event_type": event_type,
@@ -3558,7 +3734,7 @@ def ingest_public_events(
                 "path": ev.path,
                 "referrer": ev.referrer,
                 "utm": ev.utm,
-                "props": ev.props,
+                "props": event_props,
             }
         )
 

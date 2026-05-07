@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { optimizeImportedHtmlDocument } from "@/funnels/importedHtmlRuntime";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
-import { CTA_LINK_CLICK_EVENT_NAME } from "@/lib/metaFunnelEvents";
 import type { PublicCommerceVariant } from "@/types/commerce";
 import type {
   ImportedHtmlInstrumentationManifest,
@@ -87,6 +86,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     pageId: page.pageId,
     pageSlug: page.slug,
     pageStage: page.stage,
+    funnelId: page.funnelId,
     publicationId: page.publicationId,
     productSlug,
     funnelSlug,
@@ -105,9 +105,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const config = ${JSON.stringify(scriptConfig)};
 
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
-  const META_PIXEL_SCRIPT_SRC = "/__mos/meta/fbevents.js";
+  const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
   const META_PIXEL_DEFER_TIMEOUT_MS = 1500;
   const POSTHOG_INSTANCE_NAME = "mosFunnel";
+  const META_ATTRIBUTION_WAIT_TIMEOUT_MS = 1500;
+  const META_ATTRIBUTION_WAIT_POLL_MS = 50;
+  const META_EMAIL_HASH_STORAGE_KEY = "mos_meta_em";
   const TRACKING_NAVIGATION_FLUSH_DELAY_MS = 250;
 
   const cleanText = (value) => {
@@ -124,6 +127,187 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
   const isNonEmptyRecord = (value) => isRecord(value) && Object.keys(value).length > 0;
+
+  const waitForTrackingNavigationFlush = () =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+    });
+
+  const readCookie = (name) => {
+    const prefix = String(name || "") + "=";
+    const match = document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(prefix));
+    return match ? cleanText(match.slice(prefix.length)) : null;
+  };
+
+  const assignCleanProp = (target, key, value) => {
+    const cleaned = cleanText(value);
+    if (cleaned) target[key] = cleaned;
+  };
+
+  const readStoredMetaEmailHash = () => {
+    try {
+      return cleanText(window.localStorage && window.localStorage.getItem(META_EMAIL_HASH_STORAGE_KEY));
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const resolveMetaExternalId = () => cleanText(config.visitorId);
+
+  const resolveMetaAdvancedMatchingProps = () => {
+    const props = {};
+    assignCleanProp(props, "external_id", resolveMetaExternalId());
+    assignCleanProp(props, "em", readStoredMetaEmailHash());
+    return props;
+  };
+
+  const resolveMetaAttributionProps = (eventSourceUrl) => {
+    const props = { action_source: "website" };
+    assignCleanProp(props, "external_id", resolveMetaExternalId());
+    assignCleanProp(props, "em", readStoredMetaEmailHash());
+    assignCleanProp(props, "fbp", readCookie("_fbp"));
+    assignCleanProp(props, "fbc", readCookie("_fbc"));
+    const currentUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+    assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
+    assignCleanProp(props, "event_source_url", currentUrl.href);
+    assignCleanProp(props, "$raw_user_agent", window.navigator && window.navigator.userAgent);
+    return props;
+  };
+
+  const resolveMetaAttributionReady = (eventSourceUrl) => {
+    const eventUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+    const hasFbclid = Boolean(cleanText(eventUrl.searchParams.get("fbclid")));
+    const hasFbp = Boolean(readCookie("_fbp"));
+    const hasFbc = Boolean(readCookie("_fbc"));
+    return hasFbp && (!hasFbclid || hasFbc);
+  };
+
+  const waitForMetaAttribution = (eventSourceUrl) => {
+    const startedAt = Date.now();
+    return new Promise((resolve) => {
+      const poll = () => {
+        const elapsedMs = Date.now() - startedAt;
+        if (resolveMetaAttributionReady(eventSourceUrl)) {
+          resolve({ elapsedMs, timedOut: false });
+          return;
+        }
+        if (elapsedMs >= META_ATTRIBUTION_WAIT_TIMEOUT_MS) {
+          resolve({ elapsedMs, timedOut: true });
+          return;
+        }
+        window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+      };
+      window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+    });
+  };
+
+  const randomEventIdSegment = () => {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+  };
+
+  const buildMetaEventId = (eventName, eventType, index) => {
+    return [
+      cleanText(eventName) || "meta",
+      cleanText(eventType) || "event",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      cleanText(config.sessionId) || "session",
+      String(index),
+      randomEventIdSegment(),
+    ].join(":");
+  };
+
+  const CLICK_ID_KEYS = ["fbclid", "gclid", "ttclid", "msclkid", "twclid", "li_fat_id"];
+  const CHECKOUT_TRACKING_PARAM_KEYS = new Set([
+    ...CLICK_ID_KEYS,
+    "experiment_id",
+    "experiment",
+    "exp",
+    "src",
+  ]);
+
+  const buildCanonicalEventId = (eventType) => {
+    return [
+      "mos",
+      cleanText(eventType) || "event",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      cleanText(config.sessionId) || "session",
+      randomEventIdSegment(),
+    ].join(":");
+  };
+
+  const resolveClickAttribution = () => {
+    const params = new URLSearchParams(window.location.search);
+    for (const key of CLICK_ID_KEYS) {
+      const value = cleanText(params.get(key));
+      if (value) {
+        return {
+          clickId: value,
+          clickIdType: key,
+          [key]: value,
+        };
+      }
+    }
+    return {};
+  };
+
+  const resolvePageType = (stage) => {
+    if (stage === "pre_sales") return "presell";
+    if (stage === "sales") return "offer";
+    if (stage === "checkout") return "checkout";
+    if (stage === "thank_you") return "thank_you";
+    return "custom";
+  };
+
+  const resolveExperimentId = () => {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      cleanText(params.get("experiment_id")) ||
+      cleanText(params.get("experiment")) ||
+      cleanText(params.get("exp"))
+    );
+  };
+
+  const resolveDeviceType = () => {
+    const width = window.innerWidth || (document.documentElement && document.documentElement.clientWidth) || 0;
+    if (width > 0 && width < 768) return "mobile";
+    if (width >= 768 && width < 1024) return "tablet";
+    return "desktop";
+  };
+
+  const resolveRuntimeContextProps = (props) => {
+    const pageStage = cleanText((props && props.pageStage) || config.pageStage);
+    const experimentId = resolveExperimentId();
+    const externalId = resolveMetaExternalId();
+    const emailHash = readStoredMetaEmailHash();
+    return {
+      productSlug: cleanText(config.productSlug),
+      funnelSlug: cleanText(config.funnelSlug),
+      publicationId: cleanText(config.publicationId),
+      pageId: cleanText(config.pageId),
+      pageSlug: cleanText(config.pageSlug),
+      pageStage,
+      pageType: resolvePageType(pageStage),
+      pageVariant: cleanText(config.pageSlug),
+      visitorId: cleanText(config.visitorId),
+      sessionId: cleanText(config.sessionId),
+      path: window.location.pathname + window.location.search,
+      referrer: document.referrer || undefined,
+      deviceType: resolveDeviceType(),
+      browserUserAgent: window.navigator && window.navigator.userAgent,
+      ...(externalId ? { external_id: externalId } : {}),
+      ...(emailHash ? { em: emailHash } : {}),
+      ...(experimentId ? { experimentId } : {}),
+      ...resolveClickAttribution(),
+    };
+  };
 
   const posthogTrackingConfig = isRecord(config.tracking) ? config.tracking : null;
   const PRESALE_SOURCE_PARAM = "src";
@@ -210,6 +394,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return utm;
   };
 
+  const isCheckoutTrackingParam = (key) => {
+    const normalized = String(key || "").trim();
+    return normalized.startsWith("utm_") || CHECKOUT_TRACKING_PARAM_KEYS.has(normalized);
+  };
+
   const pendingMetaPurchaseStorageKey = (resolvedSessionId, resolvedFunnelSlug) => {
     const cleanSessionId = cleanText(resolvedSessionId);
     const cleanFunnelSlug = cleanText(resolvedFunnelSlug);
@@ -290,7 +479,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
       window.__mosMetaPixelIds = [];
     }
     if (!window.__mosMetaPixelIds.includes(pixelId)) {
-      window.fbq("init", pixelId);
+      const advancedMatching = resolveMetaAdvancedMatchingProps();
+      if (isNonEmptyRecord(advancedMatching)) {
+        window.fbq("init", pixelId, advancedMatching);
+      } else {
+        window.fbq("init", pixelId);
+      }
       window.__mosMetaPixelIds.push(pixelId);
     }
     return pixelId;
@@ -306,13 +500,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
 
     const defaults = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogDefaults) || "2026-01-30";
     const personProfiles =
-      cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogPersonProfiles) || "always";
+      cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogPersonProfiles) || "identified_only";
     const distinctId = cleanText(config.visitorId) || "anonymous-funnel-visitor";
 
     !function(t,e){var o,n,p,r,d;e.__SV||(window.posthog&&window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0])&&r.parentNode?r.parentNode.insertBefore(p,r):(d=t.head||t.body||t.documentElement)&&d.appendChild(p);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Ir Sr init jr $r Ci qr Hr Dr capture calculateEventProperties Wr register register_once register_for_session unregister unregister_for_session Qr getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync tn identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty Jr Yr createPersonProfile setInternalOrTestUser Kr Pr nn opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing zr debug ki Xr getPageViewId captureTraceFeedback captureTraceMetric Mr".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
 
     const existingInstance = window.posthog && window.posthog[POSTHOG_INSTANCE_NAME];
-    if (existingInstance && existingInstance.__mosFunnelConfigured === "true") {
+    if (
+      existingInstance &&
+      (existingInstance.__mosFunnelConfigured === "true" || window.__mosFunnelPostHogConfigured === "true")
+    ) {
+      window.__mosFunnelPostHogConfigured = "true";
       return existingInstance;
     }
 
@@ -347,33 +545,53 @@ function buildStandaloneImportedHtmlRuntimeScript({
       });
     }
     instance.__mosFunnelConfigured = "true";
+    window.__mosFunnelPostHogConfigured = "true";
     return instance;
   };
 
-  const trackPostHogEvent = (eventType, props) => {
-    const posthog = ensurePostHogInstance();
-    if (!posthog || typeof posthog.capture !== "function") {
-      return;
-    }
-
+  const trackPostHogEvent = (eventType, props, mappedCaptures) => {
+    const eventSourceUrl = window.location.href;
     const baseEventProps = {
-      productSlug: cleanText(config.productSlug),
-      funnelSlug: cleanText(config.funnelSlug),
-      publicationId: cleanText(config.publicationId),
-      pageId: cleanText(config.pageId),
-      pageSlug: cleanText(config.pageSlug),
-      pageStage: cleanText((props && props.pageStage) || config.pageStage),
-      visitorId: cleanText(config.visitorId),
-      sessionId: cleanText(config.sessionId),
-      path: window.location.pathname + window.location.search,
-      referrer: document.referrer || undefined,
+      ...resolveRuntimeContextProps(props),
       utm: getUtmParams(),
     };
 
-    const captures = resolvePostHogCaptures(eventType, props, baseEventProps);
-    captures.forEach((capture) => {
-      posthog.capture(capture.eventName, capture.eventProps);
-    });
+    const emitCaptures = (additionalEventProps) => {
+      const captures = resolvePostHogCaptures(eventType, props, baseEventProps, mappedCaptures, eventSourceUrl);
+      let sent = false;
+      const sendCaptures = () => {
+        if (sent) return;
+        const posthog = ensurePostHogInstance();
+        if (!posthog || posthog.__loaded !== true || typeof posthog.capture !== "function") return;
+        sent = true;
+        captures.forEach((capture) => {
+          posthog.capture(capture.eventName, {
+            ...capture.eventProps,
+            ...(additionalEventProps || {}),
+          });
+        });
+      };
+      sendCaptures();
+      if (!sent) {
+        window.setTimeout(sendCaptures, 100);
+        window.setTimeout(sendCaptures, 500);
+        window.setTimeout(sendCaptures, 1500);
+        window.setTimeout(sendCaptures, 3000);
+        window.setTimeout(sendCaptures, 5000);
+      }
+    };
+
+    if (Array.isArray(mappedCaptures) && mappedCaptures.length && !resolveMetaAttributionReady(eventSourceUrl)) {
+      waitForMetaAttribution(eventSourceUrl).then(({ elapsedMs, timedOut }) => {
+        emitCaptures({
+          meta_cookie_wait_ms: elapsedMs,
+          ...(timedOut ? { meta_cookie_wait_timed_out: true } : {}),
+        });
+      });
+      return;
+    }
+
+    emitCaptures();
   };
 
   const resolveMetaPixelPageStage = (props) => {
@@ -411,12 +629,21 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return nextProps;
   };
 
-  const trackMetaPixel = (method, eventName, params) => {
+  const trackMetaPixel = (method, eventName, params, eventId) => {
     if (typeof window.fbq !== "function") {
       return;
     }
+    const options = cleanText(eventId) ? { eventID: cleanText(eventId) } : null;
     if (isNonEmptyRecord(params)) {
+      if (options) {
+        window.fbq(method, eventName, params, options);
+        return;
+      }
       window.fbq(method, eventName, params);
+      return;
+    }
+    if (options) {
+      window.fbq(method, eventName, {}, options);
       return;
     }
     window.fbq(method, eventName);
@@ -425,36 +652,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const resolveMappedMetaEvents = (eventType, props) => {
     const pageStage = resolveMetaPixelPageStage(props);
     const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
-    const fromPresale = props && props.fromPresale === true;
     if (eventType === "pre_sales_page_view" || eventType === "custom_page_view") {
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
     }
     if (eventType === "sales_page_view") {
-      const captures = [{ method: "track", eventName: "PageView", params: pageViewParams }];
-      if (fromPresale) {
-        captures.push({ method: "trackCustom", eventName: "EnteredSales", params: pageViewParams });
-        return captures;
-      }
-      captures.push({ method: "track", eventName: "ViewContent", params: pageViewParams });
-      return captures;
+      return [
+        { method: "track", eventName: "PageView", params: pageViewParams },
+        { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams },
+      ];
     }
     if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
-    }
-    if (eventType === "sales_to_checkout_click") {
-      const variantId = cleanText(props && props.variantId);
-      if (variantId) {
-        return [{
-          method: "track",
-          eventName: "AddToCart",
-          params: {
-            content_ids: [variantId],
-            content_type: "product",
-            num_items: 1,
-          },
-        }];
-      }
-      return [];
     }
     if (eventType === "pre_sales_to_sales_click") {
       return [{
@@ -466,20 +674,30 @@ function buildStandaloneImportedHtmlRuntimeScript({
         },
       }];
     }
-    if (eventType === "custom_page_click") {
-      return [{ method: "trackCustom", eventName: CTA_LINK_CLICK_EVENT_NAME, params: props || {} }];
+    if (eventType === "sales_to_checkout_click") {
+      return [{
+        method: "trackCustom",
+        eventName: "SalesToCheckoutClick",
+        params: {
+          from_stage: "sales",
+          to_stage: "checkout",
+        },
+      }];
     }
-    if (eventType === "Entered Funnel") {
-      return [{ method: "trackCustom", eventName: "Entered Funnel", params: pageViewParams }];
+    if (eventType === "presell_page_view") {
+      return [{ method: "trackCustom", eventName: "EnteredPresales", params: pageViewParams }];
     }
     return [];
   };
 
-  const resolvePostHogCaptures = (eventType, props, baseEventProps) => {
+  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {
     const sanitizedProps = sanitizePostHogProps(props);
+    const canonicalEventId = cleanText(props && props.eventId);
     const pageStage = cleanText((props && props.pageStage) || config.pageStage);
     const contentCategory = resolvePostHogContentCategory(pageStage);
-    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    const mappedCaptures = Array.isArray(providedMappedCaptures)
+      ? providedMappedCaptures
+      : resolveMappedMetaEvents(eventType, props);
     if (!mappedCaptures.length) {
       return [{
         eventName: eventType,
@@ -487,17 +705,23 @@ function buildStandaloneImportedHtmlRuntimeScript({
           ...baseEventProps,
           ...sanitizedProps,
           internal_event_type: eventType,
-          $event_id: buildPostHogEventId(eventType, eventType, 0),
+          ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
+          $event_id: canonicalEventId || buildPostHogEventId(eventType, eventType, 0),
         },
       }];
     }
     return mappedCaptures.map((capture, index) => {
+      const metaEventId = cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index);
       const eventProps = {
         ...baseEventProps,
         ...sanitizedProps,
         ...(isRecord(capture.params) ? capture.params : {}),
         internal_event_type: eventType,
-        $event_id: buildPostHogEventId(capture.eventName, eventType, index),
+        ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
+        ...resolveMetaAttributionProps(eventSourceUrl),
+        meta_event_name: capture.eventName,
+        meta_event_id: metaEventId,
+        $event_id: metaEventId,
       };
       if (contentCategory) {
         eventProps.content_category = contentCategory;
@@ -512,28 +736,43 @@ function buildStandaloneImportedHtmlRuntimeScript({
     });
   };
 
-  const trackMetaPixelForEvent = (eventType, props) => {
+  const trackMetaPixelCaptures = (mappedCaptures) => {
     const pixelId = ensureMetaPixelBootstrap();
     if (!pixelId || typeof window.fbq !== "function") {
       return;
     }
-    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    const attributionParams = resolveMetaAttributionProps(window.location.href);
     mappedCaptures.forEach((capture) => {
-      trackMetaPixel(capture.method, capture.eventName, capture.params);
+      trackMetaPixel(capture.method, capture.eventName, {
+        ...(isRecord(capture.params) ? capture.params : {}),
+        ...attributionParams,
+      }, capture.eventId);
     });
   };
 
   const trackEvent = (eventType, props) => {
-    trackMetaPixelForEvent(eventType, props || {});
-    trackPostHogEvent(eventType, props || {});
+    const canonicalEventId = cleanText(props && props.eventId) || buildCanonicalEventId(eventType);
+    const eventProps = {
+      eventId: canonicalEventId,
+      ...(props || {}),
+    };
+    const mappedCaptures = resolveMappedMetaEvents(eventType, eventProps).map((capture, index) => ({
+      ...capture,
+      eventId: cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index),
+    }));
+    trackMetaPixelCaptures(mappedCaptures);
+    trackPostHogEvent(eventType, eventProps, mappedCaptures);
     try {
+      const runtimeContextProps = resolveRuntimeContextProps(eventProps);
       void fetch(config.apiBaseUrl + "/public/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           events: [
             {
+              eventId: canonicalEventId,
               eventType,
+              occurredAt: new Date().toISOString(),
               publicationId: config.publicationId,
               pageId: config.pageId,
               visitorId: config.visitorId,
@@ -542,10 +781,16 @@ function buildStandaloneImportedHtmlRuntimeScript({
               referrer: document.referrer || undefined,
               utm: getUtmParams(),
               props: {
+                ...runtimeContextProps,
+                ...resolveMetaAttributionProps(window.location.href),
                 fromPageId: config.pageId,
                 slug: config.pageSlug,
                 pageStage: config.pageStage,
-                ...(props || {}),
+                metaEvents: mappedCaptures.map((capture) => ({
+                  eventName: capture.eventName,
+                  eventId: capture.eventId,
+                })),
+                ...eventProps,
               },
             },
           ],
@@ -559,10 +804,21 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
   };
 
-  const waitForTrackingNavigationFlush = () =>
-    new Promise((resolve) => {
-      window.setTimeout(resolve, TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+  const installTrackEventBridge = () => {
+    if (window.__mosStandaloneTrackEventBridgeInstalled) return;
+    window.__mosStandaloneTrackEventBridgeInstalled = true;
+    window.MOSStandaloneAnalytics = {
+      trackEvent,
+    };
+    window.addEventListener("mos:track-event", (event) => {
+      const detail = event && event.detail;
+      if (!isRecord(detail)) return;
+      const eventType = cleanText(detail.eventType);
+      if (!eventType) return;
+      const props = isRecord(detail.props) ? detail.props : {};
+      trackEvent(eventType, props);
     });
+  };
 
   const normalizeSelection = (selection) => {
     if (!isRecord(selection)) return null;
@@ -667,6 +923,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const PREPARED_CHECKOUT_POLL_INTERVAL_MS = 150;
   const PREPARED_CHECKOUT_POLL_TIMEOUT_MS = 10 * 1000;
   const CHECKOUT_LOADING_LABEL = "Preparing secure checkout...";
+  const CHECKOUT_CLICK_LOADING_LABEL = "Opening secure checkout...";
   const CHECKOUT_ERROR_LABEL = "Secure checkout is unavailable right now.";
   let warmCheckoutBindingsTimeout = null;
   let checkoutNavigationInProgress = false;
@@ -687,7 +944,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     trackedPageViewIds.push(config.pageId);
     window.__mosStandaloneImportedHtmlTrackedPageViewIds = trackedPageViewIds;
     const presaleSignal = config.pageStage === "sales" ? resolvePresaleAttribution() : null;
-    trackEvent(resolvePageViewEventType(), {
+    const pageViewProps = {
       pageStage: config.pageStage,
       ...(presaleSignal
         ? {
@@ -695,7 +952,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
             presaleSignal,
           }
         : {}),
-    });
+    };
+    trackEvent(resolvePageViewEventType(), pageViewProps);
+    if (config.pageStage === "pre_sales") {
+      trackEvent("presell_page_view", {
+        ...pageViewProps,
+        rmbcEventName: "EnteredPresales",
+      });
+    }
+    if (config.pageStage === "sales") {
+      trackEvent("offer_page_view", pageViewProps);
+    }
   };
 
   const scheduleInitialPageView = () => {
@@ -711,6 +978,347 @@ function buildStandaloneImportedHtmlRuntimeScript({
       return;
     }
     window.setTimeout(run, 0);
+  };
+
+  const SCROLL_DEPTH_MILESTONES = [10, 25, 50, 75, 90, 100];
+  const QUALIFIED_ACTIVE_TIME_MS = 3000;
+  const QUALIFIED_SCROLL_DEPTH_PCT = 25;
+  const trackedScrollDepthMilestones = {};
+  const observedViewTargetKeys = {};
+  const interactionListenerKeys = {};
+  let interactionSequence = 0;
+  let maxScrollDepthPct = 0;
+  let scrollTrackingScheduled = false;
+  let qualifiedSessionTracked = false;
+  let engagementTrackingInitialized = false;
+  let activeStartedAt = Date.now();
+  let activeAccumulatedMs = 0;
+
+  const currentActiveTimeMs = () => {
+    if (document.visibilityState === "hidden") {
+      return activeAccumulatedMs;
+    }
+    return activeAccumulatedMs + Math.max(0, Date.now() - activeStartedAt);
+  };
+
+  const pauseActiveTime = () => {
+    if (document.visibilityState === "hidden") {
+      return;
+    }
+    activeAccumulatedMs = currentActiveTimeMs();
+  };
+
+  const resumeActiveTime = () => {
+    activeStartedAt = Date.now();
+  };
+
+  const trackQualifiedSession = (reason) => {
+    if (qualifiedSessionTracked) return;
+    qualifiedSessionTracked = true;
+    trackEvent("qualified_session", {
+      reason,
+      activeTimeMs: Math.round(currentActiveTimeMs()),
+      maxScrollDepthPct,
+      qualificationActiveTimeMs: QUALIFIED_ACTIVE_TIME_MS,
+      qualificationScrollDepthPct: QUALIFIED_SCROLL_DEPTH_PCT,
+    });
+  };
+
+  const evaluateQualifiedSession = (reason) => {
+    if (currentActiveTimeMs() >= QUALIFIED_ACTIVE_TIME_MS || maxScrollDepthPct >= QUALIFIED_SCROLL_DEPTH_PCT) {
+      trackQualifiedSession(reason);
+    }
+  };
+
+  const calculateScrollDepthPct = () => {
+    const doc = document.documentElement;
+    const body = document.body;
+    const scrollTop = window.scrollY || doc.scrollTop || (body && body.scrollTop) || 0;
+    const viewportHeight = window.innerHeight || doc.clientHeight || 0;
+    const scrollHeight = Math.max(
+      doc.scrollHeight || 0,
+      body ? body.scrollHeight || 0 : 0,
+      doc.offsetHeight || 0,
+      body ? body.offsetHeight || 0 : 0,
+      viewportHeight,
+    );
+    if (!scrollHeight || viewportHeight >= scrollHeight) return 100;
+    return Math.max(0, Math.min(100, Math.round(((scrollTop + viewportHeight) / scrollHeight) * 100)));
+  };
+
+  const handleScrollDepthTracking = () => {
+    scrollTrackingScheduled = false;
+    maxScrollDepthPct = Math.max(maxScrollDepthPct, calculateScrollDepthPct());
+    for (const milestone of SCROLL_DEPTH_MILESTONES) {
+      if (maxScrollDepthPct >= milestone && trackedScrollDepthMilestones[milestone] !== true) {
+        trackedScrollDepthMilestones[milestone] = true;
+        trackEvent("scroll_depth", {
+          scrollDepthPct: milestone,
+          maxScrollDepthPct,
+          activeTimeMs: Math.round(currentActiveTimeMs()),
+        });
+      }
+    }
+    evaluateQualifiedSession("scroll_depth");
+  };
+
+  const scheduleScrollDepthTracking = () => {
+    if (scrollTrackingScheduled) return;
+    scrollTrackingScheduled = true;
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(handleScrollDepthTracking);
+      return;
+    }
+    window.setTimeout(handleScrollDepthTracking, 0);
+  };
+
+  const initializeEngagementTracking = () => {
+    if (engagementTrackingInitialized) return;
+    engagementTrackingInitialized = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        pauseActiveTime();
+        return;
+      }
+      resumeActiveTime();
+    });
+    window.addEventListener("pagehide", pauseActiveTime);
+    window.addEventListener("scroll", scheduleScrollDepthTracking, { passive: true });
+    window.addEventListener("resize", scheduleScrollDepthTracking);
+    window.setInterval(() => evaluateQualifiedSession("active_time"), 1000);
+    scheduleScrollDepthTracking();
+  };
+
+  const observationTargetsFromManifest = () => {
+    const targets = [];
+    const addTarget = (eventType, kind, target) => {
+      if (!target || typeof target !== "object") return;
+      const id = cleanText(target.id);
+      const selector = cleanText(target.selector);
+      if (!id || !selector) return;
+      targets.push({
+        eventType,
+        kind,
+        id,
+        selector,
+        label: cleanText(target.label),
+      });
+    };
+
+    const manifest = config.manifest || {};
+    if (Array.isArray(manifest.sections)) {
+      manifest.sections.forEach((target) => addTarget("section_view", "section", target));
+    }
+    if (Array.isArray(manifest.proofs)) {
+      manifest.proofs.forEach((target) => addTarget("proof_view", "proof", target));
+    }
+    if (Array.isArray(manifest.ctas)) {
+      manifest.ctas.forEach((target) => addTarget("cta_view", "cta", target));
+    }
+    if (Array.isArray(manifest.offerStacks)) {
+      manifest.offerStacks.forEach((target) => addTarget("offer_stack_view", "offer_stack", target));
+    }
+    if (Array.isArray(manifest.valueStacks)) {
+      manifest.valueStacks.forEach((target) => addTarget("value_stack_view", "value_stack", target));
+    }
+    if (Array.isArray(manifest.priceReveals)) {
+      manifest.priceReveals.forEach((target) => addTarget("price_reveal_view", "price_reveal", target));
+    }
+    if (Array.isArray(manifest.guarantees)) {
+      manifest.guarantees.forEach((target) => addTarget("guarantee_view", "guarantee", target));
+    }
+    if (Array.isArray(manifest.trustElements)) {
+      manifest.trustElements.forEach((target) => addTarget("trust_element_view", "trust_element", target));
+    }
+    if (Array.isArray(manifest.bindings)) {
+      manifest.bindings.forEach((binding) => {
+        if (!binding || typeof binding !== "object") return;
+        const id = cleanText(binding.id);
+        const selector = cleanText(binding.selector);
+        if (!id || !selector) return;
+        targets.push({
+          eventType: "cta_view",
+          kind: "cta",
+          id,
+          selector,
+          bindingType: cleanText(binding.type),
+          trackEventType: cleanText(binding.trackEventType),
+        });
+      });
+    }
+    return targets;
+  };
+
+  const trackObservedViewTarget = (target, element, index) => {
+    const key = [target.eventType, target.id, String(index)].join(":");
+    if (observedViewTargetKeys[key] === true) return;
+    observedViewTargetKeys[key] = true;
+    trackEvent(target.eventType, {
+      targetKind: target.kind,
+      targetId: target.id,
+      selector: target.selector,
+      label: target.label || undefined,
+      bindingType: target.bindingType || undefined,
+      trackEventType: target.trackEventType || undefined,
+      text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
+      activeTimeMs: Math.round(currentActiveTimeMs()),
+      maxScrollDepthPct,
+      ...(target.kind === "cta" ? { ctaId: target.id } : {}),
+      ...(target.kind === "section" ? { sectionId: target.id } : {}),
+      ...(target.kind === "proof" ? { proofId: target.id } : {}),
+      ...(target.kind === "offer_stack" ? { offerStackId: target.id, offer_id: target.id } : {}),
+      ...(target.kind === "value_stack" ? { valueStackId: target.id } : {}),
+      ...(target.kind === "price_reveal" ? { priceRevealId: target.id } : {}),
+      ...(target.kind === "guarantee" ? { guaranteeId: target.id, guarantee_id: target.id } : {}),
+      ...(target.kind === "trust_element" ? { trustElementId: target.id } : {}),
+    });
+  };
+
+  const initializeViewTracking = () => {
+    if (typeof window.IntersectionObserver !== "function") return;
+    const targets = observationTargetsFromManifest();
+    if (!targets.length) return;
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.5) return;
+          const targetConfig = entry.target.__mosViewTrackingTarget;
+          const targetIndex = entry.target.__mosViewTrackingIndex || 0;
+          if (targetConfig) {
+            trackObservedViewTarget(targetConfig, entry.target, targetIndex);
+          }
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: [0.5] },
+    );
+    targets.forEach((target) => {
+      const matches = Array.from(document.querySelectorAll(target.selector));
+      matches.forEach((element, index) => {
+        if (!(element instanceof HTMLElement)) return;
+        const key = [target.eventType, target.id, String(index)].join(":");
+        if (observedViewTargetKeys[key] === true) return;
+        element.__mosViewTrackingTarget = target;
+        element.__mosViewTrackingIndex = index;
+        observer.observe(element);
+      });
+    });
+  };
+
+  const interactionTargetsFromManifest = () => {
+    const targets = [];
+    const addTarget = (eventType, kind, target) => {
+      if (!target || typeof target !== "object") return;
+      const id = cleanText(target.id);
+      const selector = cleanText(target.selector);
+      if (!id || !selector) return;
+      targets.push({
+        eventType,
+        kind,
+        id,
+        selector,
+        label: cleanText(target.label),
+        event: target.event === "input" || target.event === "change" ? target.event : "click",
+        source: target.source === "text" || target.source === "checked" ? target.source : "value",
+        interactionType: cleanText(target.interactionType) || kind,
+      });
+    };
+    const manifest = config.manifest || {};
+    if (Array.isArray(manifest.selectorInteractions)) {
+      manifest.selectorInteractions.forEach((target) => addTarget("selector_interaction", "selector", target));
+    }
+    if (Array.isArray(manifest.productDetailInteractions)) {
+      manifest.productDetailInteractions.forEach((target) =>
+        addTarget("product_detail_interaction", "product_detail", target),
+      );
+    }
+    return targets;
+  };
+
+  const readInteractionValue = (element, source) => {
+    if (source === "checked") {
+      return element instanceof HTMLInputElement ? (element.checked ? "checked" : "unchecked") : undefined;
+    }
+    if (source === "text") {
+      return normalizeText(element.textContent || "") || undefined;
+    }
+    if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) {
+      return normalizeText(element.value || "") || undefined;
+    }
+    return normalizeText(element.textContent || "") || undefined;
+  };
+
+  const selectedValueLooksSubscribed = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "subscribe" || normalized === "subscription" || normalized.includes("subscribe");
+  };
+
+  const trackInteractionTarget = (target, element) => {
+    interactionSequence += 1;
+    const selectedValue = readInteractionValue(element, target.source);
+    const props = {
+      targetKind: target.kind,
+      targetId: target.id,
+      selector: target.selector,
+      label: target.label || undefined,
+      interactionType: target.interactionType,
+      selectedValue,
+      text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
+      activeTimeMs: Math.round(currentActiveTimeMs()),
+      maxScrollDepthPct,
+      interactionSequence,
+      ...(target.kind === "selector" ? { selectorId: target.id } : {}),
+      ...(target.kind === "product_detail" ? { productDetailId: target.id } : {}),
+    };
+    trackEvent(target.eventType, props);
+    if (target.eventType === "selector_interaction" && selectedValueLooksSubscribed(selectedValue)) {
+      trackEvent("subscription_selected", {
+        ...props,
+        subscription_flag: true,
+      });
+    }
+    evaluateQualifiedSession("element_interaction");
+  };
+
+  const initializeInteractionTracking = () => {
+    const targets = interactionTargetsFromManifest();
+    if (!targets.length) return;
+    targets.forEach((target) => {
+      const matches = Array.from(document.querySelectorAll(target.selector));
+      matches.forEach((element, index) => {
+        if (!(element instanceof HTMLElement)) return;
+        const key = [target.eventType, target.id, String(index), target.event].join(":");
+        if (interactionListenerKeys[key] === true) return;
+        interactionListenerKeys[key] = true;
+        element.addEventListener(target.event, () => trackInteractionTarget(target, element), {
+          passive: true,
+        });
+      });
+    });
+  };
+
+  const initializeEngagementTrackingSafely = () => {
+    try {
+      initializeEngagementTracking();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Failed to initialize engagement tracking.", error);
+    }
+  };
+
+  const initializeViewTrackingSafely = () => {
+    try {
+      initializeViewTracking();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Failed to initialize view tracking.", error);
+    }
+  };
+
+  const initializeInteractionTrackingSafely = () => {
+    try {
+      initializeInteractionTracking();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Failed to initialize interaction tracking.", error);
+    }
   };
 
   const selectionsMatch = (left, right) => {
@@ -897,6 +1505,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const parseResponseError = async (response) => {
     try {
       const payload = await response.clone().json();
+      const firstError = Array.isArray(payload && payload.errors) ? payload.errors[0] : null;
+      const errorDetail = cleanText(firstError && firstError.detail);
+      if (errorDetail) return errorDetail;
+      const errorTitle = cleanText(firstError && firstError.title);
+      if (errorTitle) return errorTitle;
       const detail = cleanText(payload && payload.detail);
       if (detail) return detail;
       const message = cleanText(payload && payload.message);
@@ -962,7 +1575,157 @@ function buildStandaloneImportedHtmlRuntimeScript({
     };
   };
 
-  const createCheckoutPayload = ({ resolvedVariantId, resolvedSelection }) => {
+  const serializeCheckoutAttributeValue = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === "string") return cleanText(value);
+    return JSON.stringify(value);
+  };
+
+  const checkoutAttributionProps = ({ ctaId, transitionId } = {}) => {
+    const metaProps = resolveMetaAttributionProps(window.location.href);
+    const clickProps = resolveClickAttribution();
+    const experimentId = resolveExperimentId();
+    return {
+      ...(clickProps.clickId ? { clickId: clickProps.clickId, clickIdType: clickProps.clickIdType } : {}),
+      ...(metaProps.fbp ? { fbp: metaProps.fbp } : {}),
+      ...(metaProps.fbc ? { fbc: metaProps.fbc } : {}),
+      ...(metaProps.external_id ? { externalId: metaProps.external_id } : {}),
+      ...(metaProps.em ? { em: metaProps.em } : {}),
+      ...(metaProps.event_source_url ? { eventSourceUrl: metaProps.event_source_url } : {}),
+      pageVariant: cleanText(config.pageSlug),
+      ...(experimentId ? { experimentId } : {}),
+      ...(cleanText(ctaId) ? { ctaId: cleanText(ctaId) } : {}),
+      ...(cleanText(transitionId) ? { transitionId: cleanText(transitionId) } : {}),
+    };
+  };
+
+  const checkoutAttributeMap = ({ resolvedVariantId, resolvedSelection, ctaId, transitionId }) => {
+    const attribution = checkoutAttributionProps({ ctaId, transitionId });
+    return {
+      funnel_slug: cleanText(config.funnelSlug),
+      funnel_id: cleanText(config.funnelId),
+      publication_id: cleanText(config.publicationId),
+      page_id: cleanText(config.pageId),
+      visitor_id: cleanText(config.visitorId),
+      session_id: cleanText(config.sessionId),
+      variant_id: cleanText(resolvedVariantId),
+      price_point_id: cleanText(resolvedVariantId),
+      selection: resolvedSelection || {},
+      utm: getUtmParams(),
+      quantity: "1",
+      click_id: attribution.clickId,
+      click_id_type: attribution.clickIdType,
+      fbp: attribution.fbp,
+      fbc: attribution.fbc,
+      external_id: attribution.externalId,
+      em: attribution.em,
+      event_source_url: attribution.eventSourceUrl,
+      page_variant: attribution.pageVariant,
+      experiment_id: attribution.experimentId,
+      cta_id: attribution.ctaId,
+      transition_id: attribution.transitionId,
+    };
+  };
+
+  const appendCheckoutAttributesToCartUrl = (checkoutUrl, attributes) => {
+    const href = cleanText(checkoutUrl);
+    if (!href) return href;
+    let url;
+    try {
+      url = new URL(href, window.location.href);
+    } catch (_) {
+      return href;
+    }
+    if (!url.pathname.startsWith("/cart/")) {
+      return href;
+    }
+    Object.entries(attributes || {}).forEach(([key, value]) => {
+      const serialized = serializeCheckoutAttributeValue(value);
+      if (serialized) {
+        url.searchParams.set("attributes[" + key + "]", serialized);
+      }
+    });
+    return url.toString();
+  };
+
+  const appendCheckoutTrackingUrlParams = (targetUrl) => {
+    const href = cleanText(targetUrl);
+    if (!href) return href;
+    const url = new URL(href, window.location.href);
+    const params = new URLSearchParams(window.location.search);
+    for (const [key, value] of params.entries()) {
+      if (isCheckoutTrackingParam(key)) {
+        url.searchParams.set(key, value);
+      }
+    }
+    return url.toString();
+  };
+
+  const checkoutUrlHost = (checkoutUrl) => {
+    const href = cleanText(checkoutUrl);
+    if (!href) return null;
+    try {
+      return new URL(href, window.location.href).host;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const checkoutTimingProps = ({ transitionId, ctaId, checkoutUrl, resolvedVariantId, resolvedSelection }) => {
+    const connection = window.navigator && window.navigator.connection;
+    const props = {
+      transitionId: cleanText(transitionId),
+      ctaId: cleanText(ctaId),
+      checkout_url_host: checkoutUrlHost(checkoutUrl),
+      selected_offer: cleanText(resolvedSelection && (resolvedSelection.offerId || resolvedSelection.Offer || resolvedSelection.Pack)),
+      variant_ids: cleanText(resolvedVariantId) ? [cleanText(resolvedVariantId)] : undefined,
+      user_agent: window.navigator && window.navigator.userAgent,
+      device_type: resolveDeviceType(),
+      connection_effective_type: connection && connection.effectiveType,
+      connection_rtt: connection && typeof connection.rtt === "number" ? connection.rtt : undefined,
+      connection_downlink: connection && typeof connection.downlink === "number" ? connection.downlink : undefined,
+      device_memory: window.navigator && typeof window.navigator.deviceMemory === "number" ? window.navigator.deviceMemory : undefined,
+      performance_now_ms: window.performance && typeof window.performance.now === "function"
+        ? Math.round(window.performance.now())
+        : undefined,
+      client_timestamp_ms: Date.now(),
+    };
+    return Object.fromEntries(Object.entries(props).filter(([, value]) => value !== undefined && value !== null && value !== ""));
+  };
+
+  let checkoutHandoffContext = null;
+  let checkoutPagehideTracked = false;
+  let checkoutVisibilityHiddenTracked = false;
+
+  const trackCheckoutTimingEvent = (eventType, context) => {
+    const props = isRecord(context) ? context : checkoutHandoffContext;
+    if (!props) return;
+    trackEvent(eventType, {
+      ...props,
+      performance_now_ms: window.performance && typeof window.performance.now === "function"
+        ? Math.round(window.performance.now())
+        : undefined,
+      client_timestamp_ms: Date.now(),
+    });
+  };
+
+  const installCheckoutHandoffTracking = () => {
+    if (window.__mosCheckoutHandoffTrackingInstalled === true) return;
+    window.__mosCheckoutHandoffTrackingInstalled = true;
+    window.addEventListener("pagehide", () => {
+      if (!checkoutHandoffContext || checkoutPagehideTracked !== false) return;
+      checkoutPagehideTracked = true;
+      trackCheckoutTimingEvent("checkout_pagehide", checkoutHandoffContext);
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (!checkoutHandoffContext || checkoutVisibilityHiddenTracked !== false) return;
+      if (document.visibilityState !== "hidden") return;
+      checkoutVisibilityHiddenTracked = true;
+      trackCheckoutTimingEvent("checkout_visibility_hidden", checkoutHandoffContext);
+    });
+  };
+
+  const createCheckoutPayload = ({ resolvedVariantId, resolvedSelection, ctaId, transitionId }) => {
     const checkoutUrls = resolveCheckoutUrls();
     return {
       funnelSlug: config.funnelSlug,
@@ -975,6 +1738,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       visitorId: config.visitorId,
       sessionId: config.sessionId,
       utm: getUtmParams(),
+      ...checkoutAttributionProps({ ctaId, transitionId }),
     };
   };
 
@@ -997,11 +1761,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
     };
   };
 
-  const requestCheckout = async ({ resolvedVariantId, resolvedSelection }) => {
+  const requestCheckout = async ({ resolvedVariantId, resolvedSelection, ctaId, transitionId }) => {
     const response = await fetch(config.apiBaseUrl + "/public/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(createCheckoutPayload({ resolvedVariantId, resolvedSelection })),
+      body: JSON.stringify(createCheckoutPayload({ resolvedVariantId, resolvedSelection, ctaId, transitionId })),
     });
 
     if (!response.ok) {
@@ -1021,11 +1785,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
     };
   };
 
-  const requestPreparedCheckout = async ({ resolvedVariantId, resolvedSelection }) => {
+  const requestPreparedCheckout = async ({ resolvedVariantId, resolvedSelection, ctaId, transitionId }) => {
     const response = await fetch(config.apiBaseUrl + "/public/checkout/prepare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(createCheckoutPayload({ resolvedVariantId, resolvedSelection })),
+      body: JSON.stringify(createCheckoutPayload({ resolvedVariantId, resolvedSelection, ctaId, transitionId })),
     });
 
     if (!response.ok) {
@@ -1077,6 +1841,25 @@ function buildStandaloneImportedHtmlRuntimeScript({
     };
   };
 
+  const markPreparedCheckoutConsumed = (preparedCheckoutId) => {
+    const cleanedId = cleanText(preparedCheckoutId);
+    if (!cleanedId) return;
+    try {
+      void fetch(
+        config.apiBaseUrl + "/public/checkout/prepare/" + encodeURIComponent(cleanedId) + "/consume",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+        },
+      ).catch((error) => {
+        console.error("[StandaloneImportedHtmlPage] Failed to mark prepared checkout consumed.", error);
+      });
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Failed to mark prepared checkout consumed.", error);
+    }
+  };
+
   const resolveVariantForCheckout = (checkout, selectionFromDom, variants) => {
     const resolver = checkout && checkout.variantResolver;
     if (!resolver || typeof resolver.type !== "string") {
@@ -1102,8 +1885,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   const resolveCheckoutBindingState = async (binding) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
     const selectionFromDom = augmentSelectionWithCheckoutContext(
-      readSelectionFromResolver(binding.checkout.variantResolver, binding.id || "unknown"),
+      readSelectionFromResolver(binding.checkout.variantResolver, bindingId),
     );
     const checkoutVariants =
       selectionFromDom && !cachedVariants.length ? await loadCommerceVariants() : cachedVariants;
@@ -1118,6 +1902,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       variant,
       resolvedVariantId,
       resolvedSelection,
+      ctaId: bindingId,
       cacheKey: buildPreparedCheckoutCacheKey(resolvedVariantId, resolvedSelection),
     };
   };
@@ -1166,7 +1951,14 @@ function buildStandaloneImportedHtmlRuntimeScript({
     throw new Error("Prepared checkout timed out.");
   };
 
-  const prepareCheckoutInBackground = async ({ variant, resolvedVariantId, resolvedSelection, cacheKey }) => {
+  const prepareCheckoutInBackground = async ({
+    variant,
+    resolvedVariantId,
+    resolvedSelection,
+    cacheKey,
+    ctaId,
+    transitionId,
+  }) => {
     if (!cacheKey || !variant || variant.provider !== "shopify") {
       return null;
     }
@@ -1179,7 +1971,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
     const promise = (async () => {
       try {
-        let preparedCheckout = await requestPreparedCheckout({ resolvedVariantId, resolvedSelection });
+        let preparedCheckout = await requestPreparedCheckout({
+          resolvedVariantId,
+          resolvedSelection,
+          ctaId,
+          transitionId,
+        });
         if (preparedCheckout.status === "pending") {
           preparedCheckout = await waitForPreparedCheckoutStatus(
             preparedCheckout.preparedCheckoutId,
@@ -1276,14 +2073,19 @@ function buildStandaloneImportedHtmlRuntimeScript({
     variant,
     resolvedVariantId,
     resolvedSelection,
+    transitionId,
   }) => {
     const isWarmableShopifyCheckout = Boolean(cacheKey) && Boolean(variant) && variant.provider === "shopify";
     if (!isWarmableShopifyCheckout) {
-      return requestCheckout({ resolvedVariantId, resolvedSelection });
+      return requestCheckout({ resolvedVariantId, resolvedSelection, ctaId: bindingId, transitionId });
     }
     let preparedCheckout = getPreparedCheckoutRecord(cacheKey);
     if (preparedCheckout) {
-      return consumePreparedCheckout(preparedCheckout.preparedCheckoutId);
+      markPreparedCheckoutConsumed(preparedCheckout.preparedCheckoutId);
+      return {
+        checkoutUrl: preparedCheckout.checkoutUrl,
+        sessionId: preparedCheckout.sessionId || null,
+      };
     }
     setCheckoutBindingState(bindingId, {
       status: "loading",
@@ -1292,7 +2094,14 @@ function buildStandaloneImportedHtmlRuntimeScript({
     });
     preparedCheckout =
       (await waitForPreparedCheckout(cacheKey)) ||
-      (await prepareCheckoutInBackground({ variant, resolvedVariantId, resolvedSelection, cacheKey }));
+      (await prepareCheckoutInBackground({
+        variant,
+        resolvedVariantId,
+        resolvedSelection,
+        cacheKey,
+        ctaId: bindingId,
+        transitionId,
+      }));
     if (!preparedCheckout) {
       setCheckoutBindingState(bindingId, {
         status: "error",
@@ -1301,17 +2110,16 @@ function buildStandaloneImportedHtmlRuntimeScript({
       });
       throw new Error("Prepared checkout is unavailable.");
     }
-    const consumedCheckout = await consumePreparedCheckout(preparedCheckout.preparedCheckoutId);
-    preparedCheckoutCache[cacheKey] = {
-      ...preparedCheckout,
-      ...consumedCheckout,
-    };
+    markPreparedCheckoutConsumed(preparedCheckout.preparedCheckoutId);
     setCheckoutBindingState(bindingId, {
       status: "ready",
       cacheKey,
       message: null,
     });
-    return consumedCheckout;
+    return {
+      checkoutUrl: preparedCheckout.checkoutUrl,
+      sessionId: preparedCheckout.sessionId || null,
+    };
   };
 
   const isCheckoutBindingTarget = (target) => {
@@ -1423,6 +2231,474 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
   };
 
+  const EMAIL_CAPTURE_LOADING_LABEL = "Saving your email...";
+  const EMAIL_CAPTURE_SUCCESS_LABEL = "You're subscribed.";
+  const EMAIL_CAPTURE_ERROR_LABEL = "We couldn't save your email. Please try again.";
+  const KLAVIYO_CLIENT_SUBSCRIPTION_ENDPOINT = "https://a.klaviyo.com/client/subscriptions";
+
+  const isLikelyEmailAddress = (value) => {
+    const text = String(value || "");
+    if (!text) return false;
+    for (let index = 0; index < text.length; index += 1) {
+      const code = text.charCodeAt(index);
+      if (code <= 32 || code === 127) return false;
+    }
+    const parts = text.split("@");
+    if (parts.length !== 2) return false;
+    const local = parts[0];
+    const domain = parts[1];
+    return Boolean(local && domain && domain.includes(".") && !domain.startsWith(".") && !domain.endsWith("."));
+  };
+  const isPrivateKlaviyoApiKey = (value) => cleanText(value).toLowerCase().startsWith("pk_");
+
+  const ensureEmailCaptureStatusNote = (bindingId, element) => {
+    const existingId = cleanText(element.dataset.mosEmailCaptureStatusNoteId);
+    if (existingId) {
+      const existing = document.getElementById(existingId);
+      if (existing) return existing;
+    }
+    const noteId =
+      "mos-email-capture-status-" +
+      String(bindingId || "unknown") +
+      "-" +
+      String(Date.now()) +
+      "-" +
+      String(Math.floor(Math.random() * 100000));
+    const note = document.createElement("p");
+    note.id = noteId;
+    note.style.display = "none";
+    note.style.width = "100%";
+    note.style.margin = "0.65rem 0 0";
+    note.style.fontSize = "0.875rem";
+    note.style.lineHeight = "1.35";
+    note.style.fontWeight = "600";
+    note.style.letterSpacing = "normal";
+    note.style.textTransform = "none";
+    note.style.color = "inherit";
+    note.setAttribute("aria-live", "polite");
+    element.insertAdjacentElement("afterend", note);
+    element.dataset.mosEmailCaptureStatusNoteId = noteId;
+    return note;
+  };
+
+  const setEmailCaptureStatus = (bindingId, element, status, message) => {
+    const note = ensureEmailCaptureStatusNote(bindingId, element);
+    const cleanedMessage = cleanText(message);
+    if (!status || !cleanedMessage) {
+      note.textContent = "";
+      note.style.display = "none";
+      note.removeAttribute("role");
+      return;
+    }
+    note.textContent = cleanedMessage;
+    note.style.display = "block";
+    note.style.color = status === "error" ? "#b42318" : status === "success" ? "#047857" : "inherit";
+    note.setAttribute("role", status === "error" ? "alert" : "status");
+  };
+
+  const setEmailCaptureSubmitting = (element, busy) => {
+    if (!(element instanceof HTMLElement)) return;
+    const controls = Array.from(
+      element.querySelectorAll("button[type='submit'], button:not([type]), input[type='submit']"),
+    );
+    element.setAttribute("aria-busy", busy ? "true" : "false");
+    controls.forEach((control) => {
+      if (!(control instanceof HTMLElement)) return;
+      if (busy) {
+        if (!("mosEmailCaptureSavedDisabled" in control.dataset)) {
+          const disabled =
+            control instanceof HTMLButtonElement || control instanceof HTMLInputElement
+              ? control.disabled
+              : control.getAttribute("aria-disabled") === "true";
+          control.dataset.mosEmailCaptureSavedDisabled = disabled ? "true" : "false";
+        }
+        control.setAttribute("aria-disabled", "true");
+        control.setAttribute("aria-busy", "true");
+        if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+          control.disabled = true;
+        }
+        return;
+      }
+      const wasDisabled = control.dataset.mosEmailCaptureSavedDisabled === "true";
+      control.removeAttribute("aria-busy");
+      if (wasDisabled) {
+        control.setAttribute("aria-disabled", "true");
+      } else {
+        control.removeAttribute("aria-disabled");
+      }
+      if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+        control.disabled = wasDisabled;
+      }
+      delete control.dataset.mosEmailCaptureSavedDisabled;
+    });
+    if (!busy) {
+      element.removeAttribute("aria-busy");
+    }
+  };
+
+  const queryEmailCaptureElement = (rootElement, selector, label) => {
+    const cleanedSelector = cleanText(selector);
+    if (!cleanedSelector) {
+      throw new Error(label + " selector is missing.");
+    }
+    try {
+      if (rootElement && typeof rootElement.querySelector === "function") {
+        const scopedMatch = rootElement.querySelector(cleanedSelector);
+        if (scopedMatch) return scopedMatch;
+      }
+      return document.querySelector(cleanedSelector);
+    } catch (_) {
+      throw new Error(label + " selector '" + cleanedSelector + "' is invalid.");
+    }
+  };
+
+  const readEmailCaptureElementValue = (element, source) => {
+    if (
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement
+    ) {
+      return cleanText(element.value);
+    }
+    if (source === "text") {
+      return cleanText(element.textContent || "");
+    }
+    return cleanText(element.getAttribute("value")) || cleanText(element.textContent || "");
+  };
+
+  const readEmailCaptureEmail = (binding, element) => {
+    const emailCapture = binding && binding.emailCapture;
+    if (!emailCapture || emailCapture.provider !== "klaviyo") {
+      throw new Error("Email capture binding '" + String(binding && binding.id ? binding.id : "unknown") + "' is missing Klaviyo configuration.");
+    }
+    const emailElement = queryEmailCaptureElement(element, emailCapture.emailSelector, "Email capture email");
+    const email = readEmailCaptureElementValue(emailElement, "value");
+    if (!email || !isLikelyEmailAddress(email)) {
+      throw new Error("Please enter a valid email address.");
+    }
+    return email.toLowerCase();
+  };
+
+  const readEmailCaptureProfileProperties = (binding, element) => {
+    const emailCapture = binding && binding.emailCapture;
+    const fields = Array.isArray(emailCapture && emailCapture.profileFields) ? emailCapture.profileFields : [];
+    const properties = {};
+    fields.forEach((field) => {
+      const name = cleanText(field && field.name);
+      const selector = cleanText(field && field.selector);
+      if (!name || !selector) return;
+      const fieldElement = queryEmailCaptureElement(element, selector, "Email capture profile field '" + name + "'");
+      const value = readEmailCaptureElementValue(fieldElement, field.source === "text" ? "text" : "value");
+      if (value) {
+        properties[name] = value;
+      }
+    });
+    return properties;
+  };
+
+  const buildKlaviyoSubscriptionPayload = (binding, element, email) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    const emailCapture = binding && binding.emailCapture;
+    if (!emailCapture || emailCapture.provider !== "klaviyo") {
+      throw new Error("Email capture binding '" + bindingId + "' is missing Klaviyo configuration.");
+    }
+    const source = cleanText(emailCapture.source);
+    if (!source) {
+      throw new Error("Email capture binding '" + bindingId + "' is missing a Klaviyo source.");
+    }
+    const profileProperties = {
+      source,
+      capture_source: source,
+      product_slug: cleanText(config.productSlug),
+      funnel_slug: cleanText(config.funnelSlug),
+      page_slug: cleanText(config.pageSlug),
+      page_stage: cleanText(config.pageStage),
+      page_id: cleanText(config.pageId),
+      publication_id: cleanText(config.publicationId),
+      visitor_id: cleanText(config.visitorId),
+      session_id: cleanText(config.sessionId),
+      binding_id: bindingId,
+      url: window.location.href,
+      utm: getUtmParams(),
+      ...readEmailCaptureProfileProperties(binding, element),
+    };
+    const payload = {
+      data: {
+        type: "subscription",
+        attributes: {
+          custom_source: source,
+          profile: {
+            data: {
+              type: "profile",
+              attributes: {
+                email,
+                properties: profileProperties,
+                subscriptions: {
+                  email: {
+                    marketing: {
+                      consent: "SUBSCRIBED",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const listId = cleanText(emailCapture.klaviyo && emailCapture.klaviyo.listId);
+    if (listId) {
+      payload.data.relationships = {
+        list: {
+          data: {
+            type: "list",
+            id: listId,
+          },
+        },
+      };
+    }
+    return payload;
+  };
+
+  const requestKlaviyoEmailSubscription = async (binding, element, email) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    const emailCapture = binding && binding.emailCapture;
+    const klaviyo = emailCapture && emailCapture.klaviyo;
+    const publicApiKey = cleanText(klaviyo && klaviyo.publicApiKey);
+    if (!publicApiKey) {
+      throw new Error("Email capture binding '" + bindingId + "' is missing the Klaviyo public API key.");
+    }
+    if (isPrivateKlaviyoApiKey(publicApiKey)) {
+      throw new Error("Email capture binding '" + bindingId + "' must use the Klaviyo public Site ID, not a private API key.");
+    }
+    const revision = cleanText(klaviyo && klaviyo.revision);
+    if (!revision) {
+      throw new Error("Email capture binding '" + bindingId + "' is missing the Klaviyo API revision.");
+    }
+    const url = new URL(KLAVIYO_CLIENT_SUBSCRIPTION_ENDPOINT);
+    url.searchParams.set("company_id", publicApiKey);
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.api+json",
+        "Content-Type": "application/vnd.api+json",
+        revision,
+      },
+      body: JSON.stringify(buildKlaviyoSubscriptionPayload(binding, element, email)),
+    });
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
+    }
+  };
+
+  const loadKlaviyoOnsiteScript = (publicApiKey) => {
+    const key = cleanText(publicApiKey);
+    if (!key) return;
+    if (isPrivateKlaviyoApiKey(key)) return;
+    if (!window.klaviyo) {
+      window.klaviyo = [];
+    }
+    const scriptId = "mos-klaviyo-onsite-" + key.replace(/[^A-Za-z0-9_-]/g, "-");
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.async = true;
+    script.type = "text/javascript";
+    script.src = "https://static.klaviyo.com/onsite/js/" + encodeURIComponent(key) + "/klaviyo.js";
+    (document.body || document.head || document.documentElement).appendChild(script);
+  };
+
+  const loadKlaviyoOnsiteScriptForBinding = (binding) => {
+    const key =
+      binding &&
+      binding.emailCapture &&
+      binding.emailCapture.klaviyo &&
+      binding.emailCapture.klaviyo.publicApiKey;
+    loadKlaviyoOnsiteScript(key);
+  };
+
+  const sendKlaviyoBrowserSignals = (binding, email) => {
+    const source = cleanText(binding && binding.emailCapture && binding.emailCapture.source);
+    const props = {
+      email,
+      source,
+      capture_source: source,
+      product_slug: cleanText(config.productSlug),
+      funnel_slug: cleanText(config.funnelSlug),
+      page_slug: cleanText(config.pageSlug),
+      page_stage: cleanText(config.pageStage),
+      binding_id: String(binding && binding.id ? binding.id : "unknown"),
+    };
+    try {
+      const klaviyo = window.klaviyo;
+      if (Array.isArray(klaviyo)) {
+        klaviyo.push(["identify", { email }]);
+        klaviyo.push(["track", "Email Capture Submitted", props]);
+        return;
+      }
+      if (klaviyo && typeof klaviyo.identify === "function") {
+        klaviyo.identify({ email });
+      }
+      if (klaviyo && typeof klaviyo.track === "function") {
+        klaviyo.track("Email Capture Submitted", props);
+      }
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Klaviyo browser signal failed.", error);
+    }
+  };
+
+  const sha256Hex = async (value) => {
+    if (!window.crypto || !window.crypto.subtle || typeof TextEncoder === "undefined") {
+      throw new Error("Browser SHA-256 hashing is unavailable.");
+    }
+    const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  };
+
+  const persistMetaEmailHash = async (email) => {
+    const normalizedEmail = cleanText(email) ? String(email).trim().toLowerCase() : null;
+    if (!normalizedEmail) return null;
+    let emailHash = null;
+    try {
+      emailHash = await sha256Hex(normalizedEmail);
+      window.localStorage.setItem(META_EMAIL_HASH_STORAGE_KEY, emailHash);
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Failed to persist Meta email hash.", error);
+    }
+    return emailHash;
+  };
+
+  const identifyPostHogEmailCapture = (binding, email, emailHash) => {
+    const normalizedEmail = cleanText(email) ? String(email).trim().toLowerCase() : null;
+    if (!normalizedEmail) return;
+    const posthog = ensurePostHogInstance();
+    if (!posthog || typeof posthog.identify !== "function") return;
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    const source = cleanText(binding && binding.emailCapture && binding.emailCapture.source);
+    const personProps = {
+      email: normalizedEmail,
+      capture_source: source,
+      product_slug: cleanText(config.productSlug),
+      funnel_slug: cleanText(config.funnelSlug),
+      page_slug: cleanText(config.pageSlug),
+      page_stage: cleanText(config.pageStage),
+      page_id: cleanText(config.pageId),
+      publication_id: cleanText(config.publicationId),
+      visitor_id: cleanText(config.visitorId),
+      session_id: cleanText(config.sessionId),
+      binding_id: bindingId,
+      external_id: resolveMetaExternalId(),
+    };
+    assignCleanProp(personProps, "em", emailHash);
+    assignCleanProp(personProps, "email_sha256", emailHash);
+    posthog.identify(normalizedEmail, personProps);
+  };
+
+  const completeEmailCaptureSuccess = (binding, element) => {
+    const emailCapture = binding && binding.emailCapture;
+    if (
+      element instanceof HTMLFormElement &&
+      emailCapture &&
+      emailCapture.successBehavior === "redispatch_submit"
+    ) {
+      element.dataset.mosEmailCaptureSucceeded = "true";
+      element.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      if (element.dataset.mosEmailCaptureSucceeded === "true") {
+        delete element.dataset.mosEmailCaptureSucceeded;
+      }
+      return;
+    }
+    setEmailCaptureStatus(
+      String(binding && binding.id ? binding.id : "unknown"),
+      element,
+      "success",
+      cleanText(emailCapture && emailCapture.successMessage) || EMAIL_CAPTURE_SUCCESS_LABEL,
+    );
+  };
+
+  const handleEmailCaptureSubmit = async (binding, element, event) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    if (event && event.__mosEmailCaptureBypass === true) {
+      return;
+    }
+    if (element.dataset.mosEmailCaptureSucceeded === "true") {
+      if (event) {
+        event.__mosEmailCaptureBypass = true;
+      }
+      delete element.dataset.mosEmailCaptureSucceeded;
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+    if (element instanceof HTMLFormElement && typeof element.reportValidity === "function" && !element.reportValidity()) {
+      return;
+    }
+
+    const emailCapture = binding && binding.emailCapture;
+    const source = cleanText(emailCapture && emailCapture.source) || bindingId;
+    try {
+      const email = readEmailCaptureEmail(binding, element);
+      setEmailCaptureSubmitting(element, true);
+      setEmailCaptureStatus(bindingId, element, "loading", EMAIL_CAPTURE_LOADING_LABEL);
+      trackEvent(binding.trackEventType || "email_capture_submit", {
+        bindingId,
+        source,
+        provider: "klaviyo",
+      });
+      await requestKlaviyoEmailSubscription(binding, element, email);
+      const emailHash = await persistMetaEmailHash(email);
+      identifyPostHogEmailCapture(binding, email, emailHash);
+      sendKlaviyoBrowserSignals(binding, email);
+      trackEvent("email_capture_success", {
+        bindingId,
+        source,
+        provider: "klaviyo",
+      });
+      completeEmailCaptureSuccess(binding, element);
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Email capture binding '" + bindingId + "' failed.", error);
+      trackEvent("email_capture_failed", {
+        bindingId,
+        source,
+        provider: "klaviyo",
+        errorMessage: cleanText(error && error.message) || "Email capture failed.",
+      });
+      setEmailCaptureStatus(
+        bindingId,
+        element,
+        "error",
+        cleanText(emailCapture && emailCapture.errorMessage) || EMAIL_CAPTURE_ERROR_LABEL,
+      );
+    } finally {
+      setEmailCaptureSubmitting(element, false);
+    }
+  };
+
+  const emailCaptureFormBindings = [];
+  let emailCaptureDocumentSubmitListenerBound = false;
+
+  const registerEmailCaptureSubmitBinding = (binding, element) => {
+    emailCaptureFormBindings.push({ binding, element });
+    if (!emailCaptureDocumentSubmitListenerBound) {
+      emailCaptureDocumentSubmitListenerBound = true;
+      document.addEventListener("submit", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLFormElement)) return;
+        const match = emailCaptureFormBindings.find((entry) => entry && entry.element === target);
+        if (!match) return;
+        void handleEmailCaptureSubmit(match.binding, match.element, event);
+      }, true);
+    }
+    element.addEventListener("submit", (event) => {
+      void handleEmailCaptureSubmit(binding, element, event);
+    }, true);
+  };
+
   const bindManifest = () => {
     if (!config.manifest || !Array.isArray(config.manifest.bindings)) return;
 
@@ -1464,6 +2740,19 @@ function buildStandaloneImportedHtmlRuntimeScript({
           }
         }
         element.dataset.mosStandaloneImportedHtmlBound = "true";
+        if (binding.type === "email_capture") {
+          if (!(element instanceof HTMLFormElement)) {
+            console.error(
+              "[StandaloneImportedHtmlPage] Email capture binding '" +
+                String(binding.id || "unknown") +
+                "' must target a form element.",
+            );
+            continue;
+          }
+          loadKlaviyoOnsiteScriptForBinding(binding);
+          registerEmailCaptureSubmitBinding(binding, element);
+          continue;
+        }
         element.addEventListener("click", async (event) => {
           const modifiedClick =
             event instanceof MouseEvent &&
@@ -1514,19 +2803,37 @@ function buildStandaloneImportedHtmlRuntimeScript({
             }
 
             const bindingId = String(binding.id || "unknown");
+            setCheckoutBindingState(bindingId, {
+              status: "loading",
+              cacheKey: null,
+              message: CHECKOUT_CLICK_LOADING_LABEL,
+            });
             const { variant, resolvedVariantId, resolvedSelection, cacheKey } = await syncCheckoutBindingWarmState(
               binding,
             );
+            const transitionId = buildCanonicalEventId("checkout_transition");
+            const checkoutEventProps = {
+              fromStage: config.pageStage,
+              toStage: "checkout",
+              bindingId,
+              ctaId: bindingId,
+              transitionId,
+              buttonText: buttonText || undefined,
+              ...(resolvedVariantId ? { variantId: resolvedVariantId } : {}),
+              ...(variant && typeof variant.price === "number" ? { value: Math.round(variant.price) / 100 } : {}),
+              ...(variant && variant.currency ? { currency: variant.currency } : {}),
+              ...checkoutTimingProps({
+                transitionId,
+                ctaId: bindingId,
+                resolvedVariantId,
+                resolvedSelection,
+              }),
+            };
 
+            void trackEvent("checkout_click", checkoutEventProps);
             void trackEvent(
               binding.trackEventType || "sales_to_checkout_click",
-              {
-                fromStage: config.pageStage,
-                toStage: "checkout",
-                bindingId,
-                buttonText: buttonText || undefined,
-                ...(resolvedVariantId ? { variantId: resolvedVariantId } : {}),
-              },
+              checkoutEventProps,
             );
 
             if (binding.checkout.mode === "external_checkout_url") {
@@ -1537,7 +2844,32 @@ function buildStandaloneImportedHtmlRuntimeScript({
               if (!checkoutUrl) {
                 throw new Error("Missing external checkout URL for binding '" + String(binding.id || "unknown") + "'.");
               }
-              window.location.href = checkoutUrl;
+              const finalCheckoutUrl = appendCheckoutTrackingUrlParams(
+                appendCheckoutAttributesToCartUrl(
+                  checkoutUrl,
+                  checkoutAttributeMap({
+                    resolvedVariantId,
+                    resolvedSelection,
+                    ctaId: bindingId,
+                    transitionId,
+                  }),
+                ),
+              );
+              checkoutHandoffContext = {
+                ...checkoutEventProps,
+                ...checkoutTimingProps({
+                  transitionId,
+                  ctaId: bindingId,
+                  checkoutUrl: finalCheckoutUrl,
+                  resolvedVariantId,
+                  resolvedSelection,
+                }),
+              };
+              checkoutPagehideTracked = false;
+              checkoutVisibilityHiddenTracked = false;
+              checkoutNavigationInProgress = true;
+              trackCheckoutTimingEvent("checkout_redirect_started", checkoutHandoffContext);
+              window.location.href = finalCheckoutUrl;
               return;
             }
 
@@ -1547,6 +2879,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
               variant,
               resolvedVariantId,
               resolvedSelection,
+              transitionId,
             });
 
             if (variant && variant.provider === "stripe") {
@@ -1564,8 +2897,22 @@ function buildStandaloneImportedHtmlRuntimeScript({
               }
             }
 
+            const finalCheckoutUrl = appendCheckoutTrackingUrlParams(checkout.checkoutUrl);
+            checkoutHandoffContext = {
+              ...checkoutEventProps,
+              ...checkoutTimingProps({
+                transitionId,
+                ctaId: bindingId,
+                checkoutUrl: finalCheckoutUrl,
+                resolvedVariantId,
+                resolvedSelection,
+              }),
+            };
+            checkoutPagehideTracked = false;
+            checkoutVisibilityHiddenTracked = false;
             checkoutNavigationInProgress = true;
-            window.location.href = checkout.checkoutUrl;
+            trackCheckoutTimingEvent("checkout_redirect_started", checkoutHandoffContext);
+            window.location.href = finalCheckoutUrl;
           } catch (error) {
             console.error(
               "[StandaloneImportedHtmlPage] Binding '" + String(binding.id || "unknown") + "' failed.",
@@ -1642,18 +2989,27 @@ function buildStandaloneImportedHtmlRuntimeScript({
     window.setTimeout(() => scheduleWarmCheckoutBindings(0), 1000);
   };
 
+  installTrackEventBridge();
+  installCheckoutHandoffTracking();
   bindManifestSafely();
   applyMobileSpacingFixesSafely();
   scheduleInitialWarmCheckoutBindings();
   scheduleInitialPageView();
+  initializeEngagementTrackingSafely();
+  initializeViewTrackingSafely();
+  initializeInteractionTrackingSafely();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindManifestSafely, { once: true });
     document.addEventListener("DOMContentLoaded", applyMobileSpacingFixesSafely, { once: true });
+    document.addEventListener("DOMContentLoaded", initializeViewTrackingSafely, { once: true });
+    document.addEventListener("DOMContentLoaded", initializeInteractionTrackingSafely, { once: true });
     document.addEventListener("DOMContentLoaded", scheduleInitialWarmCheckoutBindings, { once: true });
     document.addEventListener("DOMContentLoaded", scheduleInitialPageView, { once: true });
   }
   window.addEventListener("load", bindManifestSafely, { once: true });
   window.addEventListener("load", applyMobileSpacingFixesSafely, { once: true });
+  window.addEventListener("load", initializeViewTrackingSafely, { once: true });
+  window.addEventListener("load", initializeInteractionTrackingSafely, { once: true });
   window.addEventListener("load", scheduleInitialWarmCheckoutBindings, { once: true });
   window.addEventListener("load", scheduleInitialPageView, { once: true });
   window.setTimeout(bindManifestSafely, 0);
@@ -1662,6 +3018,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
   window.setTimeout(applyMobileSpacingFixesSafely, 0);
   window.setTimeout(applyMobileSpacingFixesSafely, 250);
   window.setTimeout(applyMobileSpacingFixesSafely, 1000);
+  window.setTimeout(initializeViewTrackingSafely, 0);
+  window.setTimeout(initializeViewTrackingSafely, 250);
+  window.setTimeout(initializeViewTrackingSafely, 1000);
+  window.setTimeout(initializeInteractionTrackingSafely, 0);
+  window.setTimeout(initializeInteractionTrackingSafely, 250);
+  window.setTimeout(initializeInteractionTrackingSafely, 1000);
   window.addEventListener("resize", applyMobileSpacingFixesSafely);
   document.addEventListener("input", () => scheduleWarmCheckoutBindings(), true);
   document.addEventListener("change", () => scheduleWarmCheckoutBindings(), true);

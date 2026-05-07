@@ -53,11 +53,24 @@ mos/backend/artifact-downloads/
 # Local temp/output
 .tmp/
 tmp/
+.local/
 mos/backend/.tmp/
 mos/backend/tmp/
+mos/.local/
+mos/frontend/.tmp-*
+mos/frontend/tmp_*
 swipe/
 template-image-workspace/output/*
 !template-image-workspace/output/.gitkeep
+
+# Local generated deployment/artifact workspaces
+/analytics upgrades/
+/cloudhand/
+/local-sites/
+/template-images/
+/walk-away-from-trt-assets
+/feel-again*.html
+/feel-again*.png
 
 # Taskmaster
 .taskmaster/

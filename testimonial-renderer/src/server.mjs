@@ -208,6 +208,7 @@ const maybeGeneratePdpBackground = async (payload) => {
   }
 
   const preset = resolvePdpPreset(payload);
+  const showBottomBanner = payload.output?.showBottomBanner !== false;
   const commentCount = Array.isArray(payload.comments) && payload.comments.length > 0 ? payload.comments.length : 1;
   const basePrompt = hasPrompt
     ? background.prompt.trim()
@@ -216,6 +217,7 @@ const maybeGeneratePdpBackground = async (payload) => {
         preset,
         vars: background.promptVars,
         commentCount,
+        showBottomBanner,
       });
   const brandPromptGuidance = buildBrandPromptGuidance(payload.brand);
   const prompt = brandPromptGuidance ? `${basePrompt} ${brandPromptGuidance}` : basePrompt;

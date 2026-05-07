@@ -25,7 +25,7 @@ from app.schemas.shopify import (
     ShopifyComplianceWebhookPayload,
     ShopifyOrderWebhookPayload,
 )
-from app.services.meta_conversions import MetaConversionError, send_shopify_purchase_event
+from app.services.paid_ads_qa import clean_optional_text
 
 router = APIRouter(prefix="/shopify", tags=["shopify"])
 logger = logging.getLogger(__name__)
@@ -98,6 +98,26 @@ def _parse_quantity(value: str | None) -> int:
     return quantity
 
 
+def _tracking_note_attributes(note_attributes: dict[str, str]) -> dict[str, str]:
+    tracked_keys = {
+        "click_id",
+        "click_id_type",
+        "fbp",
+        "fbc",
+        "event_source_url",
+        "page_variant",
+        "experiment_id",
+        "cta_id",
+        "transition_id",
+        "purchase_mode",
+    }
+    return {
+        key: value
+        for key in tracked_keys
+        if (value := clean_optional_text(note_attributes.get(key)))
+    }
+
+
 def _price_to_cents(total_price: str | None) -> int | None:
     if total_price is None:
         return None
@@ -153,6 +173,7 @@ def ingest_shopify_order_webhook(
     selection = _parse_metadata_json(payload.noteAttributes.get("selection"), "selection")
     utm = _parse_metadata_json(payload.noteAttributes.get("utm"), "utm")
     quantity = _parse_quantity(payload.noteAttributes.get("quantity"))
+    tracking_attrs = _tracking_note_attributes(payload.noteAttributes)
 
     funnel = session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
     if not funnel:
@@ -175,30 +196,9 @@ def ingest_shopify_order_webhook(
         "shopify_order_id": payload.orderId,
         "shopify_order_name": payload.orderName,
         "note_attributes": payload.noteAttributes,
+        "tracking": tracking_attrs,
         "line_items": [item.model_dump(exclude_none=True) for item in payload.lineItems],
     }
-    meta_conversion: dict[str, object] | None = None
-    try:
-        meta_conversion = send_shopify_purchase_event(
-            session=session,
-            funnel=funnel,
-            payload=payload,
-            external_order_ref=external_order_ref,
-            amount_cents=amount_cents,
-            currency=payload.currency,
-            quantity=quantity,
-            variant_id=price_point_id,
-            session_id=session_id,
-            visitor_id=visitor_id,
-        )
-    except MetaConversionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
-        ) from exc
-    if meta_conversion is not None:
-        checkout_metadata["meta_conversion"] = meta_conversion
-
     order = FunnelOrder(
         org_id=funnel.org_id,
         client_id=funnel.client_id,
@@ -220,40 +220,37 @@ def ingest_shopify_order_webhook(
     session.add(order)
 
     if funnel.active_publication_id and page_id:
-        session.add(
-            FunnelEvent(
-                occurred_at=datetime.now(timezone.utc),
-                org_id=funnel.org_id,
-                client_id=funnel.client_id,
-                campaign_id=funnel.campaign_id,
-                funnel_id=funnel.id,
-                publication_id=funnel.active_publication_id,
-                page_id=page_id,
-                event_type=FunnelEventTypeEnum.order_completed,
-                visitor_id=visitor_id,
-                session_id=session_id,
-                host=None,
-                path=None,
-                referrer=None,
-                utm=utm,
-                props={
-                    "provider": "shopify",
-                    "shop_domain": payload.shopDomain,
-                    "shopify_order_id": payload.orderId,
-                    "shopify_order_name": payload.orderName,
-                    "amount_cents": amount_cents,
-                    "currency": payload.currency,
-                    **(
-                        {
-                            "meta_event_id": meta_conversion.get("eventId"),
-                            "meta_pixel_id": meta_conversion.get("pixelId"),
-                        }
-                        if meta_conversion is not None
-                        else {}
-                    ),
-                },
+        event_props = {
+            "provider": "shopify",
+            "shop_domain": payload.shopDomain,
+            "shopify_order_id": payload.orderId,
+            "shopify_order_name": payload.orderName,
+            "amount_cents": amount_cents,
+            "currency": payload.currency,
+            "quantity": quantity,
+            **tracking_attrs,
+        }
+        for event_type in (FunnelEventTypeEnum.order_completed, FunnelEventTypeEnum.purchase):
+            session.add(
+                FunnelEvent(
+                    event_id=f"{event_type.value}:{external_order_ref}",
+                    occurred_at=datetime.now(timezone.utc),
+                    org_id=funnel.org_id,
+                    client_id=funnel.client_id,
+                    campaign_id=funnel.campaign_id,
+                    funnel_id=funnel.id,
+                    publication_id=funnel.active_publication_id,
+                    page_id=page_id,
+                    event_type=event_type,
+                    visitor_id=visitor_id,
+                    session_id=session_id,
+                    host=None,
+                    path=None,
+                    referrer=None,
+                    utm=utm,
+                    props=event_props,
+                )
             )
-        )
 
     session.commit()
     return {"received": True}
@@ -311,12 +308,16 @@ def ingest_shopify_compliance_webhook(
             "status": "acknowledged_no_local_customer_dataset",
         }
 
-    deleted_orders = session.query(FunnelOrder).filter(
-        FunnelOrder.stripe_session_id.like(f"shopify:{shop_domain}:%")
-    ).delete(synchronize_session=False)
-    deleted_drafts = session.query(ShopifyThemeTemplateDraft).filter(
-        ShopifyThemeTemplateDraft.shop_domain == shop_domain
-    ).delete(synchronize_session=False)
+    deleted_orders = (
+        session.query(FunnelOrder)
+        .filter(FunnelOrder.stripe_session_id.like(f"shopify:{shop_domain}:%"))
+        .delete(synchronize_session=False)
+    )
+    deleted_drafts = (
+        session.query(ShopifyThemeTemplateDraft)
+        .filter(ShopifyThemeTemplateDraft.shop_domain == shop_domain)
+        .delete(synchronize_session=False)
+    )
     session.commit()
 
     logger.info(

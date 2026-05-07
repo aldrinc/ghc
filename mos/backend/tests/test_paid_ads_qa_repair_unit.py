@@ -247,12 +247,10 @@ def test_repair_funnel_meta_tracking_updates_profile(monkeypatch) -> None:
                     "mode": "public_funnel_runtime",
                     "pixelId": "pixel-123",
                     "browserEvents": [
-                        "Entered Funnel",
+                        "EnteredFunnel",
                         "PageView",
-                        "ViewContent",
+                        "EnteredSales",
                         "PreSalesToSalesClick",
-                        "AddToCart",
-                        "Purchase",
                     ],
                     "funnelIds": ["funnel-1"],
                 }

@@ -827,7 +827,7 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert 'new Blob([payload], { type: "application/json" })' in entry_html
     assert "pageLifecycleFinalizing = true;" in entry_html
     assert "/public/checkout" in entry_html
-    assert "/public/checkout/prepare" not in entry_html
+    assert "/public/checkout/prepare" in entry_html
     assert "standalone_html" in entry_html
     assert "web_vital_recorded" in entry_html
     assert "metricName" in entry_html
@@ -842,19 +842,20 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert "window.posthog.init(" in entry_html
     assert "capture_pageview: true" in entry_html
     assert "capture_pageleave: true" in entry_html
-    assert "posthog.capture(capture.eventName, capture.eventProps);" in entry_html
-    assert "CTA Link Click" in entry_html
+    assert "posthog.capture(capture.eventName, {" in entry_html
+    assert "...capture.eventProps" in entry_html
+    assert "SalesToCheckoutClick" in entry_html
     assert "internal_event_type" in entry_html
     assert "content_category" in entry_html
-    assert "/__mos/meta/fbevents.js" in entry_html
-    assert "connect.facebook.net/en_US/fbevents.js" not in entry_html
-    assert 'window.fbq("init", pixelId);' in entry_html
-    assert "location = /__mos/meta/fbevents.js" in conf
-    assert "proxy_pass https://connect.facebook.net/en_US/fbevents.js;" in conf
-    assert "sub_filter_types application/javascript application/x-javascript text/javascript;" in conf
-    assert "location ^~ /__mos/meta/tr/" in conf
-    assert "proxy_pass https://www.facebook.com/tr/;" in conf
-    assert "proxy_set_header Host www.facebook.com;" in conf
+    assert "https://connect.facebook.net/en_US/fbevents.js" in entry_html
+    assert "/__mos/meta/fbevents.js" not in entry_html
+    assert 'window.fbq("init", pixelId' in entry_html
+    assert "location = /__mos/meta/fbevents.js" not in conf
+    assert "proxy_pass https://connect.facebook.net/en_US/fbevents.js;" not in conf
+    assert "sub_filter_types application/javascript application/x-javascript text/javascript;" not in conf
+    assert "location ^~ /__mos/meta/tr/" not in conf
+    assert "proxy_pass https://www.facebook.com/tr/;" not in conf
+    assert "proxy_set_header Host www.facebook.com;" not in conf
     assert "location ^~ /__mos/meta/signals/config/" not in conf
     assert "location ^~ /__mos/meta/privacy_sandbox/" not in conf
     assert "fbevents_telemetry" not in conf
@@ -2449,7 +2450,7 @@ def test_validate_funnel_artifact_site_output_requires_meta_pixel_bootstrap_when
     deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
     deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START"
 
-    with pytest.raises(ValueError, match="Meta Pixel proxy script"):
+    with pytest.raises(ValueError, match="direct Meta Pixel script"):
         deployer._validate_funnel_artifact_site_output(
             site_dir="/opt/apps/landing-artifact/site-releases/20260422T000000Z",
             source=app.source_ref,

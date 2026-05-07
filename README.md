@@ -119,7 +119,7 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 - `DEPLOY_ROOT_DIR` (default `cloudhand`)
 - `DEPLOY_PROJECT_ID` (default `mos`)
 - `DEPLOY_PUBLIC_BASE_URL` (for example `https://moshq.app`)
-- `DEPLOY_PUBLIC_API_BASE_URL` (for example `https://moshq.app/api`)
+- `DEPLOY_PUBLIC_API_BASE_URL` (for example `https://api.moshq.app`; standalone imported HTML deploys require an origin URL without a path)
 - `BUNNY_API_KEY`
 - `BUNNY_API_BASE_URL` (default `https://api.bunny.net`)
 - `BUNNY_PULLZONE_ORIGIN_IP` (for example `46.225.124.104`)

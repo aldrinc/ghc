@@ -17,6 +17,15 @@ class PublicCheckoutRequest(BaseModel):
     visitorId: Optional[str] = None
     sessionId: Optional[str] = None
     utm: Optional[dict[str, Any]] = None
+    clickId: Optional[str] = None
+    clickIdType: Optional[str] = None
+    fbp: Optional[str] = None
+    fbc: Optional[str] = None
+    eventSourceUrl: Optional[str] = None
+    pageVariant: Optional[str] = None
+    experimentId: Optional[str] = None
+    ctaId: Optional[str] = None
+    transitionId: Optional[str] = None
 
 
 class PublicPreparedCheckoutResponse(BaseModel):

@@ -281,14 +281,14 @@ def _meta_account_008_mos_tracking_ready(profile: dict[str, Any]) -> bool:
     status = normalize_tracking_provider(metadata.get("status"))
     mode = normalize_tracking_provider(metadata.get("mode"))
     channel = normalize_tracking_provider(metadata.get("channel"))
-    browser_events = _normalize_string_list(metadata.get("browserEvents"))
+    browser_events = {item.replace("_", "").lower() for item in _normalize_string_list(metadata.get("browserEvents"))}
     return (
         bool(pixel_id)
         and status == "active"
         and mode == "public_funnel_runtime"
         and channel == "meta"
-        and "pageview" in {item.replace("_", "").lower() for item in browser_events}
-        and "addtocart" in {item.replace("_", "").lower() for item in browser_events}
+        and "pageview" in browser_events
+        and "salestocheckoutclick" in browser_events
     )
 
 
@@ -339,12 +339,11 @@ def activate_mos_meta_funnel_tracking_profile(
         "pixelId": pixel_id,
         "dataSetId": data_set_id,
         "browserEvents": [
-            "Entered Funnel",
+            "EnteredFunnel",
             "PageView",
-            "ViewContent",
+            "EnteredSales",
             "PreSalesToSalesClick",
-            "AddToCart",
-            "Purchase",
+            "SalesToCheckoutClick",
         ],
         "internalEvents": [
             "Entered Funnel",

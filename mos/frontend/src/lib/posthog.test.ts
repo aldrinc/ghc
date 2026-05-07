@@ -21,11 +21,14 @@ describe("capturePostHogEvent", () => {
       configurable: true,
       value: "https://example.com/presale",
     });
+    document.cookie = "_fbp=fb.1.1710000000.browser; path=/";
   });
 
   afterEach(() => {
     vi.useRealTimers();
     delete window.posthog;
+    document.cookie = "_fbp=; Max-Age=0; path=/";
+    document.cookie = "_fbc=; Max-Age=0; path=/";
     document.head.innerHTML = "";
     document.body.innerHTML = "";
   });
@@ -83,7 +86,7 @@ describe("capturePostHogEvent", () => {
     );
   });
 
-  it("defaults person profiles to always when tracking omits the setting", () => {
+  it("defaults person profiles to identified_only when tracking omits the setting", () => {
     const trackingWithoutPersonProfiles = { ...tracking };
     delete (trackingWithoutPersonProfiles as { posthogPersonProfiles?: string }).posthogPersonProfiles;
 
@@ -112,7 +115,7 @@ describe("capturePostHogEvent", () => {
           expect.objectContaining({
             capture_pageview: true,
             capture_pageleave: true,
-            person_profiles: "always",
+            person_profiles: "identified_only",
           }),
           "mosFunnel",
         ],
@@ -120,7 +123,7 @@ describe("capturePostHogEvent", () => {
     );
   });
 
-  it("maps checkout clicks to AddToCart instead of the internal event name", () => {
+  it("maps checkout clicks to AddToCart and the checkout transition event", () => {
     capturePostHogEvent({
       tracking,
       distinctId: "visitor-1",
@@ -152,6 +155,16 @@ describe("capturePostHogEvent", () => {
             content_ids: ["variant-123"],
             content_type: "product",
             num_items: 1,
+            $event_id: expect.any(String),
+          }),
+        ],
+        [
+          "capture",
+          "SalesToCheckoutClick",
+          expect.objectContaining({
+            internal_event_type: "sales_to_checkout_click",
+            from_stage: "sales",
+            to_stage: "checkout",
             $event_id: expect.any(String),
           }),
         ],

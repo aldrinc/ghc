@@ -54,6 +54,7 @@ import {
   ChevronsUpDown,
   LogOut,
   LayoutDashboard,
+  BarChart3,
   ListChecks,
   Target,
   MessageSquare,
@@ -114,6 +115,7 @@ const EXECUTION_NAV: NavSection = {
   label: "Execution",
   items: [
     { title: "Campaigns", path: "/campaigns", icon: Target },
+    { title: "Analytics", path: "/workspaces/execution/analytics", icon: BarChart3 },
     { title: "Postiz", path: "/workspaces/execution/postiz", icon: Send },
   ],
 };

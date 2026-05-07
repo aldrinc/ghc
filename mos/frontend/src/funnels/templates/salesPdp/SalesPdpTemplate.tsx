@@ -51,6 +51,12 @@ import {
 } from "@/funnels/templates/shared/designSystemBrandLogo";
 import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 import { PaymentIconStrip } from "@/funnels/templates/shared/PaymentIconStrip";
+import {
+  appendCheckoutTrackingUrlParams,
+  buildCheckoutTimingProps,
+  buildCheckoutAttributionProps,
+  buildCheckoutTransitionId,
+} from "@/lib/checkoutAttribution";
 import { checkoutClickEventForStage } from "@/lib/funnelTracking";
 import { pendingMetaPurchaseStorageKey, writePendingMetaPurchase } from "@/lib/metaCheckout";
 
@@ -1075,6 +1081,9 @@ type SalesPdpHeroProps = {
 
 export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, copyJson }: SalesPdpHeroProps) {
   const runtime = useFunnelRuntime();
+  const checkoutHandoffContextRef = useRef<Record<string, unknown> | null>(null);
+  const checkoutPagehideTrackedRef = useRef(false);
+  const checkoutVisibilityHiddenTrackedRef = useRef(false);
   const resolvedHero = parseJson<HeroConfig>(configJson) ?? config ?? salesPdpDefaults.config.hero
   const resolvedModals = parseJson<ModalsConfig>(modalsJson) ?? modals ?? salesPdpDefaults.config.modals
   const resolvedCopy = parseJson<UiCopy>(copyJson) ?? copy ?? salesPdpDefaults.copy
@@ -1187,6 +1196,39 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
   const [openWhyBundle, setOpenWhyBundle] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+
+  useEffect(() => {
+    const emitCheckoutHandoffEvent = (
+      eventType: "checkout_pagehide" | "checkout_visibility_hidden",
+    ) => {
+      const context = checkoutHandoffContextRef.current;
+      if (!context) return;
+      runtime?.trackEvent?.({
+        eventType,
+        props: {
+          ...context,
+          ...buildCheckoutTimingProps({}),
+        },
+      });
+    };
+    const handlePagehide = () => {
+      if (checkoutPagehideTrackedRef.current) return;
+      checkoutPagehideTrackedRef.current = true;
+      emitCheckoutHandoffEvent("checkout_pagehide");
+    };
+    const handleVisibilityChange = () => {
+      if (checkoutVisibilityHiddenTrackedRef.current) return;
+      if (document.visibilityState !== "hidden") return;
+      checkoutVisibilityHiddenTrackedRef.current = true;
+      emitCheckoutHandoffEvent("checkout_visibility_hidden");
+    };
+    window.addEventListener("pagehide", handlePagehide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", handlePagehide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [runtime]);
 
   useEffect(() => {
     return () => {
@@ -1354,10 +1396,34 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       const checkoutCancelUrl = new URL(window.location.href);
       checkoutReturnUrl.searchParams.set("checkout", "success");
       checkoutCancelUrl.searchParams.set("checkout", "cancel");
+      const transitionId = buildCheckoutTransitionId();
+      const ctaId = "sales_pdp_purchase_cta";
+      const checkoutAttribution = buildCheckoutAttributionProps({
+        pageVariant: (runtime.pageId ? runtime.pageMap[runtime.pageId] : null) || runtime.entrySlug || null,
+        ctaId,
+        transitionId,
+      });
+      const checkoutEventProps = {
+        ctaId,
+        transitionId,
+        variantId: variant.id,
+        value: Math.round(variant.price) / 100,
+        currency: variant.currency,
+        ...buildCheckoutTimingProps({
+          transitionId,
+          ctaId,
+          selectedOffer: selectedOfferObj?.id,
+          variantIds: [variant.id],
+        }),
+      };
+      runtime.trackEvent?.({
+        eventType: "checkout_click",
+        props: checkoutEventProps,
+      });
       runtime.trackEvent?.(
         checkoutClickEventForStage({
           fromStage: runtime.pageStage || "custom",
-          props: { variantId: variant.id },
+          props: checkoutEventProps,
         }),
       );
       const response = await fetch(`${apiBaseUrl}/public/checkout`, {
@@ -1374,6 +1440,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
           visitorId: runtime.visitorId || undefined,
           sessionId: runtime.sessionId || undefined,
           utm: getUtmParams(),
+          ...checkoutAttribution,
         }),
       });
       if (!response.ok) {
@@ -1397,10 +1464,26 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
           provider: normalizedProvider,
         });
       }
-      window.location.href = data.checkoutUrl as string;
+      const finalCheckoutUrl = appendCheckoutTrackingUrlParams(data.checkoutUrl as string);
+      checkoutHandoffContextRef.current = {
+        ...checkoutEventProps,
+        ...buildCheckoutTimingProps({
+          transitionId,
+          ctaId,
+          checkoutUrl: finalCheckoutUrl,
+          selectedOffer: selectedOfferObj?.id,
+          variantIds: [variant.id],
+        }),
+      };
+      checkoutPagehideTrackedRef.current = false;
+      checkoutVisibilityHiddenTrackedRef.current = false;
+      runtime.trackEvent?.({
+        eventType: "checkout_redirect_started",
+        props: checkoutHandoffContextRef.current,
+      });
+      window.location.href = finalCheckoutUrl;
     } catch (err) {
       setCheckoutError(err instanceof Error ? err.message : "Checkout failed.");
-    } finally {
       setIsCheckingOut(false);
     }
   }
@@ -1673,9 +1756,10 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                     className={styles.ctaButton}
                     onClick={handleCheckout}
                     disabled={isCheckingOut}
+                    aria-busy={isCheckingOut ? "true" : undefined}
                     ref={ctaButtonRef}
                   >
-                    {isCheckingOut ? "Starting checkout…" : ctaLabel}
+                    {isCheckingOut ? "Opening secure checkout..." : ctaLabel}
                     <span className={styles.ctaIconCircle} aria-hidden="true">
                       <IconArrow dir="right" size={24} />
                     </span>

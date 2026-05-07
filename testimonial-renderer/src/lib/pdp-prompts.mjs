@@ -5,10 +5,21 @@ const aspectRatioForPreset = (preset) => {
   throw new Error(`Unsupported output preset: ${preset}. Only "feed" is supported.`);
 };
 
-const bubbleSpaceHintForTemplate = (template, commentCount = 1) => {
+const bubbleSpaceHintForTemplate = (template, { commentCount = 1, showBottomBanner = true } = {}) => {
   switch (template) {
     case 'pdp_ugc_standard':
       if (commentCount > 1) {
+        if (!showBottomBanner) {
+          return [
+            'Leave clean, simple background space in the top-left corner where a comment overlay will later sit.',
+            'Also leave clean, simple background space on the right side of the frame from the vertical middle down toward the lower-right corner where a second comment overlay will later sit.',
+            'Let the photo extend naturally all the way to the bottom edge of the frame with no blank strip, no soft blur band, no out-of-focus foreground bar, no tabletop edge created just to make room, and no reserved banner area.',
+            'Keep the subject face in the center or center-left of the frame, fully visible and away from the top-left open area.',
+            'Keep the product and label in the lower-left or lower-middle-left part of the frame, clear of the open space on the right side.',
+            'If the subject is pointing at the product, keep the hands and pointing finger near the product on the left side of the frame.',
+            'Do not place the face, product, label, hands, or any important detail in the open spaces reserved for the overlays.',
+          ].join(' ');
+        }
         return [
           'Leave clean, simple background space in the top-left corner where a comment overlay will later sit.',
           'Also leave clean, simple background space on the right side of the frame from the vertical middle of the image down to just above the bottom banner where a second comment overlay will later sit.',
@@ -16,6 +27,13 @@ const bubbleSpaceHintForTemplate = (template, commentCount = 1) => {
           'Keep the product and label in the lower-left or lower-middle-left part of the frame, above the bottom banner and clear of the open space on the right side.',
           'If the subject is pointing at the product, keep the hands and pointing finger near the product on the left side of the frame.',
           'Do not place the face, product, label, hands, or any important detail in the open spaces reserved for the overlays.',
+        ].join(' ');
+      }
+      if (!showBottomBanner) {
+        return [
+          'Leave clean, simple background space in the lower-left corner of the frame for a later comment overlay.',
+          'Let the photo extend naturally all the way to the bottom edge of the frame with no blank strip, no soft blur band, no out-of-focus foreground bar, no tabletop edge created just to make room, and no reserved banner area.',
+          'Keep the subject face and product on the middle or right side of the frame and do not place the product, label, or hands in that lower-left open area.',
         ].join(' ');
       }
       return [
@@ -58,7 +76,13 @@ const stringifyAvoid = (avoid) => {
   return `Avoid: ${cleaned.join('; ')}.`;
 };
 
-export const buildPdpBackgroundPrompt = ({ template, preset, vars, commentCount = 1 }) => {
+export const buildPdpBackgroundPrompt = ({
+  template,
+  preset,
+  vars,
+  commentCount = 1,
+  showBottomBanner = true,
+}) => {
   if (typeof template !== 'string' || !template.trim()) {
     throw new Error('template is required to build PDP background prompt.');
   }
@@ -70,7 +94,7 @@ export const buildPdpBackgroundPrompt = ({ template, preset, vars, commentCount 
   }
 
   const aspectRatio = aspectRatioForPreset(preset);
-  const bubbleHint = bubbleSpaceHintForTemplate(template, commentCount);
+  const bubbleHint = bubbleSpaceHintForTemplate(template, { commentCount, showBottomBanner });
 
   const product = typeof vars.product === 'string' ? vars.product.trim() : '';
   if (!product) {

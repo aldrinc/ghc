@@ -2,6 +2,11 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { resolveRuntimePagePath, useFunnelRuntime } from '@/funnels/puckConfig'
 import { navigationClickEventForStages, resolvePublicFunnelStage } from '@/lib/funnelTracking'
+import {
+  buildPresaleAttributedInternalPath,
+  isPresaleToSalesNavigation,
+  markPresaleAttribution,
+} from '@/lib/presaleAttribution'
 import { ArrowRightIcon } from '../Icons/ArrowRightIcon'
 import styles from './Button.module.css'
 
@@ -69,6 +74,11 @@ export function Button({ linkType, href, targetPageId, children, size = 'lg', cl
     isInternal && targetPageId && runtime?.pageStageMap[targetPageId]
       ? runtime.pageStageMap[targetPageId]
       : resolvePublicFunnelStage(targetSlug)
+  const presaleToSales = isPresaleToSalesNavigation(runtime?.pageStage, targetStage)
+  const navigationHref =
+    presaleToSales && typeof window !== 'undefined'
+      ? buildPresaleAttributedInternalPath(resolvedHref, window.location.search)
+      : resolvedHref
   const clickEvent = navigationClickEventForStages({
     fromStage: runtime?.pageStage ?? 'custom',
     toStage: targetStage,
@@ -77,6 +87,15 @@ export function Button({ linkType, href, targetPageId, children, size = 'lg', cl
       ...(href ? { href } : {})
     }
   })
+  const handleClick = () => {
+    if (presaleToSales && typeof window !== 'undefined' && runtime) {
+      markPresaleAttribution(window.sessionStorage, {
+        productSlug: runtime.productSlug,
+        funnelSlug: runtime.funnelSlug,
+      })
+    }
+    runtime?.trackEvent?.(clickEvent)
+  }
 
   const content = (
     <span className={styles.inner}>
@@ -91,8 +110,8 @@ export function Button({ linkType, href, targetPageId, children, size = 'lg', cl
     return (
       <Link
         className={`${styles.shell} ${styles[size]} ${className ?? ''}`}
-        to={resolvedHref}
-        onClick={() => runtime?.trackEvent?.(clickEvent)}
+        to={navigationHref}
+        onClick={handleClick}
       >
         {content}
       </Link>

@@ -1,7 +1,7 @@
 import type { PublicFunnelStage } from "@/types/funnels";
 
 export type RuntimeTrackingEvent =
-  | { eventType: "Entered Funnel"; props?: Record<string, unknown> }
+  | { eventType: "presell_page_view"; props?: Record<string, unknown> }
   | { eventType: "pre_sales_page_view"; props?: Record<string, unknown> }
   | { eventType: "sales_page_view"; props?: Record<string, unknown> }
   | { eventType: "checkout_page_view"; props?: Record<string, unknown> }
@@ -9,7 +9,36 @@ export type RuntimeTrackingEvent =
   | { eventType: "custom_page_view"; props?: Record<string, unknown> }
   | { eventType: "pre_sales_to_sales_click"; props?: Record<string, unknown> }
   | { eventType: "sales_to_checkout_click"; props?: Record<string, unknown> }
-  | { eventType: "custom_page_click"; props?: Record<string, unknown> };
+  | { eventType: "checkout_click"; props?: Record<string, unknown> }
+  | { eventType: "checkout_redirect_started"; props?: Record<string, unknown> }
+  | { eventType: "checkout_pagehide"; props?: Record<string, unknown> }
+  | { eventType: "checkout_visibility_hidden"; props?: Record<string, unknown> }
+  | { eventType: "custom_page_click"; props?: Record<string, unknown> }
+  | { eventType: "qualified_session"; props?: Record<string, unknown> }
+  | { eventType: "scroll_depth"; props?: Record<string, unknown> }
+  | { eventType: "section_view"; props?: Record<string, unknown> }
+  | { eventType: "proof_view"; props?: Record<string, unknown> }
+  | { eventType: "cta_view"; props?: Record<string, unknown> }
+  | { eventType: "offer_stack_view"; props?: Record<string, unknown> }
+  | { eventType: "value_stack_view"; props?: Record<string, unknown> }
+  | { eventType: "price_reveal_view"; props?: Record<string, unknown> }
+  | { eventType: "selector_interaction"; props?: Record<string, unknown> }
+  | { eventType: "subscription_selected"; props?: Record<string, unknown> }
+  | { eventType: "guarantee_view"; props?: Record<string, unknown> }
+  | { eventType: "trust_element_view"; props?: Record<string, unknown> }
+  | { eventType: "product_detail_interaction"; props?: Record<string, unknown> }
+  | { eventType: "quiz_lead_viewed"; props?: Record<string, unknown> }
+  | { eventType: "quiz_question_viewed"; props?: Record<string, unknown> }
+  | { eventType: "quiz_option_presented"; props?: Record<string, unknown> }
+  | { eventType: "quiz_option_selected"; props?: Record<string, unknown> }
+  | { eventType: "quiz_option_deselected"; props?: Record<string, unknown> }
+  | { eventType: "quiz_question_submitted"; props?: Record<string, unknown> }
+  | { eventType: "quiz_completed"; props?: Record<string, unknown> }
+  | { eventType: "quiz_result_viewed"; props?: Record<string, unknown> }
+  | { eventType: "quiz_mechanism_viewed"; props?: Record<string, unknown> }
+  | { eventType: "quiz_proof_viewed"; props?: Record<string, unknown> }
+  | { eventType: "quiz_recommendation_viewed"; props?: Record<string, unknown> }
+  | { eventType: "quiz_cta_viewed"; props?: Record<string, unknown> };
 
 const FUNNEL_STAGE_ALIASES: Record<string, PublicFunnelStage> = {
   "pre-sales": "pre_sales",

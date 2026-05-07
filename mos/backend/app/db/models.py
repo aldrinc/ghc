@@ -681,9 +681,16 @@ class FunnelEvent(Base):
     __table_args__ = (
         sa.Index("idx_funnel_events_occurred_at", "occurred_at"),
         sa.Index("idx_funnel_events_funnel_pub", "funnel_id", "publication_id"),
+        sa.Index(
+            "uq_funnel_events_event_id",
+            "event_id",
+            unique=True,
+            postgresql_where=sa.text("event_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    event_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -3027,9 +3034,7 @@ class ClientCompliancePolicyOverride(Base):
             "page_key",
             name="uq_compliance_policy_overrides_org_client_page",
         ),
-        sa.Index(
-            "idx_compliance_policy_overrides_org_client", "org_id", "client_id"
-        ),
+        sa.Index("idx_compliance_policy_overrides_org_client", "org_id", "client_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -5030,6 +5035,42 @@ class AdTeardownAssertionEvidence(Base):
         ForeignKey("ad_teardown_evidence_items.id", ondelete="CASCADE"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# =============================================================================
+# Analytics Integration Models
+# =============================================================================
+
+
+class ClientPosthogSettings(Base):
+    """Workspace-scoped PostHog settings for public funnel analytics."""
+
+    __tablename__ = "client_posthog_settings"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", name="uq_client_posthog_settings_org_client"),
+        sa.Index("idx_client_posthog_settings_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    project_api_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    api_host: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ui_host: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    defaults: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    person_profiles: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_mode: Mapped[str] = mapped_column(Text, nullable=False, server_default="structured")
+    source_snippet: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

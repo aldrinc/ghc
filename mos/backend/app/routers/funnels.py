@@ -63,6 +63,7 @@ from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError
 from app.services.html_funnel_reference import HtmlReferenceError
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
+from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services.funnel_templates import (
     apply_template_assets,
     get_funnel_template,
@@ -128,6 +129,57 @@ _FUNNEL_COMPLIANCE_PAGE_SPECS: tuple[dict[str, str], ...] = (
         "templateId": "compliance-contact",
     },
 )
+
+
+def _canonical_public_page_slug_for_validation(
+    *, slug: str | None = None, template_id: str | None = None, page_name: str | None = None
+) -> str | None:
+    raw_slug = str(slug or "").strip()
+    if not raw_slug:
+        return None
+    page_stage = resolve_funnel_page_stage(
+        slug=raw_slug,
+        template_id=template_id,
+        page_name=page_name,
+    )
+    if page_stage == "pre_sales" and raw_slug.lower() in {"pre-sales", "presales"}:
+        return "presales"
+    return raw_slug
+
+
+def _ensure_public_page_slug_available(
+    *,
+    pages: list[FunnelPage],
+    slug: str,
+    template_id: str | None,
+    page_name: str,
+    exclude_page_id: str | None = None,
+) -> None:
+    candidate_public_slug = _canonical_public_page_slug_for_validation(
+        slug=slug,
+        template_id=template_id,
+        page_name=page_name,
+    )
+    if not candidate_public_slug:
+        return
+
+    for existing_page in pages:
+        if exclude_page_id and str(existing_page.id) == str(exclude_page_id):
+            continue
+        existing_public_slug = _canonical_public_page_slug_for_validation(
+            slug=existing_page.slug,
+            template_id=existing_page.template_id,
+            page_name=existing_page.name,
+        )
+        if existing_public_slug != candidate_public_slug:
+            continue
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Public page slug '{candidate_public_slug}' is already used by "
+                f"'{existing_page.name}'. Choose a different slug."
+            ),
+        )
 
 
 def _apply_compliance_profile_page_props(
@@ -749,6 +801,12 @@ def create_page(
     ordering = len(pages)
     desired = payload.slug or payload.name
     unique_slug = generate_unique_slug(session, funnel_id=funnel_id, desired_slug=desired)
+    _ensure_public_page_slug_available(
+        pages=pages,
+        slug=unique_slug,
+        template_id=template_id,
+        page_name=payload.name,
+    )
 
     page = pages_repo.create(
         funnel_id=funnel_id,
@@ -1074,6 +1132,16 @@ def update_page(
                     detail="Next page must belong to the funnel.",
                 )
         update_fields["next_page_id"] = next_page_id
+
+    candidate_name = payload.name if payload.name is not None else page.name
+    candidate_slug = update_fields.get("slug", page.slug)
+    _ensure_public_page_slug_available(
+        pages=pages_repo.list(funnel_id=funnel_id),
+        slug=candidate_slug,
+        template_id=page.template_id,
+        page_name=candidate_name,
+        exclude_page_id=page_id,
+    )
 
     updated = pages_repo.update(page_id=page_id, **update_fields)
     return jsonable_encoder(updated)
