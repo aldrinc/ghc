@@ -65,7 +65,7 @@ const CURATED_NO_PRODUCT_REVEAL_POLICY = [
   "Do not show the Tenor product, Daily Drive Essentials packaging, bottles, capsules, labels, Supplement Facts panels, checkout/product-page imagery, or any product reference image in the generated image.",
   "Keep the image problem-aware and non-product-facing while preserving the selected swipe composition.",
 ].join("\n");
-const PUBLISH_BASE_URL = "https://shoptenorco.com";
+const PUBLISH_BASE_URL = "https://shop.shoptenorco.com";
 const GLP_PRESALE_URL = "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/";
 const QUIZ_PRESALE_URL = "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/";
 const SALES_URL =
@@ -2092,7 +2092,7 @@ async function upsertCreativeSpec(campaignId, group, bundle, existingLookups) {
       })),
     },
   };
-  const existing = existingLookups.byAssetId.get(assetId) || existingLookups.byGroupKey.get(group.key) || existingLookups.byGroupKey.get(group.rowKey);
+  const existing = existingLookups.byAssetId.get(assetId);
   if (!existing) {
     const created = await authed("/meta/specs/creatives", {
       method: "POST",
@@ -2107,17 +2107,12 @@ async function upsertCreativeSpec(campaignId, group, bundle, existingLookups) {
       creativeSpecId: created.id,
     };
   }
-  const updated = await authed(`/meta/specs/creatives/${encodeURIComponent(existing.id)}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ assetId, ...body }),
-  });
   return {
-    action: "updated",
+    action: "reused",
     groupKey: group.key,
     primaryAssetId: assetId,
     siblingVariantAssetIds: groupedAdMetadata.siblingVariantAssetIds,
-    creativeSpecId: updated.id || existing.id,
+    creativeSpecId: existing.id,
   };
 }
 
@@ -2228,16 +2223,11 @@ async function createSpecs() {
   }
   const creativeSpecs = await getCreativeSpecs(manifest.campaignId);
   const creativeByAssetId = new Map();
-  const creativeByGroupKey = new Map();
+  const currentAssetIds = new Set(manifest.entries.map((entry) => entry.result.assetId));
   for (const spec of creativeSpecs || []) {
     const assetId = specAssetId(spec);
-    if (assetId) creativeByAssetId.set(assetId, spec);
-    const groupKey = creativeSpecGroupKey(spec);
-    if (!groupKey) continue;
-    if (creativeByGroupKey.has(groupKey)) {
-      throw new Error(`Duplicate creative spec for logical group ${groupKey}`);
-    }
-    creativeByGroupKey.set(groupKey, spec);
+    if (!assetId || !currentAssetIds.has(assetId)) continue;
+    if (!creativeByAssetId.has(assetId)) creativeByAssetId.set(assetId, spec);
   }
   const groupedEntries = groupEntriesByGroupKey(manifest.entries);
   const creativeResults = [];
@@ -2246,7 +2236,7 @@ async function createSpecs() {
       manifest.campaignId,
       group,
       bundleForGroup(manifest, group, groupedEntries),
-      { byAssetId: creativeByAssetId, byGroupKey: creativeByGroupKey },
+      { byAssetId: creativeByAssetId },
     ));
   }
   const adsetResults = await upsertAdSetSpecs(manifest.campaignId, await getAdSetSpecs(manifest.campaignId));
