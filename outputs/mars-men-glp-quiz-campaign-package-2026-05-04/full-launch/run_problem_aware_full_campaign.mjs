@@ -1439,6 +1439,50 @@ function mergeManifestState(baseManifest, nextManifest) {
   };
 }
 
+function applySnapshotInPlace(target, source) {
+  for (const key of Object.keys(target)) {
+    if (!(key in source)) delete target[key];
+  }
+  for (const [key, value] of Object.entries(source)) {
+    target[key] = value;
+  }
+}
+
+function syncManifestObjectInPlace(targetManifest, sourceManifest) {
+  targetManifest.updatedAt = sourceManifest.updatedAt;
+  targetManifest.createdAt = sourceManifest.createdAt;
+  targetManifest.note = sourceManifest.note;
+  targetManifest.campaignId = sourceManifest.campaignId;
+  targetManifest.campaignName = sourceManifest.campaignName;
+  targetManifest.metaCampaignName = sourceManifest.metaCampaignName;
+  targetManifest.batchId = sourceManifest.batchId;
+  targetManifest.generationKey = sourceManifest.generationKey;
+  targetManifest.stageOneModel = sourceManifest.stageOneModel;
+  targetManifest.renderModelId = sourceManifest.renderModelId;
+  targetManifest.groupedCreativePlan = sourceManifest.groupedCreativePlan;
+  targetManifest.targetPublishPlan = sourceManifest.targetPublishPlan;
+  targetManifest.destinations = sourceManifest.destinations;
+  targetManifest.sourceCollections = sourceManifest.sourceCollections;
+  targetManifest.copyAssignmentPlan = sourceManifest.copyAssignmentPlan;
+  targetManifest.expectedCounts = sourceManifest.expectedCounts;
+
+  targetManifest.groups = sourceManifest.groups;
+
+  const currentEntries = Array.isArray(targetManifest.entries) ? targetManifest.entries : [];
+  const currentByKey = new Map(currentEntries.map((entry) => [entry.key, entry]));
+  const nextEntries = [];
+  for (const sourceEntry of sourceManifest.entries || []) {
+    const currentEntry = currentByKey.get(sourceEntry.key);
+    if (currentEntry) {
+      applySnapshotInPlace(currentEntry, sourceEntry);
+      nextEntries.push(currentEntry);
+    } else {
+      nextEntries.push(sourceEntry);
+    }
+  }
+  targetManifest.entries = nextEntries;
+}
+
 function persistManifest(manifest) {
   let latest = null;
   if (existsSync(MANIFEST_PATH)) {
@@ -1453,8 +1497,8 @@ function persistManifest(manifest) {
   const tempPath = `${MANIFEST_PATH}.${process.pid}.tmp`;
   writeFileSync(tempPath, serialized);
   renameSync(tempPath, MANIFEST_PATH);
-  manifest.groups = mergedManifest.groups;
-  manifest.entries = mergedManifest.entries;
+  const writtenManifest = JSON.parse(serialized);
+  syncManifestObjectInPlace(manifest, writtenManifest);
 }
 
 function isModerationError(error) {
