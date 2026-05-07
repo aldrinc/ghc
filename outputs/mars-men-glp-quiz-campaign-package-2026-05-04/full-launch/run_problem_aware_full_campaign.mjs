@@ -1645,6 +1645,103 @@ async function generateAll() {
   }, null, 2));
 }
 
+async function reconcileManifest() {
+  if (!existsSync(MANIFEST_PATH)) {
+    throw new Error(`Missing manifest: ${MANIFEST_PATH}. Run manifest first.`);
+  }
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+  if (manifestNeedsRebuild(manifest)) {
+    throw new Error(`Manifest at ${MANIFEST_PATH} is stale for generationKey ${GENERATION_KEY}. Rebuild it with the manifest command first.`);
+  }
+  validateManifest(manifest, { requireResults: false });
+  await getBackendToken();
+
+  const unresolvedEntries = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId);
+  let completed = 0;
+  let reset = 0;
+  let stillRunning = 0;
+  let skipped = 0;
+
+  for (const entry of unresolvedEntries) {
+    const workflowRunId = entry.workflow?.workflowRunId;
+    if (!workflowRunId) {
+      skipped += 1;
+      continue;
+    }
+
+    const detail = await authed(`/workflows/${encodeURIComponent(workflowRunId)}`);
+    const status = detail?.run?.status;
+    if (status === "running" || status === "queued" || status === "pending") {
+      stillRunning += 1;
+      continue;
+    }
+
+    if (status === "failed" || status === "cancelled") {
+      delete entry.workflow;
+      persistManifest(manifest);
+      reset += 1;
+      continue;
+    }
+
+    if (status !== "completed") {
+      continue;
+    }
+
+    const workflowPath = path.join(OUT_DIR, `workflow-${entry.key}.json`);
+    writeFileSync(workflowPath, JSON.stringify(detail, null, 2) + "\n");
+    const { assetId, payloadOut } = extractAssetId(detail);
+    const asset = await resolveAsset(manifest.campaignId, assetId);
+    const extension = (asset.content_type || "image/png").includes("jpeg") ? "jpg" : "png";
+    let localPath = entry.result?.localPath || null;
+    if (GENERATE_DOWNLOAD_ASSETS && !localPath) {
+      localPath = path.join(GENERATED_DIR, `${entry.key}.${extension}`);
+      downloadPublicAsset(asset.public_id, localPath);
+    }
+
+    entry.workflow = {
+      workflowRunId,
+      temporalWorkflowId: entry.workflow?.temporalWorkflowId || null,
+      workflowUrl: `https://moshq.app/workflows/${workflowRunId}`,
+      workflowDetailPath: workflowPath,
+      payloadOut,
+      ...(entry.workflow?.primaryOpenAiFailure ? { primaryOpenAiFailure: entry.workflow.primaryOpenAiFailure } : {}),
+    };
+    entry.result = {
+      assetId,
+      publicId: asset.public_id,
+      publicUrl: `${API_BASE}/public/assets/${asset.public_id}`,
+      contentType: asset.content_type,
+      width: asset.width,
+      height: asset.height,
+      localPath,
+      remoteJobId: payloadOut?.job_id || null,
+      renderProvider: payloadOut?.swipe_render_provider || null,
+      renderModelIdRequested: entry.payload.renderModelId,
+      renderModelIdUsed: payloadOut?.swipe_render_model_id || entry.payload.renderModelId,
+      usedAuthorizedFallback: entry.payload.renderModelId !== RENDER_MODEL_ID,
+      expectedRenderer: expectedRendererFor(entry.payload.renderModelId),
+      productReferenceRequired: Boolean(entry.payload.swipeRequiresProductImage),
+      productReferenceAttached: Boolean(payloadOut?.product_reference_attached),
+      productReferenceRenderAssetIds: payloadOut?.product_reference_render_asset_ids || [],
+      productReferenceImageUrlsSelected: payloadOut?.product_reference_image_urls_selected || [],
+    };
+    persistManifest(manifest);
+    completed += 1;
+  }
+
+  console.log(JSON.stringify({
+    manifestPath: MANIFEST_PATH,
+    campaignId: manifest.campaignId,
+    unresolvedScanned: unresolvedEntries.length,
+    completed,
+    reset,
+    stillRunning,
+    skipped,
+    aspectRatioFilter: GENERATE_ASPECT_RATIO_FILTER,
+    entryKeyFilter: GENERATE_ENTRY_KEY_FILTER,
+  }, null, 2));
+}
+
 function requireFullManifest() {
   if (!existsSync(MANIFEST_PATH)) throw new Error(`Missing manifest: ${MANIFEST_PATH}`);
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
@@ -2264,6 +2361,7 @@ function usage() {
     "  setup",
     "  manifest",
     "  generate",
+    "  reconcile",
     "  stamp-batch",
     "  create-specs",
     "  validate-publish",
@@ -2293,6 +2391,7 @@ async function main() {
     return;
   }
   if (command === "generate") return generateAll();
+  if (command === "reconcile") return reconcileManifest();
   if (command === "stamp-batch") return stampBatch();
   if (command === "create-specs") return createSpecs();
   if (command === "validate-publish") return validatePublish();
