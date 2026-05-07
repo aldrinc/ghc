@@ -271,6 +271,14 @@ export function toLocalDateTimeValue(value?: string | null): string {
   return offsetDate.toISOString().slice(0, 16);
 }
 
+export function defaultNextDayLocalStartTimeValue(now = new Date()): string {
+  const next = new Date(now);
+  next.setDate(next.getDate() + 1);
+  next.setHours(0, 1, 0, 0);
+  const offsetDate = new Date(next.getTime() - next.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
 export function fromLocalDateTimeValue(value: string): string | null {
   const cleaned = value.trim();
   if (!cleaned) return null;
@@ -332,7 +340,7 @@ export function buildAdSetForm(
         : String(DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS),
     dsaBeneficiary: readString(spec.dsa_beneficiary) || defaultPageName,
     dsaPayor: readString(spec.dsa_payor) || defaultPageName,
-    startTime: toLocalDateTimeValue(spec.start_time),
+    startTime: toLocalDateTimeValue(spec.start_time) || defaultNextDayLocalStartTimeValue(),
     endTime: toLocalDateTimeValue(spec.end_time),
     promotedPixelId: readString(promotedObject?.pixel_id) || "",
     promotedCustomEventType: readString(promotedObject?.custom_event_type) || "",
