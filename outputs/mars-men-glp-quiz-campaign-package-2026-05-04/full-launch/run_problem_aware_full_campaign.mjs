@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -70,8 +71,17 @@ const SALES_URL =
   "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039";
 const GENERATE_CONCURRENCY = Number(process.env.GENERATE_CONCURRENCY || "4");
 const GENERATE_MAX_PASSES = Number(process.env.GENERATE_MAX_PASSES || "1");
+const GENERATE_DOWNLOAD_ASSETS = process.env.GENERATE_DOWNLOAD_ASSETS !== "0";
 const FORCE_NANOBANANA_FALLBACK_FOR_PENDING = process.env.FORCE_NANOBANANA_FALLBACK_FOR_PENDING === "1";
 const CONTINUE_ON_FAILURE = process.env.CONTINUE_ON_FAILURE === "1";
+const GENERATE_ASPECT_RATIO_FILTER = (process.env.GENERATE_ASPECT_RATIO_FILTER || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const GENERATE_ENTRY_KEY_FILTER = (process.env.GENERATE_ENTRY_KEY_FILTER || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const GENERATE_ASPECT_RATIO_PRIORITY = (process.env.GENERATE_ASPECT_RATIO_PRIORITY || "1:1,4:5,9:16")
   .split(",")
   .map((value) => value.trim())
@@ -79,6 +89,8 @@ const GENERATE_ASPECT_RATIO_PRIORITY = (process.env.GENERATE_ASPECT_RATIO_PRIORI
 const GENERATE_ASPECT_RATIO_PRIORITY_ORDER = new Map(
   GENERATE_ASPECT_RATIO_PRIORITY.map((aspectRatio, index) => [aspectRatio, index]),
 );
+const GENERATE_ASPECT_RATIO_FILTER_SET = new Set(GENERATE_ASPECT_RATIO_FILTER);
+const GENERATE_ENTRY_KEY_FILTER_SET = new Set(GENERATE_ENTRY_KEY_FILTER);
 const TENOR_PRODUCT_REFERENCE_CREATIVE_IDS = new Set([
   "C005",
   "C006",
@@ -1345,8 +1357,11 @@ async function generateOneEntry(manifest, entry, renderModelId = RENDER_MODEL_ID
   const { assetId, payloadOut } = extractAssetId(detail);
   const asset = await resolveAsset(manifest.campaignId, assetId);
   const extension = (asset.content_type || "image/png").includes("jpeg") ? "jpg" : "png";
-  const localPath = path.join(GENERATED_DIR, `${entry.key}.${extension}`);
-  downloadPublicAsset(asset.public_id, localPath);
+  let localPath = null;
+  if (GENERATE_DOWNLOAD_ASSETS) {
+    localPath = path.join(GENERATED_DIR, `${entry.key}.${extension}`);
+    downloadPublicAsset(asset.public_id, localPath);
+  }
   return {
     payload,
     workflow: {
@@ -1388,8 +1403,58 @@ function expectedRendererFor(renderModelId) {
   throw new Error(`No approved renderer expectation for ${renderModelId}`);
 }
 
+function mergeDefined(baseValue, nextValue) {
+  if (!baseValue && !nextValue) return nextValue ?? baseValue;
+  if (!baseValue) return nextValue;
+  if (!nextValue) return baseValue;
+  return { ...baseValue, ...nextValue };
+}
+
+function mergeEntryState(baseEntry, nextEntry) {
+  const merged = { ...baseEntry, ...nextEntry };
+  merged.payload = nextEntry.payload || baseEntry.payload;
+  merged.workflow = mergeDefined(baseEntry.workflow, nextEntry.workflow);
+  merged.result = mergeDefined(baseEntry.result, nextEntry.result);
+  if (baseEntry.primaryOpenAiFailure || nextEntry.primaryOpenAiFailure) {
+    merged.primaryOpenAiFailure = mergeDefined(baseEntry.primaryOpenAiFailure, nextEntry.primaryOpenAiFailure);
+  }
+  if ("error" in nextEntry || "error" in baseEntry) {
+    merged.error = nextEntry.error ?? baseEntry.error;
+  }
+  return merged;
+}
+
+function mergeManifestState(baseManifest, nextManifest) {
+  if (!baseManifest || manifestNeedsRebuild(baseManifest)) return nextManifest;
+  const nextEntryMap = new Map((nextManifest.entries || []).map((entry) => [entry.key, entry]));
+  const mergedEntries = (baseManifest.entries || []).map((entry) => {
+    const nextEntry = nextEntryMap.get(entry.key);
+    return nextEntry ? mergeEntryState(entry, nextEntry) : entry;
+  });
+  return {
+    ...baseManifest,
+    ...nextManifest,
+    groups: nextManifest.groups || baseManifest.groups,
+    entries: mergedEntries,
+  };
+}
+
 function persistManifest(manifest) {
-  writeFileSync(MANIFEST_PATH, JSON.stringify({ ...manifest, updatedAt: new Date().toISOString() }, null, 2) + "\n");
+  let latest = null;
+  if (existsSync(MANIFEST_PATH)) {
+    try {
+      latest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+    } catch {
+      latest = null;
+    }
+  }
+  const mergedManifest = mergeManifestState(latest, manifest);
+  const serialized = JSON.stringify({ ...mergedManifest, updatedAt: new Date().toISOString() }, null, 2) + "\n";
+  const tempPath = `${MANIFEST_PATH}.${process.pid}.tmp`;
+  writeFileSync(tempPath, serialized);
+  renameSync(tempPath, MANIFEST_PATH);
+  manifest.groups = mergedManifest.groups;
+  manifest.entries = mergedManifest.entries;
 }
 
 function isModerationError(error) {
@@ -1431,8 +1496,21 @@ function compareGenerationPriority(left, right) {
   return 0;
 }
 
-function pendingEntriesForPass(manifest) {
+function selectedEntriesForRun(manifest) {
   return manifest.entries
+    .filter((entry) => {
+      if (GENERATE_ASPECT_RATIO_FILTER_SET.size && !GENERATE_ASPECT_RATIO_FILTER_SET.has(entry.aspectRatio)) {
+        return false;
+      }
+      if (GENERATE_ENTRY_KEY_FILTER_SET.size && !GENERATE_ENTRY_KEY_FILTER_SET.has(entry.key)) {
+        return false;
+      }
+      return true;
+    });
+}
+
+function pendingEntriesForPass(manifest) {
+  return selectedEntriesForRun(manifest)
     .filter((entry) => !entry.result?.assetId)
     .sort(compareGenerationPriority);
 }
@@ -1444,11 +1522,10 @@ function summarizeFailures(failures) {
 }
 
 async function runGeneratePass(manifest, passIndex, passCount) {
-  const pending = manifest.entries.filter((entry) => !entry.result?.assetId);
   const prioritizedPending = pendingEntriesForPass(manifest);
   console.log(
     `Starting generate pass ${passIndex}/${passCount} with ${prioritizedPending.length} pending ` +
-      `(priority=${GENERATE_ASPECT_RATIO_PRIORITY.join(" -> ")})`,
+      `(priority=${GENERATE_ASPECT_RATIO_PRIORITY.join(" -> ")}, filter=${GENERATE_ASPECT_RATIO_FILTER.join(",") || "all"})`,
   );
   let nextIndex = 0;
   const failures = [];
@@ -1497,7 +1574,7 @@ async function runGeneratePass(manifest, passIndex, passCount) {
     }
   }
   await Promise.all(Array.from({ length: GENERATE_CONCURRENCY }, (_, index) => worker(index + 1)));
-  const pendingAfterPass = manifest.entries.filter((entry) => !entry.result?.assetId).length;
+  const pendingAfterPass = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId).length;
   console.log(
     `Finished generate pass ${passIndex}/${passCount}: completed=${completedThisPass}, ` +
       `failures=${failures.length}, pending=${pendingAfterPass}`,
@@ -1516,10 +1593,17 @@ async function generateAll() {
   }
   validateManifest(manifest, { requireResults: false });
   await getBackendToken();
+  const selectedEntries = selectedEntriesForRun(manifest);
+  if (!selectedEntries.length) {
+    throw new Error(
+      `No manifest entries matched the requested filters. aspectRatios=${GENERATE_ASPECT_RATIO_FILTER.join(",") || "all"} ` +
+        `entryKeys=${GENERATE_ENTRY_KEY_FILTER.join(",") || "all"}`,
+    );
+  }
 
   let allFailures = [];
   for (let passIndex = 1; passIndex <= GENERATE_MAX_PASSES; passIndex += 1) {
-    const pendingBeforePass = manifest.entries.filter((entry) => !entry.result?.assetId).length;
+    const pendingBeforePass = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId).length;
     if (pendingBeforePass === 0) break;
     const { completedThisPass, failures, pendingAfterPass } = await runGeneratePass(
       manifest,
@@ -1539,7 +1623,7 @@ async function generateAll() {
     }
   }
 
-  const remaining = manifest.entries.filter((entry) => !entry.result?.assetId);
+  const remaining = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId);
   if (remaining.length) {
     throw new Error(
       `Generation stopped with ${remaining.length} asset variant(s) still pending after ${GENERATE_MAX_PASSES} pass(es). ` +
@@ -1555,6 +1639,8 @@ async function generateAll() {
     rawAssetCount: manifest.entries.length,
     concurrency: GENERATE_CONCURRENCY,
     passes: GENERATE_MAX_PASSES,
+    aspectRatioFilter: GENERATE_ASPECT_RATIO_FILTER,
+    entryKeyFilter: GENERATE_ENTRY_KEY_FILTER,
     aspectRatioPriority: GENERATE_ASPECT_RATIO_PRIORITY,
   }, null, 2));
 }
