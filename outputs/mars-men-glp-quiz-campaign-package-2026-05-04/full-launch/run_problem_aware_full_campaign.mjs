@@ -47,6 +47,7 @@ const GLP_BRIEF_ID = "brief_glp_listicle_swipe_image2";
 const QUIZ_BRIEF_ID = "brief_quiz_funnel_swipe_image2";
 const STAGING_FUNNEL_ID = "be65d76e-ced9-4948-9465-18723c8446fd";
 const STAGING_PAGE_ID = "ab3102f4-a179-410a-9eb0-66aa3020cafc";
+const SELECTED_OFFER_ID = "3c0e9404-e837-4cf7-b036-6a38b6103d3e";
 const STAGE_ONE_MODEL = "gemini-3.1-pro-preview";
 const RENDER_MODEL_ID = "gpt-image-2";
 const NANOBANANA_RENDER_MODEL_ID = "gemini-3.1-flash-image-preview";
@@ -1024,6 +1025,7 @@ function buildBasePayload({ state, entry, congruenceBlock }) {
       clientId: CLIENT_ID,
       productId: PRODUCT_ID,
       campaignId: state.campaignId,
+      selectedOfferId: SELECTED_OFFER_ID,
       assetBriefId: assetBriefIdForDestinationKey(entry.destinationKey),
       requirementIndex: 0,
       swipeRequiresProductImage: entry.productReferenceRequired,

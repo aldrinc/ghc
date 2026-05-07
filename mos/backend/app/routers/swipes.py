@@ -502,6 +502,7 @@ async def _start_swipe_image_ad_run(
                 client_id=payload.client_id,
                 product_id=payload.product_id,
                 campaign_id=payload.campaign_id,
+                selected_offer_id=payload.selected_offer_id,
                 asset_brief_id=payload.asset_brief_id,
                 requirement_index=payload.requirement_index,
                 company_swipe_id=payload.company_swipe_id,
