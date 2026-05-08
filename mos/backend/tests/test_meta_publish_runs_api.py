@@ -41,6 +41,7 @@ from app.db.models import (
     MetaPublishRun,
     MetaCreativeSpec,
     MetaWorkspaceAdConfig,
+    PaidAdsQaRun,
     ProductOffer,
     ProductVariant,
 )
@@ -292,7 +293,92 @@ def _create_meta_publish_inputs(
     ]
     for adset_spec in adset_specs:
         db_session.refresh(adset_spec)
+    batch_id = asset.ai_metadata.get("creativeGenerationBatchId") if isinstance(asset.ai_metadata, dict) else None
+    generation_key = f"batch:{batch_id}" if batch_id else "batch:latest-run"
+    qa_asset_ids = [
+        str(row.id)
+        for row in db_session.scalars(
+            select(Asset).where(
+                Asset.org_id == TEST_ORG_ID,
+                Asset.campaign_id == campaign_id,
+            )
+        ).all()
+    ]
+    db_session.add(
+        PaidAdsQaRun(
+            org_id=TEST_ORG_ID,
+            client_id=str(asset.client_id),
+            campaign_id=campaign_id,
+            platform="meta",
+            subject_type="campaign",
+            subject_id=campaign_id,
+            ruleset_version=RULESET_VERSION,
+            status="passed",
+            blocker_count=0,
+            high_count=0,
+            medium_count=0,
+            low_count=0,
+            needs_manual_review_count=0,
+            checked_rule_ids=[
+                "META-POLICY-LLM-001",
+                "META-COPY-006",
+                "META-UBP-001",
+                "META-IMAGE-001",
+                "META-LP-007",
+            ],
+            report_markdown="# Paid Ads QA Report\n\nStatus: passed",
+            metadata_json={
+                "generationKey": generation_key,
+                "generationAssetIds": qa_asset_ids,
+                "policyClassificationMethod": "llm",
+            },
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
     return creative_spec, adset_specs[0]
+
+
+def _seed_passed_paid_ads_qa_run(
+    db_session,
+    *,
+    client_id: str,
+    campaign_id: str,
+    generation_key: str,
+    asset_ids: list[str],
+) -> None:
+    db_session.add(
+        PaidAdsQaRun(
+            org_id=TEST_ORG_ID,
+            client_id=client_id,
+            campaign_id=campaign_id,
+            platform="meta",
+            subject_type="campaign",
+            subject_id=campaign_id,
+            ruleset_version=RULESET_VERSION,
+            status="passed",
+            blocker_count=0,
+            high_count=0,
+            medium_count=0,
+            low_count=0,
+            needs_manual_review_count=0,
+            checked_rule_ids=[
+                "META-POLICY-LLM-001",
+                "META-COPY-006",
+                "META-UBP-001",
+                "META-IMAGE-001",
+                "META-LP-007",
+            ],
+            report_markdown="# Paid Ads QA Report\n\nStatus: passed",
+            metadata_json={
+                "generationKey": generation_key,
+                "generationAssetIds": asset_ids,
+                "policyClassificationMethod": "llm",
+            },
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
 
 
 def _seed_meta_workspace_config(db_session, *, client_id: str) -> MetaWorkspaceAdConfig:
@@ -2808,6 +2894,13 @@ def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(
     db_session.add(creative_spec)
     db_session.add_all(adset_specs)
     db_session.commit()
+    _seed_passed_paid_ads_qa_run(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        generation_key="batch:latest-run",
+        asset_ids=[str(asset.id)],
+    )
 
     _upsert_meta_profile(api_client, client_id=client_id)
 
@@ -2948,6 +3041,13 @@ def test_validate_meta_publish_plan_supports_manual_creative_context_without_lau
     db_session.add(creative_spec)
     db_session.add_all(adset_specs)
     db_session.commit()
+    _seed_passed_paid_ads_qa_run(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        generation_key="batch:latest-run",
+        asset_ids=[str(asset.id)],
+    )
 
     _upsert_meta_profile(api_client, client_id=client_id)
 

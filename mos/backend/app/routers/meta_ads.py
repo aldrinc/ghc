@@ -49,6 +49,7 @@ from app.db.repositories.experiments import ExperimentsRepository
 from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
+from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.meta_ads import (
     MetaAdAccountConnectionResponse,
     MetaAdAccountConnectionUpsertRequest,
@@ -2118,6 +2119,55 @@ def _create_publish_run_item_record(
     )
 
 
+def _paid_ads_qa_publish_gate_blocker(
+    *,
+    session: Session,
+    org_id: str,
+    campaign_id: str,
+    generation_key: str,
+    selected_asset_ids: list[str],
+) -> str | None:
+    qa_repo = PaidAdsQaRepository(session)
+    latest_meta_run = next(
+        (
+            run
+            for run in qa_repo.list_runs(
+                org_id=org_id,
+                campaign_id=campaign_id,
+                subject_type="campaign",
+                limit=10,
+            )
+            if run.platform == "meta"
+        ),
+        None,
+    )
+    if latest_meta_run is None:
+        return "Meta publish is blocked until full paid ads QA has been run for this campaign generation."
+    metadata = dict(latest_meta_run.metadata_json) if isinstance(latest_meta_run.metadata_json, dict) else {}
+    if latest_meta_run.ruleset_version != RULESET_VERSION:
+        return (
+            "Meta publish is blocked because the latest paid ads QA run used ruleset "
+            f"{latest_meta_run.ruleset_version}; rerun QA with {RULESET_VERSION}."
+        )
+    qa_generation_key = _clean_optional_text(metadata.get("generationKey"))
+    if qa_generation_key != generation_key:
+        return (
+            "Meta publish is blocked because the latest paid ads QA run does not match "
+            f"generationKey {generation_key}."
+        )
+    qa_asset_ids = metadata.get("generationAssetIds")
+    if not isinstance(qa_asset_ids, list) or not set(selected_asset_ids).issubset(
+        {str(asset_id) for asset_id in qa_asset_ids}
+    ):
+        return "Meta publish is blocked because the latest paid ads QA run does not cover every selected creative."
+    if latest_meta_run.status != "passed":
+        return (
+            "Meta publish is blocked because the latest paid ads QA run status is "
+            f"{latest_meta_run.status}; resolve findings and rerun QA."
+        )
+    return None
+
+
 def _validate_publish_plan(
     *,
     campaign: Campaign,
@@ -2203,6 +2253,17 @@ def _validate_publish_plan(
             blockers.append("No campaign assets were found for this publish generation.")
     elif not selected_assets:
         blockers.append("All creatives are excluded from the final Meta package for this generation.")
+
+    if selected_assets:
+        qa_blocker = _paid_ads_qa_publish_gate_blocker(
+            session=session,
+            org_id=auth.org_id,
+            campaign_id=str(campaign.id),
+            generation_key=payload.generationKey,
+            selected_asset_ids=[str(asset.id) for asset in selected_assets],
+        )
+        if qa_blocker:
+            blockers.append(qa_blocker)
 
     resolved_meta_config = _resolve_meta_workspace_context_for_campaign(
         session=session,

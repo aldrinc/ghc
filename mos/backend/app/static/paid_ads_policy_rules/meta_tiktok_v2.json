@@ -64,6 +64,16 @@
       "needsVerification": true
     },
     {
+      "sourceId": "meta.unacceptable_business_practices",
+      "platform": "meta",
+      "sourceKind": "official_policy",
+      "title": "Unacceptable Business Practices",
+      "url": "https://transparency.meta.com/policies/ad-standards/fraud-scams/unacceptable-business-practices/",
+      "lastUpdated": null,
+      "regionScope": "Global",
+      "needsVerification": true
+    },
+    {
       "sourceId": "tiktok.operator_account_readiness_checklist",
       "platform": "tiktok",
       "sourceKind": "operator_requirement",
@@ -330,6 +340,22 @@
       "commonFailureExamples": ["Campaign has no Meta ad set specs."]
     },
     {
+      "ruleId": "META-POLICY-LLM-001",
+      "ruleType": "operational_readiness",
+      "platform": "meta",
+      "domain": "campaign",
+      "severity": "blocker",
+      "requirement": "Every Meta creative must complete LLM-based policy classification across copy, image, and destination context before publish.",
+      "policyAnchorQuote": null,
+      "automated": true,
+      "manualReviewRequired": false,
+      "sourceId": "meta.operator_ads_manager_setup_checklist",
+      "sourceNeedsVerification": true,
+      "appliesToObjects": ["campaign", "creative_spec", "asset"],
+      "fixGuidance": ["Run paid ads QA with a configured OpenAI model and inspectable creative image assets before publishing to Meta."],
+      "commonFailureExamples": ["No image available for LLM inspection.", "OPENAI_API_KEY is not configured."]
+    },
+    {
       "ruleId": "META-COPY-002",
       "ruleType": "policy",
       "platform": "meta",
@@ -392,6 +418,54 @@
       "appliesToObjects": ["campaign", "creative_spec"],
       "fixGuidance": ["Remove body-shaming or humiliation-based language from the copy."],
       "commonFailureExamples": ["Are you fat?", "Stop being ugly."]
+    },
+    {
+      "ruleId": "META-COPY-006",
+      "ruleType": "policy",
+      "platform": "meta",
+      "domain": "copy",
+      "severity": "high",
+      "requirement": "Ads must not assert or imply a viewer's personal health, body, medical, or biological attribute. General category language is allowed when it does not target the viewer personally.",
+      "policyAnchorQuote": "Ads must not contain content that asserts or implies personal attributes.",
+      "automated": true,
+      "manualReviewRequired": false,
+      "sourceId": "meta.privacy_personal_attributes",
+      "sourceNeedsVerification": false,
+      "appliesToObjects": ["campaign", "creative_spec"],
+      "fixGuidance": ["Rewrite personal-attribute claims into non-personal educational framing. The word \"testosterone\" is allowed by itself; avoid phrasing that claims knowledge of the viewer's testosterone or body state."],
+      "commonFailureExamples": ["Your testosterone is crashing.", "You are gaining weight because of this condition."]
+    },
+    {
+      "ruleId": "META-UBP-001",
+      "ruleType": "policy",
+      "platform": "meta",
+      "domain": "copy",
+      "severity": "blocker",
+      "requirement": "Ads must not use deceptive, sensational, or hidden-cause framing that may mislead people about health or body outcomes.",
+      "policyAnchorQuote": "Unacceptable Business Practices",
+      "automated": true,
+      "manualReviewRequired": false,
+      "sourceId": "meta.unacceptable_business_practices",
+      "sourceNeedsVerification": true,
+      "appliesToObjects": ["campaign", "creative_spec", "asset", "landing_page"],
+      "fixGuidance": ["Remove hidden-cause or deceptive urgency framing such as \"secretly crashing\" and rewrite the claim as a neutral, substantiated article hook."],
+      "commonFailureExamples": ["This medication is secretly crashing your hormones.", "Doctors hid this natural fix."]
+    },
+    {
+      "ruleId": "META-IMAGE-001",
+      "ruleType": "policy",
+      "platform": "meta",
+      "domain": "assets",
+      "severity": "blocker",
+      "requirement": "Image creatives must pass LLM visual policy review for misleading authority, fake news/science framing, before-and-after body outcomes, and personal-attribute visual callouts.",
+      "policyAnchorQuote": "Unacceptable Business Practices",
+      "automated": true,
+      "manualReviewRequired": false,
+      "sourceId": "meta.unacceptable_business_practices",
+      "sourceNeedsVerification": true,
+      "appliesToObjects": ["campaign", "asset", "creative_spec"],
+      "fixGuidance": ["Replace or revise visuals that imply misleading medical authority, fake scientific validation, hidden harm, or direct personal-attribute targeting."],
+      "commonFailureExamples": ["A fake medical/news screenshot implying an undisclosed health danger.", "A before/after body transformation visual tied to a supplement claim."]
     },
     {
       "ruleId": "META-LP-001",
@@ -488,6 +562,22 @@
       "appliesToObjects": ["campaign", "creative_spec"],
       "fixGuidance": ["Add visible support email, phone, or contact page access on the destination."],
       "commonFailureExamples": ["No contact or support marker detected."]
+    },
+    {
+      "ruleId": "META-LP-007",
+      "ruleType": "policy",
+      "platform": "meta",
+      "domain": "landing_page",
+      "severity": "blocker",
+      "requirement": "Landing pages must not materially reinforce unacceptable-business-practices, personal-attribute, or exaggerated health-result risk from the ad.",
+      "policyAnchorQuote": "Unacceptable Business Practices",
+      "automated": true,
+      "manualReviewRequired": false,
+      "sourceId": "meta.unacceptable_business_practices",
+      "sourceNeedsVerification": true,
+      "appliesToObjects": ["campaign", "creative_spec", "landing_page"],
+      "fixGuidance": ["Revise destination copy so it is congruent, neutral, substantiated, and does not amplify hidden-cause or personal-attribute claims from the ad."],
+      "commonFailureExamples": ["A lander headline claims a treatment is secretly crashing the reader's hormones.", "A quiz page frames the reader as personally having a health decline."]
     },
     {
       "ruleId": "TTK-ACCOUNT-001",

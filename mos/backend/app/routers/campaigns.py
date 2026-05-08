@@ -86,7 +86,6 @@ from app.services.campaign_creative_context import (
     persist_manual_campaign_creative_context,
     set_campaign_creative_context_provider,
 )
-from app.services.paid_ads_qa import list_meta_copy_policy_issues
 from app.services.public_routing import require_product_route_slug
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.campaign_planning import CampaignPlanningInput, CampaignPlanningWorkflow
@@ -1575,13 +1574,6 @@ def setup_campaign_meta_review(
                 "status": "draft",
                 "metadata_json": desired_metadata_json,
             }
-            spec_copy_issues = list_meta_copy_policy_issues(
-                {
-                    "primary_text": desired_creative_spec_fields["primary_text"],
-                    "headline": desired_creative_spec_fields["headline"],
-                    "description": desired_creative_spec_fields["description"],
-                }
-            )
             destination_url = desired_creative_spec_fields["destination_url"]
             asset_issues: list[dict[str, str]] = []
             if not destination_url:
@@ -1592,7 +1584,6 @@ def setup_campaign_meta_review(
                         "message": "The destination page could not be resolved to a funnel review path for this asset.",
                     }
                 )
-            asset_issues.extend(spec_copy_issues)
             if asset_issues:
                 invalid_assets.append(
                     {

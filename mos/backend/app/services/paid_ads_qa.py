@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from collections import defaultdict
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -16,8 +17,10 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.models import PaidAdsPlatformProfile
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
+from app.observability import get_openai_client_class
 from app.services.meta_review import resolve_meta_review_destination_url
 from app.services.meta_ads import MetaAdsClient, MetaAdsError
+from app.services.media_storage import MediaStorage, MediaStorageConfigurationError
 
 
 LEGACY_RULESET_VERSION = "paid_ads_policy_ruleset_v1"
@@ -33,24 +36,6 @@ _RULESET_FILES = {
 _MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
 _DEFAULT_META_TRACKING_URL_PARAMETERS = "utm_source=meta&utm_medium=paid"
 
-_PRIVATE_INFO_RE = re.compile(
-    r"\b(?:we know you(?:'re| are)?|you have|your (?:medical|health|credit|debt|diabetes|weight|age|skin)|"
-    r"enter your (?:ssn|social security|credit card|bank account|phone number|email))\b",
-    re.IGNORECASE,
-)
-_DISCRIMINATION_RE = re.compile(
-    r"\b(?:not for|only for|exclude(?:s|d)?|no)\s+"
-    r"(?:women|men|mothers|fathers|christians|muslims|jews|black|white|asian|latino|disabled|seniors)\b",
-    re.IGNORECASE,
-)
-_NEGATIVE_SELF_PERCEPTION_RE = re.compile(
-    r"\b(?:ugly|fat|ashamed|embarrassed|insecure|unattractive|hide your body|hate your skin)\b",
-    re.IGNORECASE,
-)
-_SIEP_RE = re.compile(
-    r"\b(?:vote|election|ballot|candidate|senate|congress|governor|mayor|political|campaign finance)\b",
-    re.IGNORECASE,
-)
 _UNDER_CONSTRUCTION_RE = re.compile(
     r"\b(?:under construction|coming soon|launching soon|page not found|404)\b",
     re.IGNORECASE,
@@ -59,6 +44,18 @@ _PRIVACY_RE = re.compile(r"\bprivacy\b", re.IGNORECASE)
 _CONTACT_RE = re.compile(r"\b(?:contact|support|help center|customer service)\b", re.IGNORECASE)
 _MAILTO_RE = re.compile(r"mailto:", re.IGNORECASE)
 _PHONE_RE = re.compile(r"\+?\d[\d\s().-]{6,}\d")
+_LLM_POLICY_REVIEW_METADATA_KEY = "paidAdsQaLlmPolicyReview"
+_LLM_POLICY_RULE_IDS = {
+    "META-POLICY-LLM-001",
+    "META-COPY-002",
+    "META-COPY-003",
+    "META-COPY-004",
+    "META-COPY-005",
+    "META-COPY-006",
+    "META-UBP-001",
+    "META-IMAGE-001",
+    "META-LP-007",
+}
 
 
 class MetaProfileRefreshError(RuntimeError):
@@ -897,34 +894,369 @@ def _combine_copy_fields(spec: dict[str, Any]) -> str:
     )
 
 
-def list_meta_copy_policy_issues(spec: dict[str, Any]) -> list[dict[str, str]]:
-    copy_blob = _combine_copy_fields(spec)
-    issues: list[dict[str, str]] = []
-    if _PRIVATE_INFO_RE.search(copy_blob):
-        issues.append(
+def _metadata_dict(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _asset_llm_policy_review(asset: Any | None, spec: dict[str, Any]) -> dict[str, Any] | None:
+    metadata_sources = [
+        _metadata_dict(getattr(asset, "ai_metadata", None)) if asset is not None else {},
+        _metadata_dict(spec.get("metadata_json")),
+    ]
+    for metadata in metadata_sources:
+        review = metadata.get(_LLM_POLICY_REVIEW_METADATA_KEY)
+        if isinstance(review, dict):
+            return dict(review)
+    return None
+
+
+def _asset_image_data_url(asset: Any | None) -> str | None:
+    if asset is None:
+        return None
+    storage_key = clean_optional_text(getattr(asset, "storage_key", None))
+    if not storage_key:
+        return None
+    try:
+        data, detected_type = MediaStorage().download_bytes(key=storage_key)
+    except MediaStorageConfigurationError as exc:
+        raise RuntimeError(f"Paid ads image policy QA cannot inspect asset image: {exc}") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"Paid ads image policy QA could not load asset image '{storage_key}': {exc}") from exc
+    content_type = clean_optional_text(getattr(asset, "content_type", None)) or clean_optional_text(detected_type)
+    if not content_type or not content_type.startswith("image/"):
+        raise RuntimeError(
+            "Paid ads image policy QA requires image assets with an image/* content type."
+        )
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:{content_type};base64,{encoded}"
+
+
+def _extract_openai_output_text(response: Any) -> str:
+    output_text = getattr(response, "output_text", None)
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text.strip()
+    payload = response.model_dump() if hasattr(response, "model_dump") else response
+    fragments: list[str] = []
+
+    def collect(value: Any) -> None:
+        if isinstance(value, dict):
+            text = value.get("text")
+            if isinstance(text, str) and text.strip():
+                fragments.append(text.strip())
+            for nested in value.values():
+                collect(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                collect(nested)
+
+    collect(payload)
+    return "\n".join(fragments).strip()
+
+
+def _call_paid_ads_policy_llm(*, context: dict[str, Any], image_data_url: str | None) -> dict[str, Any]:
+    api_key = clean_optional_text(settings.OPENAI_API_KEY)
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for LLM-based paid ads policy QA.")
+    model = clean_optional_text(settings.PAID_ADS_QA_LLM_MODEL)
+    if not model:
+        raise RuntimeError("PAID_ADS_QA_LLM_MODEL is required for LLM-based paid ads policy QA.")
+    reasoning_effort = clean_optional_text(settings.PAID_ADS_QA_LLM_REASONING_EFFORT) or "high"
+    client = get_openai_client_class()(
+        api_key=api_key,
+        timeout=float(settings.PAID_ADS_QA_LLM_TIMEOUT_SECONDS or 60.0),
+    )
+    user_content: list[dict[str, Any]] = [
+        {
+            "type": "input_text",
+            "text": json.dumps(context, ensure_ascii=False, sort_keys=True),
+        }
+    ]
+    if image_data_url:
+        user_content.append({"type": "input_image", "image_url": image_data_url})
+    response = client.responses.create(
+        model=model,
+        reasoning={"effort": reasoning_effort},
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "You are MOS paid ads QA. Classify the provided Meta ad copy, landing page text, "
+                    "and image against the supplied rule ids. Use LLM visual understanding for the image; "
+                    "do not invoke OCR tools or external lookups. Use the supplied policy examples as "
+                    "classification guidance and the campaign-specific rejected references only as calibration; "
+                    "do not overfit to one industry, one product category, or one exact phrase. The word "
+                    "'testosterone' is allowed by itself when it is general product, category, or educational "
+                    "language. Flag personal-attribute risk when the ad asserts or strongly implies a user's "
+                    "own protected health, body, medical, age, financial, voting, or identity attribute. Flag "
+                    "unacceptable-business-practices risk when the ad experience uses deceptive, misleading, "
+                    "hidden-cause, sensational, fake-authority, or bait-style framing. Return strict JSON "
+                    "with keys passed, findings, and "
+                    "revisionGuidance. Each finding must use one of the supplied rule ids and include "
+                    "status, title, message, evidence.policyTrace, and fixGuidance."
+                ),
+            },
+            {"role": "user", "content": user_content},
+        ],
+    )
+    output_text = _extract_openai_output_text(response)
+    if not output_text:
+        raise RuntimeError("Paid ads policy LLM returned no text output.")
+    try:
+        parsed = json.loads(output_text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Paid ads policy LLM returned invalid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Paid ads policy LLM output must be a JSON object.")
+    parsed.setdefault("model", model)
+    parsed.setdefault("reasoningEffort", reasoning_effort)
+    return parsed
+
+
+def _llm_policy_context(
+    *,
+    spec: dict[str, Any],
+    copy_blob: str,
+    destination_url: str | None,
+    page: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "task": "Meta paid ads policy classification",
+        "method": "LLM-only policy classification for copy, image, and landing-page risk.",
+        "rules": [
             {
                 "ruleId": "META-COPY-002",
-                "title": "Copy appears to reference private information",
-                "message": "The Meta draft copy appears to ask for or imply knowledge of private user information.",
-            }
-        )
-    if _DISCRIMINATION_RE.search(copy_blob):
-        issues.append(
+                "policyTrace": "Meta Privacy Violations and Personal Attributes",
+                "classify": "Ad copy asserts or implies private knowledge about the viewer.",
+            },
             {
                 "ruleId": "META-COPY-003",
-                "title": "Copy appears discriminatory",
-                "message": "The Meta draft copy appears to contain discriminatory or exclusionary language.",
-            }
-        )
-    if _NEGATIVE_SELF_PERCEPTION_RE.search(copy_blob):
-        issues.append(
+                "policyTrace": "Meta Discriminatory Practices",
+                "classify": "Ad copy excludes protected classes or expresses discriminatory access.",
+            },
+            {
+                "ruleId": "META-COPY-004",
+                "policyTrace": "Meta SIEP",
+                "classify": "Ad copy appears to involve social issues, elections, or politics.",
+            },
             {
                 "ruleId": "META-COPY-005",
-                "title": "Negative self-perception language detected",
-                "message": "The Meta draft copy appears to use shaming or negative self-perception language.",
-            }
+                "policyTrace": "Meta Health and Wellness negative self-perception",
+                "classify": "Ad copy attempts to generate shame or negative self-perception.",
+            },
+            {
+                "ruleId": "META-COPY-006",
+                "policyTrace": "Meta Privacy Violations and Personal Attributes",
+                "classify": (
+                    "Ad copy makes a direct personal health/body/medical attribute claim about the viewer. "
+                    "General category/product language is allowed when it does not assert or imply knowledge "
+                    "of the viewer's own condition."
+                ),
+            },
+            {
+                "ruleId": "META-UBP-001",
+                "policyTrace": "Meta Unacceptable Business Practices",
+                "classify": (
+                    "Ad experience uses deceptive, misleading, sensational, fake-authority, or hidden-cause "
+                    "framing around a product, service, scheme, offer, or health/body outcome."
+                ),
+            },
+            {
+                "ruleId": "META-IMAGE-001",
+                "policyTrace": "Meta policy review of ad creative media",
+                "classify": (
+                    "Image creative visually reinforces a policy risk, including fake authority/news/science framing, "
+                    "misleading medical implication, before/after body-result framing, or direct personal-attribute callout."
+                ),
+            },
+            {
+                "ruleId": "META-LP-007",
+                "policyTrace": "Meta landing-page and ad-experience review",
+                "classify": (
+                    "Landing page materially reinforces UBP, personal-attribute, or health-result exaggeration risk "
+                    "from the ad."
+                ),
+            },
+        ],
+        "policyExamples": {
+            "metaPrivacyViolationsPersonalAttributes": {
+                "sourceUrl": "https://transparency.meta.com/policies/ad-standards/objectionable-content/privacy-violations-personal-attributes/",
+                "guidance": [
+                    "Allowed: product or service availability framed generally, including general health-condition treatment availability.",
+                    "Allowed: passing age-range or demographic references when they do not assert the viewer personally has that attribute.",
+                    "Allowed: using you/your language without tying it to a personal attribute.",
+                    "Not allowed: asking whether the viewer has a medical condition or other protected personal attribute.",
+                    "Not allowed: implying the advertiser knows the viewer's medical information, voting status, financial status, identity, or age.",
+                    "Not allowed: using you/your/other language to reference a protected personal attribute.",
+                ],
+            },
+            "metaHealthWellness": {
+                "sourceUrl": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+                "guidance": [
+                    "Allowed: health, dietary, or weight-loss products when targeted appropriately and presented without negative self-perception tactics.",
+                    "Allowed: illustrating product or service use and realistic impact over time without shame, insecurity, or perfect-body framing.",
+                    "Not allowed: copy that exploits insecurities, body-shaming, or negative body image to promote a health-related product.",
+                    "Not allowed: side-by-side weight-loss transformation comparisons tied to product use.",
+                    "Not allowed: close-up visuals pinching fat or isolating a body area to create negative self-perception.",
+                ],
+            },
+            "metaUnacceptableBusinessPractices": {
+                "sourceUrl": "https://transparency.meta.com/policies/ad-standards/fraud-scams/unacceptable-business-practices/",
+                "guidance": [
+                    "Not allowed: deceptive or misleading promotion of products, services, schemes, or offers.",
+                    "Not allowed: bait-style framing where the ad creates a misleading reason to click and the destination does not substantiate it clearly.",
+                    "Not allowed: fake authority, fake news, or fake scientific framing that could mislead people about the product, service, or offer.",
+                    "Not allowed: exaggerated health-result or hidden-cause framing used to pressure action or collect money/personal information.",
+                    "Review holistically across image, copy, destination, offer clarity, business identity, and substantiation.",
+                ],
+            },
+        },
+        "campaignSpecificRejectedReferences": [
+            {
+                "reference": "GLP-1s are secretly crashing your testosterone.",
+                "calibrationOnly": True,
+                "riskTypes": ["hidden-cause/sensational framing", "personal health/body attribute phrasing"],
+            },
+            {
+                "reference": "Doctors did not mention what this weight loss protocol may do to your testosterone.",
+                "calibrationOnly": True,
+                "riskTypes": ["medical authority framing", "personal health/body attribute phrasing"],
+            },
+            {
+                "reference": "If you are over 40 and gaining weight, this quiz explains what may be happening.",
+                "calibrationOnly": True,
+                "riskTypes": ["age/body personal-attribute phrasing"],
+            },
+            {
+                "reference": "Researchers found a hidden reason men may lose their drive during rapid weight loss.",
+                "calibrationOnly": True,
+                "riskTypes": ["research authority framing", "hidden-cause framing"],
+            },
+        ],
+        "ad": {
+            "creativeSpecId": spec.get("id"),
+            "assetId": spec.get("asset_id"),
+            "primaryText": spec.get("primary_text"),
+            "headline": spec.get("headline"),
+            "description": spec.get("description"),
+            "combinedCopy": copy_blob,
+            "destinationUrl": destination_url,
+        },
+        "landingPage": page
+        if page is not None
+        else {
+            "bodyText": None,
+            "note": "Landing page was not available for LLM policy classification.",
+        },
+        "outputContract": {
+            "passed": "boolean",
+            "findings": [
+                {
+                    "ruleId": "one supplied rule id",
+                    "status": "failed or needs_manual_review",
+                    "title": "short title",
+                    "message": "policy-grounded explanation",
+                    "evidence": {"policyTrace": ["source/rationale bullets"], "observations": []},
+                    "fixGuidance": ["specific edits needed"],
+                }
+            ],
+            "revisionGuidance": ["optional campaign repair guidance"],
+        },
+    }
+
+
+def _normalize_llm_policy_review_findings(
+    *,
+    ruleset: dict[str, Any],
+    review: dict[str, Any],
+    artifact_ref: str,
+    artifact_type: str,
+) -> list[dict[str, Any]]:
+    raw_findings = review.get("findings")
+    if not isinstance(raw_findings, list):
+        raise RuntimeError("Paid ads policy LLM output must include findings as a list.")
+    findings: list[dict[str, Any]] = []
+    for raw in raw_findings:
+        if not isinstance(raw, dict):
+            continue
+        rule_id = clean_optional_text(raw.get("ruleId"))
+        if rule_id not in _LLM_POLICY_RULE_IDS:
+            raise RuntimeError(f"Paid ads policy LLM returned unsupported rule id: {rule_id}")
+        status_value = clean_optional_text(raw.get("status")) or "failed"
+        if status_value not in {"failed", "needs_manual_review"}:
+            raise RuntimeError(
+                f"Paid ads policy LLM returned unsupported status '{status_value}' for {rule_id}."
+            )
+        evidence = _metadata_dict(raw.get("evidence"))
+        evidence["llmPolicyReview"] = {
+            "model": review.get("model"),
+            "reasoningEffort": review.get("reasoningEffort"),
+            "revisionGuidance": review.get("revisionGuidance"),
+        }
+        findings.append(
+            _new_finding(
+                ruleset=ruleset,
+                rule_id=rule_id,
+                status=status_value,
+                title=clean_optional_text(raw.get("title")) or "LLM policy review finding",
+                message=clean_optional_text(raw.get("message"))
+                or "The LLM policy review flagged this Meta ad component.",
+                artifact_type=artifact_type,
+                artifact_ref=artifact_ref,
+                evidence=evidence,
+            )
         )
-    return issues
+    return findings
+
+
+def evaluate_meta_creative_policy_with_llm(
+    *,
+    ruleset: dict[str, Any],
+    spec: dict[str, Any],
+    asset: Any | None,
+    copy_blob: str,
+    destination_url: str | None,
+    page: dict[str, Any] | None,
+    artifact_ref: str,
+) -> list[dict[str, Any]]:
+    try:
+        review = _asset_llm_policy_review(asset, spec)
+        if review is None:
+            image_data_url = _asset_image_data_url(asset)
+            if not image_data_url:
+                raise RuntimeError(
+                    "Paid ads image policy QA requires an inspectable image for every Meta creative."
+                )
+            review = _call_paid_ads_policy_llm(
+                context=_llm_policy_context(
+                    spec=spec,
+                    copy_blob=copy_blob,
+                    destination_url=destination_url,
+                    page=page,
+                ),
+                image_data_url=image_data_url,
+            )
+    except RuntimeError as exc:
+        return [
+            _new_finding(
+                ruleset=ruleset,
+                rule_id="META-POLICY-LLM-001",
+                status="failed",
+                title="LLM policy classification did not complete",
+                message=str(exc),
+                artifact_type="creative_spec",
+                artifact_ref=artifact_ref,
+                evidence={
+                    "method": "LLM-only policy classification",
+                    "assetId": spec.get("asset_id"),
+                },
+            )
+        ]
+    return _normalize_llm_policy_review_findings(
+        ruleset=ruleset,
+        review=review,
+        artifact_ref=artifact_ref,
+        artifact_type="creative_spec",
+    )
 
 
 def _looks_absolute_http_url(value: str | None) -> bool:
@@ -1017,7 +1349,7 @@ def _load_public_funnel_snapshot(url: str) -> dict[str, Any] | None:
         "requestedUrl": url,
         "finalUrl": url,
         "statusCode": 200,
-        "bodyText": extracted_text[:50000],
+        "bodyText": extracted_text,
         "inspectionSource": "public_funnel_api",
     }
 
@@ -1032,7 +1364,7 @@ def _landing_page_snapshot(url: str) -> dict[str, Any]:
         "requestedUrl": url,
         "finalUrl": str(response.url),
         "statusCode": response.status_code,
-        "bodyText": response.text[:50000],
+        "bodyText": response.text,
         "inspectionSource": "http_fetch",
     }
 
@@ -1111,6 +1443,7 @@ def evaluate_meta_campaign(
         )
 
     ready_asset_ids = {str(asset.id) for asset in ready_assets}
+    ready_assets_by_id = {str(asset.id): asset for asset in ready_assets}
     creative_asset_ids = {str(spec.asset_id) for spec in creative_specs if getattr(spec, "asset_id", None)}
     missing_asset_ids = sorted(ready_asset_ids - creative_asset_ids)
     if missing_asset_ids:
@@ -1129,16 +1462,21 @@ def evaluate_meta_campaign(
 
     checked_rule_ids.extend(
         [
+            "META-POLICY-LLM-001",
             "META-COPY-002",
             "META-COPY-003",
             "META-COPY-004",
             "META-COPY-005",
+            "META-COPY-006",
+            "META-UBP-001",
+            "META-IMAGE-001",
             "META-LP-001",
             "META-LP-002",
             "META-LP-003",
             "META-LP-004",
             "META-LP-005",
             "META-LP-006",
+            "META-LP-007",
         ]
     )
     for spec in creative_specs:
@@ -1153,59 +1491,6 @@ def evaluate_meta_campaign(
         }
         artifact_ref = str(spec.id)
         copy_blob = _combine_copy_fields(spec_dict)
-        copy_issues = list_meta_copy_policy_issues(spec_dict)
-        if any(issue["ruleId"] == "META-COPY-002" for issue in copy_issues):
-            findings.append(
-                _new_finding(
-                    ruleset=ruleset,
-                    rule_id="META-COPY-002",
-                    status="failed",
-                    title="Copy appears to reference private information",
-                    message="The Meta draft copy appears to ask for or imply knowledge of private user information.",
-                    artifact_type="creative_spec",
-                    artifact_ref=artifact_ref,
-                    evidence={"copy": copy_blob},
-                )
-            )
-        if any(issue["ruleId"] == "META-COPY-003" for issue in copy_issues):
-            findings.append(
-                _new_finding(
-                    ruleset=ruleset,
-                    rule_id="META-COPY-003",
-                    status="failed",
-                    title="Copy appears discriminatory",
-                    message="The Meta draft copy appears to contain discriminatory or exclusionary language.",
-                    artifact_type="creative_spec",
-                    artifact_ref=artifact_ref,
-                    evidence={"copy": copy_blob},
-                )
-            )
-        if _SIEP_RE.search(copy_blob):
-            findings.append(
-                _new_finding(
-                    ruleset=ruleset,
-                    rule_id="META-COPY-004",
-                    status="needs_manual_review",
-                    title="Potential SIEP copy detected",
-                    message="The Meta draft copy contains possible social-issues, election, or politics keywords and needs manual review.",
-                    artifact_type="creative_spec",
-                    artifact_ref=artifact_ref,
-                    evidence={"copy": copy_blob},
-                )
-            )
-        if any(issue["ruleId"] == "META-COPY-005" for issue in copy_issues):
-            findings.append(
-                _new_finding(
-                    ruleset=ruleset,
-                    rule_id="META-COPY-005",
-                    status="failed",
-                    title="Negative self-perception language detected",
-                    message="The Meta draft copy appears to use shaming or negative self-perception language.",
-                    artifact_type="creative_spec",
-                    artifact_ref=artifact_ref,
-                    evidence={"copy": copy_blob},
-                )
-            )
 
         destination_value, destination_source = _creative_spec_destination(spec_dict)
         if not destination_value:
@@ -1314,6 +1599,17 @@ def evaluate_meta_campaign(
                     evidence={"destinationUrl": public_destination, "finalUrl": page["finalUrl"]},
                 )
             )
+        findings.extend(
+            evaluate_meta_creative_policy_with_llm(
+                ruleset=ruleset,
+                spec=spec_dict,
+                asset=ready_assets_by_id.get(str(spec.asset_id)),
+                copy_blob=copy_blob,
+                destination_url=public_destination,
+                page=page,
+                artifact_ref=artifact_ref,
+            )
+        )
 
     return {
         "platform": "meta",
