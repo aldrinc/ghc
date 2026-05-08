@@ -590,6 +590,93 @@ def test_meta_campaign_paid_ads_qa_evaluates_copy_and_landing_page(
     assert "META-COPY-002" in report_resp.text
 
 
+def test_landing_page_snapshot_http_fetch_keeps_full_page_text(monkeypatch) -> None:
+    long_body = "A" * 60000 + " Privacy Policy. Contact support@example.com"
+
+    class _Response:
+        status_code = 200
+        text = long_body
+        url = "https://example.com/offer"
+
+    class _Client:
+        def __init__(self, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def get(self, url):
+            assert url == "https://example.com/offer"
+            return _Response()
+
+    monkeypatch.setattr(paid_ads_qa_service, "_load_public_funnel_snapshot", lambda _url: None)
+    monkeypatch.setattr(paid_ads_qa_service.httpx, "Client", _Client)
+
+    snapshot = paid_ads_qa_service._landing_page_snapshot("https://example.com/offer")
+
+    assert snapshot["inspectionSource"] == "http_fetch"
+    assert len(snapshot["bodyText"]) == len(long_body)
+    assert snapshot["bodyText"].endswith("Privacy Policy. Contact support@example.com")
+
+
+def test_landing_page_snapshot_public_funnel_keeps_full_extracted_text(monkeypatch) -> None:
+    long_intro = "A" * 60000
+
+    class _Response:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def get(self, url):
+            if url.endswith("/public/funnels/product-slug/funnel-slug/pages/page-slug"):
+                return _Response(
+                    {
+                        "metadata": {"intro": long_intro},
+                        "puckData": {
+                            "footer": {
+                                "legal": "Privacy Policy",
+                                "support": "Contact support@example.com",
+                            }
+                        },
+                    }
+                )
+            raise AssertionError(f"Unexpected URL: {url}")
+
+    monkeypatch.setattr(
+        paid_ads_qa_service.settings,
+        "DEPLOY_PUBLIC_API_BASE_URL",
+        "https://api.example.test",
+    )
+    monkeypatch.setattr(paid_ads_qa_service.httpx, "Client", _Client)
+
+    snapshot = paid_ads_qa_service._landing_page_snapshot(
+        "https://shoptenorco.com/product-slug/funnel-slug/page-slug"
+    )
+
+    assert snapshot["inspectionSource"] == "public_funnel_api"
+    assert len(snapshot["bodyText"]) > 60000
+    assert "Privacy Policy" in snapshot["bodyText"]
+    assert snapshot["bodyText"].endswith("Contact support@example.com")
+
+
 def test_meta_campaign_paid_ads_qa_lists_previous_runs(
     api_client,
     db_session,

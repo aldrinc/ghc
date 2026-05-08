@@ -1017,7 +1017,7 @@ def _load_public_funnel_snapshot(url: str) -> dict[str, Any] | None:
         "requestedUrl": url,
         "finalUrl": url,
         "statusCode": 200,
-        "bodyText": extracted_text[:50000],
+        "bodyText": extracted_text,
         "inspectionSource": "public_funnel_api",
     }
 
@@ -1032,7 +1032,7 @@ def _landing_page_snapshot(url: str) -> dict[str, Any]:
         "requestedUrl": url,
         "finalUrl": str(response.url),
         "statusCode": response.status_code,
-        "bodyText": response.text[:50000],
+        "bodyText": response.text,
         "inspectionSource": "http_fetch",
     }
 
