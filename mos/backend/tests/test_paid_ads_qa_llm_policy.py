@@ -87,6 +87,9 @@ def test_meta_policy_classification_uses_llm_image_context(monkeypatch: pytest.M
     context = captured["context"]
     assert isinstance(context, dict)
     assert context["method"] == "LLM-only policy classification for copy, image, and landing-page risk."
+    assert "policyExamples" in context
+    assert "campaignSpecificRejectedReferences" in context
+    assert len(context["campaignSpecificRejectedReferences"]) >= 3
 
 
 def test_meta_policy_llm_flags_rejected_campaign_patterns_without_banning_testosterone(

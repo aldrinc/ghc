@@ -982,11 +982,15 @@ def _call_paid_ads_policy_llm(*, context: dict[str, Any], image_data_url: str | 
                 "content": (
                     "You are MOS paid ads QA. Classify the provided Meta ad copy, landing page text, "
                     "and image against the supplied rule ids. Use LLM visual understanding for the image; "
-                    "do not invoke OCR tools or external lookups. The word 'testosterone' is allowed by itself. "
-                    "Flag personal-attribute risk only when the ad asserts or strongly implies a user's own "
-                    "health/body state, such as 'your testosterone'. Flag unacceptable-business-practices risk "
-                    "when framing implies hidden manipulation, deception, or sensational health causality, "
-                    "such as 'secretly crashing'. Return strict JSON with keys passed, findings, and "
+                    "do not invoke OCR tools or external lookups. Use the supplied policy examples as "
+                    "classification guidance and the campaign-specific rejected references only as calibration; "
+                    "do not overfit to one industry, one product category, or one exact phrase. The word "
+                    "'testosterone' is allowed by itself when it is general product, category, or educational "
+                    "language. Flag personal-attribute risk when the ad asserts or strongly implies a user's "
+                    "own protected health, body, medical, age, financial, voting, or identity attribute. Flag "
+                    "unacceptable-business-practices risk when the ad experience uses deceptive, misleading, "
+                    "hidden-cause, sensational, fake-authority, or bait-style framing. Return strict JSON "
+                    "with keys passed, findings, and "
                     "revisionGuidance. Each finding must use one of the supplied rule ids and include "
                     "status, title, message, evidence.policyTrace, and fixGuidance."
                 ),
@@ -1044,16 +1048,16 @@ def _llm_policy_context(
                 "policyTrace": "Meta Privacy Violations and Personal Attributes",
                 "classify": (
                     "Ad copy makes a direct personal health/body/medical attribute claim about the viewer. "
-                    "General testosterone category/product language is allowed; phrasing like 'your testosterone' "
-                    "can be risky when it implies knowledge of the viewer's condition."
+                    "General category/product language is allowed when it does not assert or imply knowledge "
+                    "of the viewer's own condition."
                 ),
             },
             {
                 "ruleId": "META-UBP-001",
                 "policyTrace": "Meta Unacceptable Business Practices",
                 "classify": (
-                    "Ad experience uses deceptive, sensational, or hidden-cause framing around health/body outcomes, "
-                    "including claims like 'secretly crashing' or equivalent undisclosed-harm framing."
+                    "Ad experience uses deceptive, misleading, sensational, fake-authority, or hidden-cause "
+                    "framing around a product, service, scheme, offer, or health/body outcome."
                 ),
             },
             {
@@ -1071,6 +1075,61 @@ def _llm_policy_context(
                     "Landing page materially reinforces UBP, personal-attribute, or health-result exaggeration risk "
                     "from the ad."
                 ),
+            },
+        ],
+        "policyExamples": {
+            "metaPrivacyViolationsPersonalAttributes": {
+                "sourceUrl": "https://transparency.meta.com/policies/ad-standards/objectionable-content/privacy-violations-personal-attributes/",
+                "guidance": [
+                    "Allowed: product or service availability framed generally, including general health-condition treatment availability.",
+                    "Allowed: passing age-range or demographic references when they do not assert the viewer personally has that attribute.",
+                    "Allowed: using you/your language without tying it to a personal attribute.",
+                    "Not allowed: asking whether the viewer has a medical condition or other protected personal attribute.",
+                    "Not allowed: implying the advertiser knows the viewer's medical information, voting status, financial status, identity, or age.",
+                    "Not allowed: using you/your/other language to reference a protected personal attribute.",
+                ],
+            },
+            "metaHealthWellness": {
+                "sourceUrl": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+                "guidance": [
+                    "Allowed: health, dietary, or weight-loss products when targeted appropriately and presented without negative self-perception tactics.",
+                    "Allowed: illustrating product or service use and realistic impact over time without shame, insecurity, or perfect-body framing.",
+                    "Not allowed: copy that exploits insecurities, body-shaming, or negative body image to promote a health-related product.",
+                    "Not allowed: side-by-side weight-loss transformation comparisons tied to product use.",
+                    "Not allowed: close-up visuals pinching fat or isolating a body area to create negative self-perception.",
+                ],
+            },
+            "metaUnacceptableBusinessPractices": {
+                "sourceUrl": "https://transparency.meta.com/policies/ad-standards/fraud-scams/unacceptable-business-practices/",
+                "guidance": [
+                    "Not allowed: deceptive or misleading promotion of products, services, schemes, or offers.",
+                    "Not allowed: bait-style framing where the ad creates a misleading reason to click and the destination does not substantiate it clearly.",
+                    "Not allowed: fake authority, fake news, or fake scientific framing that could mislead people about the product, service, or offer.",
+                    "Not allowed: exaggerated health-result or hidden-cause framing used to pressure action or collect money/personal information.",
+                    "Review holistically across image, copy, destination, offer clarity, business identity, and substantiation.",
+                ],
+            },
+        },
+        "campaignSpecificRejectedReferences": [
+            {
+                "reference": "GLP-1s are secretly crashing your testosterone.",
+                "calibrationOnly": True,
+                "riskTypes": ["hidden-cause/sensational framing", "personal health/body attribute phrasing"],
+            },
+            {
+                "reference": "Doctors did not mention what this weight loss protocol may do to your testosterone.",
+                "calibrationOnly": True,
+                "riskTypes": ["medical authority framing", "personal health/body attribute phrasing"],
+            },
+            {
+                "reference": "If you are over 40 and gaining weight, this quiz explains what may be happening.",
+                "calibrationOnly": True,
+                "riskTypes": ["age/body personal-attribute phrasing"],
+            },
+            {
+                "reference": "Researchers found a hidden reason men may lose their drive during rapid weight loss.",
+                "calibrationOnly": True,
+                "riskTypes": ["research authority framing", "hidden-cause framing"],
             },
         ],
         "ad": {
