@@ -133,10 +133,10 @@ def _backfill_existing_posthog_settings() -> None:
     profile_rows = connection.execute(
         sa.text(
             """
-            SELECT org_id::text AS org_id, client_id::text AS client_id, metadata_json
+            SELECT org_id::text AS org_id, client_id::text AS client_id, metadata AS metadata_json
             FROM paid_ads_platform_profiles
             WHERE platform = 'meta'
-              AND metadata_json ? 'mosPosthogTracking'
+              AND metadata ? 'mosPosthogTracking'
             """
         )
     ).mappings()
