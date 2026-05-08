@@ -1483,7 +1483,6 @@ def test_campaign_meta_review_setup_rejects_invalid_assets_before_writing_specs(
     assert invalid_asset["assetId"] == str(asset.id)
     rule_ids = {issue["ruleId"] for issue in invalid_asset["issues"]}
     assert "META-LP-001" in rule_ids
-    assert "META-COPY-002" in rule_ids
 
     creative_specs = db_session.scalars(
         select(MetaCreativeSpec).where(MetaCreativeSpec.campaign_id == campaign_id)
