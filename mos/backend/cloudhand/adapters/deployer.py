@@ -5803,6 +5803,9 @@ WantedBy=multi-user.target
 		  const META_ATTRIBUTION_WAIT_POLL_MS = 50;
 		  const META_EMAIL_HASH_STORAGE_KEY = "mos_meta_em";
 		  const TRACKING_NAVIGATION_FLUSH_DELAY_MS = 250;
+		  const RMBC_SESSION_PARAM = "rmbc_session_id";
+		  const RMBC_ANONYMOUS_PARAM = "rmbc_anonymous_id";
+		  const RMBC_CLICK_PARAM = "rmbc_click_id";
 	  const PRESALE_SOURCE_PARAM = "src";
   const PRESALE_SOURCE_VALUE = "presale";
   const EVENTS_ENDPOINT = String(config.apiBasePath || "/api") + "/public/events";
@@ -5937,6 +5940,9 @@ WantedBy=multi-user.target
 	    assignCleanProp(props, "fbc", readCookie("_fbc"));
 		    const currentUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
 		    assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
+		    assignCleanProp(props, "rmbc_session_id", currentUrl.searchParams.get(RMBC_SESSION_PARAM));
+		    assignCleanProp(props, "rmbc_anonymous_id", currentUrl.searchParams.get(RMBC_ANONYMOUS_PARAM));
+		    assignCleanProp(props, "rmbc_click_id", currentUrl.searchParams.get(RMBC_CLICK_PARAM));
 		    assignCleanProp(props, "event_source_url", currentUrl.href);
 		    assignCleanProp(props, "$raw_user_agent", window.navigator && window.navigator.userAgent);
 		    return props;
@@ -5996,6 +6002,29 @@ WantedBy=multi-user.target
   };
   const resolveClickAttribution = () => {
     const params = new URLSearchParams(window.location.search);
+    const rmbcClickId = cleanText(params.get(RMBC_CLICK_PARAM));
+    if (rmbcClickId) {
+      const attribution = {
+        clickId: rmbcClickId,
+        clickIdType: RMBC_CLICK_PARAM,
+        rmbcClickId,
+        rmbc_click_id: rmbcClickId,
+        bridgeClickId: rmbcClickId,
+        bridge_click_id: rmbcClickId,
+      };
+      for (const key of CLICK_ID_KEYS) {
+        const value = cleanText(params.get(key));
+        if (value) {
+          attribution.paidClickId = value;
+          attribution.paid_click_id = value;
+          attribution.paidClickIdType = key;
+          attribution.paid_click_id_type = key;
+          attribution[key] = value;
+          break;
+        }
+      }
+      return attribution;
+    }
     for (const key of CLICK_ID_KEYS) {
       const value = cleanText(params.get(key));
       if (value) {
@@ -6077,13 +6106,31 @@ WantedBy=multi-user.target
       ...clickAttribution,
       ...(clickAttribution.clickId ? { click_id: clickAttribution.clickId } : {}),
       ...(clickAttribution.clickIdType ? { click_id_type: clickAttribution.clickIdType } : {}),
+      ...(cleanText(new URLSearchParams(window.location.search).get(RMBC_SESSION_PARAM))
+        ? { rmbc_session_id: cleanText(new URLSearchParams(window.location.search).get(RMBC_SESSION_PARAM)) }
+        : {}),
+      ...(cleanText(new URLSearchParams(window.location.search).get(RMBC_ANONYMOUS_PARAM))
+        ? { rmbc_anonymous_id: cleanText(new URLSearchParams(window.location.search).get(RMBC_ANONYMOUS_PARAM)) }
+        : {}),
     };
   };
   const posthogTrackingConfig = isRecord(config.tracking) ? config.tracking : null;
   const createFallbackId = (prefix) =>
     prefix + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-  const getOrCreateStoredId = (storage, key, prefix) => {
+  const getSearchParam = (name) => {
     try {
+      return cleanText(new URLSearchParams(window.location.search).get(name));
+    } catch (_) {
+      return null;
+    }
+  };
+  const getOrCreateStoredId = (storage, key, prefix, preferredId) => {
+    const cleanedPreferredId = cleanText(preferredId);
+    try {
+      if (cleanedPreferredId) {
+        storage.setItem(key, cleanedPreferredId);
+        return cleanedPreferredId;
+      }
       const existing = storage.getItem(key);
       if (existing) return existing;
       const nextId =
@@ -6093,15 +6140,21 @@ WantedBy=multi-user.target
       storage.setItem(key, nextId);
       return nextId;
     } catch (_) {
-      return createFallbackId(prefix);
+      return cleanedPreferredId || createFallbackId(prefix);
     }
   };
 
-  const visitorId = getOrCreateStoredId(window.localStorage, "funnel_visitor_id", "funnel-visitor");
+  const visitorId = getOrCreateStoredId(
+    window.localStorage,
+    "funnel_visitor_id",
+    "funnel-visitor",
+    getSearchParam(RMBC_ANONYMOUS_PARAM),
+  );
   const sessionId = getOrCreateStoredId(
     window.sessionStorage,
     "funnel_session_id:" + String(config.productSlug || "unknown") + ":" + String(config.funnelSlug || "unknown"),
     "funnel-session",
+    getSearchParam(RMBC_SESSION_PARAM),
   );
 
   const getUtmParams = () => {
@@ -6179,6 +6232,16 @@ WantedBy=multi-user.target
     nextUrl.searchParams.delete("checkout");
     return nextUrl.toString();
   };
+  const buildBridgeClickId = (bindingId, ctaPosition) => {
+    return [
+      "click",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      cleanText(bindingId) || "cta",
+      String(ctaPosition || 1),
+      randomEventIdSegment(),
+    ].join("_");
+  };
   const buildInternalNavigationUrl = (targetPath, options) => {
     const normalizedTargetPath = cleanText(targetPath);
     if (!normalizedTargetPath) return window.location.href;
@@ -6188,6 +6251,12 @@ WantedBy=multi-user.target
     nextUrl.search = currentUrl.search;
     if (isPresaleToSalesNavigation(options && options.fromStage, options && options.toStage)) {
       nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);
+      const bridgeSessionId = cleanText(options && options.sessionId) || cleanText(sessionId);
+      const bridgeAnonymousId = cleanText(options && options.anonymousId) || cleanText(visitorId);
+      const bridgeClickId = cleanText(options && options.clickId);
+      if (bridgeSessionId) nextUrl.searchParams.set(RMBC_SESSION_PARAM, bridgeSessionId);
+      if (bridgeAnonymousId) nextUrl.searchParams.set(RMBC_ANONYMOUS_PARAM, bridgeAnonymousId);
+      if (bridgeClickId) nextUrl.searchParams.set(RMBC_CLICK_PARAM, bridgeClickId);
     }
     return nextUrl.toString();
   };
@@ -6511,13 +6580,11 @@ WantedBy=multi-user.target
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
     }
     if (eventType === "sales_page_view") {
-      const fromPresale = props && props.fromPresale === true;
       return [
         { method: "track", eventName: "PageView", params: pageViewParams },
         { method: "trackCustom", eventName: "Entered Sales Page", params: pageViewParams },
-        fromPresale
-          ? { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams }
-          : { method: "track", eventName: "ViewContent", params: pageViewParams },
+        { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams },
+        { method: "track", eventName: "ViewContent", params: pageViewParams },
       ];
     }
     if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
@@ -6531,6 +6598,13 @@ WantedBy=multi-user.target
           from_stage: "pre_sales",
           to_stage: "sales",
         },
+      }];
+    }
+    if (eventType === "add_to_cart") {
+      return [{
+        method: "track",
+        eventName: "AddToCart",
+        params: resolveProductMetaParams(props),
       }];
     }
     if (eventType === "sales_to_checkout_click") {
@@ -8421,6 +8495,8 @@ WantedBy=multi-user.target
             element.href = buildInternalNavigationUrl(targetPath, {
               fromStage: config.pageStage,
               toStage: targetStage || "custom",
+              sessionId,
+              anonymousId: visitorId,
             });
           }
         }
@@ -8467,11 +8543,16 @@ WantedBy=multi-user.target
               if (!targetPath) {
                 throw new Error("Target page path is missing for binding '" + String(binding.id || "unknown") + "'.");
               }
+              const ctaPosition = matchIndex + 1;
+              const isPresaleSalesClick = isPresaleToSalesNavigation(config.pageStage, targetStage || "custom");
+              const bridgeClickId = isPresaleSalesClick ? buildBridgeClickId(binding.id, ctaPosition) : null;
               const destinationUrl = buildInternalNavigationUrl(targetPath, {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",
+                sessionId,
+                anonymousId: visitorId,
+                clickId: bridgeClickId,
               });
-              const ctaPosition = matchIndex + 1;
               trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",
@@ -8486,8 +8567,18 @@ WantedBy=multi-user.target
                 buttonText: buttonText || undefined,
                 destinationUrl,
                 destination_url: destinationUrl,
+                ...(bridgeClickId
+                  ? {
+                      clickId: bridgeClickId,
+                      click_id: bridgeClickId,
+                      clickIdType: RMBC_CLICK_PARAM,
+                      click_id_type: RMBC_CLICK_PARAM,
+                      rmbcClickId: bridgeClickId,
+                      rmbc_click_id: bridgeClickId,
+                    }
+                  : {}),
               });
-              if (isPresaleToSalesNavigation(config.pageStage, targetStage || "custom")) {
+              if (isPresaleSalesClick) {
                 markPresaleAttribution();
               }
               await waitForTrackingNavigationFlush();

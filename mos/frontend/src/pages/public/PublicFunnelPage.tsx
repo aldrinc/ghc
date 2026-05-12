@@ -236,7 +236,34 @@ function resolveStandaloneImportedHtmlPayload(
   };
 }
 
-function getOrCreateId(storage: Storage, key: string) {
+function getSearchParam(name: string) {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get(name);
+  return typeof value === "string" ? value.trim() || null : null;
+}
+
+function buildMetaPixelRuntimeParams(params?: Record<string, unknown>) {
+  if (typeof window === "undefined") return params;
+  const url = new URL(window.location.href);
+  const merged: Record<string, unknown> = {
+    ...(params || {}),
+    event_source_url: url.href,
+  };
+  for (const key of ["fbclid", "rmbc_session_id", "rmbc_anonymous_id", "rmbc_click_id"]) {
+    const value = url.searchParams.get(key)?.trim();
+    if (value) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+function getOrCreateId(storage: Storage, key: string, preferredId?: string | null) {
+  const cleanedPreferredId = typeof preferredId === "string" ? preferredId.trim() : "";
+  if (cleanedPreferredId) {
+    storage.setItem(key, cleanedPreferredId);
+    return cleanedPreferredId;
+  }
   const existing = storage.getItem(key);
   if (existing) return existing;
   const id =
@@ -374,9 +401,17 @@ export function PublicFunnelPage() {
   const sentPageViewRef = useRef<string | null>(null);
   const handledCheckoutReturnRef = useRef<string | null>(null);
 
-  const visitorId = useMemo(() => getOrCreateId(localStorage, "funnel_visitor_id"), []);
+  const visitorId = useMemo(
+    () => getOrCreateId(localStorage, "funnel_visitor_id", getSearchParam("rmbc_anonymous_id")),
+    [],
+  );
   const sessionId = useMemo(
-    () => getOrCreateId(sessionStorage, `funnel_session_id:${productSlug || "unknown"}:${funnelSlug || "unknown"}`),
+    () =>
+      getOrCreateId(
+        sessionStorage,
+        `funnel_session_id:${productSlug || "unknown"}:${funnelSlug || "unknown"}`,
+        getSearchParam("rmbc_session_id"),
+      ),
     [funnelSlug, productSlug],
   );
   const standaloneImportedHtmlPayload = useMemo(
@@ -510,7 +545,7 @@ export function PublicFunnelPage() {
       trackMetaPixelEvent(
         metaPixelId,
         mappedMetaEvent.eventName,
-        mappedMetaEvent.params,
+        buildMetaPixelRuntimeParams(mappedMetaEvent.params),
         mappedMetaEvent.method,
       );
     }

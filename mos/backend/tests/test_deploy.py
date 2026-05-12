@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import os
 from pathlib import Path
@@ -2282,6 +2283,101 @@ def test_build_funnel_publication_workload_patch_rejects_pathful_api_base_for_st
         )
 
 
+def _tiny_png_bytes() -> bytes:
+    return base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+    )
+
+
+def test_validate_standalone_html_image_references_accepts_src_and_srcset_assets():
+    site_dir = "/tmp/mos-standalone-preflight"
+    png = _tiny_png_bytes()
+    served_assets = {
+        "/shop/daily/presales/assets/hero.png": SimpleNamespace(
+            content=png,
+            content_type="image/png",
+        ),
+        "/shop/daily/presales/assets/hero-480.png": SimpleNamespace(
+            content=png,
+            content_type="image/png",
+        ),
+        "/shop/daily/presales/assets/hero-800.png": SimpleNamespace(
+            content=png,
+            content_type="image/png",
+        ),
+    }
+
+    deploy_service._validate_standalone_html_image_references(
+        site_dir=site_dir,
+        uploaded_html_files={
+            f"{site_dir}/shop/daily/presales/index.html": """
+            <picture>
+              <source srcset="./assets/hero-480.png 480w, ./assets/hero-800.png 800w">
+              <img src="./assets/hero.png" srcset="./assets/hero-480.png 480w, ./assets/hero-800.png 800w">
+            </picture>
+            """,
+        },
+        uploaded_binary_files={},
+        standalone_served_assets=served_assets,
+        public_server_names=["shop.example.com"],
+        upstream_api_base_root="https://api.example.com",
+    )
+
+
+def test_validate_standalone_html_image_references_rejects_missing_srcset_asset():
+    site_dir = "/tmp/mos-standalone-preflight"
+    png = _tiny_png_bytes()
+    served_assets = {
+        "/shop/daily/presales/assets/hero.png": SimpleNamespace(
+            content=png,
+            content_type="image/png",
+        ),
+        "/shop/daily/presales/assets/hero-480.png": SimpleNamespace(
+            content=png,
+            content_type="image/png",
+        ),
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="missing deployed image asset"):
+        deploy_service._validate_standalone_html_image_references(
+            site_dir=site_dir,
+            uploaded_html_files={
+                f"{site_dir}/shop/daily/presales/index.html": """
+                <picture>
+                  <source srcset="./assets/hero-480.png 480w, ./assets/missing-800.png 800w">
+                  <img src="./assets/hero.png">
+                </picture>
+                """,
+            },
+            uploaded_binary_files={},
+            standalone_served_assets=served_assets,
+            public_server_names=["shop.example.com"],
+            upstream_api_base_root="https://api.example.com",
+        )
+
+
+def test_validate_standalone_html_image_references_validates_uploaded_public_asset_bytes():
+    site_dir = "/tmp/mos-standalone-preflight"
+    public_id = "77777777-7777-4777-8777-777777777777"
+    png = _tiny_png_bytes()
+
+    deploy_service._validate_standalone_html_image_references(
+        site_dir=site_dir,
+        uploaded_html_files={
+            f"{site_dir}/shop/daily/sales-page/index.html": (
+                f'<img src="/public/assets/{public_id}" '
+                f'srcset="/api/public/assets/{public_id}.png 480w">'
+            ),
+        },
+        uploaded_binary_files={
+            f"{site_dir}/api/public/assets/{public_id}.png": png,
+        },
+        standalone_served_assets={},
+        public_server_names=["shop.example.com"],
+        upstream_api_base_root="https://api.example.com",
+    )
+
+
 def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatible_artifact(monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist")
     workload_patch = deploy_service.build_funnel_publication_workload_patch(
@@ -3586,6 +3682,22 @@ def _build_tracking_validation_artifact_payload(*, include_presales: bool) -> di
     }
 
 
+def _expected_sales_posthog_context(**overrides) -> dict:
+    props = {
+        "product_slug": "ember",
+        "funnel_slug": "daily",
+        "publication_id": "00000000-0000-0000-0000-000000000999",
+        "page_id": "sales-page-id",
+        "page_slug": "sales-page",
+        "page_stage": "sales",
+        "content_category": "sales_page",
+        "session_id": "session-1",
+        "visitor_id": "visitor-1",
+    }
+    props.update(overrides)
+    return props
+
+
 def _install_publish_job_mocks(monkeypatch):
     import app.db.base as db_base
     import app.services.funnels as funnels_service
@@ -3690,18 +3802,30 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "PageView",
         "Entered Sales Page",
         "EnteredSales",
+        "ViewContent",
         "AddToCart",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
     assert path_plan["expected_posthog_events"] == [
         "pre_sales_page_view",
+        "PageView",
         "presell_page_view",
+        "EnteredPresales",
+        "Entered Presales Page",
         "pre_sales_to_sales_click",
         "cta_click",
+        "PreSalesToSalesClick",
         "sales_page_view",
+        "PageView",
+        "Entered Sales Page",
+        "EnteredSales",
+        "ViewContent",
         "offer_page_view",
         "sales_to_checkout_click",
+        "AddToCart",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
     ]
     assert sorted(page["slug"] for page in plan["pages_to_validate"]) == [
         "presales",
@@ -3731,6 +3855,7 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
         "Entered Funnel",
         "PageView",
         "Entered Sales Page",
+        "EnteredSales",
         "ViewContent",
         "AddToCart",
         "SalesToCheckoutClick",
@@ -3738,8 +3863,15 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
     ]
     assert path_plan["expected_posthog_events"] == [
         "sales_page_view",
+        "PageView",
+        "Entered Sales Page",
+        "EnteredSales",
+        "ViewContent",
         "offer_page_view",
         "sales_to_checkout_click",
+        "AddToCart",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
     ]
     assert [page["slug"] for page in plan["pages_to_validate"]] == ["sales-page"]
 
@@ -3773,13 +3905,19 @@ def test_build_funnel_tracking_validation_plan_for_checkout_started_flow():
         "Entered Funnel",
         "PageView",
         "Entered Sales Page",
+        "EnteredSales",
         "ViewContent",
         "InitiateCheckout",
     ]
     assert path_plan["expected_posthog_events"] == [
         "sales_page_view",
+        "PageView",
+        "Entered Sales Page",
+        "EnteredSales",
+        "ViewContent",
         "offer_page_view",
         "checkout_started",
+        "InitiateCheckout",
     ]
 
 
@@ -3811,6 +3949,7 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
         access_urls=["https://shop.shopemberco.com/"],
         render_mode="html_deploy",
     )
+    sales_url = "https://shop.shopemberco.com/ember/daily/sales-page/"
 
     observed_state = {
         "internal": [
@@ -3831,7 +3970,8 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
             ["track", "PreSalesToSalesClick", {}],
             ["track", "PageView", {}],
             ["track", "Entered Sales Page", {}],
-            ["track", "EnteredSales", {}],
+            ["track", "EnteredSales", {"event_source_url": sales_url}],
+            ["track", "ViewContent", {}],
             ["track", "AddToCart", {}],
             ["track", "SalesToCheckoutClick", {}],
             ["track", "SalesToCheckoutClicked", {}],
@@ -3848,12 +3988,23 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
             ],
             "captures": [
                 ["pre_sales_page_view", {}],
+                ["PageView", {}],
                 ["presell_page_view", {}],
+                ["EnteredPresales", {}],
+                ["Entered Presales Page", {}],
                 ["pre_sales_to_sales_click", {}],
                 ["cta_click", {}],
-                ["sales_page_view", {}],
+                ["PreSalesToSalesClick", {}],
+                ["sales_page_view", _expected_sales_posthog_context()],
+                ["PageView", {}],
+                ["Entered Sales Page", {}],
+                ["EnteredSales", _expected_sales_posthog_context()],
+                ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
+                ["AddToCart", {}],
+                ["SalesToCheckoutClick", {}],
+                ["SalesToCheckoutClicked", {}],
             ],
         },
     }
@@ -3862,6 +4013,268 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
         path_plan=plan["path_plans"][0],
         observed_state=observed_state,
     )
+
+
+def test_validate_observed_tracking_events_rejects_extra_sales_entry_meta_events():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    observed_state = {
+        "internal": [
+            {"eventType": "Entered Funnel"},
+            {"eventType": "sales_page_view"},
+            {"eventType": "offer_page_view"},
+            {"eventType": "sales_to_checkout_click"},
+        ],
+        "meta": [
+            ["init", "pixel-123"],
+            ["track", "Entered Funnel", {}],
+            ["track", "PageView", {}],
+            ["track", "Entered Sales Page", {}],
+            ["track", "EnteredSales", {}],
+            ["track", "EnteredSales", {}],
+            ["track", "ViewContent", {}],
+            ["track", "AddToCart", {}],
+            ["track", "SalesToCheckoutClick", {}],
+            ["track", "SalesToCheckoutClicked", {}],
+        ],
+        "posthog": {
+            "inits": [
+                [
+                    "phc_test_123",
+                    {
+                        "api_host": "https://emb.shopemberco.com",
+                        "ui_host": "https://us.posthog.com",
+                    },
+                ]
+            ],
+            "captures": [
+                ["sales_page_view", {}],
+                ["PageView", {}],
+                ["Entered Sales Page", {}],
+                ["EnteredSales", {}],
+                ["ViewContent", {}],
+                ["offer_page_view", {}],
+                ["sales_to_checkout_click", {}],
+                ["AddToCart", {}],
+                ["SalesToCheckoutClick", {}],
+                ["SalesToCheckoutClicked", {}],
+            ],
+        },
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="must fire only on sales_page_view loads"):
+        deploy_service._validate_observed_tracking_events(
+            path_plan=plan["path_plans"][0],
+            observed_state=observed_state,
+        )
+
+
+def test_validate_observed_tracking_events_rejects_missing_sales_posthog_context():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+    sales_url = "https://shop.shopemberco.com/ember/daily/sales-page/"
+
+    observed_state = {
+        "internal": [
+            {"eventType": "Entered Funnel"},
+            {"eventType": "sales_page_view"},
+            {"eventType": "offer_page_view"},
+            {"eventType": "sales_to_checkout_click"},
+        ],
+        "meta": [
+            ["init", "pixel-123"],
+            ["track", "Entered Funnel", {}],
+            ["track", "PageView", {}],
+            ["track", "Entered Sales Page", {}],
+            ["track", "EnteredSales", {"event_source_url": sales_url}],
+            ["track", "ViewContent", {}],
+            ["track", "AddToCart", {}],
+            ["track", "SalesToCheckoutClick", {}],
+            ["track", "SalesToCheckoutClicked", {}],
+        ],
+        "posthog": {
+            "inits": [
+                [
+                    "phc_test_123",
+                    {
+                        "api_host": "https://emb.shopemberco.com",
+                        "ui_host": "https://us.posthog.com",
+                    },
+                ]
+            ],
+            "captures": [
+                ["sales_page_view", {"session_id": "session-1", "visitor_id": "visitor-1"}],
+                ["PageView", {}],
+                ["Entered Sales Page", {}],
+                ["EnteredSales", _expected_sales_posthog_context()],
+                ["ViewContent", {}],
+                ["offer_page_view", {}],
+                ["sales_to_checkout_click", {}],
+                ["AddToCart", {}],
+                ["SalesToCheckoutClick", {}],
+                ["SalesToCheckoutClicked", {}],
+            ],
+        },
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="sales page PostHog funnel context"):
+        deploy_service._validate_observed_tracking_events(
+            path_plan=plan["path_plans"][0],
+            observed_state=observed_state,
+        )
+
+
+def test_validate_observed_tracking_events_rejects_presales_sales_entry_meta_events():
+    with pytest.raises(deploy_service.DeployError, match="must fire only on sales_page_view loads"):
+        deploy_service._assert_sales_entry_meta_events_match_sales_loads(
+            internal_events=["Entered Funnel", "pre_sales_page_view", "presell_page_view"],
+            meta_event_names=["PageView", "EnteredPresales", "EnteredSales"],
+            context_label="https://shoptenorco.com/quiz/",
+        )
+
+
+def test_validate_observed_tracking_events_requires_presales_sales_rmbc_stitching():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+    destination_url = (
+        "https://shop.shopemberco.com/ember/daily/sales-page/"
+        "?rmbc_session_id=sess-1&rmbc_anonymous_id=anon-1&rmbc_click_id=click-1"
+    )
+
+    observed_state = {
+        "internal": [
+            {"eventType": "Entered Funnel"},
+            {"eventType": "pre_sales_page_view"},
+            {"eventType": "presell_page_view"},
+            {
+                "eventType": "pre_sales_to_sales_click",
+                "props": {
+                    "session_id": "sess-1",
+                    "visitor_id": "anon-1",
+                    "click_id": "click-1",
+                    "rmbc_click_id": "click-1",
+                    "destination_url": destination_url,
+                },
+            },
+            {
+                "eventType": "sales_page_view",
+                "props": {
+                    "session_id": "sess-1",
+                    "visitor_id": "anon-1",
+                    "click_id": "click-1",
+                },
+            },
+            {"eventType": "offer_page_view"},
+            {"eventType": "sales_to_checkout_click"},
+        ],
+        "meta": [
+            ["init", "pixel-123"],
+            ["track", "Entered Funnel", {}],
+            ["track", "PageView", {}],
+            ["track", "EnteredPresales", {}],
+            ["track", "Entered Presales Page", {}],
+            ["track", "PreSalesToSalesClick", {}],
+            ["track", "PageView", {}],
+            ["track", "Entered Sales Page", {}],
+            ["track", "EnteredSales", {"event_source_url": destination_url}],
+            ["track", "ViewContent", {}],
+            ["track", "AddToCart", {}],
+            ["track", "SalesToCheckoutClick", {}],
+            ["track", "SalesToCheckoutClicked", {}],
+        ],
+        "posthog": {
+            "inits": [["phc_test_123", {"api_host": "https://emb.shopemberco.com", "ui_host": "https://us.posthog.com"}]],
+            "captures": [
+                ["pre_sales_page_view", {}],
+                ["PageView", {}],
+                ["presell_page_view", {}],
+                ["EnteredPresales", {}],
+                ["Entered Presales Page", {}],
+                ["pre_sales_to_sales_click", {}],
+                ["cta_click", {}],
+                ["PreSalesToSalesClick", {}],
+                [
+                    "sales_page_view",
+                    _expected_sales_posthog_context(
+                        session_id="sess-1",
+                        visitor_id="anon-1",
+                        click_id="click-1",
+                    ),
+                ],
+                ["PageView", {}],
+                ["Entered Sales Page", {}],
+                [
+                    "EnteredSales",
+                    _expected_sales_posthog_context(
+                        session_id="sess-1",
+                        visitor_id="anon-1",
+                        click_id="click-1",
+                    ),
+                ],
+                ["ViewContent", {}],
+                ["offer_page_view", {}],
+                ["sales_to_checkout_click", {}],
+                ["AddToCart", {}],
+                ["SalesToCheckoutClick", {}],
+                ["SalesToCheckoutClicked", {}],
+            ],
+        },
+    }
+
+    deploy_service._validate_observed_tracking_events(
+        path_plan=plan["path_plans"][0],
+        observed_state=observed_state,
+    )
+
+    missing_click_bridge_state = json.loads(json.dumps(observed_state))
+    missing_click_props = missing_click_bridge_state["internal"][3]["props"]
+    missing_click_props.pop("click_id")
+    missing_click_props.pop("rmbc_click_id")
+    with pytest.raises(deploy_service.DeployError, match="missing RMBC bridge values"):
+        deploy_service._validate_observed_tracking_events(
+            path_plan=plan["path_plans"][0],
+            observed_state=missing_click_bridge_state,
+        )
+
+    observed_state["posthog"]["captures"][8][1]["session_id"] = "other-session"
+    with pytest.raises(deploy_service.DeployError, match="RMBC bridge values did not stitch"):
+        deploy_service._validate_observed_tracking_events(
+            path_plan=plan["path_plans"][0],
+            observed_state=observed_state,
+        )
+
+
+def test_validate_observed_tracking_events_rejects_public_events_400():
+    with pytest.raises(deploy_service.DeployError, match="/public/events returned non-2xx"):
+        deploy_service._assert_public_events_requests_succeeded(
+            observed_state={
+                "network": {
+                    "publicEvents": [
+                        {
+                            "url": "https://shop.shopemberco.com/api/public/events",
+                            "status": 400,
+                            "ok": False,
+                        }
+                    ]
+                }
+            }
+        )
 
 
 def test_validate_observed_tracking_events_rejects_missing_checkout_event():
@@ -3884,6 +4297,8 @@ def test_validate_observed_tracking_events_rejects_missing_checkout_event():
             ["init", "pixel-123"],
             ["track", "Entered Funnel", {}],
             ["track", "PageView", {}],
+            ["track", "Entered Sales Page", {}],
+            ["track", "EnteredSales", {}],
             ["track", "ViewContent", {}],
         ],
         "posthog": {
@@ -3938,6 +4353,182 @@ def test_activate_tracking_validation_target_uses_dom_click():
     assert calls[1] == ("wait_for", "attached", deploy_service._DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS)
     assert calls[2][0] == "evaluate"
     assert "element.click()" in calls[2][1]
+
+
+def test_wait_for_tracking_validation_state_polls_until_events_settle(monkeypatch):
+    states = [
+        {
+            "internal": [],
+            "meta": [],
+            "posthog": {"inits": [], "captures": []},
+            "network": {"publicEvents": []},
+        },
+        {
+            "internal": [{"eventType": "sales_page_view"}],
+            "meta": [],
+            "posthog": {"inits": [], "captures": []},
+            "network": {"publicEvents": []},
+        },
+    ]
+    waits: list[int] = []
+
+    monkeypatch.setattr(deploy_service, "_DEPLOY_TRACKING_VALIDATION_ASSERTION_TIMEOUT_MS", 500)
+    monkeypatch.setattr(deploy_service, "_DEPLOY_TRACKING_VALIDATION_ASSERTION_POLL_MS", 150)
+
+    class FakePage:
+        def evaluate(self, script):
+            return states.pop(0) if states else {
+                "internal": [{"eventType": "sales_page_view"}],
+                "meta": [],
+                "posthog": {"inits": [], "captures": []},
+                "network": {"publicEvents": []},
+            }
+
+        def wait_for_timeout(self, ms):
+            waits.append(ms)
+
+    observed_state = deploy_service._wait_for_tracking_validation_state(
+        page=FakePage(),
+        path_plan={
+            "expected_internal_events": ["sales_page_view"],
+            "expected_meta_events": [],
+            "expected_posthog_events": [],
+            "tracking": {},
+        },
+    )
+
+    assert observed_state["internal"] == [{"eventType": "sales_page_view"}]
+    assert waits == [150]
+
+
+def test_validate_posthog_live_readback_requires_api_key_when_enabled(monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_REQUIRE_POSTHOG_READBACK", True)
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY", None)
+
+    with pytest.raises(deploy_service.DeployError, match="POSTHOG_READBACK_API_KEY"):
+        deploy_service._validate_posthog_live_readback(
+            path_plan={
+                "required_posthog_readback_events": ["sales_page_view", "EnteredSales"],
+                "tracking": {"posthogUiHost": "https://us.posthog.com"},
+            },
+            validation_id="deploy-validation-123",
+        )
+
+
+def test_validate_posthog_live_readback_polls_until_sales_aliases_land(monkeypatch):
+    calls: list[object] = []
+    payloads = [
+        {
+            "results": [
+                [
+                    "sales_page_view",
+                    "2026-05-12T17:00:00Z",
+                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
+                    "",
+                    "",
+                    "",
+                    "deploy-validation-123",
+                    "deploy-validation-123",
+                    "sales_page",
+                    "sales",
+                    "",
+                ]
+            ]
+        },
+        {
+            "results": [
+                [
+                    "sales_page_view",
+                    "2026-05-12T17:00:00Z",
+                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
+                    "",
+                    "",
+                    "",
+                    "deploy-validation-123",
+                    "deploy-validation-123",
+                    "sales_page",
+                    "sales",
+                    "",
+                ],
+                [
+                    "EnteredSales",
+                    "2026-05-12T17:00:01Z",
+                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
+                    "",
+                    "",
+                    "",
+                    "deploy-validation-123",
+                    "deploy-validation-123",
+                    "sales_page",
+                    "sales",
+                    "",
+                ],
+                [
+                    "SalesToCheckoutClick",
+                    "2026-05-12T17:00:02Z",
+                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
+                    "",
+                    "",
+                    "",
+                    "deploy-validation-123",
+                    "deploy-validation-123",
+                    "sales_page",
+                    "sales",
+                    "",
+                ],
+            ]
+        },
+    ]
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return payloads.pop(0)
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, **kwargs):
+            calls.append(("post", url, kwargs["headers"]["Authorization"], kwargs["json"]))
+            return FakeResponse()
+
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY", "phx_test")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_TIMEOUT_SECONDS", 2.0)
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_POLL_SECONDS", 0.5)
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(deploy_service.time, "sleep", lambda seconds: calls.append(("sleep", seconds)))
+
+    result = deploy_service._validate_posthog_live_readback(
+        path_plan={
+            "required_posthog_readback_events": [
+                "sales_page_view",
+                "EnteredSales",
+                "SalesToCheckoutClick",
+            ],
+            "tracking": {"posthogUiHost": "https://us.posthog.com"},
+        },
+        validation_id="deploy-validation-123",
+    )
+
+    assert result is not None
+    assert result["observedEvents"] == [
+        "EnteredSales",
+        "SalesToCheckoutClick",
+        "sales_page_view",
+    ]
+    assert calls[0][0] == "post"
+    assert calls[0][1] == "https://us.posthog.com/api/projects/@current/query/"
+    assert calls[0][2] == "Bearer phx_test"
+    assert ("sleep", 0.5) in calls
 
 
 def test_validate_deployed_tracking_html_checks_meta_event_proxy_endpoint(monkeypatch):
@@ -4004,6 +4595,44 @@ def test_validate_deployed_tracking_html_checks_meta_event_proxy_endpoint(monkey
 
     assert "https://shoptenorco.com/__mos/meta/fbevents.js" in requested_urls
     assert "https://shoptenorco.com/__mos/meta/tr/" in requested_urls
+
+
+def test_validate_deployed_tracking_html_rejects_legacy_mars_references(monkeypatch):
+    class FakeResponse:
+        text = '<script src="https://ss.mengotomars.com/pixel.js"></script>'
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    with pytest.raises(deploy_service.DeployError, match="forbidden legacy references"):
+        deploy_service._validate_deployed_tracking_html(
+            validation_plan={
+                "render_mode": deploy_service._FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML,
+                "origin": "https://shoptenorco.com",
+                "pages_to_validate": [
+                    {
+                        "url": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+                        "tracking": {},
+                    }
+                ],
+            }
+        )
 
 
 def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_for_public_checkout(monkeypatch):

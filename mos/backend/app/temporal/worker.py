@@ -19,6 +19,10 @@ from app.temporal.workflows.campaign_funnel_media_enrichment import (
 )
 from app.temporal.workflows.experiment_design import ExperimentDesignWorkflow
 from app.temporal.workflows.creative_production import CreativeProductionWorkflow
+from app.temporal.workflows.swipe_animated_template import (
+    SwipeAnimatedTemplateAnalysisWorkflow,
+    SwipeAnimatedTemplateRenderWorkflow,
+)
 from app.temporal.workflows.swipe_image_ad import SwipeImageAdWorkflow
 from app.temporal.workflows.swipe_taxonomy import SwipeTaxonomyWorkflow
 from app.temporal.workflows.experiment_cycle import ExperimentCycleWorkflow
@@ -101,6 +105,10 @@ from app.temporal.activities.ad_breakdown_activities import (
 from app.temporal.activities.swipe_image_ad_activities import (
     generate_swipe_image_ad_activity,
 )
+from app.temporal.activities.swipe_animated_template_activities import (
+    analyze_animated_template_source_activity,
+    render_animated_template_activity,
+)
 from app.temporal.activities.swipe_taxonomy_activities import analyze_swipe_asset_activity
 from app.temporal.activities.strategy_v2_activities import (
     apply_strategy_v2_angle_selection_activity,
@@ -153,6 +161,8 @@ async def main() -> None:
             CampaignFunnelMediaEnrichmentWorkflow,
             ExperimentDesignWorkflow,
             CreativeProductionWorkflow,
+            SwipeAnimatedTemplateAnalysisWorkflow,
+            SwipeAnimatedTemplateRenderWorkflow,
             SwipeImageAdWorkflow,
             SwipeTaxonomyWorkflow,
             ExperimentCycleWorkflow,
@@ -213,6 +223,8 @@ async def main() -> None:
             list_ads_for_run_activity,
             generate_ad_breakdown_activity,
             persist_teardown_from_breakdown_activity,
+            analyze_animated_template_source_activity,
+            render_animated_template_activity,
             generate_swipe_image_ad_activity,
             analyze_swipe_asset_activity,
             check_strategy_v2_enabled_activity,

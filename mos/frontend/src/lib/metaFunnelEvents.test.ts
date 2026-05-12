@@ -36,6 +36,7 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
     ).toEqual([
       { eventName: "PageView", params: { page_stage: "sales" } },
       { eventName: "Entered Sales Page", method: "trackCustom", params: { page_stage: "sales" } },
+      { eventName: "EnteredSales", method: "trackCustom", params: { page_stage: "sales" } },
       { eventName: "ViewContent", params: { page_stage: "sales" } },
     ]);
   });
@@ -50,6 +51,7 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
       { eventName: "PageView", params: { page_stage: "sales" } },
       { eventName: "Entered Sales Page", method: "trackCustom", params: { page_stage: "sales" } },
       { eventName: "EnteredSales", method: "trackCustom", params: { page_stage: "sales" } },
+      { eventName: "ViewContent", params: { page_stage: "sales" } },
     ]);
   });
 
@@ -66,6 +68,39 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
         params: {
           from_stage: "pre_sales",
           to_stage: "sales",
+        },
+      },
+    ]);
+  });
+
+  it("does not emit sales-entry Meta events for pre-sales to sales clicks", () => {
+    const mapped = mapRuntimeEventToMetaPixelEvents({
+      eventType: "pre_sales_to_sales_click",
+      props: { fromStage: "pre_sales", toStage: "sales", pageStage: "pre_sales" },
+    });
+
+    expect(mapped.map((event) => event.eventName)).toEqual(["PreSalesToSalesClick"]);
+    expect(mapped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventName: "EnteredSales" }),
+        expect.objectContaining({ eventName: "Entered Sales Page" }),
+      ]),
+    );
+  });
+
+  it("maps add-to-cart purchase intent to the Meta AddToCart event", () => {
+    expect(
+      mapRuntimeEventToMetaPixelEvents({
+        eventType: "add_to_cart",
+        props: { variantId: "variant-123" },
+      }),
+    ).toEqual([
+      {
+        eventName: "AddToCart",
+        params: {
+          content_ids: ["variant-123"],
+          content_type: "product",
+          num_items: 1,
         },
       },
     ]);

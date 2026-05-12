@@ -22,6 +22,7 @@ from app.db.repositories.shopify_theme_template_drafts import (
 from app.db.repositories.gemini_context_files import GeminiContextFilesRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.storefront_imports import StorefrontImportsRepository
+from app.db.repositories.animated_templates import AnimatedTemplatesRepository
 
 __all__ = [
     "ClientsRepository",
@@ -34,6 +35,7 @@ __all__ = [
     "WorkflowsRepository",
     "AdsRepository",
     "DeepResearchJobsRepository",
+    "JobsRepository",
     "TeardownsRepository",
     "ClaudeContextFilesRepository",
     "ClientComplianceProfilesRepository",
@@ -46,4 +48,5 @@ __all__ = [
     "GeminiContextFilesRepository",
     "StrategyV2LaunchesRepository",
     "StorefrontImportsRepository",
+    "AnimatedTemplatesRepository",
 ]
