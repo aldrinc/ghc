@@ -144,7 +144,7 @@ def test_create_campaign_rejects_unsupported_asset_brief_types(api_client: TestC
     )
 
     assert campaign_resp.status_code == 422
-    assert "Supported values: image, video." in campaign_resp.text
+    assert "Supported values: image, animated_image, video." in campaign_resp.text
 
 
 def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):

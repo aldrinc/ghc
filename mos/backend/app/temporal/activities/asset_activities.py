@@ -5,11 +5,10 @@ import hashlib
 import io
 import json
 import mimetypes
-import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, Sequence
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -46,6 +45,7 @@ from app.schemas.creative_generation import (
     CreativeGenerationPlanArtifact,
     CreativeGenerationPlanItem,
 )
+from app.schemas.asset_brief_types import normalize_asset_brief_type
 from app.schemas.creative_service import CreativeServiceVideoAttachmentIn
 from app.services.claude_files import (
     CLAUDE_DEFAULT_MODEL,
@@ -55,18 +55,14 @@ from app.services.claude_files import (
 )
 from app.services.campaign_destinations import (
     CampaignDestinationError,
-    campaign_delivery_snapshot,
-    destination_label_for_type,
     requirement_destination_label,
     requirement_destination_type,
     require_valid_external_delivery,
-    resolve_campaign_delivery_destination,
 )
 from app.services.campaign_creative_context import load_campaign_creative_context
 from app.services.creative_service_client import (
     CreativeServiceClient,
     CreativeServiceConfigError,
-    CreativeServiceRequestError,
 )
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.gemini_file_search import (
@@ -82,7 +78,7 @@ from app.services.video_ads_orchestrator import (
 )
 
 _IMAGE_TERMINAL_STATUSES = {"succeeded", "failed"}
-_SUPPORTED_FORMATS = {"image", "video"}
+_SUPPORTED_FORMATS = {"image", "animated_image", "video"}
 _DEFAULT_SWIPE_SOURCE_SET_KEY = "default_initial_swipes_v1"
 _AD_COPY_PACK_SCHEMA_VERSION = 2
 _DEFAULT_SWIPE_SOURCE_LABELS = [
@@ -156,12 +152,7 @@ class _BriefExecutionScope:
 
 
 def _normalize_requirement_format(value: str) -> str:
-    normalized = value.strip().lower()
-    if normalized in {"image", "image_ad", "image-ad"}:
-        return "image"
-    if normalized in {"video", "video_ad", "video-ad"}:
-        return "video"
-    return normalized
+    return normalize_asset_brief_type(value)
 
 
 def _extract_requirement_swipe_source(requirement: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -2331,6 +2322,15 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                             f"{generation_errors[0]} additional_failures={len(generation_errors) - 1}"
                         )
                     continue
+
+                elif normalized_format == "animated_image":
+                    raise ApplicationError(
+                        "Animated image asset requirements are not supported by the static creative production path. "
+                        "Run /swipes/animated-templates/analyze for the source template, approve the manifest, "
+                        "then render through the animated template workflow.",
+                        type="AnimatedTemplateReviewRequired",
+                        non_retryable=True,
+                    )
 
                 elif normalized_format == "video":
                     if video_orchestrator is None:

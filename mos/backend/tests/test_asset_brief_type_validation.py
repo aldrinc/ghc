@@ -10,19 +10,23 @@ from app.schemas.workflow_launches import StrategyV2LaunchAngleCampaignRequest
 
 
 def test_normalize_required_asset_brief_types_accepts_supported_values() -> None:
-    assert normalize_required_asset_brief_types([" image ", "video", "image"], field_name="assetBriefTypes") == [
+    assert normalize_required_asset_brief_types(
+        [" image ", "video", "image", "gif", "animated-image"],
+        field_name="assetBriefTypes",
+    ) == [
         "image",
         "video",
+        "animated_image",
     ]
 
 
 def test_normalize_required_asset_brief_types_rejects_unsupported_values() -> None:
-    with pytest.raises(ValueError, match="Supported values: image, video."):
+    with pytest.raises(ValueError, match="Supported values: image, animated_image, video."):
         normalize_required_asset_brief_types(["static-image"], field_name="assetBriefTypes")
 
 
 def test_campaign_create_rejects_unsupported_asset_brief_types() -> None:
-    with pytest.raises(ValidationError, match="Supported values: image, video."):
+    with pytest.raises(ValidationError, match="Supported values: image, animated_image, video."):
         CampaignCreate(
             client_id="client-1",
             product_id="product-1",
@@ -33,7 +37,7 @@ def test_campaign_create_rejects_unsupported_asset_brief_types() -> None:
 
 
 def test_campaign_intent_request_rejects_unsupported_asset_brief_types() -> None:
-    with pytest.raises(ValidationError, match="Supported values: image, video."):
+    with pytest.raises(ValidationError, match="Supported values: image, animated_image, video."):
         CampaignIntentRequest(
             campaignName="Campaign",
             productId="product-1",
@@ -43,7 +47,7 @@ def test_campaign_intent_request_rejects_unsupported_asset_brief_types() -> None
 
 
 def test_strategy_v2_launch_request_rejects_unsupported_asset_brief_types() -> None:
-    with pytest.raises(ValidationError, match="Supported values: image, video."):
+    with pytest.raises(ValidationError, match="Supported values: image, animated_image, video."):
         StrategyV2LaunchAngleCampaignRequest(
             channels=["meta"],
             assetBriefTypes=["static-image"],

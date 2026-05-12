@@ -41,13 +41,11 @@ from app.db.enums import (
     GeminiContextFileStatusEnum,
     CampaignStatusEnum,
     ClientStatusEnum,
-    CommerceProviderEnum,
     FunnelAssetKindEnum,
     FunnelAssetSourceEnum,
     FunnelAssetStatusEnum,
     FunnelDomainStatusEnum,
     FunnelEventTypeEnum,
-    FunnelExperienceKindEnum,
     FunnelPageReviewStatusEnum,
     FunnelPageVersionSourceEnum,
     FunnelPageVersionStatusEnum,
@@ -56,10 +54,7 @@ from app.db.enums import (
     MediaAssetTypeEnum,
     MediaMirrorStatusEnum,
     ResearchJobStatusEnum,
-    SiteFamilyEnum,
-    SitePageTypeEnum,
     SiteThemeBindingModeEnum,
-    SiteTypeEnum,
     UserRoleEnum,
     WorkflowKindEnum,
     WorkflowStatusEnum,
@@ -2382,6 +2377,197 @@ class StrategyV2Launch(Base):
     )
     launch_temporal_workflow_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by_user: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AnimatedTemplateManifest(Base):
+    __tablename__ = "animated_template_manifests"
+    __table_args__ = (
+        sa.Index("idx_animated_template_manifests_org_status", "org_id", "status"),
+        sa.Index("idx_animated_template_manifests_org_source", "org_id", "source_sha256"),
+        sa.Index("idx_animated_template_manifests_campaign", "org_id", "campaign_id"),
+        sa.Index("idx_animated_template_manifests_company_swipe", "company_swipe_id"),
+        sa.Index(
+            "uq_animated_template_manifests_org_idempotency",
+            "org_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=sa.text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"), nullable=True
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    workflow_run_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    company_swipe_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("company_swipe_assets.id", ondelete="SET NULL"), nullable=True
+    )
+    company_swipe_media_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("company_swipe_media.id", ondelete="SET NULL"), nullable=True
+    )
+    source_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    source_mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    manifest_schema_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1"
+    )
+    analyzer_version: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=sa.text("'needs_review'"),
+    )
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    validation: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    summary: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    idempotency_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approved_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejected_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    supersedes_manifest_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("animated_template_manifests.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AnimatedTemplateManifestEvent(Base):
+    __tablename__ = "animated_template_manifest_events"
+    __table_args__ = (
+        sa.Index("idx_animated_template_manifest_events_manifest", "manifest_id", "created_at"),
+        sa.Index("idx_animated_template_manifest_events_org", "org_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    manifest_id: Mapped[str] = mapped_column(
+        ForeignKey("animated_template_manifests.id", ondelete="CASCADE"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AnimatedTemplateRun(Base):
+    __tablename__ = "animated_template_runs"
+    __table_args__ = (
+        sa.Index("idx_animated_template_runs_manifest", "manifest_id", "created_at"),
+        sa.Index("idx_animated_template_runs_org_status", "org_id", "status"),
+        sa.Index(
+            "uq_animated_template_runs_org_idempotency",
+            "org_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=sa.text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    manifest_id: Mapped[str] = mapped_column(
+        ForeignKey("animated_template_manifests.id", ondelete="CASCADE"), nullable=False
+    )
+    client_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"), nullable=True
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    workflow_run_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=sa.text("'queued'"))
+    render_request: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    render_plan: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    cost_estimate: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    cost_actual: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    qa_report: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    output_asset_ids: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+    output_artifact_ids: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+    idempotency_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AnimatedTemplateArtifact(Base):
+    __tablename__ = "animated_template_artifacts"
+    __table_args__ = (
+        sa.Index("idx_animated_template_artifacts_manifest", "manifest_id", "artifact_kind"),
+        sa.Index("idx_animated_template_artifacts_run", "run_id", "artifact_kind"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    manifest_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("animated_template_manifests.id", ondelete="CASCADE"), nullable=True
+    )
+    run_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("animated_template_runs.id", ondelete="CASCADE"), nullable=True
+    )
+    artifact_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    storage_key: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    size_bytes: Mapped[Optional[int]] = mapped_column(sa.BigInteger, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

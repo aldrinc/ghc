@@ -44,6 +44,9 @@ const POSTHOG_INSTANCE_NAME = "mosFunnel";
 const META_ATTRIBUTION_WAIT_TIMEOUT_MS = 1500;
 const META_ATTRIBUTION_WAIT_POLL_MS = 50;
 const META_EMAIL_HASH_STORAGE_KEY = "mos_meta_em";
+const RMBC_SESSION_PARAM = "rmbc_session_id";
+const RMBC_ANONYMOUS_PARAM = "rmbc_anonymous_id";
+const RMBC_CLICK_PARAM = "rmbc_click_id";
 
 function cleanText(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -93,6 +96,9 @@ function resolveMetaAttributionProps(eventSourceUrl?: string | null): Record<str
   if (typeof window !== "undefined") {
     const url = new URL(cleanText(eventSourceUrl) || window.location.href);
     assignCleanProp(props, "fbclid", url.searchParams.get("fbclid"));
+    assignCleanProp(props, "rmbc_session_id", url.searchParams.get(RMBC_SESSION_PARAM));
+    assignCleanProp(props, "rmbc_anonymous_id", url.searchParams.get(RMBC_ANONYMOUS_PARAM));
+    assignCleanProp(props, "rmbc_click_id", url.searchParams.get(RMBC_CLICK_PARAM));
     assignCleanProp(props, "event_source_url", url.href);
     assignCleanProp(props, "$raw_user_agent", window.navigator?.userAgent);
   }
@@ -197,6 +203,8 @@ function isRuntimeTrackingEventType(value: string): value is RuntimeTrackingEven
     || value === "thank_you_page_view"
     || value === "custom_page_view"
     || value === "pre_sales_to_sales_click"
+    || value === "add_to_cart"
+    || value === "purchase_intent_click"
     || value === "sales_to_checkout_click"
     || value === "checkout_started"
     || value === "custom_page_click"

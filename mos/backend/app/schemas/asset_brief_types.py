@@ -3,7 +3,18 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 
-SUPPORTED_ASSET_BRIEF_TYPES: tuple[str, ...] = ("image", "video")
+SUPPORTED_ASSET_BRIEF_TYPES: tuple[str, ...] = ("image", "animated_image", "video")
+
+
+def normalize_asset_brief_type(value: str) -> str:
+    cleaned = " ".join(value.strip().lower().replace("-", "_").split())
+    if cleaned in {"image", "image_ad"}:
+        return "image"
+    if cleaned in {"animated", "animated_image", "gif"}:
+        return "animated_image"
+    if cleaned in {"video", "video_ad"}:
+        return "video"
+    return cleaned
 
 
 def normalize_required_asset_brief_types(
@@ -21,7 +32,7 @@ def normalize_required_asset_brief_types(
     for item in value:
         if not isinstance(item, str) or not item.strip():
             raise ValueError(f"{field_name} must contain non-empty strings.")
-        cleaned = " ".join(item.strip().lower().split())
+        cleaned = normalize_asset_brief_type(item)
         if cleaned not in SUPPORTED_ASSET_BRIEF_TYPES:
             invalid.append(item.strip())
             continue

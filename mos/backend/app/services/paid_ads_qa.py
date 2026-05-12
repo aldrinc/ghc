@@ -344,6 +344,7 @@ def activate_mos_meta_funnel_tracking_profile(
             "Entered Presales Page",
             "Entered Sales Page",
             "EnteredSales",
+            "ViewContent",
             "PreSalesToSalesClick",
             "SalesToCheckoutClick",
             "SalesToCheckoutClicked",

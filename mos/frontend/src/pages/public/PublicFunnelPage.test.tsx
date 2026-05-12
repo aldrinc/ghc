@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 import type { PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
 import { capturePostHogEvent } from "@/lib/posthog";
+import { trackMetaPixelEvent } from "@/lib/metaPixel";
 
 const importedHtmlRendererMock = vi.fn(() => <div data-testid="standalone-imported-html-page" />);
 
@@ -201,6 +202,72 @@ describe("PublicFunnelPage", () => {
             posthogProjectApiKey: "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
           }),
         }),
+      );
+    });
+  });
+
+  it("passes sales source URL and RMBC params to Meta events", async () => {
+    const salesPage = buildImportedHtmlPage();
+    salesPage.pageId = "page-2";
+    salesPage.slug = "sales-page";
+    salesPage.stage = "sales";
+    salesPage.tracking = {
+      ...salesPage.tracking,
+      metaPixelId: "pixel-123",
+    };
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/meta")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ entrySlug: "sales-page" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      if (url.endsWith("/commerce")) {
+        return new Promise<Response>(() => {});
+      }
+      if (url.endsWith("/pages/sales-page")) {
+        return Promise.resolve(
+          new Response(JSON.stringify(salesPage), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      if (url.endsWith("/public/events")) {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      throw new Error(`Unexpected fetch request in test: ${url}`);
+    }) as typeof fetch;
+
+    const salesEntry =
+      "/example-product/example-funnel/sales-page?rmbc_session_id=sess-1&rmbc_anonymous_id=anon-1&rmbc_click_id=click-1&fbclid=fb-1";
+    window.history.pushState({}, "", salesEntry);
+
+    render(
+      <MemoryRouter
+        initialEntries={[salesEntry]}
+      >
+        <Routes>
+          <Route path="/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(trackMetaPixelEvent).toHaveBeenCalledWith(
+        "pixel-123",
+        "EnteredSales",
+        expect.objectContaining({
+          event_source_url: expect.stringContaining("/sales-page?"),
+          rmbc_session_id: "sess-1",
+          rmbc_anonymous_id: "anon-1",
+          rmbc_click_id: "click-1",
+          fbclid: "fb-1",
+        }),
+        "trackCustom",
       );
     });
   });

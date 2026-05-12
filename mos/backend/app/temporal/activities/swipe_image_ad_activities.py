@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import re
 import threading
@@ -11,6 +12,7 @@ from typing import Any, Dict, List, Tuple
 from urllib.parse import unquote, urlparse
 
 import httpx
+from PIL import Image, UnidentifiedImageError
 try:
     from google import genai
     from google.genai import types as genai_types
@@ -93,6 +95,19 @@ _SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES: Dict[str, str] = {
     "swipe_stage1_strategy_v2_copy": "Swipe Stage1 Strategy V2 Copy",
     "swipe_stage1_strategy_v2_copy_context": "Swipe Stage1 Strategy V2 Copy Context",
 }
+
+
+def _is_animated_swipe_image(content: bytes, mime_type: str) -> bool:
+    normalized_mime = str(mime_type or "").split(";", 1)[0].strip().lower()
+    if normalized_mime not in {"image/gif", "image/webp"}:
+        return False
+    try:
+        with Image.open(io.BytesIO(content)) as image:
+            return bool(getattr(image, "is_animated", False) and getattr(image, "n_frames", 1) > 1)
+    except (UnidentifiedImageError, OSError) as exc:
+        raise RuntimeError(
+            f"Failed to inspect animated swipe image state (mime_type={normalized_mime})."
+        ) from exc
 
 
 def _resolve_swipe_gemini_timeout_seconds() -> int:
@@ -3723,6 +3738,13 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             company_swipe_id=company_swipe_id,
             swipe_image_url=swipe_image_url,
         )
+        if _is_animated_swipe_image(swipe_bytes, swipe_mime_type):
+            raise ApplicationError(
+                "Animated swipe media is not supported by the static swipe image path. "
+                "Use the animated template analysis flow instead.",
+                type="AnimatedSwipeRequiresAnimatedTemplateFlow",
+                non_retryable=True,
+            )
         swipe_image_sha256 = hashlib.sha256(swipe_bytes).hexdigest()
         swipe_image_size_bytes = len(swipe_bytes)
         resolved_swipe_requires_product_image, swipe_product_image_policy_source, swipe_source_filename = (
