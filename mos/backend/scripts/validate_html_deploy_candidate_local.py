@@ -855,7 +855,15 @@ def main() -> None:
             result = deploy_service._run_funnel_tracking_post_deploy_validation_sync(
                 validation_plan=validation_plan
             )
-            print(json.dumps({"origin": origin, "result": result}, indent=2))
+            lighthouse = deploy_service._run_html_deploy_lighthouse_validation_sync(
+                validation_plan=validation_plan
+            )
+            print(
+                json.dumps(
+                    {"origin": origin, "result": result, "lighthouse": lighthouse},
+                    indent=2,
+                )
+            )
         finally:
             server.shutdown()
             thread.join(timeout=5)
