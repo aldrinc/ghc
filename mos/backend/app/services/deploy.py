@@ -93,12 +93,113 @@ _DEPLOY_TRACKING_VALIDATION_ASSERTION_POLL_MS = int(
     os.getenv("DEPLOY_TRACKING_VALIDATION_ASSERTION_POLL_MS", "1500")
 )
 _DEPLOY_TRACKING_VALIDATION_STORAGE_KEY = "__mos_deploy_tracking_validation__"
+_HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM = "mos_deploy_candidate_release"
+_HTML_DEPLOY_CANDIDATE_ACTIVATION_MODE = "candidate_only"
+_HTML_DEPLOY_CANDIDATE_RELEASE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _HTML_DEPLOY_FORBIDDEN_REFERENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("MenGoToMars tracking host", re.compile(r"\bmengotomars\.com\b", flags=re.IGNORECASE)),
     ("Mars Men brand reference", re.compile(r"\bmars\s+men\b", flags=re.IGNORECASE)),
     ("Mars Health brand reference", re.compile(r"\bmars\s+health\b", flags=re.IGNORECASE)),
     ("legacy Mars storefront host", re.compile(r"\b(?:shopmars|mymars)\b", flags=re.IGNORECASE)),
     ("legacy Mars funnel token", re.compile(r"\bc9095d\b", flags=re.IGNORECASE)),
+)
+_HTML_DEPLOY_FORBIDDEN_COMPACT_REFERENCES: tuple[tuple[str, str], ...] = (
+    ("MenGoToMars compact tracking host", "mengotomars"),
+    ("Mars Men compact brand reference", "marsmen"),
+    ("Mars Health compact brand reference", "marshealth"),
+    ("legacy shopmars storefront token", "shopmars"),
+    ("legacy mymars storefront token", "mymars"),
+    ("legacy Mars funnel token", "c9095d"),
+)
+_POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
+    ("current_url", "properties['$current_url']"),
+    ("event_source_url", "properties['event_source_url']"),
+    ("destination_url", "properties['destination_url']"),
+    ("url_params", "properties['url_params']"),
+    ("path", "properties['path']"),
+    ("utm_source", "properties['utm_source']"),
+    ("utm_medium", "properties['utm_medium']"),
+    ("utm_content", "properties['utm_content']"),
+    ("utm_campaign", "properties['utm_campaign']"),
+    ("content_category", "properties['content_category']"),
+    ("page_stage", "properties['page_stage']"),
+    ("pageStage", "properties['pageStage']"),
+    ("session_id", "properties['session_id']"),
+    ("sessionId", "properties['sessionId']"),
+    ("visitor_id", "properties['visitor_id']"),
+    ("visitorId", "properties['visitorId']"),
+    ("anonymous_id", "properties['anonymous_id']"),
+    ("anonymousId", "properties['anonymousId']"),
+    ("click_id", "properties['click_id']"),
+    ("clickId", "properties['clickId']"),
+    ("source_page_type", "properties['source_page_type']"),
+    ("sourcePageType", "properties['sourcePageType']"),
+    ("from_stage", "properties['from_stage']"),
+    ("fromStage", "properties['fromStage']"),
+    ("to_stage", "properties['to_stage']"),
+    ("toStage", "properties['toStage']"),
+    ("product_slug", "properties['product_slug']"),
+    ("productSlug", "properties['productSlug']"),
+    ("funnel_slug", "properties['funnel_slug']"),
+    ("funnelSlug", "properties['funnelSlug']"),
+    ("publication_id", "properties['publication_id']"),
+    ("publicationId", "properties['publicationId']"),
+    ("page_id", "properties['page_id']"),
+    ("pageId", "properties['pageId']"),
+    ("page_slug", "properties['page_slug']"),
+    ("pageSlug", "properties['pageSlug']"),
+    ("fbclid", "properties['fbclid']"),
+    ("fbc", "properties['fbc']"),
+    ("fbp", "properties['fbp']"),
+    ("mos_deploy_validation_id", "properties['mos_deploy_validation_id']"),
+    ("mosDeployValidationId", "properties['mosDeployValidationId']"),
+    ("internal_event_type", "properties['internal_event_type']"),
+    ("canonical_event_type", "properties['canonical_event_type']"),
+    ("posthog_event_role", "properties['posthog_event_role']"),
+    ("targetKind", "properties['targetKind']"),
+    ("targetId", "properties['targetId']"),
+    ("target_id", "properties['target_id']"),
+    ("section_id", "properties['section_id']"),
+    ("sectionId", "properties['sectionId']"),
+    ("proof_id", "properties['proof_id']"),
+    ("proofId", "properties['proofId']"),
+    ("proof_type", "properties['proof_type']"),
+    ("proofType", "properties['proofType']"),
+    ("cta_id", "properties['cta_id']"),
+    ("ctaId", "properties['ctaId']"),
+    ("cta_position", "properties['cta_position']"),
+    ("ctaPosition", "properties['ctaPosition']"),
+    ("quiz_id", "properties['quiz_id']"),
+    ("quizId", "properties['quizId']"),
+    ("quiz_version", "properties['quiz_version']"),
+    ("quizVersion", "properties['quizVersion']"),
+    ("quiz_variant", "properties['quiz_variant']"),
+    ("quizVariant", "properties['quizVariant']"),
+    ("question_id", "properties['question_id']"),
+    ("questionId", "properties['questionId']"),
+    ("question_index", "properties['question_index']"),
+    ("questionIndex", "properties['questionIndex']"),
+    ("option_id", "properties['option_id']"),
+    ("optionId", "properties['optionId']"),
+    ("result_id", "properties['result_id']"),
+    ("resultId", "properties['resultId']"),
+    ("segment_id", "properties['segment_id']"),
+    ("segmentId", "properties['segmentId']"),
+    ("recommendation_id", "properties['recommendation_id']"),
+    ("recommendationId", "properties['recommendationId']"),
+    ("answer_path_id", "properties['answer_path_id']"),
+    ("answerPathId", "properties['answerPathId']"),
+    ("mechanism_name", "properties['mechanism_name']"),
+    ("mechanismName", "properties['mechanismName']"),
+    ("offer_id", "properties['offer_id']"),
+    ("offerId", "properties['offerId']"),
+    ("dedupe_key", "properties['dedupe_key']"),
+    ("dedupeKey", "properties['dedupeKey']"),
+)
+_POSTHOG_READBACK_COLUMNS: tuple[str, ...] = (
+    "event",
+    "timestamp",
+    *(column for column, _select in _POSTHOG_READBACK_COLUMN_SELECTS),
 )
 _DEPLOY_TRACKING_VALIDATION_INIT_SCRIPT = """
 (() => {
@@ -2529,7 +2630,7 @@ def _build_expected_tracking_events(
     has_pre_sales: bool,
     checkout_event_types: list[str],
 ) -> dict[str, list[str]]:
-    internal_events = ["Entered Funnel"]
+    internal_events: list[str] = []
     if has_pre_sales:
         internal_events.extend(
             [
@@ -2541,7 +2642,6 @@ def _build_expected_tracking_events(
             ]
         )
         meta_events = [
-            "Entered Funnel",
             "PageView",
             "EnteredPresales",
             "Entered Presales Page",
@@ -2571,7 +2671,6 @@ def _build_expected_tracking_events(
         internal_events.append("sales_page_view")
         internal_events.append("offer_page_view")
         meta_events = [
-            "Entered Funnel",
             "PageView",
             "Entered Sales Page",
             "EnteredSales",
@@ -2612,6 +2711,133 @@ def _build_expected_tracking_events(
     }
 
 
+def _normalize_html_artifact_kind(value: Any) -> str:
+    return str(value or "").strip().lower().replace("-", "_")
+
+
+def _html_deploy_tracking_profile(
+    *,
+    start_artifact_kind: str,
+    has_pre_sales: bool,
+) -> str:
+    normalized_kind = _normalize_html_artifact_kind(start_artifact_kind)
+    if has_pre_sales and normalized_kind in {"quiz", "quiz_funnel"}:
+        return "quiz_presell"
+    if has_pre_sales and normalized_kind in {"listicle", "listical", "listicle_hybrid"}:
+        return "listical_presell"
+    if not has_pre_sales:
+        return "sales"
+    return "presell"
+
+
+def _manifest_target_event_requirements(
+    *,
+    manifest: dict[str, Any],
+    profile: str,
+) -> list[str]:
+    events: list[str] = []
+
+    def _has_targets(key: str) -> bool:
+        value = manifest.get(key) if isinstance(manifest, dict) else None
+        return isinstance(value, list) and len(value) > 0
+
+    if profile in {"listical_presell", "quiz_presell"}:
+        events.extend(["scroll_depth", "qualified_session"])
+        if _has_targets("sections"):
+            events.append("section_view")
+        if _has_targets("proofs"):
+            events.append("proof_view")
+        if _has_targets("ctas") or _has_targets("bindings"):
+            events.append("cta_view")
+
+    if profile == "quiz_presell":
+        quiz_target_events = [
+            ("quizLeads", "QuizLeadViewed"),
+            ("quizQuestions", "QuizQuestionViewed"),
+            ("quizOptions", "QuizOptionPresented"),
+            ("quizResults", "QuizResultViewed"),
+            ("quizMechanisms", "QuizMechanismViewed"),
+            ("proofs", "QuizProofViewed"),
+            ("quizRecommendations", "QuizRecommendationViewed"),
+            ("ctas", "QuizCtaViewed"),
+        ]
+        for manifest_key, event_name in quiz_target_events:
+            if _has_targets(manifest_key):
+                events.append(event_name)
+        events.extend(
+            [
+                "QuizOptionSelected",
+                "QuizQuestionSubmitted",
+                "QuizCompleted",
+            ]
+        )
+
+    return events
+
+
+def _dedupe_preserving_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        normalized = str(value or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _build_required_posthog_readback_events(
+    *,
+    expected_posthog_events: list[str],
+    start_page: dict[str, Any],
+    sales_page: dict[str, Any],
+    checkout_targets: list[dict[str, Any]],
+    has_pre_sales: bool,
+) -> list[str]:
+    expected_event_set = {
+        str(event_name or "").strip()
+        for event_name in expected_posthog_events
+        if str(event_name or "").strip()
+    }
+    start_artifact_kind = str(start_page.get("html_artifact_kind") or "").strip()
+    profile = _html_deploy_tracking_profile(
+        start_artifact_kind=start_artifact_kind,
+        has_pre_sales=has_pre_sales,
+    )
+    required: list[str] = []
+    if has_pre_sales:
+        required.extend(
+            [
+                "presell_page_view",
+                "EnteredPresales",
+                "cta_click",
+                "PreSalesToSalesClick",
+            ]
+        )
+        start_manifest = start_page.get("manifest")
+        if isinstance(start_manifest, dict):
+            required.extend(
+                _manifest_target_event_requirements(
+                    manifest=start_manifest,
+                    profile=profile,
+                )
+            )
+    required.extend(["sales_page_view", "EnteredSales"])
+    if checkout_targets:
+        if "AddToCart" in expected_event_set:
+            required.append("AddToCart")
+        if "SalesToCheckoutClick" in expected_event_set:
+            required.append("SalesToCheckoutClick")
+        if "SalesToCheckoutClicked" in expected_event_set:
+            required.append("SalesToCheckoutClicked")
+        if "purchase_intent_click" in expected_event_set:
+            required.append("purchase_intent_click")
+        if "InitiateCheckout" in expected_event_set:
+            required.append("InitiateCheckout")
+    return _dedupe_preserving_order(required)
+
+
 def _build_tracking_path_plan(
     *,
     start_page: dict[str, Any],
@@ -2620,6 +2846,11 @@ def _build_tracking_path_plan(
     checkout_targets: list[dict[str, Any]],
 ) -> dict[str, Any]:
     has_pre_sales = bool(pre_sales_click_selectors)
+    start_artifact_kind = str(start_page.get("html_artifact_kind") or "").strip()
+    tracking_profile = _html_deploy_tracking_profile(
+        start_artifact_kind=start_artifact_kind,
+        has_pre_sales=has_pre_sales,
+    )
     tracking = _resolve_consistent_tracking_config(
         page_payloads=[
             start_page["payload"],
@@ -2640,25 +2871,20 @@ def _build_tracking_path_plan(
         "pre_sales_click_selectors": pre_sales_click_selectors,
         "checkout_targets": checkout_targets,
         "tracking": tracking,
+        "tracking_validation_profile": tracking_profile,
         "expected_internal_events": expected["internal"],
         "expected_meta_events": expected["meta"] if _tracking_config_has_meta(tracking) else [],
         "expected_posthog_events": (
             expected["posthog"] if _tracking_config_has_posthog(tracking) else []
         ),
         "required_posthog_readback_events": (
-            [
-                event_name
-                for event_name in (
-                    "presell_page_view",
-                    "EnteredPresales",
-                    "PreSalesToSalesClick",
-                    "sales_page_view",
-                    "EnteredSales",
-                    "SalesToCheckoutClick",
-                    "SalesToCheckoutClicked",
-                )
-                if event_name in set(expected["posthog"])
-            ]
+            _build_required_posthog_readback_events(
+                expected_posthog_events=expected["posthog"],
+                start_page=start_page,
+                sales_page=sales_page,
+                checkout_targets=checkout_targets,
+                has_pre_sales=has_pre_sales,
+            )
             if _tracking_config_has_posthog(tracking)
             else []
         ),
@@ -2672,6 +2898,7 @@ def _build_funnel_tracking_validation_plan(
     publication_id: str,
     access_urls: list[str],
     render_mode: str,
+    candidate_release_id: str | None = None,
 ) -> dict[str, Any]:
     normalized_access_urls = _normalize_access_urls(access_urls)
     if not normalized_access_urls:
@@ -2743,6 +2970,14 @@ def _build_funnel_tracking_validation_plan(
             )
         )
 
+    normalized_candidate_release_id = ""
+    if candidate_release_id:
+        normalized_candidate_release_id = _validate_html_deploy_candidate_release_id(
+            candidate_release_id
+        )
+        for path_plan in path_plans:
+            path_plan["candidate_release_id"] = normalized_candidate_release_id
+
     pages_to_validate_by_url: dict[str, dict[str, Any]] = {}
     for path_plan in path_plans:
         pages_to_validate_by_url[str(path_plan["start_page"]["url"])] = path_plan["start_page"]
@@ -2757,6 +2992,7 @@ def _build_funnel_tracking_validation_plan(
         "pages_to_validate": list(pages_to_validate_by_url.values()),
         "path_plans": path_plans,
         "checkout_validated": bool(checkout_targets),
+        "candidate_release_id": normalized_candidate_release_id or None,
     }
 
 
@@ -2808,6 +3044,16 @@ def _find_html_deploy_forbidden_references(*, text: str) -> list[str]:
     matches: list[str] = []
     for label, pattern in _HTML_DEPLOY_FORBIDDEN_REFERENCE_PATTERNS:
         if pattern.search(haystack):
+            matches.append(label)
+    decoded_haystack = haystack
+    for _ in range(2):
+        next_decoded = unquote(decoded_haystack)
+        if next_decoded == decoded_haystack:
+            break
+        decoded_haystack = next_decoded
+    compact_haystack = re.sub(r"[^a-z0-9]+", "", decoded_haystack.lower())
+    for label, token in _HTML_DEPLOY_FORBIDDEN_COMPACT_REFERENCES:
+        if token and token in compact_haystack:
             matches.append(label)
     return matches
 
@@ -2871,7 +3117,13 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
     if validation_plan.get("render_mode") != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
         return
 
-    seen_meta_proxy_origins: set[str] = set()
+    candidate_release_id = str(validation_plan.get("candidate_release_id") or "").strip()
+    candidate_query_params: dict[str, str] = {}
+    if candidate_release_id:
+        candidate_query_params[_HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM] = (
+            _validate_html_deploy_candidate_release_id(candidate_release_id)
+        )
+
     seen_posthog_api_hosts: set[str] = set()
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         for page in validation_plan.get("pages_to_validate", []):
@@ -2880,42 +3132,35 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
             page_url = str(page.get("url") or "").strip()
             if not page_url:
                 continue
-            response = client.get(page_url)
+            fetch_url = (
+                _append_url_query_params(page_url, candidate_query_params)
+                if candidate_query_params
+                else page_url
+            )
+            response = client.get(fetch_url)
             response.raise_for_status()
             html_document = response.text
             _assert_no_html_deploy_forbidden_references(
                 text=html_document,
-                context_label=f"'{page_url}' deployed HTML",
+                context_label=f"'{fetch_url}' deployed HTML",
             )
             tracking = page.get("tracking")
             tracking_config = tracking if isinstance(tracking, dict) else {}
 
             expected_meta_pixel_id = str(tracking_config.get("metaPixelId") or "").strip()
             if expected_meta_pixel_id:
-                if expected_meta_pixel_id not in html_document or "/__mos/meta/fbevents.js" not in html_document:
+                if (
+                    expected_meta_pixel_id not in html_document
+                    or "https://connect.facebook.net/en_US/fbevents.js" not in html_document
+                    or "window.fbq(\"init\"" not in html_document
+                ):
                     raise DeployError(
-                        f"Post-deploy tracking validation failed for '{page_url}': Meta Pixel bootstrap was not embedded through the MOS proxy."
+                        f"Post-deploy tracking validation failed for '{fetch_url}': direct Meta Pixel bootstrap was not embedded."
                     )
-                if "connect.facebook.net/en_US/fbevents.js" in html_document:
+                if "/__mos/meta/fbevents.js" in html_document:
                     raise DeployError(
-                        f"Post-deploy tracking validation failed for '{page_url}': Meta Pixel bootstrap bypasses the MOS proxy."
+                        f"Post-deploy tracking validation failed for '{fetch_url}': Meta Pixel bootstrap used the legacy MOS proxy path."
                     )
-                origin = str(validation_plan.get("origin") or "").rstrip("/")
-                if origin and origin not in seen_meta_proxy_origins:
-                    proxy_response = client.get(f"{origin}/__mos/meta/fbevents.js")
-                    proxy_response.raise_for_status()
-                    if "/__mos/meta/tr" not in proxy_response.text:
-                        raise DeployError(
-                            "Post-deploy tracking validation failed: proxied Meta script does not rewrite event beacons through /__mos/meta/tr."
-                        )
-                    _validate_meta_proxy_endpoint(
-                        client=client,
-                        origin=origin,
-                        path="/__mos/meta/tr/",
-                        pixel_id=expected_meta_pixel_id,
-                        page_url=page_url,
-                    )
-                    seen_meta_proxy_origins.add(origin)
 
             expected_posthog_api_key = str(tracking_config.get("posthogProjectApiKey") or "").strip()
             if expected_posthog_api_key:
@@ -2938,7 +3183,7 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
                 )
                 if missing_fragment is not None:
                     raise DeployError(
-                        f"Post-deploy tracking validation failed for '{page_url}': expected deployed HTML to include "
+                        f"Post-deploy tracking validation failed for '{fetch_url}': expected deployed HTML to include "
                         f"'{missing_fragment}' for PostHog bootstrap."
                     )
                 api_host = str(tracking_config.get("posthogApiHost") or "").strip()
@@ -3100,70 +3345,112 @@ def _assert_public_events_requests_succeeded(*, observed_state: dict[str, Any]) 
         )
 
 
-def _assert_props_include_bridge_values(
+def _assert_props_include_canonical_handoff_values(
     *,
     props: dict[str, Any],
     expected_session_id: str,
-    expected_anonymous_id: str,
+    expected_visitor_id: str,
     expected_click_id: str,
     label: str,
 ) -> None:
-    observed_session_id = _first_tracking_prop(props, "session_id", "sessionId", "rmbc_session_id")
-    observed_anonymous_id = _first_tracking_prop(
-        props,
-        "anonymous_id",
-        "anonymousId",
-        "visitor_id",
-        "visitorId",
-        "rmbc_anonymous_id",
-    )
-    observed_click_id = _first_tracking_prop(
-        props,
-        "rmbc_click_id",
-        "bridge_click_id",
-        "bridgeClickId",
-        "click_id",
-        "clickId",
-    )
-    mismatches: list[str] = []
-    if expected_session_id and observed_session_id != expected_session_id:
-        mismatches.append(f"session_id expected {expected_session_id!r}, observed {observed_session_id!r}")
-    if expected_anonymous_id and observed_anonymous_id != expected_anonymous_id:
-        mismatches.append(f"anonymous_id expected {expected_anonymous_id!r}, observed {observed_anonymous_id!r}")
-    if expected_click_id and observed_click_id != expected_click_id:
-        mismatches.append(f"click_id expected {expected_click_id!r}, observed {observed_click_id!r}")
+    expected = {
+        "session_id": _clean_tracking_value(expected_session_id),
+        "visitor_id": _clean_tracking_value(expected_visitor_id),
+        "click_id": _clean_tracking_value(expected_click_id),
+    }
+    observed = {
+        "session_id": _first_tracking_prop(props, "session_id", "sessionId"),
+        "visitor_id": _first_tracking_prop(props, "visitor_id", "visitorId"),
+        "click_id": _first_tracking_prop(props, "click_id", "clickId"),
+    }
+    mismatches = [
+        f"{field} expected {expected_value!r}, observed {observed[field]!r}"
+        for field, expected_value in expected.items()
+        if expected_value and observed[field] != expected_value
+    ]
     if mismatches:
         raise DeployError(
-            f"Post-deploy tracking validation failed for {label}: RMBC bridge values did not stitch; "
+            f"Post-deploy tracking validation failed for {label}: event did not use one canonical "
+            "funnel session across the presales-to-sales handoff; "
             + "; ".join(mismatches)
         )
 
 
-def _assert_url_includes_bridge_values(
+def _expected_presales_source_page_type(*, path_plan: dict[str, Any]) -> str:
+    start_page = path_plan.get("start_page") if isinstance(path_plan, dict) else {}
+    artifact_kind = (
+        str(start_page.get("html_artifact_kind") or "").strip().lower()
+        if isinstance(start_page, dict)
+        else ""
+    )
+    artifact_kind = artifact_kind.replace("-", "_")
+    if artifact_kind in {"quiz", "quiz_funnel"}:
+        return "quiz_presell"
+    if artifact_kind in {"listicle", "listical", "listicle_hybrid"}:
+        return "listical_presell"
+    return ""
+
+
+def _assert_sales_event_presales_source_context(
+    *,
+    props: dict[str, Any],
+    expected_source_page_type: str,
+    label: str,
+) -> None:
+    if not expected_source_page_type:
+        return
+    required_context = [
+        (("source_page_type", "sourcePageType"), "source_page_type", expected_source_page_type),
+        (("from_stage", "fromStage"), "from_stage", "pre_sales"),
+        (("to_stage", "toStage"), "to_stage", "sales"),
+    ]
+    for keys, field_label, expected_value in required_context:
+        observed_value = _first_tracking_prop(props, *keys)
+        if observed_value != expected_value:
+            raise DeployError(
+                f"Post-deploy tracking validation failed for {label}: presales handoff source context "
+                f"'{field_label}' expected {expected_value!r}, observed {observed_value!r}."
+            )
+
+
+def _assert_url_includes_handoff_values(
     *,
     url: str,
     expected_session_id: str,
-    expected_anonymous_id: str,
+    expected_visitor_id: str,
     expected_click_id: str,
+    expected_source_page_type: str = "",
     label: str,
 ) -> None:
     params = _params_from_url(url)
     mismatches: list[str] = []
-    if expected_session_id and params.get("rmbc_session_id") != expected_session_id:
+    if expected_session_id and params.get("session_id") != expected_session_id:
         mismatches.append(
-            f"rmbc_session_id expected {expected_session_id!r}, observed {params.get('rmbc_session_id')!r}"
+            f"session_id expected {expected_session_id!r}, observed {params.get('session_id')!r}"
         )
-    if expected_anonymous_id and params.get("rmbc_anonymous_id") != expected_anonymous_id:
+    if expected_visitor_id and params.get("visitor_id") != expected_visitor_id:
         mismatches.append(
-            f"rmbc_anonymous_id expected {expected_anonymous_id!r}, observed {params.get('rmbc_anonymous_id')!r}"
+            f"visitor_id expected {expected_visitor_id!r}, observed {params.get('visitor_id')!r}"
         )
-    if expected_click_id and params.get("rmbc_click_id") != expected_click_id:
+    if expected_click_id and params.get("click_id") != expected_click_id:
         mismatches.append(
-            f"rmbc_click_id expected {expected_click_id!r}, observed {params.get('rmbc_click_id')!r}"
+            f"click_id expected {expected_click_id!r}, observed {params.get('click_id')!r}"
         )
+    if expected_source_page_type:
+        expected_context_params = {
+            "source_page_type": expected_source_page_type,
+            "from_stage": "pre_sales",
+            "to_stage": "sales",
+        }
+        for param_name, expected_value in expected_context_params.items():
+            observed_value = params.get(param_name)
+            if observed_value != expected_value:
+                mismatches.append(
+                    f"{param_name} expected {expected_value!r}, observed {observed_value!r}"
+                )
     if mismatches:
         raise DeployError(
-            f"Post-deploy tracking validation failed for {label}: sales URL did not preserve RMBC bridge params; "
+            f"Post-deploy tracking validation failed for {label}: sales URL did not preserve canonical handoff params; "
             + "; ".join(mismatches)
         )
 
@@ -3187,51 +3474,73 @@ def _assert_presales_to_sales_bridge_stitched(
         return
 
     click_props = click_props_items[-1]
-    expected_session_id = _first_tracking_prop(click_props, "session_id", "sessionId", "rmbc_session_id")
-    expected_anonymous_id = _first_tracking_prop(
-        click_props,
-        "anonymous_id",
-        "anonymousId",
-        "visitor_id",
-        "visitorId",
-        "rmbc_anonymous_id",
-    )
+    expected_session_id = _first_tracking_prop(click_props, "session_id", "sessionId")
+    expected_visitor_id = _first_tracking_prop(click_props, "visitor_id", "visitorId")
     expected_click_id = _first_tracking_prop(
         click_props,
-        "rmbc_click_id",
-        "bridge_click_id",
-        "bridgeClickId",
         "click_id",
         "clickId",
     )
     missing_click_bridge_values = []
     if not expected_session_id:
-        missing_click_bridge_values.append("rmbc_session_id/session_id")
-    if not expected_anonymous_id:
-        missing_click_bridge_values.append("rmbc_anonymous_id/visitor_id")
+        missing_click_bridge_values.append("session_id")
+    if not expected_visitor_id:
+        missing_click_bridge_values.append("visitor_id")
     if not expected_click_id:
-        missing_click_bridge_values.append("rmbc_click_id/click_id")
+        missing_click_bridge_values.append("click_id")
     if missing_click_bridge_values:
         raise DeployError(
             "Post-deploy tracking validation failed for pre_sales_to_sales_click internal event: "
-            f"missing RMBC bridge values {missing_click_bridge_values!r}."
+            f"missing canonical handoff values {missing_click_bridge_values!r}."
         )
     destination_url = _first_tracking_prop(click_props, "destination_url", "destinationUrl")
-    _assert_url_includes_bridge_values(
+    expected_source_page_type = _expected_presales_source_page_type(path_plan=path_plan)
+    _assert_sales_event_presales_source_context(
+        props=click_props,
+        expected_source_page_type=expected_source_page_type,
+        label="pre_sales_to_sales_click internal event",
+    )
+    _assert_url_includes_handoff_values(
         url=destination_url,
         expected_session_id=expected_session_id,
-        expected_anonymous_id=expected_anonymous_id,
+        expected_visitor_id=expected_visitor_id,
         expected_click_id=expected_click_id,
+        expected_source_page_type=expected_source_page_type,
         label="pre-sales to sales destination_url",
     )
 
-    _assert_props_include_bridge_values(
+    _assert_props_include_canonical_handoff_values(
         props=sales_props_items[-1],
         expected_session_id=expected_session_id,
-        expected_anonymous_id=expected_anonymous_id,
+        expected_visitor_id=expected_visitor_id,
         expected_click_id=expected_click_id,
         label="sales_page_view internal event",
     )
+    _assert_sales_event_presales_source_context(
+        props=sales_props_items[-1],
+        expected_source_page_type=expected_source_page_type,
+        label="sales_page_view internal event",
+    )
+
+    for posthog_event_name in ("pre_sales_to_sales_click", "cta_click", "PreSalesToSalesClick"):
+        posthog_props_items = _extract_recorded_posthog_event_props(
+            observed_state=observed_state,
+            event_name=posthog_event_name,
+        )
+        if not posthog_props_items:
+            continue
+        _assert_props_include_canonical_handoff_values(
+            props=posthog_props_items[-1],
+            expected_session_id=expected_session_id,
+            expected_visitor_id=expected_visitor_id,
+            expected_click_id=expected_click_id,
+            label=f"{posthog_event_name} PostHog capture",
+        )
+        _assert_sales_event_presales_source_context(
+            props=posthog_props_items[-1],
+            expected_source_page_type=expected_source_page_type,
+            label=f"{posthog_event_name} PostHog capture",
+        )
 
     for posthog_event_name in ("sales_page_view", "EnteredSales"):
         posthog_props_items = _extract_recorded_posthog_event_props(
@@ -3240,12 +3549,35 @@ def _assert_presales_to_sales_bridge_stitched(
         )
         if not posthog_props_items:
             continue
-        _assert_props_include_bridge_values(
+        _assert_props_include_canonical_handoff_values(
             props=posthog_props_items[-1],
             expected_session_id=expected_session_id,
-            expected_anonymous_id=expected_anonymous_id,
+            expected_visitor_id=expected_visitor_id,
             expected_click_id=expected_click_id,
             label=f"{posthog_event_name} PostHog capture",
+        )
+        _assert_sales_event_presales_source_context(
+            props=posthog_props_items[-1],
+            expected_source_page_type=expected_source_page_type,
+            label=f"{posthog_event_name} PostHog capture",
+        )
+
+    presales_click_meta_params = _extract_recorded_meta_event_params(
+        observed_state=observed_state,
+        event_name="PreSalesToSalesClick",
+    )
+    if presales_click_meta_params:
+        _assert_props_include_canonical_handoff_values(
+            props=presales_click_meta_params[-1],
+            expected_session_id=expected_session_id,
+            expected_visitor_id=expected_visitor_id,
+            expected_click_id=expected_click_id,
+            label="PreSalesToSalesClick Meta event",
+        )
+        _assert_sales_event_presales_source_context(
+            props=presales_click_meta_params[-1],
+            expected_source_page_type=expected_source_page_type,
+            label="PreSalesToSalesClick Meta event",
         )
 
     entered_sales_meta_params = _extract_recorded_meta_event_params(
@@ -3257,12 +3589,25 @@ def _assert_presales_to_sales_bridge_stitched(
             entered_sales_meta_params[-1],
             "event_source_url",
         )
-        _assert_url_includes_bridge_values(
+        _assert_url_includes_handoff_values(
             url=meta_event_source_url,
             expected_session_id=expected_session_id,
-            expected_anonymous_id=expected_anonymous_id,
+            expected_visitor_id=expected_visitor_id,
             expected_click_id=expected_click_id,
+            expected_source_page_type=expected_source_page_type,
             label="EnteredSales Meta event_source_url",
+        )
+        _assert_props_include_canonical_handoff_values(
+            props=entered_sales_meta_params[-1],
+            expected_session_id=expected_session_id,
+            expected_visitor_id=expected_visitor_id,
+            expected_click_id=expected_click_id,
+            label="EnteredSales Meta event",
+        )
+        _assert_sales_event_presales_source_context(
+            props=entered_sales_meta_params[-1],
+            expected_source_page_type=expected_source_page_type,
+            label="EnteredSales Meta event",
         )
 
 
@@ -3307,8 +3652,8 @@ def _assert_sales_posthog_events_include_funnel_context(
         (("content_category",), "content_category", "sales_page"),
     ]
     required_identity_context = [
-        (("session_id", "sessionId", "rmbc_session_id"), "session_id"),
-        (("visitor_id", "visitorId", "anonymous_id", "anonymousId", "rmbc_anonymous_id"), "visitor_id"),
+        (("session_id", "sessionId"), "session_id"),
+        (("visitor_id", "visitorId"), "visitor_id"),
     ]
     for posthog_event_name in ("sales_page_view", "EnteredSales"):
         posthog_props_items = _extract_recorded_posthog_event_props(
@@ -3424,6 +3769,11 @@ def _validate_observed_tracking_events(*, path_plan: dict[str, Any], observed_st
             observed_state=observed_state,
         )
 
+    _assert_presales_to_sales_bridge_stitched(
+        path_plan=path_plan,
+        observed_state=observed_state,
+    )
+
     expected_posthog_api_key = str(tracking.get("posthogProjectApiKey") or "").strip()
     expected_posthog_api_host = str(tracking.get("posthogApiHost") or "").strip()
     if expected_posthog_api_key and expected_posthog_api_host:
@@ -3451,6 +3801,10 @@ def _validate_observed_tracking_events(*, path_plan: dict[str, Any], observed_st
         posthog_event_names = _extract_recorded_posthog_event_names(
             observed_events=(posthog_state.get("captures") if isinstance(posthog_state, dict) else []) or []
         )
+        _assert_quiz_completed_not_duplicated(
+            event_names=posthog_event_names,
+            label="browser-captured PostHog events",
+        )
         _assert_event_multiset_contains(
             observed=posthog_event_names,
             expected=list(path_plan.get("expected_posthog_events") or []),
@@ -3460,11 +3814,6 @@ def _validate_observed_tracking_events(*, path_plan: dict[str, Any], observed_st
             path_plan=path_plan,
             observed_state=observed_state,
         )
-
-    _assert_presales_to_sales_bridge_stitched(
-        path_plan=path_plan,
-        observed_state=observed_state,
-    )
 
 
 def _activate_tracking_validation_target(*, page: Any, selector: str) -> None:
@@ -3482,6 +3831,134 @@ def _activate_tracking_validation_target(*, page: Any, selector: str) -> None:
 }
 """
     )
+
+
+def _tracking_path_requires_live_posthog_readback(*, path_plan: dict[str, Any]) -> bool:
+    return bool(
+        [
+            event_name
+            for event_name in path_plan.get("required_posthog_readback_events", [])
+            if str(event_name or "").strip()
+        ]
+    )
+
+
+def _is_meta_pixel_request_url(url: str) -> bool:
+    parsed = urlsplit(str(url or ""))
+    host = parsed.netloc.lower()
+    path = parsed.path.lower().rstrip("/")
+    return host.endswith("facebook.com") and path.endswith("/tr")
+
+
+def _meta_event_name_from_request_url(url: str) -> str:
+    parsed = urlsplit(str(url or ""))
+    params = parse_qs(parsed.query)
+    values = params.get("ev") or []
+    return str(values[-1] or "").strip() if values else ""
+
+
+def _assert_meta_pixel_network_requests_succeeded(
+    *,
+    meta_pixel_responses: list[dict[str, Any]],
+    expected_meta_events: list[str],
+    context_label: str,
+) -> None:
+    expected_events = [
+        str(event_name or "").strip()
+        for event_name in expected_meta_events
+        if str(event_name or "").strip()
+    ]
+    if not expected_events:
+        return
+    failed_responses = [
+        response
+        for response in meta_pixel_responses
+        if isinstance(response, dict)
+        and response.get("status") is not None
+        and int(response.get("status") or 0) >= 400
+    ]
+    if failed_responses:
+        raise DeployError(
+            "Post-deploy tracking validation failed for Meta Pixel network delivery "
+            f"on {context_label}: pixel requests returned HTTP errors {failed_responses!r}."
+        )
+    observed_events = [
+        str(response.get("event") or "").strip()
+        for response in meta_pixel_responses
+        if isinstance(response, dict) and str(response.get("event") or "").strip()
+    ]
+    missing_events = [
+        event_name
+        for event_name in expected_events
+        if event_name not in observed_events
+    ]
+    if missing_events:
+        raise DeployError(
+            "Post-deploy tracking validation failed for Meta Pixel network delivery "
+            f"on {context_label}: missing pixel receive proof for events {missing_events!r}; "
+            f"observed {sorted(set(observed_events))!r}."
+        )
+
+
+def _exercise_tracking_page_view_targets(*, page: Any) -> None:
+    page.evaluate(
+        """
+async () => {
+  const sleep = (durationMs) => new Promise((resolve) => window.setTimeout(resolve, durationMs));
+  const doc = document.documentElement;
+  const body = document.body;
+  const scrollHeight = Math.max(
+    doc ? doc.scrollHeight || 0 : 0,
+    body ? body.scrollHeight || 0 : 0,
+    doc ? doc.offsetHeight || 0 : 0,
+    body ? body.offsetHeight || 0 : 0,
+    window.innerHeight || 0,
+  );
+  const maxScrollY = Math.max(0, scrollHeight - (window.innerHeight || 0));
+  for (const pct of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
+    window.scrollTo(0, Math.round(maxScrollY * pct));
+    window.dispatchEvent(new Event("scroll"));
+    await sleep(250);
+  }
+}
+"""
+    )
+    page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+
+
+def _exercise_quiz_manifest_interactions(*, page: Any, manifest: dict[str, Any]) -> None:
+    if not isinstance(manifest, dict):
+        return
+    quiz_options = manifest.get("quizOptions")
+    if not isinstance(quiz_options, list) or not quiz_options:
+        return
+    sorted_options = sorted(
+        [
+            option
+            for option in quiz_options
+            if isinstance(option, dict) and str(option.get("selector") or "").strip()
+        ],
+        key=lambda option: (
+            int(option.get("questionIndex") or 0),
+            str(option.get("id") or ""),
+        ),
+    )
+    seen_questions: set[str] = set()
+    for option in sorted_options:
+        question_key = (
+            str(option.get("questionId") or "").strip()
+            or str(option.get("questionIndex") or "").strip()
+            or str(option.get("id") or "").strip()
+        )
+        if question_key in seen_questions:
+            continue
+        seen_questions.add(question_key)
+        selector = str(option.get("selector") or "").strip()
+        try:
+            _activate_tracking_validation_target(page=page, selector=selector)
+            page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+        except Exception:
+            continue
 
 
 def _collect_tracking_validation_state(*, page: Any) -> dict[str, Any]:
@@ -3555,19 +4032,15 @@ def _query_posthog_readback_events(
     validation_id: str,
 ) -> list[dict[str, Any]]:
     escaped_validation_id = str(validation_id or "").replace("'", "\\'")
+    selected_property_columns = "\n".join(
+        f"  {select_expression} as {column_name},"
+        for column_name, select_expression in _POSTHOG_READBACK_COLUMN_SELECTS
+    ).rstrip(",")
     query = f"""
 select
   event,
   timestamp,
-  properties['$current_url'] as current_url,
-  properties.event_source_url as event_source_url,
-  properties.destination_url as destination_url,
-  properties.url_params as url_params,
-  properties.utm_content as utm_content,
-  properties.utm_campaign as utm_campaign,
-  properties.content_category as content_category,
-  properties.page_stage as page_stage,
-  properties.pageStage as pageStage
+{selected_property_columns}
 from events
 where timestamp > now() - interval 2 hour
   and (
@@ -3575,6 +4048,10 @@ where timestamp > now() - interval 2 hour
     or position(toString(properties.event_source_url), '{escaped_validation_id}') > 0
     or position(toString(properties.destination_url), '{escaped_validation_id}') > 0
     or position(toString(properties.url_params), '{escaped_validation_id}') > 0
+    or position(toString(properties.path), '{escaped_validation_id}') > 0
+    or position(toString(properties.mos_deploy_validation_id), '{escaped_validation_id}') > 0
+    or position(toString(properties.mosDeployValidationId), '{escaped_validation_id}') > 0
+    or position(toString(properties.fbclid), '{escaped_validation_id}') > 0
     or position(toString(properties.utm_content), '{escaped_validation_id}') > 0
     or position(toString(properties.utm_campaign), '{escaped_validation_id}') > 0
   )
@@ -3595,19 +4072,6 @@ limit 1000
     raw_rows = payload.get("results") if isinstance(payload, dict) else []
     if not isinstance(raw_rows, list):
         return []
-    columns = [
-        "event",
-        "timestamp",
-        "current_url",
-        "event_source_url",
-        "destination_url",
-        "url_params",
-        "utm_content",
-        "utm_campaign",
-        "content_category",
-        "page_stage",
-        "pageStage",
-    ]
     rows: list[dict[str, Any]] = []
     for raw_row in raw_rows:
         if not isinstance(raw_row, list):
@@ -3615,10 +4079,201 @@ limit 1000
         rows.append(
             {
                 column: raw_row[index] if index < len(raw_row) else None
-                for index, column in enumerate(columns)
+                for index, column in enumerate(_POSTHOG_READBACK_COLUMNS)
             }
         )
     return rows
+
+
+def _readback_prop(row: dict[str, Any], *keys: str) -> str:
+    return _first_tracking_prop(row, *keys)
+
+
+def _readback_rows_for_event(*, rows: list[dict[str, Any]], event_name: str) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in rows
+        if isinstance(row, dict) and str(row.get("event") or "").strip() == event_name
+    ]
+
+
+def _readback_row_contains_validation_id(*, row: dict[str, Any], validation_id: str) -> bool:
+    if not validation_id:
+        return True
+    scan_values = [
+        row.get("current_url"),
+        row.get("event_source_url"),
+        row.get("destination_url"),
+        row.get("url_params"),
+        row.get("path"),
+        row.get("utm_content"),
+        row.get("utm_campaign"),
+        row.get("fbclid"),
+        row.get("mos_deploy_validation_id"),
+        row.get("mosDeployValidationId"),
+    ]
+    for value in scan_values:
+        if isinstance(value, (dict, list)):
+            serialized = json.dumps(value, sort_keys=True)
+        else:
+            serialized = str(value or "")
+        if validation_id in serialized:
+            return True
+    return False
+
+
+def _assert_readback_context_field(
+    *,
+    row: dict[str, Any],
+    keys: tuple[str, ...],
+    field_label: str,
+    expected_value: str | None,
+    require_non_empty: bool,
+    label: str,
+) -> None:
+    observed_value = _readback_prop(row, *keys)
+    expected = _clean_tracking_value(expected_value)
+    if expected and observed_value != expected:
+        raise DeployError(
+            f"Post-deploy tracking validation failed for live PostHog readback {label}: "
+            f"'{field_label}' expected {expected!r}, observed {observed_value!r}."
+        )
+    if require_non_empty and not observed_value:
+        raise DeployError(
+            f"Post-deploy tracking validation failed for live PostHog readback {label}: "
+            f"'{field_label}' is missing."
+        )
+
+
+def _assert_readback_sales_context(
+    *,
+    rows: list[dict[str, Any]],
+    path_plan: dict[str, Any],
+    validation_id: str,
+) -> None:
+    sales_page = path_plan.get("sales_page") if isinstance(path_plan, dict) else {}
+    if not isinstance(sales_page, dict):
+        return
+    expected_context = [
+        (("product_slug", "productSlug"), "product_slug", str(sales_page.get("product_slug") or "")),
+        (("funnel_slug", "funnelSlug"), "funnel_slug", str(sales_page.get("funnel_slug") or "")),
+        (("publication_id", "publicationId"), "publication_id", str(sales_page.get("publication_id") or "")),
+        (("page_id", "pageId"), "page_id", str(sales_page.get("page_id") or "")),
+        (("page_slug", "pageSlug"), "page_slug", str(sales_page.get("slug") or "")),
+        (("page_stage", "pageStage"), "page_stage", "sales"),
+        (("content_category",), "content_category", "sales_page"),
+    ]
+    for event_name in ("sales_page_view", "EnteredSales"):
+        event_rows = _readback_rows_for_event(rows=rows, event_name=event_name)
+        if not event_rows:
+            continue
+        row = event_rows[-1]
+        for keys, field_label, expected_value in expected_context:
+            _assert_readback_context_field(
+                row=row,
+                keys=keys,
+                field_label=field_label,
+                expected_value=expected_value,
+                require_non_empty=bool(expected_value),
+                label=f"'{validation_id}' {event_name}",
+            )
+        for keys, field_label in (
+            (("session_id", "sessionId"), "session_id"),
+            (("visitor_id", "visitorId"), "visitor_id"),
+        ):
+            _assert_readback_context_field(
+                row=row,
+                keys=keys,
+                field_label=field_label,
+                expected_value=None,
+                require_non_empty=True,
+                label=f"'{validation_id}' {event_name}",
+            )
+
+
+def _assert_readback_presales_handoff(
+    *,
+    rows: list[dict[str, Any]],
+    path_plan: dict[str, Any],
+    validation_id: str,
+) -> None:
+    if not path_plan.get("pre_sales_click_selectors"):
+        return
+    expected_source_page_type = _expected_presales_source_page_type(path_plan=path_plan)
+    click_rows = [
+        row
+        for event_name in ("PreSalesToSalesClick", "cta_click", "pre_sales_to_sales_click")
+        for row in _readback_rows_for_event(rows=rows, event_name=event_name)
+    ]
+    if not click_rows:
+        return
+    click_row = click_rows[-1]
+    expected_session_id = _readback_prop(click_row, "session_id", "sessionId")
+    expected_visitor_id = _readback_prop(click_row, "visitor_id", "visitorId")
+    expected_click_id = _readback_prop(click_row, "click_id", "clickId")
+    missing = []
+    if not expected_session_id:
+        missing.append("session_id")
+    if not expected_visitor_id:
+        missing.append("visitor_id")
+    if not expected_click_id:
+        missing.append("click_id")
+    if missing:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog readback "
+            f"'{validation_id}': pre-sales to sales click rows are missing canonical handoff fields {missing!r}."
+        )
+    destination_url = _readback_prop(click_row, "destination_url", "destinationUrl")
+    _assert_url_includes_handoff_values(
+        url=destination_url,
+        expected_session_id=expected_session_id,
+        expected_visitor_id=expected_visitor_id,
+        expected_click_id=expected_click_id,
+        expected_source_page_type=expected_source_page_type,
+        label=f"live PostHog readback '{validation_id}' pre-sales to sales destination_url",
+    )
+
+    for row in click_rows:
+        _assert_props_include_canonical_handoff_values(
+            props=row,
+            expected_session_id=expected_session_id,
+            expected_visitor_id=expected_visitor_id,
+            expected_click_id=expected_click_id,
+            label=f"live PostHog readback {str(row.get('event') or '').strip()}",
+        )
+        _assert_sales_event_presales_source_context(
+            props=row,
+            expected_source_page_type=expected_source_page_type,
+            label=f"live PostHog readback {str(row.get('event') or '').strip()}",
+        )
+
+    for event_name in ("sales_page_view", "EnteredSales"):
+        for row in _readback_rows_for_event(rows=rows, event_name=event_name):
+            _assert_props_include_canonical_handoff_values(
+                props=row,
+                expected_session_id=expected_session_id,
+                expected_visitor_id=expected_visitor_id,
+                expected_click_id=expected_click_id,
+                label=f"live PostHog readback {event_name}",
+            )
+            _assert_sales_event_presales_source_context(
+                props=row,
+                expected_source_page_type=expected_source_page_type,
+                label=f"live PostHog readback {event_name}",
+            )
+
+
+def _assert_quiz_completed_not_duplicated(
+    *,
+    event_names: list[str],
+    label: str,
+) -> None:
+    quiz_completed_count = event_names.count("QuizCompleted")
+    if quiz_completed_count > 1:
+        raise DeployError(
+            "Post-deploy tracking validation failed: QuizCompleted must fire once per validated quiz path; "
+            f"observed {quiz_completed_count} QuizCompleted events in {label}."
+        )
 
 
 def _assert_posthog_readback_rows(
@@ -3626,6 +4281,7 @@ def _assert_posthog_readback_rows(
     rows: list[dict[str, Any]],
     required_events: list[str],
     validation_id: str,
+    path_plan: dict[str, Any] | None = None,
 ) -> None:
     event_names = [
         str(row.get("event") or "").strip()
@@ -3643,6 +4299,23 @@ def _assert_posthog_readback_rows(
             f"'{validation_id}': missing expected events {missing_events!r}; "
             f"observed {sorted(set(event_names))!r}."
         )
+    mismatched_validation_rows = [
+        str(row.get("event") or "").strip()
+        for row in rows
+        if isinstance(row, dict)
+        and str(row.get("event") or "").strip() in set(required_events)
+        and not _readback_row_contains_validation_id(row=row, validation_id=validation_id)
+    ]
+    if mismatched_validation_rows:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog readback "
+            f"'{validation_id}': expected rows did not include the validation id "
+            f"{mismatched_validation_rows!r}."
+        )
+    _assert_quiz_completed_not_duplicated(
+        event_names=event_names,
+        label=f"live PostHog readback '{validation_id}'",
+    )
 
     sales_rows = [
         row
@@ -3661,6 +4334,17 @@ def _assert_posthog_readback_rows(
                 "Post-deploy tracking validation failed for live PostHog readback "
                 f"'{validation_id}': sales page events landed without sales page context."
             )
+    if path_plan:
+        _assert_readback_sales_context(
+            rows=rows,
+            path_plan=path_plan,
+            validation_id=validation_id,
+        )
+        _assert_readback_presales_handoff(
+            rows=rows,
+            path_plan=path_plan,
+            validation_id=validation_id,
+        )
 
 
 def _validate_posthog_live_readback(
@@ -3678,12 +4362,10 @@ def _validate_posthog_live_readback(
 
     api_key = str(settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY or "").strip()
     if not api_key:
-        if settings.DEPLOY_TRACKING_VALIDATION_REQUIRE_POSTHOG_READBACK:
-            raise DeployError(
-                "Post-deploy tracking validation requires live PostHog readback, but "
-                "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY is not configured."
-            )
-        return None
+        raise DeployError(
+            "Post-deploy tracking validation requires live PostHog readback for html-deploy-v1, but "
+            "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY is not configured."
+        )
 
     tracking = path_plan.get("tracking") if isinstance(path_plan, dict) else {}
     tracking_config = tracking if isinstance(tracking, dict) else {}
@@ -3708,6 +4390,7 @@ def _validate_posthog_live_readback(
                     rows=rows,
                     required_events=required_events,
                     validation_id=validation_id,
+                    path_plan=path_plan,
                 )
                 return {
                     "validationId": validation_id,
@@ -3746,32 +4429,53 @@ def _run_single_tracking_path_validation(
         raise DeployError("Post-deploy tracking validation requires start and sales page URLs.")
 
     validation_id = f"deploy-validation-{uuid4().hex}"
-    query_separator = "&" if "?" in start_url else "?"
-    paid_entry_url = (
-        f"{start_url}{query_separator}"
-        + urlencode(
-            {
-                "utm_source": "deploy-validation",
-                "utm_medium": "deploy-validation",
-                "utm_campaign": validation_id,
-                "utm_content": validation_id,
-                "mos_deploy_validation_id": validation_id,
-                "fbclid": validation_id,
-            }
+    validation_query_params = {
+        "utm_source": "deploy-validation",
+        "utm_medium": "deploy-validation",
+        "utm_campaign": validation_id,
+        "utm_content": validation_id,
+        "mos_deploy_validation_id": validation_id,
+        "fbclid": validation_id,
+    }
+    candidate_release_id = str(path_plan.get("candidate_release_id") or "").strip()
+    if candidate_release_id:
+        validation_query_params[_HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM] = (
+            _validate_html_deploy_candidate_release_id(candidate_release_id)
         )
-    )
+    paid_entry_url = _append_url_query_params(start_url, validation_query_params)
+    sales_entry_url = _append_url_query_params(sales_url, validation_query_params)
     mock_checkout_url = f"{origin.rstrip('/')}/__mos_mock_checkout__/"
-    checkout_request_re = re.compile(r".*/(?:api/)?public/checkout(?:\?.*)?$")
+    checkout_request_re = re.compile(
+        r".*/(?:api/)?public/checkout(?:/prepare(?:/[^/?]+(?:/consume)?)?)?(?:\?.*)?$"
+    )
     forbidden_request_urls: list[str] = []
+    meta_pixel_responses: list[dict[str, Any]] = []
+    requires_live_posthog_readback = _tracking_path_requires_live_posthog_readback(path_plan=path_plan)
+    expected_meta_events = [
+        str(event_name or "").strip()
+        for event_name in path_plan.get("expected_meta_events", [])
+        if str(event_name or "").strip()
+    ]
+    require_meta_pixel_network_validation = bool(expected_meta_events) and (
+        path_plan.get("require_meta_pixel_network_validation") is not False
+    )
+    if requires_live_posthog_readback and not str(
+        settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY or ""
+    ).strip():
+        raise DeployError(
+            "Post-deploy tracking validation requires live PostHog readback for html-deploy-v1, but "
+            "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY is not configured."
+        )
 
     context = browser.new_context(ignore_https_errors=True)
     try:
-        context.route(
-            "**/static/array.js*",
-            lambda route: route.fulfill(
-                status=200,
-                content_type="application/javascript",
-                body="""
+        if not requires_live_posthog_readback:
+            context.route(
+                "**/static/array.js*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="application/javascript",
+                    body="""
 window.__mosPosthogArrayLoaded = true;
 (function(){
   var root = window.posthog;
@@ -3790,16 +4494,17 @@ window.__mosPosthogArrayLoaded = true;
   }
 }());
 """,
-            ),
-        )
-        context.route(
-            "**/fbevents.js*",
-            lambda route: route.fulfill(
-                status=200,
-                content_type="application/javascript",
-                body="window.__mosMetaPixelLibraryLoaded = true;",
-            ),
-        )
+                ),
+            )
+        if not require_meta_pixel_network_validation:
+            context.route(
+                "**/fbevents.js*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="application/javascript",
+                    body="window.__mosMetaPixelLibraryLoaded = true;",
+                ),
+            )
         context.route(
             "**/__mos_mock_checkout__*",
             lambda route: route.fulfill(
@@ -3808,19 +4513,43 @@ window.__mosPosthogArrayLoaded = true;
                 body="<html><body>mock checkout</body></html>",
             ),
         )
-        context.route(
-            "**/public/checkout*",
-            lambda route: route.fulfill(
+        def _fulfill_checkout_route(route: Any) -> None:
+            request_url = str(getattr(getattr(route, "request", None), "url", "") or "")
+            parsed_checkout_url = urlsplit(request_url)
+            checkout_path = parsed_checkout_url.path
+            if checkout_path.rstrip("/").endswith("/public/checkout/prepare"):
+                payload = {
+                    "preparedCheckoutId": "deploy-validation-prepared-checkout",
+                    "status": "ready",
+                    "checkoutUrl": mock_checkout_url,
+                    "sessionId": "deploy-validation-session",
+                }
+            elif checkout_path.rstrip("/").endswith(
+                "/public/checkout/prepare/deploy-validation-prepared-checkout/consume"
+            ):
+                payload = {
+                    "checkoutUrl": mock_checkout_url,
+                    "sessionId": "deploy-validation-session",
+                }
+            elif "/public/checkout/prepare/" in checkout_path:
+                payload = {
+                    "preparedCheckoutId": "deploy-validation-prepared-checkout",
+                    "status": "ready",
+                    "checkoutUrl": mock_checkout_url,
+                    "sessionId": "deploy-validation-session",
+                }
+            else:
+                payload = {
+                    "checkoutUrl": mock_checkout_url,
+                    "sessionId": "deploy-validation-session",
+                }
+            route.fulfill(
                 status=200,
                 content_type="application/json",
-                body=json.dumps(
-                    {
-                        "checkoutUrl": mock_checkout_url,
-                        "sessionId": "deploy-validation-session",
-                    }
-                ),
-            ),
-        )
+                body=json.dumps(payload),
+            )
+
+        context.route("**/public/checkout*", _fulfill_checkout_route)
         context.add_init_script(_DEPLOY_TRACKING_VALIDATION_INIT_SCRIPT)
         page = context.new_page()
         if hasattr(page, "on"):
@@ -3832,12 +4561,31 @@ window.__mosPosthogArrayLoaded = true;
                     else None
                 ),
             )
+            page.on(
+                "response",
+                lambda response: (
+                    meta_pixel_responses.append(
+                        {
+                            "url": str(response.url),
+                            "event": _meta_event_name_from_request_url(str(response.url)),
+                            "status": response.status,
+                        }
+                    )
+                    if _is_meta_pixel_request_url(str(response.url))
+                    else None
+                ),
+            )
         page.goto(
             paid_entry_url,
             wait_until="domcontentloaded",
             timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
         )
         page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+        _exercise_tracking_page_view_targets(page=page)
+        if str(start_page.get("html_artifact_kind") or "").strip().lower() == "quiz":
+            start_manifest = start_page.get("manifest")
+            if isinstance(start_manifest, dict):
+                _exercise_quiz_manifest_interactions(page=page, manifest=start_manifest)
 
         if str(start_page.get("stage") or "").strip() != "sales":
             initial_state = _collect_tracking_validation_state(page=page)
@@ -3867,11 +4615,17 @@ window.__mosPosthogArrayLoaded = true;
                         timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
                     )
                     page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+                    _exercise_tracking_page_view_targets(page=page)
+                    if str(start_page.get("html_artifact_kind") or "").strip().lower() == "quiz":
+                        start_manifest = start_page.get("manifest")
+                        if isinstance(start_manifest, dict):
+                            _exercise_quiz_manifest_interactions(page=page, manifest=start_manifest)
                     _activate_tracking_validation_target(page=page, selector=selector)
                     page.wait_for_url(
                         re.compile(re.escape(target_path)),
                         timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
                     )
+                    _exercise_tracking_page_view_targets(page=page)
                     activated_pre_sales_selector = selector
                     break
                 except Exception as exc:
@@ -3896,11 +4650,12 @@ window.__mosPosthogArrayLoaded = true;
                 try:
                     if urlsplit(page.url).path != urlsplit(sales_url).path:
                         page.goto(
-                            sales_url,
+                            sales_entry_url,
                             wait_until="domcontentloaded",
                             timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
                         )
                         page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+                    _exercise_tracking_page_view_targets(page=page)
                     if mode == "external_checkout_url":
                         external_urls = [
                             str(url or "").strip()
@@ -3950,6 +4705,12 @@ window.__mosPosthogArrayLoaded = true;
             context_label=start_url,
         )
         _wait_for_tracking_validation_state(page=page, path_plan=path_plan)
+        page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+        _assert_meta_pixel_network_requests_succeeded(
+            meta_pixel_responses=meta_pixel_responses,
+            expected_meta_events=expected_meta_events if require_meta_pixel_network_validation else [],
+            context_label=start_url,
+        )
         posthog_readback = _validate_posthog_live_readback(
             path_plan=path_plan,
             validation_id=validation_id,
@@ -4001,6 +4762,7 @@ async def _run_funnel_tracking_post_deploy_validation(
     publication_id: str,
     access_urls: list[str],
     render_mode: str,
+    candidate_release_id: str | None = None,
 ) -> dict[str, Any]:
     validation_plan = _build_funnel_tracking_validation_plan(
         artifact_payload=artifact_payload,
@@ -4008,6 +4770,7 @@ async def _run_funnel_tracking_post_deploy_validation(
         publication_id=publication_id,
         access_urls=access_urls,
         render_mode=render_mode,
+        candidate_release_id=candidate_release_id,
     )
     path_results = await asyncio.to_thread(
         _run_funnel_tracking_post_deploy_validation_sync,
@@ -4033,6 +4796,7 @@ async def _run_funnel_tracking_post_deploy_validation(
             }
         ),
         "salesUrl": validation_plan["sales_page"]["url"],
+        "candidateReleaseId": validation_plan.get("candidate_release_id"),
         "validatedPageUrls": [page["url"] for page in validation_plan["pages_to_validate"]],
         "validatedPaths": path_results,
         "checkoutValidated": bool(validation_plan["checkout_validated"]),
@@ -5066,6 +5830,40 @@ def _normalize_access_urls(urls: list[str] | None) -> list[str]:
         seen.add(url)
         out.append(url)
     return out
+
+
+def _build_html_deploy_candidate_release_id(*, job_id: str) -> str:
+    job_token = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(job_id or "").strip()).strip(".-")
+    if not job_token:
+        job_token = uuid4().hex[:12]
+    release_id = f"{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}-{job_token[:48]}"
+    if not _HTML_DEPLOY_CANDIDATE_RELEASE_ID_RE.fullmatch(release_id):
+        raise DeployError(f"Generated invalid HTML deploy candidate release id '{release_id}'.")
+    return release_id
+
+
+def _validate_html_deploy_candidate_release_id(release_id: str) -> str:
+    normalized = str(release_id or "").strip()
+    if not _HTML_DEPLOY_CANDIDATE_RELEASE_ID_RE.fullmatch(normalized):
+        raise DeployError(
+            "HTML deploy candidate release id must be 1-128 characters of letters, "
+            "numbers, '.', '_', or '-', and must start with a letter or number."
+        )
+    return normalized
+
+
+def _append_url_query_params(url: str, params: dict[str, str]) -> str:
+    parsed = urlsplit(str(url or "").strip())
+    query_pairs: list[tuple[str, str]] = []
+    if parsed.query:
+        for key, values in parse_qs(parsed.query, keep_blank_values=True).items():
+            for value in values:
+                query_pairs.append((key, value))
+    for key, value in params.items():
+        if value is None:
+            continue
+        query_pairs.append((str(key), str(value)))
+    return parsed._replace(query=urlencode(query_pairs)).geturl()
 
 
 def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
@@ -6398,6 +7196,67 @@ def _summarize_apply_result(result: dict[str, Any]) -> tuple[int, dict[str, Any]
     return rc, summary
 
 
+def _resolve_apply_result_server_ip(
+    *,
+    server_ips: Any,
+    instance_name: str | None,
+) -> str:
+    if not isinstance(server_ips, dict) or not server_ips:
+        raise DeployError("HTML deploy candidate promotion requires apply result server IPs.")
+    normalized_instance_name = str(instance_name or "").strip()
+    if normalized_instance_name:
+        resolved = str(server_ips.get(normalized_instance_name) or "").strip()
+        if not resolved:
+            raise DeployError(
+                f"HTML deploy candidate promotion could not find server IP for instance '{normalized_instance_name}'."
+            )
+        return resolved
+    if len(server_ips) == 1:
+        return str(next(iter(server_ips.values()))).strip()
+    raise DeployError(
+        "HTML deploy candidate promotion requires deploy_request.instance_name when the apply result contains multiple servers."
+    )
+
+
+def _activate_html_deploy_candidate_release(
+    *,
+    workload_patch: dict[str, Any],
+    release_id: str,
+    server_ips: Any,
+    instance_name: str | None,
+) -> dict[str, Any]:
+    from cloudhand.adapters.deployer import ServerDeployer
+    from cloudhand.secrets import get_or_create_project_ssh_key
+
+    workload_name = str(workload_patch.get("name") or "").strip()
+    if not workload_name:
+        raise DeployError("HTML deploy candidate promotion requires a workload name.")
+    destination_path = str(workload_patch.get("destination_path") or "").strip() or "/opt/apps"
+    normalized_release_id = _validate_html_deploy_candidate_release_id(release_id)
+    server_ip = _resolve_apply_result_server_ip(
+        server_ips=server_ips,
+        instance_name=instance_name,
+    )
+    private_key, _public_key = get_or_create_project_ssh_key(settings.DEPLOY_PROJECT_ID)
+    deployer = ServerDeployer(
+        ip=server_ip,
+        private_key_str=private_key,
+        local_root=_cloudhand_dir().parent,
+    )
+    deployer.activate_funnel_artifact_candidate_release(
+        app_name=workload_name,
+        destination_path=destination_path,
+        release_id=normalized_release_id,
+    )
+    return {
+        "status": "activated",
+        "serverIp": server_ip,
+        "workloadName": workload_name,
+        "destinationPath": destination_path,
+        "releaseId": normalized_release_id,
+    }
+
+
 async def _run_apply_plan_job(job_id: str) -> None:
     job = _read_job(job_id)
     path = _job_path(job_id)
@@ -6467,6 +7326,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
     hydrated_artifact_payload: dict[str, Any] | None = None
     hydrated_artifact_render_mode = ""
     publication_id = ""
+    html_deploy_candidate_release_id = ""
     deploy_lock_stack: ExitStack | None = None
 
     if not org_id or not user_id or not funnel_id:
@@ -6546,6 +7406,21 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     ).strip()
                     if source_commit:
                         release_metadata["sourceCommit"] = source_commit
+                    if (
+                        resolved_render_mode
+                        == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
+                        and bool(deploy_request.get("apply_plan", True))
+                        and bool(deploy_request.get("validate_tracking_post_deploy", True))
+                    ):
+                        html_deploy_candidate_release_id = _build_html_deploy_candidate_release_id(
+                            job_id=job_id
+                        )
+                        release_metadata["htmlDeployActivationMode"] = (
+                            _HTML_DEPLOY_CANDIDATE_ACTIVATION_MODE
+                        )
+                        release_metadata["htmlDeployCandidateReleaseId"] = (
+                            html_deploy_candidate_release_id
+                        )
                     hydrated_source_ref["release_metadata"] = release_metadata
                     workload_patch["source_ref"] = hydrated_source_ref
                     runtime_artifact_payload: dict[str, Any] = {
@@ -6643,6 +7518,48 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     summary["access_urls"] = access_urls
                     deploy_response["apply"] = summary
 
+                    if html_deploy_candidate_release_id:
+                        if not access_urls:
+                            raise DeployError(
+                                "HTML deploy candidate validation requires at least one public access URL before promotion."
+                            )
+                        if hydrated_artifact_payload is None:
+                            raise DeployError(
+                                "HTML deploy candidate validation requires a hydrated funnel runtime artifact payload."
+                            )
+                        if not publication_id:
+                            raise DeployError(
+                                "HTML deploy candidate validation requires a published funnel publication id."
+                            )
+                        job["phase"] = "validating_html_deploy_candidate"
+                        job["result"] = result_payload
+                        _write_json_atomic(path, job)
+                        html_deploy_validation_report = await _run_funnel_tracking_post_deploy_validation(
+                            artifact_payload=hydrated_artifact_payload,
+                            funnel_id=funnel_id,
+                            publication_id=publication_id,
+                            access_urls=access_urls,
+                            render_mode=hydrated_artifact_render_mode,
+                            candidate_release_id=html_deploy_candidate_release_id,
+                        )
+                        deploy_response["candidateTrackingValidation"] = (
+                            html_deploy_validation_report
+                        )
+                        deploy_response["trackingValidation"] = html_deploy_validation_report
+                        deploy_response["htmlDeployValidationReport"] = (
+                            html_deploy_validation_report
+                        )
+                        job["phase"] = "activating_html_deploy_candidate"
+                        job["result"] = result_payload
+                        _write_json_atomic(path, job)
+                        deploy_response["candidatePromotion"] = await asyncio.to_thread(
+                            _activate_html_deploy_candidate_release,
+                            workload_patch=workload_patch,
+                            release_id=html_deploy_candidate_release_id,
+                            server_ips=summary.get("server_ips") or {},
+                            instance_name=deploy_request.get("instance_name"),
+                        )
+
                 if bool(deploy_request.get("bunny_pull_zone", False)):
                     job["phase"] = "reconciling_bunny"
                     job["result"] = result_payload
@@ -6703,7 +7620,11 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     or deploy_request.get("bunny_pull_zone", False)
                     or requested_access_urls
                 )
-                if should_validate_tracking and validation_target_requested:
+                if (
+                    should_validate_tracking
+                    and validation_target_requested
+                    and not html_deploy_candidate_release_id
+                ):
                     if not access_urls:
                         raise DeployError(
                             "Post-deploy tracking validation requires at least one public access URL after deploy."
