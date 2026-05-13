@@ -42,6 +42,9 @@ def _html_shell(*, title: str, body: str, origin: str, page_stage: str) -> str:
   <head>
     <meta charset="utf-8">
     <title>{title}</title>
+    <style data-mos-render-optimization="true">
+      body {{ margin: 0; }}
+    </style>
     <script src="https://connect.facebook.net/en_US/fbevents.js"></script>
     <script>
       window.fbq = function() {{}};
@@ -772,8 +775,22 @@ def main() -> None:
                 "candidate_release_id": RELEASE_ID,
                 "checkout_validated": True,
                 "pages_to_validate": [
-                    {"url": start_url, "tracking": tracking},
-                    {"url": sales_url, "tracking": tracking},
+                    {
+                        "url": start_url,
+                        "tracking": tracking,
+                        "stage": "pre_sales",
+                        "slug": start_slug,
+                        "page_id": start_page_id,
+                        "html_artifact_kind": start_artifact_kind,
+                    },
+                    {
+                        "url": sales_url,
+                        "tracking": tracking,
+                        "stage": "sales",
+                        "slug": SALES_SLUG,
+                        "page_id": SALES_PAGE_ID,
+                        "html_artifact_kind": "sales",
+                    },
                 ],
                 "path_plans": [
                     {
@@ -855,12 +872,20 @@ def main() -> None:
             result = deploy_service._run_funnel_tracking_post_deploy_validation_sync(
                 validation_plan=validation_plan
             )
+            optimization = deploy_service._run_html_deploy_optimization_validation_sync(
+                validation_plan=validation_plan
+            )
             lighthouse = deploy_service._run_html_deploy_lighthouse_validation_sync(
                 validation_plan=validation_plan
             )
             print(
                 json.dumps(
-                    {"origin": origin, "result": result, "lighthouse": lighthouse},
+                    {
+                        "origin": origin,
+                        "result": result,
+                        "optimization": optimization,
+                        "lighthouse": lighthouse,
+                    },
                     indent=2,
                 )
             )

@@ -305,6 +305,41 @@ Acceptance:
 - The deploy response shows per-page/per-profile scores and key performance audits.
 - Existing static, browser, PostHog, and Meta gates remain the same validator path.
 
+### Phase 7A: Integrated Optimization Pipeline Gate
+
+Make the existing `html-deploy-v1` optimization work explicit, deterministic, and blocking in the same staged candidate validator. This is the production path for turning a base standalone HTML file into a deployable artifact, then proving the generated staged artifact is viable before promotion.
+
+Tasks:
+
+- Keep optimization inside the existing `html-deploy-v1` render path:
+  - localize/mirror HTML image assets into served artifact assets
+  - remove unsupported runtime dependencies such as Tailwind CDN scripts
+  - strip legacy IM8 references from listicle, quiz, and sales artifacts
+  - localize stylesheets where the renderer supports it
+  - add critical render optimization CSS markers
+  - add LCP image preload hints
+  - rewrite raster images with eager/high-priority first image handling
+  - rewrite below-fold raster images with lazy loading and async decoding
+  - add responsive `srcset`/`source` candidates for optimized image variants
+  - add font preload and origin hints where supported by the renderer
+- Validate the inactive staged candidate artifact, not the source file and not the live artifact.
+- Validate every staged page URL by appending `mos_deploy_candidate_release=<candidate_id>`.
+- Fetch staged HTML and fail when required optimization markers are missing.
+- Fetch every `img`, `source[srcset]`, image preload, and `imagesrcset` image reference over HTTP.
+- Fail closed on any missing image, 404, non-image content type, unresolved relative asset path, or stale asset URL.
+- Fail closed when Tailwind CDN runtime or legacy IM8 script URLs remain.
+- Attach optimization evidence to `htmlDeployValidationReport.optimizationValidation` beside tracking, browser, PostHog, Meta, and Lighthouse evidence.
+- Include optimization output in the local candidate validator script for fast deterministic review of staged artifacts.
+
+Acceptance:
+
+- Candidate activation does not occur when staged image references are broken.
+- Candidate activation does not occur when required render optimization markers are missing.
+- Candidate activation does not occur when unsupported runtime scripts remain.
+- The deploy response shows per-page optimization metrics: resolved image references, raster image count, responsive image count, lazy/eager/high-priority image counts, preload counts, font preload count, origin hint count, and legacy-script removal status.
+- Lighthouse remains the score gate, while optimization validation explains whether the expected production transforms were actually present.
+- The validator stays deterministic; no AI-based visual or subjective optimization judgment is required for promotion.
+
 ### Phase 8: Postgres Support Report
 
 Add read-only Postgres checks as a supporting report. This is not a replacement for PostHog readback, and Postgres event persistence is not the source of truth for quiz/listicle/sales analytics.
