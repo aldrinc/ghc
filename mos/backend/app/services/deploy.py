@@ -11,9 +11,12 @@ import json
 import os
 import posixpath
 import re
+import shlex
 import shutil
 import signal
+import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -3192,6 +3195,496 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
                     seen_posthog_api_hosts.add(api_host)
 
 
+class _HtmlDeployOptimizationParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.images: list[dict[str, str]] = []
+        self.sources: list[dict[str, str]] = []
+        self.links: list[dict[str, str]] = []
+        self.script_srcs: list[str] = []
+        self.render_optimization_style_count = 0
+
+    @staticmethod
+    def _attrs(attrs: list[tuple[str, str | None]]) -> dict[str, str]:
+        return {
+            str(name or "").strip().lower(): str(value or "").strip()
+            for name, value in attrs
+            if str(name or "").strip()
+        }
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag_name = str(tag or "").strip().lower()
+        attr_lookup = self._attrs(attrs)
+        if tag_name == "img":
+            self.images.append(attr_lookup)
+            return
+        if tag_name == "source":
+            self.sources.append(attr_lookup)
+            return
+        if tag_name == "link":
+            self.links.append(attr_lookup)
+            return
+        if tag_name == "script":
+            src = str(attr_lookup.get("src") or "").strip()
+            if src:
+                self.script_srcs.append(src)
+            return
+        if (
+            tag_name == "style"
+            and str(attr_lookup.get("data-mos-render-optimization") or "").strip().lower()
+            == "true"
+        ):
+            self.render_optimization_style_count += 1
+
+
+def _html_deploy_page_fetch_url(*, page_url: str, candidate_release_id: str) -> str:
+    if not candidate_release_id:
+        return page_url
+    return _append_url_query_params(
+        page_url,
+        {
+            _HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM: _validate_html_deploy_candidate_release_id(
+                candidate_release_id
+            )
+        },
+    )
+
+
+def _html_deploy_srcset_urls(raw_srcset: str) -> list[str]:
+    urls: list[str] = []
+    for raw_candidate in str(raw_srcset or "").split(","):
+        candidate = raw_candidate.strip()
+        if not candidate:
+            continue
+        url = candidate.split()[0].strip()
+        if url:
+            urls.append(url)
+    return urls
+
+
+def _html_deploy_is_data_or_empty_url(raw_url: str) -> bool:
+    value = str(raw_url or "").strip().lower()
+    return not value or value.startswith("data:")
+
+
+def _html_deploy_is_svg_url(raw_url: str) -> bool:
+    return urlsplit(str(raw_url or "").strip()).path.lower().endswith(".svg")
+
+
+def _html_deploy_is_raster_image_url(raw_url: str) -> bool:
+    return not _html_deploy_is_data_or_empty_url(raw_url) and not _html_deploy_is_svg_url(raw_url)
+
+
+def _html_deploy_image_reference_urls(*, parser: _HtmlDeployOptimizationParser) -> list[str]:
+    urls: list[str] = []
+    for image in parser.images:
+        src = str(image.get("src") or "").strip()
+        if src:
+            urls.append(src)
+        urls.extend(_html_deploy_srcset_urls(str(image.get("srcset") or "")))
+    for source in parser.sources:
+        urls.extend(_html_deploy_srcset_urls(str(source.get("srcset") or "")))
+    for link in parser.links:
+        rel = str(link.get("rel") or "").lower()
+        as_value = str(link.get("as") or "").lower()
+        if as_value == "image" or "preload" in rel:
+            href = str(link.get("href") or "").strip()
+            if href:
+                urls.append(href)
+            urls.extend(_html_deploy_srcset_urls(str(link.get("imagesrcset") or "")))
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for url in urls:
+        normalized = str(url or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _assert_html_deploy_image_urls_resolve(
+    *,
+    client: httpx.Client,
+    page_url: str,
+    parser: _HtmlDeployOptimizationParser,
+) -> int:
+    checked = 0
+    failures: list[str] = []
+    for raw_url in _html_deploy_image_reference_urls(parser=parser):
+        if _html_deploy_is_data_or_empty_url(raw_url):
+            continue
+        asset_url = urljoin(page_url, raw_url)
+        try:
+            response = client.get(asset_url)
+            response.raise_for_status()
+            content_type = str(response.headers.get("content-type") or "").split(";", 1)[0]
+            if not content_type.lower().startswith("image/"):
+                raise DeployError(
+                    f"expected image/* content-type, got '{content_type or 'unknown'}'"
+                )
+            checked += 1
+        except Exception as exc:
+            failures.append(f"{asset_url}: {exc}")
+    if failures:
+        preview = "; ".join(failures[:8])
+        extra = "" if len(failures) <= 8 else f"; +{len(failures) - 8} more"
+        raise DeployError(
+            "HTML deploy optimization validation failed: image assets did not resolve "
+            f"for '{page_url}'. {preview}{extra}"
+        )
+    return checked
+
+
+def _assert_html_deploy_optimization_markers(
+    *,
+    page: dict[str, Any],
+    page_url: str,
+    html_document: str,
+    parser: _HtmlDeployOptimizationParser,
+    resolved_image_count: int,
+) -> dict[str, Any]:
+    failures: list[str] = []
+    page_stage = str(page.get("stage") or "").strip().lower().replace("-", "_")
+    artifact_kind = str(page.get("html_artifact_kind") or "").strip()
+    if (
+        page_stage in {"sales", "pre_sales", "presales"}
+        and not parser.render_optimization_style_count
+    ):
+        failures.append("missing data-mos-render-optimization critical CSS")
+    if re.search(r"https?://cdn\.tailwindcss\.com\b", html_document, flags=re.IGNORECASE):
+        failures.append("Tailwind CDN runtime script was not replaced")
+
+    legacy_script_srcs = [
+        src
+        for src in parser.script_srcs
+        if re.search(r"(?:^|[./_-])im8(?:[./_-]|$)|im8health", src, flags=re.IGNORECASE)
+    ]
+    if legacy_script_srcs:
+        failures.append(f"legacy IM8 script URLs remain: {legacy_script_srcs!r}")
+
+    raster_images = [
+        image
+        for image in parser.images
+        if _html_deploy_is_raster_image_url(str(image.get("src") or ""))
+    ]
+    optimized_image_failures: list[str] = []
+    lazy_image_count = 0
+    high_priority_image_count = 0
+    eager_image_count = 0
+    responsive_image_count = 0
+    for index, image in enumerate(raster_images):
+        loading = str(image.get("loading") or "").strip().lower()
+        decoding = str(image.get("decoding") or "").strip().lower()
+        fetchpriority = str(image.get("fetchpriority") or "").strip().lower()
+        srcset = str(image.get("srcset") or "").strip()
+        if not loading:
+            optimized_image_failures.append(f"img[{index}] missing loading")
+        if decoding != "async":
+            optimized_image_failures.append(f"img[{index}] missing decoding=async")
+        if not fetchpriority:
+            optimized_image_failures.append(f"img[{index}] missing fetchpriority")
+        if loading == "lazy":
+            lazy_image_count += 1
+        if loading == "eager":
+            eager_image_count += 1
+        if fetchpriority == "high":
+            high_priority_image_count += 1
+        if srcset:
+            responsive_image_count += 1
+    responsive_image_count += sum(
+        1 for source in parser.sources if str(source.get("srcset") or "").strip()
+    )
+
+    image_preload_links = [
+        link
+        for link in parser.links
+        if str(link.get("as") or "").strip().lower() == "image"
+        and "preload" in str(link.get("rel") or "").strip().lower()
+    ]
+    font_preload_count = sum(
+        1
+        for link in parser.links
+        if str(link.get("data-mos-font-preload") or "").strip().lower() == "true"
+    )
+    origin_hint_count = sum(
+        1
+        for link in parser.links
+        if str(link.get("rel") or "").strip().lower() in {"preconnect", "dns-prefetch"}
+    )
+
+    if optimized_image_failures:
+        failures.append("; ".join(optimized_image_failures[:8]))
+    if raster_images:
+        if not image_preload_links:
+            failures.append("missing LCP image preload")
+        if high_priority_image_count < 1:
+            failures.append("missing high-priority eager image")
+        if len(raster_images) > 1 and lazy_image_count < 1:
+            failures.append("missing lazy loading for below-fold images")
+        if len(raster_images) > 1 and responsive_image_count < 1:
+            failures.append("missing responsive image srcset/source candidates")
+    if failures:
+        raise DeployError(
+            f"HTML deploy optimization validation failed for '{page_url}': "
+            + "; ".join(failures)
+        )
+
+    return {
+        "url": page_url,
+        "pageStage": page_stage or None,
+        "artifactKind": artifact_kind or None,
+        "resolvedImageReferences": resolved_image_count,
+        "rasterImageCount": len(raster_images),
+        "responsiveImageCount": responsive_image_count,
+        "lazyImageCount": lazy_image_count,
+        "eagerImageCount": eager_image_count,
+        "highPriorityImageCount": high_priority_image_count,
+        "imagePreloadCount": len(image_preload_links),
+        "fontPreloadCount": font_preload_count,
+        "originHintCount": origin_hint_count,
+        "renderOptimizationCss": bool(parser.render_optimization_style_count),
+        "tailwindRuntimeRemoved": "cdn.tailwindcss.com" not in html_document.lower(),
+        "legacyIm8ScriptsRemoved": not legacy_script_srcs,
+    }
+
+
+def _run_html_deploy_optimization_validation_sync(
+    *,
+    validation_plan: dict[str, Any],
+) -> dict[str, Any] | None:
+    if validation_plan.get("render_mode") != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+        return None
+
+    candidate_release_id = str(validation_plan.get("candidate_release_id") or "").strip()
+    pages: list[dict[str, Any]] = []
+    with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+        for page in validation_plan.get("pages_to_validate", []):
+            if not isinstance(page, dict):
+                continue
+            page_url = str(page.get("url") or "").strip()
+            if not page_url:
+                continue
+            fetch_url = _html_deploy_page_fetch_url(
+                page_url=page_url,
+                candidate_release_id=candidate_release_id,
+            )
+            response = client.get(fetch_url)
+            response.raise_for_status()
+            html_document = response.text
+            parser = _HtmlDeployOptimizationParser()
+            parser.feed(html_document)
+            resolved_image_count = _assert_html_deploy_image_urls_resolve(
+                client=client,
+                page_url=fetch_url,
+                parser=parser,
+            )
+            pages.append(
+                _assert_html_deploy_optimization_markers(
+                    page=page,
+                    page_url=fetch_url,
+                    html_document=html_document,
+                    parser=parser,
+                    resolved_image_count=resolved_image_count,
+                )
+            )
+
+    return {
+        "status": "passed",
+        "candidateReleaseId": candidate_release_id or None,
+        "pages": pages,
+    }
+
+
+def _html_deploy_lighthouse_enabled(*, validation_plan: dict[str, Any]) -> bool:
+    if validation_plan.get("render_mode") != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+        return False
+    if not bool(settings.DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED):
+        return False
+    return bool(str(validation_plan.get("candidate_release_id") or "").strip())
+
+
+def _html_deploy_lighthouse_threshold(*, profile: str) -> float:
+    normalized_profile = str(profile or "").strip().lower()
+    if normalized_profile == "desktop":
+        return float(settings.DEPLOY_HTML_DEPLOY_LIGHTHOUSE_DESKTOP_MIN_SCORE)
+    if normalized_profile == "mobile":
+        return float(settings.DEPLOY_HTML_DEPLOY_LIGHTHOUSE_MOBILE_MIN_SCORE)
+    raise DeployError(f"Unsupported Lighthouse validation profile '{profile}'.")
+
+
+def _normalize_lighthouse_score(score: Any) -> float:
+    try:
+        value = float(score)
+    except (TypeError, ValueError) as exc:
+        raise DeployError("HTML deploy Lighthouse validation failed: missing performance score.") from exc
+    if value <= 1.0:
+        return value * 100.0
+    return value
+
+
+def _html_deploy_lighthouse_urls(*, validation_plan: dict[str, Any]) -> list[str]:
+    candidate_release_id = str(validation_plan.get("candidate_release_id") or "").strip()
+    query_params: dict[str, str] = {}
+    if candidate_release_id:
+        query_params[_HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM] = (
+            _validate_html_deploy_candidate_release_id(candidate_release_id)
+        )
+
+    urls: list[str] = []
+    seen: set[str] = set()
+    for page in validation_plan.get("pages_to_validate", []):
+        if not isinstance(page, dict):
+            continue
+        page_url = str(page.get("url") or "").strip()
+        if not page_url:
+            continue
+        audit_url = _append_url_query_params(page_url, query_params) if query_params else page_url
+        if audit_url in seen:
+            continue
+        seen.add(audit_url)
+        urls.append(audit_url)
+    return urls
+
+
+def _extract_lighthouse_audit_summary(*, report: dict[str, Any]) -> dict[str, Any]:
+    audits = report.get("audits") if isinstance(report.get("audits"), dict) else {}
+    summary: dict[str, Any] = {}
+    for audit_id in (
+        "first-contentful-paint",
+        "largest-contentful-paint",
+        "speed-index",
+        "total-blocking-time",
+        "cumulative-layout-shift",
+    ):
+        audit = audits.get(audit_id) if isinstance(audits, dict) else None
+        if not isinstance(audit, dict):
+            continue
+        summary[audit_id] = {
+            "score": audit.get("score"),
+            "numericValue": audit.get("numericValue"),
+            "displayValue": audit.get("displayValue"),
+        }
+    return summary
+
+
+def _run_single_html_deploy_lighthouse_audit(*, url: str, profile: str) -> dict[str, Any]:
+    command = shlex.split(str(settings.DEPLOY_HTML_DEPLOY_LIGHTHOUSE_COMMAND or "").strip())
+    if not command:
+        raise DeployError(
+            "HTML deploy Lighthouse validation requires DEPLOY_HTML_DEPLOY_LIGHTHOUSE_COMMAND."
+        )
+    normalized_profile = str(profile or "").strip().lower()
+    if normalized_profile not in {"mobile", "desktop"}:
+        raise DeployError(f"Unsupported Lighthouse validation profile '{profile}'.")
+
+    threshold = _html_deploy_lighthouse_threshold(profile=normalized_profile)
+    timeout_seconds = max(1.0, float(settings.DEPLOY_HTML_DEPLOY_LIGHTHOUSE_TIMEOUT_SECONDS))
+    with tempfile.TemporaryDirectory(prefix="mos-html-deploy-lighthouse-") as tmp_dir:
+        report_path = Path(tmp_dir) / f"{normalized_profile}.json"
+        args = [
+            *command,
+            url,
+            "--quiet",
+            "--output=json",
+            f"--output-path={report_path}",
+            "--only-categories=performance",
+            "--chrome-flags=--headless=new --no-sandbox --disable-dev-shm-usage",
+        ]
+        if normalized_profile == "desktop":
+            args.append("--preset=desktop")
+        try:
+            completed = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise DeployError(
+                "HTML deploy Lighthouse validation failed: command "
+                f"'{command[0]}' was not found. Install Lighthouse or set "
+                "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_COMMAND to the exact executable."
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise DeployError(
+                "HTML deploy Lighthouse validation failed: command timed out after "
+                f"{timeout_seconds:.1f}s for {normalized_profile} audit of '{url}'."
+            ) from exc
+        if completed.returncode != 0:
+            output = "\n".join(
+                part.strip()
+                for part in (completed.stdout, completed.stderr)
+                if str(part or "").strip()
+            )
+            raise DeployError(
+                "HTML deploy Lighthouse validation failed for "
+                f"{normalized_profile} audit of '{url}' with exit code {completed.returncode}: "
+                f"{output[-2000:]}"
+            )
+        if not report_path.is_file():
+            raise DeployError(
+                "HTML deploy Lighthouse validation failed: Lighthouse did not write a JSON report "
+                f"for {normalized_profile} audit of '{url}'."
+            )
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise DeployError(
+                "HTML deploy Lighthouse validation failed: Lighthouse wrote invalid JSON "
+                f"for {normalized_profile} audit of '{url}'."
+            ) from exc
+
+    categories = report.get("categories") if isinstance(report, dict) else {}
+    performance = (
+        categories.get("performance")
+        if isinstance(categories, dict) and isinstance(categories.get("performance"), dict)
+        else {}
+    )
+    score = _normalize_lighthouse_score(performance.get("score"))
+    result = {
+        "url": url,
+        "profile": normalized_profile,
+        "performanceScore": round(score, 2),
+        "minimumScore": threshold,
+        "audits": _extract_lighthouse_audit_summary(report=report),
+    }
+    if score < threshold:
+        raise DeployError(
+            "HTML deploy Lighthouse validation failed for "
+            f"{normalized_profile} audit of '{url}': performance score "
+            f"{score:.2f} is below required {threshold:.2f}."
+        )
+    return result
+
+
+def _run_html_deploy_lighthouse_validation_sync(
+    *,
+    validation_plan: dict[str, Any],
+) -> dict[str, Any] | None:
+    if not _html_deploy_lighthouse_enabled(validation_plan=validation_plan):
+        return None
+    urls = _html_deploy_lighthouse_urls(validation_plan=validation_plan)
+    if not urls:
+        raise DeployError("HTML deploy Lighthouse validation requires at least one page URL.")
+
+    audits: list[dict[str, Any]] = []
+    for url in urls:
+        for profile in ("mobile", "desktop"):
+            audits.append(_run_single_html_deploy_lighthouse_audit(url=url, profile=profile))
+    return {
+        "status": "passed",
+        "candidateReleaseId": validation_plan.get("candidate_release_id"),
+        "thresholds": {
+            "mobile": _html_deploy_lighthouse_threshold(profile="mobile"),
+            "desktop": _html_deploy_lighthouse_threshold(profile="desktop"),
+        },
+        "audits": audits,
+    }
+
+
 def _assert_event_multiset_contains(*, observed: list[str], expected: list[str], label: str) -> None:
     expected_counts: dict[str, int] = {}
     observed_counts: dict[str, int] = {}
@@ -4772,8 +5265,16 @@ async def _run_funnel_tracking_post_deploy_validation(
         render_mode=render_mode,
         candidate_release_id=candidate_release_id,
     )
+    optimization_validation = await asyncio.to_thread(
+        _run_html_deploy_optimization_validation_sync,
+        validation_plan=validation_plan,
+    )
     path_results = await asyncio.to_thread(
         _run_funnel_tracking_post_deploy_validation_sync,
+        validation_plan=validation_plan,
+    )
+    lighthouse_validation = await asyncio.to_thread(
+        _run_html_deploy_lighthouse_validation_sync,
         validation_plan=validation_plan,
     )
     expected_internal_events: list[str] = []
@@ -4799,6 +5300,8 @@ async def _run_funnel_tracking_post_deploy_validation(
         "candidateReleaseId": validation_plan.get("candidate_release_id"),
         "validatedPageUrls": [page["url"] for page in validation_plan["pages_to_validate"]],
         "validatedPaths": path_results,
+        "optimizationValidation": optimization_validation,
+        "lighthouseValidation": lighthouse_validation,
         "checkoutValidated": bool(validation_plan["checkout_validated"]),
         "expectedInternalEvents": expected_internal_events,
         "expectedMetaEvents": expected_meta_events,

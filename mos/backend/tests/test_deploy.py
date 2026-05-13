@@ -4112,6 +4112,366 @@ def test_build_funnel_tracking_validation_plan_marks_candidate_release():
     assert plan["path_plans"][0]["candidate_release_id"] == "candidate-123"
 
 
+def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatch):
+    calls: list[list[str]] = []
+
+    def _fake_run(args, **kwargs):
+        calls.append([str(arg) for arg in args])
+        output_arg = next(str(arg) for arg in args if str(arg).startswith("--output-path="))
+        output_path = Path(output_arg.split("=", 1)[1])
+        profile = "desktop" if "--preset=desktop" in args else "mobile"
+        output_path.write_text(
+            json.dumps(
+                {
+                    "categories": {
+                        "performance": {"score": 0.91 if profile == "mobile" else 0.93}
+                    },
+                    "audits": {
+                        "largest-contentful-paint": {
+                            "score": 0.9,
+                            "numericValue": 1800,
+                            "displayValue": "1.8 s",
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return deploy_service.subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED", True)
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_COMMAND",
+        "lighthouse",
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_MOBILE_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_DESKTOP_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
+
+    result = deploy_service._run_html_deploy_lighthouse_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [
+                {"url": "https://shop.example.com/listicle/"},
+                {"url": "https://shop.example.com/sales-page/"},
+            ],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "passed"
+    assert result["thresholds"] == {"mobile": 85.0, "desktop": 85.0}
+    assert [audit["profile"] for audit in result["audits"]] == [
+        "mobile",
+        "desktop",
+        "mobile",
+        "desktop",
+    ]
+    assert all(
+        "mos_deploy_candidate_release=candidate-123" in audit["url"]
+        for audit in result["audits"]
+    )
+    assert len(calls) == 4
+    assert any("--preset=desktop" in call for call in calls)
+
+
+def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch):
+    def _fake_run(args, **kwargs):
+        output_arg = next(str(arg) for arg in args if str(arg).startswith("--output-path="))
+        output_path = Path(output_arg.split("=", 1)[1])
+        profile = "desktop" if "--preset=desktop" in args else "mobile"
+        output_path.write_text(
+            json.dumps(
+                {
+                    "categories": {
+                        "performance": {"score": 0.9 if profile == "desktop" else 0.84}
+                    },
+                    "audits": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return deploy_service.subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED", True)
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_COMMAND",
+        "lighthouse",
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_MOBILE_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_DESKTOP_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
+
+    with pytest.raises(deploy_service.DeployError, match="below required 85.00"):
+        deploy_service._run_html_deploy_lighthouse_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [{"url": "https://shop.example.com/sales-page/"}],
+            }
+        )
+
+
+class _HtmlDeployOptimizationFakeResponse:
+    def __init__(
+        self,
+        *,
+        text: str = "",
+        status_code: int = 200,
+        content_type: str = "text/html; charset=utf-8",
+    ) -> None:
+        self.text = text
+        self.status_code = status_code
+        self.headers = {"content-type": content_type}
+        self.request = deploy_service.httpx.Request("GET", "https://shop.example.com/")
+        self.response = deploy_service.httpx.Response(status_code, request=self.request)
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise deploy_service.httpx.HTTPStatusError(
+                "request failed",
+                request=self.request,
+                response=self.response,
+            )
+
+
+def _optimized_html_fixture() -> str:
+    return """
+<!doctype html>
+<html>
+  <head>
+    <style data-mos-render-optimization="true">body{margin:0}</style>
+    <link rel="preconnect" href="https://cdn.example.com">
+    <link rel="preload" as="font" href="/assets/font.woff2" data-mos-font-preload="true">
+    <link
+      rel="preload"
+      as="image"
+      href="/assets/hero-1200w.webp"
+      imagesrcset="/assets/hero-800w.webp 800w, /assets/hero-1200w.webp 1200w"
+      fetchpriority="high"
+    >
+  </head>
+  <body>
+    <picture>
+      <source
+        srcset="/assets/hero-800w.webp 800w, /assets/hero-1200w.webp 1200w"
+        type="image/webp"
+      >
+      <img
+        src="/assets/hero-1200w.webp"
+        srcset="/assets/hero-800w.webp 800w, /assets/hero-1200w.webp 1200w"
+        loading="eager"
+        decoding="async"
+        fetchpriority="high"
+      >
+    </picture>
+    <img
+      src="/assets/section.webp"
+      srcset="/assets/section-800w.webp 800w"
+      loading="lazy"
+      decoding="async"
+      fetchpriority="low"
+    >
+  </body>
+</html>
+"""
+
+
+def test_run_html_deploy_optimization_validation_checks_candidate_pages(monkeypatch):
+    requested_urls: list[str] = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            requested_urls.append(str(url))
+            if "/assets/" in str(url):
+                return _HtmlDeployOptimizationFakeResponse(content_type="image/webp")
+            return _HtmlDeployOptimizationFakeResponse(text=_optimized_html_fixture())
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    result = deploy_service._run_html_deploy_optimization_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [
+                {
+                    "url": "https://shop.example.com/listicle/",
+                    "stage": "pre_sales",
+                    "html_artifact_kind": "listicle",
+                },
+                {
+                    "url": "https://shop.example.com/sales-page/",
+                    "stage": "sales",
+                    "html_artifact_kind": "sales",
+                },
+            ],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "passed"
+    assert result["candidateReleaseId"] == "candidate-123"
+    assert len(result["pages"]) == 2
+    assert result["pages"][0]["renderOptimizationCss"] is True
+    assert result["pages"][0]["tailwindRuntimeRemoved"] is True
+    assert result["pages"][0]["legacyIm8ScriptsRemoved"] is True
+    assert result["pages"][0]["rasterImageCount"] == 2
+    assert result["pages"][0]["responsiveImageCount"] >= 2
+    assert result["pages"][0]["lazyImageCount"] == 1
+    assert result["pages"][0]["highPriorityImageCount"] == 1
+    assert result["pages"][0]["imagePreloadCount"] == 1
+    assert result["pages"][0]["fontPreloadCount"] == 1
+    page_requests = [url for url in requested_urls if "/assets/" not in url]
+    assert all("mos_deploy_candidate_release=candidate-123" in url for url in page_requests)
+
+
+def test_run_html_deploy_optimization_validation_fails_without_render_marker(monkeypatch):
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            return _HtmlDeployOptimizationFakeResponse(
+                text="<!doctype html><html><body>No optimization markers</body></html>"
+            )
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    with pytest.raises(deploy_service.DeployError, match="missing data-mos-render-optimization"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [
+                    {
+                        "url": "https://shop.example.com/sales-page/",
+                        "stage": "sales",
+                        "html_artifact_kind": "sales",
+                    }
+                ],
+            }
+        )
+
+
+def test_run_html_deploy_optimization_validation_fails_broken_image(monkeypatch):
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            if "/assets/" in str(url):
+                return _HtmlDeployOptimizationFakeResponse(
+                    status_code=404,
+                    content_type="text/html",
+                )
+            return _HtmlDeployOptimizationFakeResponse(text=_optimized_html_fixture())
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    with pytest.raises(deploy_service.DeployError, match="image assets did not resolve"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [
+                    {
+                        "url": "https://shop.example.com/listicle/",
+                        "stage": "pre_sales",
+                        "html_artifact_kind": "listicle",
+                    }
+                ],
+            }
+        )
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_tracking_post_deploy_validation_includes_lighthouse_report(monkeypatch):
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_funnel_tracking_post_deploy_validation_sync",
+        lambda *, validation_plan: [{"validationId": "deploy-validation-123"}],
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_html_deploy_optimization_validation_sync",
+        lambda *, validation_plan: {
+            "status": "passed",
+            "candidateReleaseId": validation_plan.get("candidate_release_id"),
+            "pages": [],
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_html_deploy_lighthouse_validation_sync",
+        lambda *, validation_plan: {
+            "status": "passed",
+            "candidateReleaseId": validation_plan.get("candidate_release_id"),
+            "audits": [],
+        },
+    )
+
+    result = await deploy_service._run_funnel_tracking_post_deploy_validation(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+        candidate_release_id="candidate-123",
+    )
+
+    assert result["candidateReleaseId"] == "candidate-123"
+    assert result["optimizationValidation"] == {
+        "status": "passed",
+        "candidateReleaseId": "candidate-123",
+        "pages": [],
+    }
+    assert result["lighthouseValidation"] == {
+        "status": "passed",
+        "candidateReleaseId": "candidate-123",
+        "audits": [],
+    }
+
+
 def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
     plan = deploy_service._build_funnel_tracking_validation_plan(
         artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
