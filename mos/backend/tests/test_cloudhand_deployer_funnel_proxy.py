@@ -897,6 +897,16 @@ def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle():
     assert "SalesToCheckoutClick" in entry_html
     assert "internal_event_type" in entry_html
     assert "content_category" in entry_html
+    assert "resolvePresaleBridgeContext" in entry_html
+    assert "source_page_type" in entry_html
+    assert "quiz_presell" in entry_html
+    assert "listical_presell" in entry_html
+    assert "session_id" in entry_html
+    assert "visitor_id" in entry_html
+    assert "click_id" in entry_html
+    assert "rmbcSessionId" not in entry_html
+    assert "rmbcAnonymousId" not in entry_html
+    assert "rmbcClickId" not in entry_html
     assert "https://connect.facebook.net/en_US/fbevents.js" in entry_html
     assert "/__mos/meta/fbevents.js" not in entry_html
     assert 'window.fbq("init", pixelId' in entry_html
@@ -921,6 +931,241 @@ def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle():
     assert runtime_page_path not in uploaded
 
 
+def test_html_deploy_attaches_production_analytics_harness_for_listicle_quiz_and_sales():
+    tracking = {
+        "provider": "meta",
+        "mode": "public_funnel_runtime",
+        "metaPixelId": "pixel-123",
+        "posthogProjectApiKey": "phc_test_123",
+        "posthogApiHost": "https://ten.shoptenorco.com",
+        "posthogUiHost": "https://us.posthog.com",
+        "posthogDefaults": "2026-01-30",
+        "posthogPersonProfiles": "identified_only",
+    }
+    page_map = {
+        "page-listicle": "listicle",
+        "page-quiz": "quiz",
+        "page-sales": "sales-page",
+    }
+    page_stage_map = {
+        "page-listicle": "pre_sales",
+        "page-quiz": "pre_sales",
+        "page-sales": "sales",
+    }
+
+    def imported_html_page(
+        *,
+        page_id: str,
+        slug: str,
+        stage: str,
+        artifact_kind: str,
+        html_document: str,
+        manifest_overrides: dict,
+    ) -> dict:
+        manifest = {
+            "schemaVersion": "html-deploy-v1",
+            "htmlArtifactKind": artifact_kind,
+            "pageStage": stage,
+            **manifest_overrides,
+        }
+        return {
+            "funnelId": "funnel-1",
+            "funnelSlug": "example-funnel",
+            "productSlug": "example-product",
+            "publicationId": "pub-1",
+            "pageId": page_id,
+            "slug": slug,
+            "stage": stage,
+            "pageMap": page_map,
+            "pageStageMap": page_stage_map,
+            "tracking": tracking,
+            "puckData": {
+                "root": {"props": {"title": slug}},
+                "content": [
+                    {
+                        "type": "ImportedHtmlDocument",
+                        "props": {
+                            "id": f"{slug}-imported-html",
+                            "title": slug,
+                            "sourceLabel": f"{slug}.html",
+                            "htmlDocument": html_document,
+                            "instrumentationManifest": manifest,
+                        },
+                    }
+                ],
+                "zones": {},
+            },
+        }
+
+    listicle_page = imported_html_page(
+        page_id="page-listicle",
+        slug="listicle",
+        stage="pre_sales",
+        artifact_kind="listicle",
+        html_document="""<!DOCTYPE html><html><head><title>Listicle</title></head><body>
+<main><section id="intro">Intro</section><section id="proof">Proof</section>
+<a id="listicle-to-sales" href="/example-product/example-funnel/sales-page/">Continue</a></main>
+</body></html>""",
+        manifest_overrides={
+            "sections": [{"id": "intro", "selector": "#intro"}],
+            "proofs": [{"id": "proof", "selector": "#proof"}],
+            "ctas": [{"id": "listicle-to-sales", "selector": "#listicle-to-sales"}],
+            "bindings": [
+                {
+                    "id": "listicle-to-sales",
+                    "type": "internal_navigation",
+                    "selector": "#listicle-to-sales",
+                    "targetPageId": "page-sales",
+                    "trackEventType": "pre_sales_to_sales_click",
+                }
+            ],
+        },
+    )
+    quiz_page = imported_html_page(
+        page_id="page-quiz",
+        slug="quiz",
+        stage="pre_sales",
+        artifact_kind="quiz",
+        html_document="""<!DOCTYPE html><html><head><title>Quiz</title></head><body>
+<main><section id="quiz-lead">Lead</section><section id="question-1">Question</section>
+<button id="option-1" type="button">Option</button><section id="result-1">Result</section>
+<section id="recommendation-1">Recommendation</section>
+<a id="quiz-to-sales" href="/example-product/example-funnel/sales-page/">Continue</a></main>
+</body></html>""",
+        manifest_overrides={
+            "quizId": "daily-drive-quiz",
+            "quizVersion": "v1",
+            "quizVariant": "control",
+            "quizLeads": [{"id": "lead", "selector": "#quiz-lead"}],
+            "quizQuestions": [{"id": "q1", "selector": "#question-1", "questionIndex": 1}],
+            "quizOptions": [
+                {
+                    "id": "a1",
+                    "selector": "#option-1",
+                    "questionId": "q1",
+                    "questionIndex": 1,
+                }
+            ],
+            "quizResults": [{"id": "result-1", "selector": "#result-1"}],
+            "quizRecommendations": [{"id": "recommendation-1", "selector": "#recommendation-1"}],
+            "ctas": [{"id": "quiz-to-sales", "selector": "#quiz-to-sales"}],
+            "bindings": [
+                {
+                    "id": "quiz-to-sales",
+                    "type": "internal_navigation",
+                    "selector": "#quiz-to-sales",
+                    "targetPageId": "page-sales",
+                    "trackEventType": "pre_sales_to_sales_click",
+                }
+            ],
+        },
+    )
+    sales_page = imported_html_page(
+        page_id="page-sales",
+        slug="sales-page",
+        stage="sales",
+        artifact_kind="sales",
+        html_document="""<!DOCTYPE html><html><head><title>Sales</title></head><body>
+<main><section id="offer">Offer</section><a id="checkout" href="#checkout">Checkout</a></main>
+</body></html>""",
+        manifest_overrides={
+            "sections": [{"id": "offer", "selector": "#offer"}],
+            "bindings": [
+                {
+                    "id": "primary-checkout",
+                    "type": "checkout",
+                    "selector": "#checkout",
+                    "trackEventType": "sales_to_checkout_click",
+                    "checkout": {
+                        "mode": "public_checkout",
+                        "variantResolver": {"type": "fixed", "variantId": "variant-1"},
+                    },
+                }
+            ],
+        },
+    )
+
+    app = _artifact_app(
+        render_mode="html_deploy",
+        html_document="<html><body>placeholder</body></html>",
+    )
+    funnel = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel["meta"]["entrySlug"] = "listicle"
+    funnel["meta"]["pages"] = [
+        {"pageId": "page-listicle", "slug": "listicle"},
+        {"pageId": "page-quiz", "slug": "quiz"},
+        {"pageId": "page-sales", "slug": "sales-page"},
+    ]
+    funnel["pages"] = {
+        "listicle": listicle_page,
+        "quiz": quiz_page,
+        "sales-page": sales_page,
+    }
+
+    deployer, uploaded, _commands = _stub_deployer()
+    deployer._configure_funnel_artifact_site(app)
+
+    def extract_config(html_document: str) -> dict:
+        match = re.search(
+            r"const config = (\{.*?\});\s*const META_PIXEL_SCRIPT_ID",
+            html_document,
+            flags=re.DOTALL,
+        )
+        assert match is not None
+        return json.loads(match.group(1))
+
+    route_html = {
+        "listicle": uploaded["/opt/apps/landing-artifact/site/example-product/example-funnel/listicle/index.html"],
+        "quiz": uploaded["/opt/apps/landing-artifact/site/example-product/example-funnel/quiz/index.html"],
+        "sales": uploaded["/opt/apps/landing-artifact/site/example-product/example-funnel/sales-page/index.html"],
+    }
+    expected = {
+        "listicle": ("listicle", "pre_sales", ["EnteredPresales", "PreSalesToSalesClick", "presell_page_view"]),
+        "quiz": (
+            "quiz",
+            "pre_sales",
+            ["EnteredPresales", "PreSalesToSalesClick", "QuizCompleted", "QuizCtaViewed"],
+        ),
+        "sales": ("sales", "sales", ["EnteredSales", "SalesToCheckoutClick", "sales_page_view"]),
+    }
+
+    for page_name, html_document in route_html.items():
+        artifact_kind, page_stage, required_tokens = expected[page_name]
+        config = extract_config(html_document)
+        assert "MOS_HTML_DEPLOY_BRIDGE_START" in html_document
+        assert config["htmlDeploySchemaVersion"] == "html-deploy-v1"
+        assert config["htmlArtifactKind"] == artifact_kind
+        assert config["pageStage"] == page_stage
+        assert config["tracking"]["metaPixelId"] == "pixel-123"
+        assert config["tracking"]["posthogProjectApiKey"] == "phc_test_123"
+        assert config["tracking"]["posthogApiHost"] == "https://ten.shoptenorco.com"
+        assert config["tracking"]["posthogUiHost"] == "https://us.posthog.com"
+        assert "window.posthog.init(" in html_document
+        assert "capture_pageview: true" in html_document
+        assert "capture_pageleave: true" in html_document
+        assert "posthog.capture(capture.eventName, {" in html_document
+        assert "https://connect.facebook.net/en_US/fbevents.js" in html_document
+        assert 'window.fbq("init", pixelId' in html_document
+        assert "event_source_url" in html_document
+        assert "session_id" in html_document
+        assert "visitor_id" in html_document
+        assert "click_id" in html_document
+        assert "source_page_type" in html_document
+        assert "from_stage" in html_document
+        assert "to_stage" in html_document
+        assert "rmbcSessionId" not in html_document
+        assert "rmbcAnonymousId" not in html_document
+        assert "rmbcClickId" not in html_document
+        for token in required_tokens:
+            assert token in html_document
+
+    assert route_html["listicle"] == uploaded["/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"]
+    assert "/example-product/example-funnel/sales-page/" in route_html["listicle"]
+    assert "/example-product/example-funnel/sales-page/" in route_html["quiz"]
+    assert "resolvePresaleSourcePageType(config.htmlArtifactKind)" in route_html["listicle"]
+    assert "resolvePresaleSourcePageType(config.htmlArtifactKind)" in route_html["quiz"]
+
+
 def test_funnel_artifact_site_standalone_builds_release_before_live_activation():
     html_document = """<!DOCTYPE html>
 <html>
@@ -939,6 +1184,52 @@ def test_funnel_artifact_site_standalone_builds_release_before_live_activation()
     assert any(cmd.startswith("mkdir -p /opt/apps/landing-artifact/site-releases/") for cmd in commands)
     assert any("ln -sfn " in cmd and "/opt/apps/landing-artifact/site.__next__" in cmd for cmd in commands)
     assert any("mv -Tf \"$next_link\" \"$live_site\"" in cmd for cmd in commands)
+
+
+def test_funnel_artifact_site_standalone_can_defer_activation_for_candidate_validation():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head><title>Standalone Sales</title></head>
+  <body><a id="main-cta" href="#shop">Start</a></body>
+</html>
+"""
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    app.source_ref.release_metadata = {
+        "htmlDeployActivationMode": "candidate_only",
+        "htmlDeployCandidateReleaseId": "candidate-123",
+    }
+    deployer, uploaded, commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert "/__mos/html-deploy-candidates/" in conf
+    assert "root /opt/apps/landing-artifact/site-releases;" in conf
+    assert "$arg_mos_deploy_candidate_release" in conf
+    assert "$cookie_mos_deploy_candidate_release" in conf
+    assert 'Set-Cookie "mos_deploy_candidate_release=$mos_candidate_release; Path=/; SameSite=Lax"' in conf
+    assert 'try_files $mos_candidate_asset_prefix$uri /site$uri =404;' in conf
+    assert "X-Robots-Tag \"noindex, nofollow, noarchive\"" in conf
+    assert any(
+        cmd.startswith("mkdir -p /opt/apps/landing-artifact/site-releases/candidate-123")
+        for cmd in commands
+    )
+    assert not any("mv -Tf \"$next_link\" \"$live_site\"" in cmd for cmd in commands)
+
+
+def test_activate_funnel_artifact_candidate_release_promotes_named_release():
+    deployer, _uploaded, commands = _stub_deployer()
+
+    deployer.activate_funnel_artifact_candidate_release(
+        app_name="landing-artifact",
+        destination_path="/opt/apps",
+        release_id="candidate-123",
+    )
+
+    activation_command = "\n".join(commands)
+    assert "built_site=/opt/apps/landing-artifact/site-releases/candidate-123" in activation_command
+    assert "live_site=/opt/apps/landing-artifact/site" in activation_command
+    assert "mv -Tf \"$next_link\" \"$live_site\"" in activation_command
 
 
 def test_html_deploy_rewrites_upstream_public_asset_urls_to_artifact_assets(monkeypatch):

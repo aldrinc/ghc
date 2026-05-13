@@ -932,7 +932,7 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(injectedDocument).toContain('src="/gallery.jpg" alt="Gallery" loading="lazy" decoding="async" fetchpriority="low"');
   });
 
-  it("tracks ViewContent for direct standalone sales pages", async () => {
+  it("tracks sales-entry events for direct standalone sales page loads", async () => {
     const { injectedDocument } = await captureInjectedDocument({
       htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
       page: {
@@ -979,6 +979,12 @@ describe("StandaloneImportedHtmlPage", () => {
           expect.objectContaining({ eventID: expect.any(String) }),
         ],
         [
+          "trackCustom",
+          "EnteredSales",
+          expect.objectContaining({ page_stage: "sales", external_id: "visitor-1" }),
+          expect.objectContaining({ eventID: expect.any(String) }),
+        ],
+        [
           "track",
           "ViewContent",
           expect.objectContaining({ page_stage: "sales", external_id: "visitor-1" }),
@@ -986,7 +992,6 @@ describe("StandaloneImportedHtmlPage", () => {
         ],
       ]),
     );
-    expect(fbqQueue.some((entry) => entry[0] === "trackCustom" && entry[1] === "EnteredSales")).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/public/events"),
       expect.objectContaining({ method: "POST" }),
@@ -1068,7 +1073,7 @@ describe("StandaloneImportedHtmlPage", () => {
     dom.window.close();
   });
 
-  it("tracks EnteredSales for presale-attributed standalone sales pages", async () => {
+  it("tracks EnteredSales for presale-attributed standalone sales page loads", async () => {
     const { injectedDocument } = await captureInjectedDocument({
       htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
       page: {
@@ -1124,9 +1129,14 @@ describe("StandaloneImportedHtmlPage", () => {
           expect.objectContaining({ page_stage: "sales", external_id: "visitor-1" }),
           expect.objectContaining({ eventID: expect.any(String) }),
         ],
+        [
+          "track",
+          "ViewContent",
+          expect.objectContaining({ page_stage: "sales", external_id: "visitor-1" }),
+          expect.objectContaining({ eventID: expect.any(String) }),
+        ],
       ]),
     );
-    expect(fbqQueue.some((entry) => entry[0] === "track" && entry[1] === "ViewContent")).toBe(false);
     expect(eventBodies[0]).toEqual(
       expect.objectContaining({
         events: [
@@ -1267,6 +1277,37 @@ describe("StandaloneImportedHtmlPage", () => {
               content_category: "sales_page",
               from_presale: false,
               meta_event_name: "PageView",
+              meta_event_id: expect.any(String),
+              action_source: "website",
+              fbp: "fb.1.1710000000.browser",
+              fbc: "fb.1.1710000001.fb-click-456",
+              fbclid: "fb-click-456",
+              event_source_url: expect.stringContaining("fbclid=fb-click-456"),
+              $event_id: expect.any(String),
+              utm: {
+                utm_campaign: "test",
+                utm_source: "meta",
+              },
+            }),
+          ],
+          [
+            "capture",
+            "EnteredSales",
+            expect.objectContaining({
+              productSlug: "example-product",
+              funnelSlug: "example-funnel",
+              publicationId: "publication-1",
+              pageId: "page-1",
+              pageSlug: "sales-page",
+              pageStage: "sales",
+              page_stage: "sales",
+              visitorId: "visitor-1",
+              external_id: "visitor-1",
+              sessionId: "session-1",
+              internal_event_type: "sales_page_view",
+              content_category: "sales_page",
+              from_presale: false,
+              meta_event_name: "EnteredSales",
               meta_event_id: expect.any(String),
               action_source: "website",
               fbp: "fb.1.1710000000.browser",
@@ -1508,12 +1549,27 @@ describe("StandaloneImportedHtmlPage", () => {
             cta_id: "primary-cta",
             ctaPosition: 1,
             cta_position: 1,
-            destinationUrl: expect.stringContaining("/sales-page"),
-            destination_url: expect.stringContaining("/sales-page"),
+            destinationUrl: expect.stringMatching(
+              /\/sales-page\?.*rmbc_session_id=session-1.*rmbc_anonymous_id=visitor-1.*rmbc_click_id=/,
+            ),
+            destination_url: expect.stringMatching(
+              /\/sales-page\?.*rmbc_session_id=session-1.*rmbc_anonymous_id=visitor-1.*rmbc_click_id=/,
+            ),
+            clickId: expect.stringMatching(/^click_publication-1_page-1_primary-cta_1_/),
+            click_id: expect.stringMatching(/^click_publication-1_page-1_primary-cta_1_/),
+            clickIdType: "rmbc_click_id",
+            click_id_type: "rmbc_click_id",
+            rmbcClickId: expect.stringMatching(/^click_publication-1_page-1_primary-cta_1_/),
+            rmbc_click_id: expect.stringMatching(/^click_publication-1_page-1_primary-cta_1_/),
           }),
         ],
       ]),
     );
+    const capturedNames = (posthogRoot.mosFunnel || [])
+      .filter((entry): entry is unknown[] => Array.isArray(entry) && entry[0] === "capture")
+      .map((entry) => entry[1]);
+    expect(capturedNames).not.toContain("EnteredSales");
+    expect(capturedNames).not.toContain("Entered Sales Page");
 
     dom.window.close();
   });

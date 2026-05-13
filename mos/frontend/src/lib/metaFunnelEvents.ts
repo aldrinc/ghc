@@ -80,10 +80,6 @@ function pageViewParams(event: RuntimeTrackingEventLike) {
   return pageStage ? { page_stage: pageStage } : undefined;
 }
 
-function isFromPresale(event: RuntimeTrackingEvent): boolean {
-  return event.props?.fromPresale === true;
-}
-
 function checkoutParams(event: RuntimeTrackingEvent) {
   const params: Record<string, unknown> = {
     content_type: "product",
@@ -116,16 +112,8 @@ export function mapRuntimeEventToMetaPixelEvents(
     return [
       { eventName: "PageView", params: pageViewParams(event) },
       { eventName: "Entered Sales Page", method: "trackCustom", params: pageViewParams(event) },
-      isFromPresale(event)
-        ? {
-            eventName: "EnteredSales",
-            method: "trackCustom",
-            params: pageViewParams(event),
-          }
-        : {
-            eventName: "ViewContent",
-            params: pageViewParams(event),
-          },
+      { eventName: "EnteredSales", method: "trackCustom", params: pageViewParams(event) },
+      { eventName: "ViewContent", params: pageViewParams(event) },
     ];
   }
   if (event.eventType === "checkout_page_view") {
@@ -145,6 +133,9 @@ export function mapRuntimeEventToMetaPixelEvents(
         },
       },
     ];
+  }
+  if (event.eventType === "add_to_cart") {
+    return [{ eventName: "AddToCart", params: checkoutParams(event as RuntimeTrackingEvent) }];
   }
   if (event.eventType === "sales_to_checkout_click") {
     const variantId =

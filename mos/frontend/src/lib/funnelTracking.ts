@@ -8,6 +8,8 @@ export type RuntimeTrackingEvent =
   | { eventType: "thank_you_page_view"; props?: Record<string, unknown> }
   | { eventType: "custom_page_view"; props?: Record<string, unknown> }
   | { eventType: "pre_sales_to_sales_click"; props?: Record<string, unknown> }
+  | { eventType: "add_to_cart"; props?: Record<string, unknown> }
+  | { eventType: "purchase_intent_click"; props?: Record<string, unknown> }
   | { eventType: "sales_to_checkout_click"; props?: Record<string, unknown> }
   | { eventType: "checkout_started"; props?: Record<string, unknown> }
   | { eventType: "checkout_click"; props?: Record<string, unknown> }

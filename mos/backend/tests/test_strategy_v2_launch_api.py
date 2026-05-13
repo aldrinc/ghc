@@ -3,8 +3,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from uuid import uuid4
 
-import pytest
-
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum, WorkflowKindEnum, WorkflowStatusEnum
 from app.db.models import Asset, Artifact, Campaign, Client, Product, ResearchArtifact, StrategyV2Launch, WorkflowRun
 from app.routers import workflows as workflows_router
@@ -459,7 +457,7 @@ def test_launch_angle_campaign_rejects_unsupported_asset_brief_types(api_client,
     )
 
     assert response.status_code == 422, response.text
-    assert "Supported values: image, video." in response.text
+    assert "Supported values: image, animated_image, video." in response.text
 
 
 def test_launch_source_context_resolves_canonical_run_for_continued_execution(db_session, monkeypatch):

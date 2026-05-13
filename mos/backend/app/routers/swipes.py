@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from PIL import Image
 from sqlalchemy import select
@@ -19,8 +19,8 @@ from app.config import settings
 from app.db.deps import get_session
 from app.db.models import Campaign, SwipeCollectionItem, WorkflowRun
 from app.db.repositories.gethookd import GetHookdSyncRunsRepository
+from app.db.repositories.animated_templates import AnimatedTemplatesRepository
 from app.db.repositories.swipes import (
-    GETHOOKD_INBOX_COLLECTION_KIND,
     GETHOOKD_ORIGIN_SYSTEM,
     GETHOOKD_REVIEW_STATUS_PENDING,
     WRITABLE_SWIPE_COLLECTION_KINDS,
@@ -31,8 +31,21 @@ from app.db.repositories.swipes import (
 )
 from app.schemas.gethookd import SwipeReviewBulkRequest
 from app.db.repositories.workflows import WorkflowsRepository
+from app.schemas.asset_brief_types import normalize_asset_brief_type
+from app.schemas.animated_templates import (
+    AnimatedTemplateAiRegionPromptResponse,
+    AnimatedTemplateAnalyzeRequest,
+    AnimatedTemplateCostEstimateResponse,
+    AnimatedTemplateManifestApprovalRequest,
+    AnimatedTemplateManifestCreateRequest,
+    AnimatedTemplateManifestRejectRequest,
+    AnimatedTemplateManifestResponse,
+    AnimatedTemplateManifestUpdateRequest,
+    AnimatedTemplateRenderRequest,
+    AnimatedTemplateRenderRunResponse,
+    AnimatedTemplateWorkflowStartResponse,
+)
 from app.schemas.swipe_assets import (
-    ClientSwipeAssetModel,
     CompanySwipeAssetModel,
     CompanySwipeMediaModel,
     GetHookdInboxResponseModel,
@@ -54,10 +67,24 @@ from app.services.media_storage import (
     MediaStorage,
     MediaStorageConfigurationError,
 )
+from app.services.animated_templates.ai_region_prompt import build_ai_region_generation_prompt
+from app.services.animated_templates.manifest_validation import (
+    sha256_json,
+    summarize_manifest,
+    validate_manifest_payload,
+    validate_render_request,
+)
+from app.services.animated_templates.render_plan import build_render_plan
 from app.services.funnels import create_funnel_upload_asset
 from app.services.meta_review import clean_optional_text, load_campaign_asset_brief_map
 from app.services.template_image_workspace import TEMPLATE_IMAGE_ASSETS_DIR
 from app.temporal.client import get_temporal_client
+from app.temporal.workflows.swipe_animated_template import (
+    SwipeAnimatedTemplateAnalysisInput,
+    SwipeAnimatedTemplateAnalysisWorkflow,
+    SwipeAnimatedTemplateRenderInput,
+    SwipeAnimatedTemplateRenderWorkflow,
+)
 from app.temporal.workflows.swipe_image_ad import SwipeImageAdInput, SwipeImageAdWorkflow
 from app.temporal.workflows.swipe_taxonomy import SwipeTaxonomyInput, SwipeTaxonomyWorkflow
 
@@ -139,6 +166,99 @@ def _dedupe_review_swipes(assets: list, media_map: dict[str, list]) -> tuple[lis
             by_fingerprint[fingerprint] = asset
 
     return [by_fingerprint[fingerprint] for fingerprint in first_seen_order], duplicate_count
+
+
+def _animated_template_manifest_idempotency_key(
+    *,
+    org_id: str,
+    payload: AnimatedTemplateManifestCreateRequest,
+    manifest_sha256: str,
+) -> str:
+    source_key = payload.company_swipe_id or payload.source_url
+    return sha256_json(
+        {
+            "kind": "animated_template_manifest_create_v1",
+            "orgId": org_id,
+            "clientId": payload.client_id,
+            "productId": payload.product_id,
+            "campaignId": payload.campaign_id,
+            "companySwipeId": payload.company_swipe_id,
+            "companySwipeMediaId": payload.company_swipe_media_id,
+            "sourceKey": source_key,
+            "sourceSha256": payload.source_sha256,
+            "manifestSha256": manifest_sha256,
+            "analyzerVersion": payload.analyzer_version,
+            "supersedesManifestId": payload.supersedes_manifest_id,
+        }
+    )
+
+
+def _animated_template_render_idempotency_key(
+    *,
+    org_id: str,
+    manifest,
+    payload: AnimatedTemplateRenderRequest,
+    render_plan: dict,
+) -> str:
+    return sha256_json(
+        {
+            "kind": "animated_template_render_v1",
+            "orgId": org_id,
+            "manifestId": str(manifest.id),
+            "manifestSha256": manifest.manifest_sha256,
+            "renderRequest": payload.model_dump(mode="json", by_alias=True, exclude_none=True),
+            "renderPlan": render_plan,
+        }
+    )
+
+
+def _serialize_animated_template_manifest(manifest) -> AnimatedTemplateManifestResponse:
+    return AnimatedTemplateManifestResponse.model_validate(manifest)
+
+
+def _serialize_animated_template_render_run(
+    *,
+    run,
+    workflow_run: WorkflowRun | None,
+) -> AnimatedTemplateRenderRunResponse:
+    return AnimatedTemplateRenderRunResponse(
+        run_id=str(run.id),
+        manifest_id=str(run.manifest_id),
+        status=run.status,
+        workflow_run_id=str(workflow_run.id) if workflow_run is not None else None,
+        temporal_workflow_id=workflow_run.temporal_workflow_id if workflow_run is not None else None,
+        render_plan=run.render_plan,
+        cost_estimate=run.cost_estimate,
+        output_artifact_ids=list(run.output_artifact_ids or []),
+    )
+
+
+def _workflow_run_for_render_run(session: Session, run) -> WorkflowRun | None:
+    if not run.workflow_run_id:
+        return None
+    return session.get(WorkflowRun, run.workflow_run_id)
+
+
+def _require_company_swipe_source(
+    *,
+    repo: CompanySwipesRepository,
+    org_id: str,
+    company_swipe_id: str | None,
+    company_swipe_media_id: str | None,
+) -> None:
+    if not company_swipe_id:
+        return
+    swipe = repo.get_asset(org_id=org_id, swipe_id=company_swipe_id)
+    if swipe is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company swipe not found")
+    if not company_swipe_media_id:
+        return
+    media_items = repo.list_media(org_id=org_id, swipe_asset_id=company_swipe_id)
+    if not any(str(media.id) == company_swipe_media_id for media in media_items):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company swipe media not found",
+        )
 
 
 def _resolve_swipe_upload_content_type_or_400(file: UploadFile) -> str:
@@ -389,7 +509,7 @@ async def _start_swipe_taxonomy_analysis(
 
 
 def _normalize_requirement_format(value: str) -> str:
-    return value.strip().lower().replace("-", "_")
+    return normalize_asset_brief_type(value)
 
 
 def _require_public_asset_base_url() -> str:
@@ -542,6 +662,72 @@ async def _start_swipe_image_ad_run(
     )
 
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}
+
+
+async def _start_swipe_animated_template_analysis_run(
+    *,
+    payload: AnimatedTemplateAnalyzeRequest,
+    auth: AuthContext,
+    session: Session,
+    temporal=None,
+) -> AnimatedTemplateWorkflowStartResponse:
+    temporal_client = temporal or await get_temporal_client()
+    temporal_workflow_id = f"swipe-animated-template-analysis-{auth.org_id}-{uuid4()}"
+
+    run = WorkflowRun(
+        org_id=auth.org_id,
+        client_id=payload.client_id,
+        product_id=payload.product_id,
+        campaign_id=payload.campaign_id,
+        temporal_workflow_id=temporal_workflow_id,
+        temporal_run_id="pending",
+        kind="swipe_animated_template_analysis",
+    )
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+
+    try:
+        handle = await temporal_client.start_workflow(
+            SwipeAnimatedTemplateAnalysisWorkflow.run,
+            SwipeAnimatedTemplateAnalysisInput(
+                org_id=auth.org_id,
+                company_swipe_id=payload.company_swipe_id,
+                company_swipe_media_id=payload.company_swipe_media_id,
+                source_url=payload.source_url,
+                source_label=payload.source_label,
+                client_id=payload.client_id,
+                product_id=payload.product_id,
+                campaign_id=payload.campaign_id,
+                analyzer_version=payload.analyzer_version,
+                idempotency_key=payload.idempotency_key,
+                workflow_run_id=str(run.id),
+            ),
+            id=temporal_workflow_id,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+    except Exception as exc:  # noqa: BLE001
+        session.delete(run)
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to start animated template analysis workflow.",
+        ) from exc
+
+    run.temporal_run_id = handle.first_execution_run_id
+    session.commit()
+
+    WorkflowsRepository(session).log_activity(
+        workflow_run_id=str(run.id),
+        step="animated_template_analysis",
+        status="started",
+        payload_in=payload.model_dump(mode="json", by_alias=True),
+    )
+
+    return AnimatedTemplateWorkflowStartResponse(
+        workflow_run_id=str(run.id),
+        temporal_workflow_id=handle.id,
+    )
 
 
 @router.get("/company")
@@ -1069,6 +1255,514 @@ async def generate_image_ad_from_swipe(
       - Persists generated assets attached to the provided asset brief
     """
     return await _start_swipe_image_ad_run(payload=payload, auth=auth, session=session)
+
+
+@router.post(
+    "/animated-templates/analyze",
+    response_model=AnimatedTemplateWorkflowStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def analyze_animated_template(
+    payload: AnimatedTemplateAnalyzeRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    company_repo = CompanySwipesRepository(session)
+    _require_company_swipe_source(
+        repo=company_repo,
+        org_id=auth.org_id,
+        company_swipe_id=payload.company_swipe_id,
+        company_swipe_media_id=payload.company_swipe_media_id,
+    )
+    return await _start_swipe_animated_template_analysis_run(
+        payload=payload,
+        auth=auth,
+        session=session,
+    )
+
+
+@router.get(
+    "/animated-templates/manifests",
+    response_model=list[AnimatedTemplateManifestResponse],
+)
+def list_animated_template_manifests(
+    campaign_id: str | None = Query(None, alias="campaignId"),
+    manifest_status: str | None = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifests = repo.list_manifests(
+        org_id=auth.org_id,
+        campaign_id=campaign_id,
+        status=manifest_status,
+        limit=limit,
+        offset=offset,
+    )
+    return [_serialize_animated_template_manifest(manifest) for manifest in manifests]
+
+
+@router.post(
+    "/animated-templates/manifests",
+    response_model=AnimatedTemplateManifestResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_animated_template_manifest(
+    payload: AnimatedTemplateManifestCreateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    company_repo = CompanySwipesRepository(session)
+    _require_company_swipe_source(
+        repo=company_repo,
+        org_id=auth.org_id,
+        company_swipe_id=payload.company_swipe_id,
+        company_swipe_media_id=payload.company_swipe_media_id,
+    )
+
+    repo = AnimatedTemplatesRepository(session)
+    if payload.supersedes_manifest_id:
+        superseded = repo.get_manifest(
+            org_id=auth.org_id,
+            manifest_id=payload.supersedes_manifest_id,
+        )
+        if superseded is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Superseded manifest not found",
+            )
+        if superseded.status != "approved":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "SUPERSEDING_MANIFEST_REQUIRES_APPROVED_SOURCE",
+                    "message": "Only approved manifests can be superseded.",
+                    "status": superseded.status,
+                },
+            )
+
+    manifest_payload = payload.manifest.model_dump(by_alias=True, exclude_none=True)
+    validation = validate_manifest_payload(manifest_payload, profile="draft")
+    if validation["status"] == "invalid":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "INVALID_ANIMATED_TEMPLATE_MANIFEST", "validation": validation},
+        )
+
+    manifest_sha256 = sha256_json(manifest_payload)
+    idempotency_key = payload.idempotency_key or _animated_template_manifest_idempotency_key(
+        org_id=auth.org_id,
+        payload=payload,
+        manifest_sha256=manifest_sha256,
+    )
+
+    existing = repo.get_manifest_by_idempotency_key(
+        org_id=auth.org_id,
+        idempotency_key=idempotency_key,
+    )
+    if existing is not None:
+        return _serialize_animated_template_manifest(existing)
+
+    manifest = repo.create_manifest(
+        org_id=auth.org_id,
+        client_id=payload.client_id,
+        product_id=payload.product_id,
+        campaign_id=payload.campaign_id,
+        workflow_run_id=payload.workflow_run_id,
+        company_swipe_id=payload.company_swipe_id,
+        company_swipe_media_id=payload.company_swipe_media_id,
+        source_kind="company_swipe" if payload.company_swipe_id else "direct_url",
+        source_url=payload.source_url,
+        source_label=payload.source_label,
+        source_sha256=payload.source_sha256,
+        source_mime_type=payload.source_mime_type,
+        manifest_schema_version=payload.manifest.schema_version,
+        analyzer_version=payload.analyzer_version,
+        status="needs_review",
+        manifest=manifest_payload,
+        manifest_sha256=manifest_sha256,
+        validation=validation,
+        summary=summarize_manifest(manifest_payload),
+        idempotency_key=idempotency_key,
+        supersedes_manifest_id=payload.supersedes_manifest_id,
+    )
+    repo.create_event(
+        org_id=auth.org_id,
+        manifest_id=str(manifest.id),
+        event_type="manifest.created",
+        actor_user_id=auth.user_id,
+        payload={"validation": validation, "summary": summarize_manifest(manifest_payload)},
+    )
+    session.commit()
+    session.refresh(manifest)
+    return _serialize_animated_template_manifest(manifest)
+
+
+@router.get(
+    "/animated-templates/manifests/{manifest_id}",
+    response_model=AnimatedTemplateManifestResponse,
+)
+def get_animated_template_manifest(
+    manifest_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    return _serialize_animated_template_manifest(manifest)
+
+
+@router.patch(
+    "/animated-templates/manifests/{manifest_id}",
+    response_model=AnimatedTemplateManifestResponse,
+)
+def update_animated_template_manifest(
+    manifest_id: str,
+    payload: AnimatedTemplateManifestUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    if manifest.status == "approved":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "APPROVED_MANIFEST_UPDATE_REQUIRES_SUPERSEDING_VERSION",
+                "message": (
+                    "Approved animated template manifests cannot be edited in place. "
+                    "Create a superseding draft manifest instead."
+                ),
+            },
+        )
+    if manifest.status == "superseded":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "SUPERSEDED_MANIFEST_IS_IMMUTABLE",
+                "message": "Superseded animated template manifests cannot be edited.",
+            },
+        )
+
+    manifest_payload = payload.manifest.model_dump(by_alias=True, exclude_none=True)
+    validation = validate_manifest_payload(manifest_payload, profile="draft")
+    if validation["status"] == "invalid":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "INVALID_ANIMATED_TEMPLATE_MANIFEST", "validation": validation},
+        )
+    summary = summarize_manifest(manifest_payload)
+    manifest_sha256 = sha256_json(manifest_payload)
+    repo.update_manifest_document(
+        manifest=manifest,
+        manifest_payload=manifest_payload,
+        manifest_sha256=manifest_sha256,
+        manifest_schema_version=payload.manifest.schema_version,
+        validation=validation,
+        summary=summary,
+        actor_user_id=auth.user_id,
+        update_notes=payload.update_notes,
+    )
+    session.commit()
+    session.refresh(manifest)
+    return _serialize_animated_template_manifest(manifest)
+
+
+@router.post(
+    "/animated-templates/manifests/{manifest_id}/approve",
+    response_model=AnimatedTemplateManifestResponse,
+)
+def approve_animated_template_manifest(
+    manifest_id: str,
+    payload: AnimatedTemplateManifestApprovalRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    validation = validate_manifest_payload(manifest.manifest, profile="approval")
+    if validation.get("blockingErrors"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "MANIFEST_APPROVAL_BLOCKED", "validation": validation},
+        )
+    repo.approve_manifest(
+        manifest=manifest,
+        actor_user_id=auth.user_id,
+        validation=validation,
+        approval_notes=payload.approval_notes,
+    )
+    session.commit()
+    session.refresh(manifest)
+    return _serialize_animated_template_manifest(manifest)
+
+
+@router.post(
+    "/animated-templates/manifests/{manifest_id}/reject",
+    response_model=AnimatedTemplateManifestResponse,
+)
+def reject_animated_template_manifest(
+    manifest_id: str,
+    payload: AnimatedTemplateManifestRejectRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    repo.reject_manifest(manifest=manifest, actor_user_id=auth.user_id, reason=payload.reason)
+    session.commit()
+    session.refresh(manifest)
+    return _serialize_animated_template_manifest(manifest)
+
+
+@router.post(
+    "/animated-templates/manifests/{manifest_id}/cost-estimate",
+    response_model=AnimatedTemplateCostEstimateResponse,
+)
+def estimate_animated_template_manifest_cost(
+    manifest_id: str,
+    payload: AnimatedTemplateRenderRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    validation = validate_render_request(manifest.manifest, payload)
+    if validation.get("blockingErrors"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "ANIMATED_TEMPLATE_COST_ESTIMATE_BLOCKED", "validation": validation},
+        )
+    render_plan = build_render_plan(manifest=manifest.manifest, render_request=payload)
+    return AnimatedTemplateCostEstimateResponse(
+        manifest_id=str(manifest.id),
+        validation=validation,
+        render_plan=render_plan,
+        cost_estimate=render_plan["costEstimate"],
+    )
+
+
+@router.get(
+    "/animated-templates/runs/{run_id}",
+    response_model=AnimatedTemplateRenderRunResponse,
+)
+def get_animated_template_render_run(
+    run_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    render_run = repo.get_run(org_id=auth.org_id, run_id=run_id)
+    if render_run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Animated render run not found")
+    return _serialize_animated_template_render_run(
+        run=render_run,
+        workflow_run=_workflow_run_for_render_run(session, render_run),
+    )
+
+
+@router.get(
+    "/animated-templates/manifests/{manifest_id}/runs",
+    response_model=list[AnimatedTemplateRenderRunResponse],
+)
+def list_animated_template_render_runs(
+    manifest_id: str,
+    run_status: str | None = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    runs = repo.list_runs(
+        org_id=auth.org_id,
+        manifest_id=manifest_id,
+        status=run_status,
+        limit=limit,
+        offset=offset,
+    )
+    return [
+        _serialize_animated_template_render_run(
+            run=render_run,
+            workflow_run=_workflow_run_for_render_run(session, render_run),
+        )
+        for render_run in runs
+    ]
+
+
+@router.post(
+    "/animated-templates/manifests/{manifest_id}/ai-region-prompt",
+    response_model=AnimatedTemplateAiRegionPromptResponse,
+)
+def build_animated_template_ai_region_prompt(
+    manifest_id: str,
+    payload: AnimatedTemplateRenderRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    if manifest.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "MANIFEST_NOT_APPROVED",
+                "message": "Animated template manifests must be approved before building AI-region prompts.",
+                "manifestId": str(manifest.id),
+                "status": manifest.status,
+            },
+        )
+    validation = validate_render_request(manifest.manifest, payload)
+    if validation.get("blockingErrors"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "ANIMATED_TEMPLATE_AI_PROMPT_BLOCKED", "validation": validation},
+        )
+    try:
+        prompt = build_ai_region_generation_prompt(
+            manifest=manifest.manifest,
+            render_request=payload,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "ANIMATED_TEMPLATE_AI_PROMPT_BLOCKED", "message": str(exc)},
+        ) from exc
+    return AnimatedTemplateAiRegionPromptResponse(manifest_id=str(manifest.id), prompt=prompt)
+
+
+@router.post(
+    "/animated-templates/manifests/{manifest_id}/render",
+    response_model=AnimatedTemplateRenderRunResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def render_animated_template_manifest(
+    manifest_id: str,
+    payload: AnimatedTemplateRenderRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AnimatedTemplatesRepository(session)
+    manifest = repo.get_manifest(org_id=auth.org_id, manifest_id=manifest_id)
+    if manifest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manifest not found")
+    if manifest.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "MANIFEST_NOT_APPROVED",
+                "message": "Animated template manifests must be approved before rendering.",
+                "manifestId": str(manifest.id),
+                "status": manifest.status,
+            },
+        )
+    validation = validate_render_request(manifest.manifest, payload)
+    if validation.get("blockingErrors"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "ANIMATED_TEMPLATE_RENDER_BLOCKED", "validation": validation},
+        )
+    render_plan = build_render_plan(manifest=manifest.manifest, render_request=payload)
+    idempotency_key = payload.idempotency_key or _animated_template_render_idempotency_key(
+        org_id=auth.org_id,
+        manifest=manifest,
+        payload=payload,
+        render_plan=render_plan,
+    )
+    existing_run = repo.get_run_by_idempotency_key(
+        org_id=auth.org_id,
+        idempotency_key=idempotency_key,
+    )
+    if existing_run is not None:
+        workflow_run = _workflow_run_for_render_run(session, existing_run)
+        return _serialize_animated_template_render_run(run=existing_run, workflow_run=workflow_run)
+
+    temporal_workflow_id = f"swipe-animated-template-render-{auth.org_id}-{manifest.id}-{uuid4()}"
+    workflow_run = WorkflowRun(
+        org_id=auth.org_id,
+        client_id=manifest.client_id,
+        product_id=manifest.product_id,
+        campaign_id=manifest.campaign_id,
+        temporal_workflow_id=temporal_workflow_id,
+        temporal_run_id="pending",
+        kind="swipe_animated_template_render",
+    )
+    session.add(workflow_run)
+    session.flush()
+    render_run = repo.create_run(
+        org_id=auth.org_id,
+        manifest_id=str(manifest.id),
+        client_id=str(manifest.client_id) if manifest.client_id else None,
+        product_id=str(manifest.product_id) if manifest.product_id else None,
+        campaign_id=str(manifest.campaign_id) if manifest.campaign_id else None,
+        workflow_run_id=str(workflow_run.id),
+        status="queued",
+        render_request=payload.model_dump(mode="json", by_alias=True, exclude_none=True),
+        render_plan=render_plan,
+        cost_estimate=render_plan["costEstimate"],
+        idempotency_key=idempotency_key,
+    )
+    session.commit()
+    session.refresh(workflow_run)
+    session.refresh(render_run)
+
+    temporal_client = await get_temporal_client()
+    try:
+        handle = await temporal_client.start_workflow(
+            SwipeAnimatedTemplateRenderWorkflow.run,
+            SwipeAnimatedTemplateRenderInput(
+                org_id=auth.org_id,
+                manifest_id=str(manifest.id),
+                run_id=str(render_run.id),
+                workflow_run_id=str(workflow_run.id),
+            ),
+            id=temporal_workflow_id,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+    except Exception as exc:  # noqa: BLE001
+        session.delete(render_run)
+        session.delete(workflow_run)
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to start animated template render workflow.",
+        ) from exc
+
+    workflow_run.temporal_run_id = handle.first_execution_run_id
+    repo.mark_run_running(run=render_run)
+    session.commit()
+    session.refresh(workflow_run)
+    session.refresh(render_run)
+
+    WorkflowsRepository(session).log_activity(
+        workflow_run_id=str(workflow_run.id),
+        step="animated_template_render",
+        status="started",
+        payload_in={
+            "manifestId": str(manifest.id),
+            "runId": str(render_run.id),
+            "renderRequest": render_run.render_request,
+        },
+    )
+
+    return _serialize_animated_template_render_run(run=render_run, workflow_run=workflow_run)
 
 
 @router.post(
