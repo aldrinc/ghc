@@ -2462,7 +2462,7 @@ def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatibl
     assert "runtime_dist_path" not in source_ref
 
 
-def test_apply_publish_job_artifact_render_mode_keeps_runtime_bundle_for_incompatible_artifact(monkeypatch):
+def test_apply_publish_job_artifact_render_mode_rejects_runtime_bundle_fallback_for_incompatible_artifact(monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist")
     workload_patch = deploy_service.build_funnel_publication_workload_patch(
         workload_name="fallback-runtime-funnel",
@@ -2510,16 +2510,13 @@ def test_apply_publish_job_artifact_render_mode_keeps_runtime_bundle_for_incompa
         },
     }
 
-    patched = deploy_service._apply_publish_job_artifact_render_mode(
-        workload_patch=workload_patch,
-        artifact_payload=artifact_payload,
-        requested_render_mode=None,
-        render_mode_was_explicit=False,
-    )
-
-    source_ref = patched["source_ref"]
-    assert source_ref["artifact_render_mode"] == "runtime_bundle"
-    assert source_ref["runtime_dist_path"] == "mos/frontend/dist"
+    with pytest.raises(deploy_service.DeployError, match="Legacy production HTML deployment fallback"):
+        deploy_service._apply_publish_job_artifact_render_mode(
+            workload_patch=workload_patch,
+            artifact_payload=artifact_payload,
+            requested_render_mode=None,
+            render_mode_was_explicit=False,
+        )
 
 
 def test_patch_workload_in_plan_assigns_different_ports_for_different_orgs(tmp_path, monkeypatch):
@@ -3939,6 +3936,36 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "presales",
         "sales-page",
     ]
+
+
+def test_build_funnel_tracking_validation_plan_rejects_runtime_bundle_mode():
+    with pytest.raises(deploy_service.DeployError, match="artifact_render_mode='html_deploy'"):
+        deploy_service._build_funnel_tracking_validation_plan(
+            artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
+            funnel_id="funnel-123",
+            publication_id="00000000-0000-0000-0000-000000000999",
+            access_urls=["https://shop.shopemberco.com/"],
+            render_mode="runtime_bundle",
+        )
+
+
+def test_build_funnel_tracking_validation_plan_rejects_legacy_html_manifest():
+    artifact_payload = json.loads(
+        json.dumps(_build_tracking_validation_artifact_payload(include_presales=True))
+    )
+    presales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["presales"][
+        "puckData"
+    ]["content"][0]["props"]["instrumentationManifest"]
+    presales_manifest["schemaVersion"] = "standalone-imported-html-v0"
+
+    with pytest.raises(deploy_service.DeployError, match="html-deploy-v1"):
+        deploy_service._build_funnel_tracking_validation_plan(
+            artifact_payload=artifact_payload,
+            funnel_id="funnel-123",
+            publication_id="00000000-0000-0000-0000-000000000999",
+            access_urls=["https://shop.shopemberco.com/"],
+            render_mode="html_deploy",
+        )
 
 
 def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_events():

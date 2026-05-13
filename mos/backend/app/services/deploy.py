@@ -80,6 +80,7 @@ _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE = "runtime_bundle"
 _FUNNEL_ARTIFACT_RENDER_MODE_HTML_DEPLOY = "html_deploy"
 _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML = _FUNNEL_ARTIFACT_RENDER_MODE_HTML_DEPLOY
 _FUNNEL_ARTIFACT_RENDER_MODE_LEGACY_STANDALONE_IMPORTED_HTML = "standalone_imported_html"
+_HTML_DEPLOY_SCHEMA_VERSION = "html-deploy-v1"
 _PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
     r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/[^\s\"'<>?#]+"
 )
@@ -2277,13 +2278,25 @@ def _resolve_publish_job_artifact_render_mode(
     render_mode_was_explicit: bool,
 ) -> str:
     normalized_requested_mode = str(requested_render_mode or "").strip().lower()
+    supports_html_deploy = _artifact_payload_supports_html_deploy(artifact_payload=artifact_payload)
     if render_mode_was_explicit:
-        return (
-            normalized_requested_mode or _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
-        )
-    if _artifact_payload_supports_html_deploy(artifact_payload=artifact_payload):
+        if normalized_requested_mode != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+            raise DeployError(
+                "Funnel publish deployment requires renderMode='html_deploy'. "
+                "Legacy production HTML deployment fallback is not allowed."
+            )
+        if not supports_html_deploy:
+            raise DeployError(
+                "Funnel publish deployment requested html_deploy, but the published artifact is not "
+                "html-deploy-v1 compatible. Legacy production HTML deployment fallback is not allowed."
+            )
         return _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
-    return _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
+    if supports_html_deploy:
+        return _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
+    raise DeployError(
+        "Funnel publish deployment requires an html-deploy-v1 compatible artifact. "
+        "Legacy production HTML deployment fallback is not allowed."
+    )
 
 
 def _apply_publish_job_artifact_render_mode(
@@ -2331,6 +2344,32 @@ def _resolve_funnel_page_manifest(*, page_payload: dict[str, Any]) -> dict[str, 
     if not isinstance(manifest, dict):
         raise DeployError("Imported HTML page is missing instrumentationManifest for tracking validation.")
     return manifest
+
+
+def _assert_html_deploy_manifest(
+    *,
+    manifest: dict[str, Any] | None,
+    page_slug: str,
+    context_label: str = "tracking validation",
+) -> None:
+    if not isinstance(manifest, dict):
+        raise DeployError(
+            f"HTML deploy {context_label} requires page '{page_slug}' to include an instrumentationManifest. "
+            "Legacy production HTML deployment fallback is not allowed."
+        )
+    schema_version = str(manifest.get("schemaVersion") or "").strip()
+    if schema_version != _HTML_DEPLOY_SCHEMA_VERSION:
+        raise DeployError(
+            f"HTML deploy {context_label} requires page '{page_slug}' to use "
+            f"instrumentationManifest.schemaVersion='{_HTML_DEPLOY_SCHEMA_VERSION}', "
+            f"observed {schema_version or '<missing>'!r}. Legacy production HTML deployment fallback is not allowed."
+        )
+    artifact_kind = str(manifest.get("htmlArtifactKind") or "").strip()
+    if not artifact_kind:
+        raise DeployError(
+            f"HTML deploy {context_label} requires page '{page_slug}' to declare "
+            "instrumentationManifest.htmlArtifactKind. Legacy production HTML deployment fallback is not allowed."
+        )
 
 
 def _normalize_tracking_config(raw_tracking: Any) -> dict[str, str]:
@@ -2518,6 +2557,7 @@ def _extract_funnel_tracking_page_entries(
     funnel_id: str,
     publication_id: str,
     origin: str,
+    render_mode: str,
 ) -> dict[str, Any]:
     products = artifact_payload.get("products")
     if not isinstance(products, dict):
@@ -2570,6 +2610,10 @@ def _extract_funnel_tracking_page_entries(
             if slug and page_id:
                 page_ids_by_slug[slug] = page_id
 
+    require_html_deploy_manifest = (
+        str(render_mode or "").strip().lower()
+        == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
+    )
     page_entries: list[dict[str, Any]] = []
     for raw_page_slug, page_payload in pages.items():
         if not isinstance(page_payload, dict):
@@ -2583,7 +2627,18 @@ def _extract_funnel_tracking_page_entries(
         manifest: dict[str, Any] | None = None
         try:
             manifest = _resolve_funnel_page_manifest(page_payload=page_payload)
-        except DeployError:
+        except DeployError as exc:
+            fallback_page_stage = _resolve_tracking_page_stage(
+                page_slug=page_slug,
+                page_id=page_id,
+                page_payload=page_payload,
+                manifest=None,
+            )
+            if require_html_deploy_manifest and fallback_page_stage in {"pre_sales", "sales"}:
+                raise DeployError(
+                    f"HTML deploy tracking validation requires page '{page_slug}' to include an "
+                    "html-deploy-v1 instrumentationManifest. Legacy production HTML deployment fallback is not allowed."
+                ) from exc
             manifest = None
         page_stage = _resolve_tracking_page_stage(
             page_slug=page_slug,
@@ -2593,6 +2648,12 @@ def _extract_funnel_tracking_page_entries(
         )
         if not page_stage:
             continue
+        if require_html_deploy_manifest and page_stage in {"pre_sales", "sales"}:
+            _assert_html_deploy_manifest(
+                manifest=manifest,
+                page_slug=page_slug,
+                context_label="tracking validation",
+            )
         page_entries.append(
             {
                 "slug": page_slug,
@@ -2903,6 +2964,12 @@ def _build_funnel_tracking_validation_plan(
     render_mode: str,
     candidate_release_id: str | None = None,
 ) -> dict[str, Any]:
+    normalized_render_mode = str(render_mode or "").strip().lower()
+    if normalized_render_mode != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+        raise DeployError(
+            "Production HTML funnel tracking validation requires artifact_render_mode='html_deploy'. "
+            "Legacy production HTML deployment fallback is not allowed."
+        )
     normalized_access_urls = _normalize_access_urls(access_urls)
     if not normalized_access_urls:
         raise DeployError("Post-deploy tracking validation requires at least one public access URL.")
@@ -2918,6 +2985,7 @@ def _build_funnel_tracking_validation_plan(
         funnel_id=funnel_id,
         publication_id=publication_id,
         origin=origin,
+        render_mode=normalized_render_mode,
     )
     page_entries: list[dict[str, Any]] = extraction["page_entries"]
     sales_pages = [entry for entry in page_entries if entry["stage"] == "sales"]
@@ -2988,7 +3056,7 @@ def _build_funnel_tracking_validation_plan(
 
     return {
         "origin": origin,
-        "render_mode": render_mode,
+        "render_mode": normalized_render_mode,
         "product_slug": extraction["product_slug"],
         "funnel_slug": extraction["funnel_slug"],
         "sales_page": sales_page,
