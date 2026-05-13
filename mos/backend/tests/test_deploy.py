@@ -2462,7 +2462,7 @@ def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatibl
     assert "runtime_dist_path" not in source_ref
 
 
-def test_apply_publish_job_artifact_render_mode_keeps_runtime_bundle_for_incompatible_artifact(monkeypatch):
+def test_apply_publish_job_artifact_render_mode_rejects_incompatible_artifact_without_legacy_fallback(monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist")
     workload_patch = deploy_service.build_funnel_publication_workload_patch(
         workload_name="fallback-runtime-funnel",
@@ -2510,16 +2510,13 @@ def test_apply_publish_job_artifact_render_mode_keeps_runtime_bundle_for_incompa
         },
     }
 
-    patched = deploy_service._apply_publish_job_artifact_render_mode(
-        workload_patch=workload_patch,
-        artifact_payload=artifact_payload,
-        requested_render_mode=None,
-        render_mode_was_explicit=False,
-    )
-
-    source_ref = patched["source_ref"]
-    assert source_ref["artifact_render_mode"] == "runtime_bundle"
-    assert source_ref["runtime_dist_path"] == "mos/frontend/dist"
+    with pytest.raises(deploy_service.DeployError, match="Legacy production HTML deployment fallback is not allowed"):
+        deploy_service._apply_publish_job_artifact_render_mode(
+            workload_patch=workload_patch,
+            artifact_payload=artifact_payload,
+            requested_render_mode=None,
+            render_mode_was_explicit=False,
+        )
 
 
 def test_patch_workload_in_plan_assigns_different_ports_for_different_orgs(tmp_path, monkeypatch):
@@ -3590,7 +3587,11 @@ def _write_publish_job_fixture(tmp_path: Path, *, job_id: str, deploy_request: d
     return job_path
 
 
-def _build_tracking_validation_artifact_payload(*, include_presales: bool) -> dict:
+def _build_tracking_validation_artifact_payload(
+    *,
+    include_presales: bool,
+    presales_artifact_kind: str = "listicle",
+) -> dict:
     tracking = {
         "metaPixelId": "pixel-123",
         "posthogProjectApiKey": "phc_test_123",
@@ -3642,7 +3643,7 @@ def _build_tracking_validation_artifact_payload(*, include_presales: bool) -> di
                         "props": {
                             "instrumentationManifest": {
                                 "schemaVersion": "html-deploy-v1",
-                                "htmlArtifactKind": "listicle",
+                                "htmlArtifactKind": presales_artifact_kind,
                                 "pageStage": "pre_sales",
                                 "bindings": [
                                     {
@@ -3827,10 +3828,82 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
+    assert path_plan["required_posthog_readback_events"] == [
+        "presell_page_view",
+        "EnteredPresales",
+        "cta_click",
+        "PreSalesToSalesClick",
+        "sales_page_view",
+        "EnteredSales",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
+    ]
     assert sorted(page["slug"] for page in plan["pages_to_validate"]) == [
         "presales",
         "sales-page",
     ]
+
+
+def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_events():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(
+            include_presales=True,
+            presales_artifact_kind="quiz",
+        ),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    path_plan = plan["path_plans"][0]
+    assert path_plan["start_page"]["html_artifact_kind"] == "quiz"
+    assert path_plan["required_posthog_readback_events"] == [
+        "presell_page_view",
+        "EnteredPresales",
+        "cta_click",
+        "PreSalesToSalesClick",
+        "QuizLeadViewed",
+        "QuizQuestionViewed",
+        "QuizOptionSelected",
+        "QuizCompleted",
+        "QuizResultViewed",
+        "QuizCtaViewed",
+        "sales_page_view",
+        "EnteredSales",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
+    ]
+
+
+def test_build_funnel_tracking_validation_plan_rejects_legacy_html_manifest():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=False)
+    manifest = (
+        artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"]["puckData"]["content"][0]["props"][
+            "instrumentationManifest"
+        ]
+    )
+    manifest["schemaVersion"] = "imported-html-instrumentation-v1"
+
+    with pytest.raises(deploy_service.DeployError, match="Legacy production HTML deployment fallback is not allowed"):
+        deploy_service._build_funnel_tracking_validation_plan(
+            artifact_payload=artifact_payload,
+            funnel_id="funnel-123",
+            publication_id="00000000-0000-0000-0000-000000000999",
+            access_urls=["https://shop.shopemberco.com/"],
+            render_mode="html_deploy",
+        )
+
+
+def test_build_funnel_tracking_validation_plan_rejects_runtime_bundle_render_mode():
+    with pytest.raises(deploy_service.DeployError, match="requires artifact_render_mode='html_deploy'"):
+        deploy_service._build_funnel_tracking_validation_plan(
+            artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
+            funnel_id="funnel-123",
+            publication_id="00000000-0000-0000-0000-000000000999",
+            access_urls=["https://shop.shopemberco.com/"],
+            render_mode="runtime_bundle",
+        )
 
 
 def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
@@ -4154,7 +4227,8 @@ def test_validate_observed_tracking_events_requires_presales_sales_rmbc_stitchin
     )
     destination_url = (
         "https://shop.shopemberco.com/ember/daily/sales-page/"
-        "?rmbc_session_id=sess-1&rmbc_anonymous_id=anon-1&rmbc_click_id=click-1"
+        "?session_id=sess-1&anonymous_id=anon-1&click_id=click-1"
+        "&source_page_type=listicle_presell&from_stage=pre_sales&to_stage=sales"
     )
 
     observed_state = {
@@ -4167,8 +4241,11 @@ def test_validate_observed_tracking_events_requires_presales_sales_rmbc_stitchin
                 "props": {
                     "session_id": "sess-1",
                     "visitor_id": "anon-1",
+                    "anonymous_id": "anon-1",
                     "click_id": "click-1",
-                    "rmbc_click_id": "click-1",
+                    "source_page_type": "listicle_presell",
+                    "from_stage": "pre_sales",
+                    "to_stage": "sales",
                     "destination_url": destination_url,
                 },
             },
@@ -4177,7 +4254,11 @@ def test_validate_observed_tracking_events_requires_presales_sales_rmbc_stitchin
                 "props": {
                     "session_id": "sess-1",
                     "visitor_id": "anon-1",
+                    "anonymous_id": "anon-1",
                     "click_id": "click-1",
+                    "source_page_type": "listicle_presell",
+                    "from_stage": "pre_sales",
+                    "to_stage": "sales",
                 },
             },
             {"eventType": "offer_page_view"},
@@ -4214,7 +4295,11 @@ def test_validate_observed_tracking_events_requires_presales_sales_rmbc_stitchin
                     _expected_sales_posthog_context(
                         session_id="sess-1",
                         visitor_id="anon-1",
+                        anonymous_id="anon-1",
                         click_id="click-1",
+                        source_page_type="listicle_presell",
+                        from_stage="pre_sales",
+                        to_stage="sales",
                     ),
                 ],
                 ["PageView", {}],
@@ -4224,7 +4309,11 @@ def test_validate_observed_tracking_events_requires_presales_sales_rmbc_stitchin
                     _expected_sales_posthog_context(
                         session_id="sess-1",
                         visitor_id="anon-1",
+                        anonymous_id="anon-1",
                         click_id="click-1",
+                        source_page_type="listicle_presell",
+                        from_stage="pre_sales",
+                        to_stage="sales",
                     ),
                 ],
                 ["ViewContent", {}],
@@ -4245,15 +4334,14 @@ def test_validate_observed_tracking_events_requires_presales_sales_rmbc_stitchin
     missing_click_bridge_state = json.loads(json.dumps(observed_state))
     missing_click_props = missing_click_bridge_state["internal"][3]["props"]
     missing_click_props.pop("click_id")
-    missing_click_props.pop("rmbc_click_id")
-    with pytest.raises(deploy_service.DeployError, match="missing RMBC bridge values"):
+    with pytest.raises(deploy_service.DeployError, match="missing canonical bridge values"):
         deploy_service._validate_observed_tracking_events(
             path_plan=plan["path_plans"][0],
             observed_state=missing_click_bridge_state,
         )
 
     observed_state["posthog"]["captures"][8][1]["session_id"] = "other-session"
-    with pytest.raises(deploy_service.DeployError, match="RMBC bridge values did not stitch"):
+    with pytest.raises(deploy_service.DeployError, match="canonical bridge values did not stitch"):
         deploy_service._validate_observed_tracking_events(
             path_plan=plan["path_plans"][0],
             observed_state=observed_state,
@@ -4417,65 +4505,49 @@ def test_validate_posthog_live_readback_requires_api_key_when_enabled(monkeypatc
 
 def test_validate_posthog_live_readback_polls_until_sales_aliases_land(monkeypatch):
     calls: list[object] = []
+    def row(event_name: str, timestamp: str, *, meta_event_name: str = "") -> list[str]:
+        return [
+            event_name,
+            timestamp,
+            "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
+            "",
+            "",
+            "/sales?mos_deploy_validation_id=deploy-validation-123",
+            "",
+            "session-1",
+            "",
+            "visitor-1",
+            "",
+            "",
+            "",
+            "click-1",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "deploy-validation-123",
+            "deploy-validation-123",
+            "sales_page",
+            "sales",
+            "",
+            meta_event_name,
+        ]
+
     payloads = [
         {
             "results": [
-                [
-                    "sales_page_view",
-                    "2026-05-12T17:00:00Z",
-                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
-                    "",
-                    "",
-                    "",
-                    "deploy-validation-123",
-                    "deploy-validation-123",
-                    "sales_page",
-                    "sales",
-                    "",
-                ]
+                row("sales_page_view", "2026-05-12T17:00:00Z")
             ]
         },
         {
             "results": [
-                [
-                    "sales_page_view",
-                    "2026-05-12T17:00:00Z",
-                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
-                    "",
-                    "",
-                    "",
-                    "deploy-validation-123",
-                    "deploy-validation-123",
-                    "sales_page",
-                    "sales",
-                    "",
-                ],
-                [
-                    "EnteredSales",
-                    "2026-05-12T17:00:01Z",
-                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
-                    "",
-                    "",
-                    "",
-                    "deploy-validation-123",
-                    "deploy-validation-123",
-                    "sales_page",
-                    "sales",
-                    "",
-                ],
-                [
-                    "SalesToCheckoutClick",
-                    "2026-05-12T17:00:02Z",
-                    "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
-                    "",
-                    "",
-                    "",
-                    "deploy-validation-123",
-                    "deploy-validation-123",
-                    "sales_page",
-                    "sales",
-                    "",
-                ],
+                row("sales_page_view", "2026-05-12T17:00:00Z"),
+                row("EnteredSales", "2026-05-12T17:00:01Z", meta_event_name="EnteredSales"),
+                row("SalesToCheckoutClick", "2026-05-12T17:00:02Z", meta_event_name="SalesToCheckoutClick"),
             ]
         },
     ]
@@ -4528,7 +4600,126 @@ def test_validate_posthog_live_readback_polls_until_sales_aliases_land(monkeypat
     assert calls[0][0] == "post"
     assert calls[0][1] == "https://us.posthog.com/api/projects/@current/query/"
     assert calls[0][2] == "Bearer phx_test"
+    assert "properties.path" in calls[0][3]["query"]["query"]
     assert ("sleep", 0.5) in calls
+
+
+def test_assert_posthog_readback_rows_rejects_meta_name_without_entered_sales_event():
+    with pytest.raises(deploy_service.DeployError, match="did not land as its own PostHog event"):
+        deploy_service._assert_posthog_readback_rows(
+            rows=[
+                {
+                    "event": "sales_page_view",
+                    "current_url": "https://shop.example.com/?mos_deploy_validation_id=deploy-validation-123",
+                    "content_category": "sales_page",
+                    "page_stage": "sales",
+                    "meta_event_name": "EnteredSales",
+                }
+            ],
+            required_events=["sales_page_view", "EnteredSales"],
+            validation_id="deploy-validation-123",
+        )
+
+
+def test_assert_posthog_readback_rows_requires_top_level_bridge_fields():
+    path_plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )["path_plans"][0]
+
+    rows = [
+        {
+            "event": "PreSalesToSalesClick",
+            "url_params": {"session_id": "sess-1", "click_id": "click-1"},
+            "source_page_type": "listicle_presell",
+            "from_stage": "pre_sales",
+            "to_stage": "sales",
+        },
+        {
+            "event": "sales_page_view",
+            "content_category": "sales_page",
+            "page_stage": "sales",
+        },
+        {
+            "event": "EnteredSales",
+            "content_category": "sales_page",
+            "page_stage": "sales",
+        },
+        {
+            "event": "SalesToCheckoutClick",
+            "content_category": "sales_page",
+            "page_stage": "sales",
+        },
+        {
+            "event": "SalesToCheckoutClicked",
+            "content_category": "sales_page",
+            "page_stage": "sales",
+        },
+    ]
+
+    with pytest.raises(deploy_service.DeployError, match="missing canonical bridge identity fields"):
+        deploy_service._assert_posthog_readback_rows(
+            rows=rows,
+            required_events=[
+                "PreSalesToSalesClick",
+                "sales_page_view",
+                "EnteredSales",
+                "SalesToCheckoutClick",
+                "SalesToCheckoutClicked",
+            ],
+            validation_id="deploy-validation-123",
+            path_plan=path_plan,
+        )
+
+
+def test_assert_posthog_readback_rows_validates_quiz_to_sales_bridge_context():
+    path_plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(
+            include_presales=True,
+            presales_artifact_kind="quiz",
+        ),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )["path_plans"][0]
+
+    def bridge_row(event_name: str, *, from_stage: str, to_stage: str) -> dict[str, str]:
+        return {
+            "event": event_name,
+            "session_id": "sess-1",
+            "visitor_id": "anon-1",
+            "click_id": "click-1",
+            "source_page_type": "quiz_presell",
+            "from_stage": from_stage,
+            "to_stage": to_stage,
+            "content_category": "sales_page" if event_name != "PreSalesToSalesClick" else "pre_sales_page",
+            "page_stage": "sales" if event_name != "PreSalesToSalesClick" else "pre_sales",
+        }
+
+    deploy_service._assert_posthog_readback_rows(
+        rows=[
+            bridge_row("PreSalesToSalesClick", from_stage="pre_sales", to_stage="sales"),
+            bridge_row("sales_page_view", from_stage="pre_sales", to_stage="sales"),
+            bridge_row("EnteredSales", from_stage="pre_sales", to_stage="sales"),
+            bridge_row("SalesToCheckoutClick", from_stage="sales", to_stage="checkout"),
+            bridge_row("SalesToCheckoutClicked", from_stage="sales", to_stage="checkout"),
+            {"event": "QuizCompleted"},
+        ],
+        required_events=[
+            "PreSalesToSalesClick",
+            "sales_page_view",
+            "EnteredSales",
+            "SalesToCheckoutClick",
+            "SalesToCheckoutClicked",
+            "QuizCompleted",
+        ],
+        validation_id="deploy-validation-123",
+        path_plan=path_plan,
+    )
 
 
 def test_validate_deployed_tracking_html_checks_meta_event_proxy_endpoint(monkeypatch):
