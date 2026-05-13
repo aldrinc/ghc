@@ -4231,12 +4231,214 @@ def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch
         )
 
 
+class _HtmlDeployOptimizationFakeResponse:
+    def __init__(
+        self,
+        *,
+        text: str = "",
+        status_code: int = 200,
+        content_type: str = "text/html; charset=utf-8",
+    ) -> None:
+        self.text = text
+        self.status_code = status_code
+        self.headers = {"content-type": content_type}
+        self.request = deploy_service.httpx.Request("GET", "https://shop.example.com/")
+        self.response = deploy_service.httpx.Response(status_code, request=self.request)
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise deploy_service.httpx.HTTPStatusError(
+                "request failed",
+                request=self.request,
+                response=self.response,
+            )
+
+
+def _optimized_html_fixture() -> str:
+    return """
+<!doctype html>
+<html>
+  <head>
+    <style data-mos-render-optimization="true">body{margin:0}</style>
+    <link rel="preconnect" href="https://cdn.example.com">
+    <link rel="preload" as="font" href="/assets/font.woff2" data-mos-font-preload="true">
+    <link
+      rel="preload"
+      as="image"
+      href="/assets/hero-1200w.webp"
+      imagesrcset="/assets/hero-800w.webp 800w, /assets/hero-1200w.webp 1200w"
+      fetchpriority="high"
+    >
+  </head>
+  <body>
+    <picture>
+      <source
+        srcset="/assets/hero-800w.webp 800w, /assets/hero-1200w.webp 1200w"
+        type="image/webp"
+      >
+      <img
+        src="/assets/hero-1200w.webp"
+        srcset="/assets/hero-800w.webp 800w, /assets/hero-1200w.webp 1200w"
+        loading="eager"
+        decoding="async"
+        fetchpriority="high"
+      >
+    </picture>
+    <img
+      src="/assets/section.webp"
+      srcset="/assets/section-800w.webp 800w"
+      loading="lazy"
+      decoding="async"
+      fetchpriority="low"
+    >
+  </body>
+</html>
+"""
+
+
+def test_run_html_deploy_optimization_validation_checks_candidate_pages(monkeypatch):
+    requested_urls: list[str] = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            requested_urls.append(str(url))
+            if "/assets/" in str(url):
+                return _HtmlDeployOptimizationFakeResponse(content_type="image/webp")
+            return _HtmlDeployOptimizationFakeResponse(text=_optimized_html_fixture())
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    result = deploy_service._run_html_deploy_optimization_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [
+                {
+                    "url": "https://shop.example.com/listicle/",
+                    "stage": "pre_sales",
+                    "html_artifact_kind": "listicle",
+                },
+                {
+                    "url": "https://shop.example.com/sales-page/",
+                    "stage": "sales",
+                    "html_artifact_kind": "sales",
+                },
+            ],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "passed"
+    assert result["candidateReleaseId"] == "candidate-123"
+    assert len(result["pages"]) == 2
+    assert result["pages"][0]["renderOptimizationCss"] is True
+    assert result["pages"][0]["tailwindRuntimeRemoved"] is True
+    assert result["pages"][0]["legacyIm8ScriptsRemoved"] is True
+    assert result["pages"][0]["rasterImageCount"] == 2
+    assert result["pages"][0]["responsiveImageCount"] >= 2
+    assert result["pages"][0]["lazyImageCount"] == 1
+    assert result["pages"][0]["highPriorityImageCount"] == 1
+    assert result["pages"][0]["imagePreloadCount"] == 1
+    assert result["pages"][0]["fontPreloadCount"] == 1
+    page_requests = [url for url in requested_urls if "/assets/" not in url]
+    assert all("mos_deploy_candidate_release=candidate-123" in url for url in page_requests)
+
+
+def test_run_html_deploy_optimization_validation_fails_without_render_marker(monkeypatch):
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            return _HtmlDeployOptimizationFakeResponse(
+                text="<!doctype html><html><body>No optimization markers</body></html>"
+            )
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    with pytest.raises(deploy_service.DeployError, match="missing data-mos-render-optimization"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [
+                    {
+                        "url": "https://shop.example.com/sales-page/",
+                        "stage": "sales",
+                        "html_artifact_kind": "sales",
+                    }
+                ],
+            }
+        )
+
+
+def test_run_html_deploy_optimization_validation_fails_broken_image(monkeypatch):
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            if "/assets/" in str(url):
+                return _HtmlDeployOptimizationFakeResponse(
+                    status_code=404,
+                    content_type="text/html",
+                )
+            return _HtmlDeployOptimizationFakeResponse(text=_optimized_html_fixture())
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    with pytest.raises(deploy_service.DeployError, match="image assets did not resolve"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [
+                    {
+                        "url": "https://shop.example.com/listicle/",
+                        "stage": "pre_sales",
+                        "html_artifact_kind": "listicle",
+                    }
+                ],
+            }
+        )
+
+
 @pytest.mark.asyncio
 async def test_run_funnel_tracking_post_deploy_validation_includes_lighthouse_report(monkeypatch):
     monkeypatch.setattr(
         deploy_service,
         "_run_funnel_tracking_post_deploy_validation_sync",
         lambda *, validation_plan: [{"validationId": "deploy-validation-123"}],
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_html_deploy_optimization_validation_sync",
+        lambda *, validation_plan: {
+            "status": "passed",
+            "candidateReleaseId": validation_plan.get("candidate_release_id"),
+            "pages": [],
+        },
     )
     monkeypatch.setattr(
         deploy_service,
@@ -4258,6 +4460,11 @@ async def test_run_funnel_tracking_post_deploy_validation_includes_lighthouse_re
     )
 
     assert result["candidateReleaseId"] == "candidate-123"
+    assert result["optimizationValidation"] == {
+        "status": "passed",
+        "candidateReleaseId": "candidate-123",
+        "pages": [],
+    }
     assert result["lighthouseValidation"] == {
         "status": "passed",
         "candidateReleaseId": "candidate-123",
