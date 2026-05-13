@@ -4112,6 +4112,159 @@ def test_build_funnel_tracking_validation_plan_marks_candidate_release():
     assert plan["path_plans"][0]["candidate_release_id"] == "candidate-123"
 
 
+def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatch):
+    calls: list[list[str]] = []
+
+    def _fake_run(args, **kwargs):
+        calls.append([str(arg) for arg in args])
+        output_arg = next(str(arg) for arg in args if str(arg).startswith("--output-path="))
+        output_path = Path(output_arg.split("=", 1)[1])
+        profile = "desktop" if "--preset=desktop" in args else "mobile"
+        output_path.write_text(
+            json.dumps(
+                {
+                    "categories": {
+                        "performance": {"score": 0.91 if profile == "mobile" else 0.93}
+                    },
+                    "audits": {
+                        "largest-contentful-paint": {
+                            "score": 0.9,
+                            "numericValue": 1800,
+                            "displayValue": "1.8 s",
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return deploy_service.subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED", True)
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_COMMAND",
+        "lighthouse",
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_MOBILE_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_DESKTOP_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
+
+    result = deploy_service._run_html_deploy_lighthouse_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [
+                {"url": "https://shop.example.com/listicle/"},
+                {"url": "https://shop.example.com/sales-page/"},
+            ],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "passed"
+    assert result["thresholds"] == {"mobile": 85.0, "desktop": 85.0}
+    assert [audit["profile"] for audit in result["audits"]] == [
+        "mobile",
+        "desktop",
+        "mobile",
+        "desktop",
+    ]
+    assert all(
+        "mos_deploy_candidate_release=candidate-123" in audit["url"]
+        for audit in result["audits"]
+    )
+    assert len(calls) == 4
+    assert any("--preset=desktop" in call for call in calls)
+
+
+def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch):
+    def _fake_run(args, **kwargs):
+        output_arg = next(str(arg) for arg in args if str(arg).startswith("--output-path="))
+        output_path = Path(output_arg.split("=", 1)[1])
+        profile = "desktop" if "--preset=desktop" in args else "mobile"
+        output_path.write_text(
+            json.dumps(
+                {
+                    "categories": {
+                        "performance": {"score": 0.9 if profile == "desktop" else 0.84}
+                    },
+                    "audits": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return deploy_service.subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED", True)
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_COMMAND",
+        "lighthouse",
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_MOBILE_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(
+        deploy_service.settings,
+        "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_DESKTOP_MIN_SCORE",
+        85.0,
+    )
+    monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
+
+    with pytest.raises(deploy_service.DeployError, match="below required 85.00"):
+        deploy_service._run_html_deploy_lighthouse_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [{"url": "https://shop.example.com/sales-page/"}],
+            }
+        )
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_tracking_post_deploy_validation_includes_lighthouse_report(monkeypatch):
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_funnel_tracking_post_deploy_validation_sync",
+        lambda *, validation_plan: [{"validationId": "deploy-validation-123"}],
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_html_deploy_lighthouse_validation_sync",
+        lambda *, validation_plan: {
+            "status": "passed",
+            "candidateReleaseId": validation_plan.get("candidate_release_id"),
+            "audits": [],
+        },
+    )
+
+    result = await deploy_service._run_funnel_tracking_post_deploy_validation(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+        candidate_release_id="candidate-123",
+    )
+
+    assert result["candidateReleaseId"] == "candidate-123"
+    assert result["lighthouseValidation"] == {
+        "status": "passed",
+        "candidateReleaseId": "candidate-123",
+        "audits": [],
+    }
+
+
 def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
     plan = deploy_service._build_funnel_tracking_validation_plan(
         artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),

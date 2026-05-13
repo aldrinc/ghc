@@ -283,7 +283,29 @@ Acceptance:
 - Quiz presales/click Meta events must prove receive or report `meta_receive_missing`.
 - Sales product/checkout clicks must prove Meta receive for the configured checkout-intent events, not only queue `fbq()`.
 
-### Phase 7: Postgres Support Report
+### Phase 7: Integrated Lighthouse Performance Gate
+
+Add Lighthouse to the same staged candidate validator report. Do not create a separate optimization validator or a separate promotion path.
+
+Tasks:
+
+- Run Lighthouse against the inactive candidate URLs by appending `mos_deploy_candidate_release=<candidate_id>`.
+- Audit every page in the compiled `html-deploy-v1` validation plan, including listicle/listicle-hybrid, quiz, and sales pages.
+- Run deterministic mobile and desktop profiles for each candidate page.
+- Require mobile performance score `>= 85`.
+- Require desktop performance score `>= 85`.
+- Fail closed when the Lighthouse command, Chrome runtime, JSON report, or score is missing.
+- Attach Lighthouse results to `htmlDeployValidationReport.lighthouseValidation` beside the tracking/browser/PostHog/Meta results.
+- Keep optimization output as evidence inside the validator report; do not introduce a standalone optimization validator.
+
+Acceptance:
+
+- Candidate activation does not occur when any staged page scores below 85 on mobile or desktop.
+- A broken Lighthouse runtime fails with a clean deploy error before promotion.
+- The deploy response shows per-page/per-profile scores and key performance audits.
+- Existing static, browser, PostHog, and Meta gates remain the same validator path.
+
+### Phase 8: Postgres Support Report
 
 Add read-only Postgres checks as a supporting report. This is not a replacement for PostHog readback, and Postgres event persistence is not the source of truth for quiz/listicle/sales analytics.
 
@@ -311,13 +333,13 @@ Acceptance:
 - Local DB drift is reported cleanly before local validator execution.
 - Prod sales internal row mismatches are reported as support findings while PostHog readback remains the blocking analytics gate.
 
-### Phase 8: Candidate Activation Gate
+### Phase 9: Candidate Activation Gate
 
 Wire all validator stages into the staged deployment gate.
 
 Tasks:
 
-- Keep candidate bundle inactive until static, browser, PostHog, and Meta checks pass. Postgres topology/schema failures can block deploys when they indicate the active route/page graph is invalid; Postgres event persistence does not replace PostHog readback.
+- Keep candidate bundle inactive until static, browser, PostHog, Meta, and Lighthouse checks pass. Postgres topology/schema failures can block deploys when they indicate the active route/page graph is invalid; Postgres event persistence does not replace PostHog readback.
 - Preserve the prior active bundle automatically on failure.
 - Return a structured validation report with failures grouped by stage.
 - Save the report to deploy metadata/log output for review.
@@ -346,6 +368,8 @@ Integration tests:
 - Local sales fixture promotes inbound canonical params.
 - Simulated PostHog readback passes only when events and fields match.
 - Simulated Meta receive passes only when `facebook.com/tr` requests are observed.
+- Simulated Lighthouse output passes only when mobile and desktop scores are `>= 85`.
+- Simulated Lighthouse output fails before candidate promotion when either score is below `85`.
 
 Manual validation:
 
@@ -393,5 +417,6 @@ Start with the smallest slice that would have caught the current prod quiz:
    - AddToCart/PostHog/Meta receive
    - SalesToCheckoutClick or mock checkout receive when checkout target is available
 8. Fail required binding selectors that match no rendered element.
+9. Add integrated Lighthouse mobile/desktop gating to the same candidate validator report.
 
 This slice creates a hard gate for the actual regressions observed without changing the visual look or feel of any deployed page.
