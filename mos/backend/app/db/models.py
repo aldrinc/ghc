@@ -1933,6 +1933,7 @@ class MetaAdSetSpec(Base):
     placements: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     daily_budget: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     lifetime_budget: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    daily_min_spend_target: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1000")
     bid_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     dsa_beneficiary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     dsa_payor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

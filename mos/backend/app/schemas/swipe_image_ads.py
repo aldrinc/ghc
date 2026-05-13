@@ -11,6 +11,11 @@ class SwipeImageAdGenerateRequest(BaseModel):
     client_id: str = Field(..., validation_alias="clientId", serialization_alias="clientId")
     product_id: str = Field(..., validation_alias="productId", serialization_alias="productId")
     campaign_id: str = Field(..., validation_alias="campaignId", serialization_alias="campaignId")
+    selected_offer_id: str | None = Field(
+        None,
+        validation_alias="selectedOfferId",
+        serialization_alias="selectedOfferId",
+    )
 
     asset_brief_id: str = Field(..., validation_alias="assetBriefId", serialization_alias="assetBriefId")
     requirement_index: int = Field(

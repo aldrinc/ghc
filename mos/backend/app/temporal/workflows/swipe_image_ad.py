@@ -21,6 +21,7 @@ class SwipeImageAdInput:
     product_id: str
     asset_brief_id: str
     campaign_id: Optional[str] = None
+    selected_offer_id: Optional[str] = None
     requirement_index: int = 0
     company_swipe_id: Optional[str] = None
     swipe_image_url: Optional[str] = None
@@ -52,6 +53,7 @@ class SwipeImageAdWorkflow:
             "client_id": input.client_id,
             "product_id": input.product_id,
             "campaign_id": input.campaign_id,
+            "selected_offer_id": input.selected_offer_id,
             "asset_brief_id": input.asset_brief_id,
             "requirement_index": input.requirement_index,
             "company_swipe_id": input.company_swipe_id,
@@ -73,6 +75,6 @@ class SwipeImageAdWorkflow:
         return await workflow.execute_activity(
             generate_swipe_image_ad_activity,
             params,
-            schedule_to_close_timeout=timedelta(minutes=20),
+            schedule_to_close_timeout=timedelta(minutes=45),
             retry_policy=_SWIPE_IMAGE_AD_ACTIVITY_RETRY_POLICY,
         )

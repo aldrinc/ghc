@@ -165,6 +165,19 @@ def _set_selected_storefront_domain(
     db_session.commit()
 
 
+def _passed_llm_policy_review_metadata(**values) -> dict:
+    return {
+        **values,
+        "paidAdsQaLlmPolicyReview": {
+            "model": "gpt-5.4-mini",
+            "reasoningEffort": "high",
+            "passed": True,
+            "findings": [],
+            "revisionGuidance": [],
+        },
+    }
+
+
 def _seed_campaign_ready_meta_objects(
     *,
     db_session,
@@ -216,7 +229,16 @@ def _seed_campaign_ready_meta_objects(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"assetBriefId": brief_id},
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "paidAdsQaLlmPolicyReview": {
+                "model": "gpt-5.4-mini",
+                "reasoningEffort": "high",
+                "passed": True,
+                "findings": [],
+                "revisionGuidance": [],
+            },
+        },
     )
     db_session.add(asset)
     db_session.commit()
@@ -543,7 +565,38 @@ def test_meta_campaign_paid_ads_qa_evaluates_copy_and_landing_page(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"assetBriefId": brief_id},
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "paidAdsQaLlmPolicyReview": {
+                "model": "gpt-5.4-mini",
+                "reasoningEffort": "high",
+                "passed": False,
+                "findings": [
+                    {
+                        "ruleId": "META-COPY-002",
+                        "status": "failed",
+                        "title": "Private information implication",
+                        "message": "The LLM policy review found copy that implies knowledge of a private health attribute.",
+                        "evidence": {"policyTrace": ["Meta personal attributes policy"]},
+                    },
+                    {
+                        "ruleId": "META-COPY-004",
+                        "status": "needs_manual_review",
+                        "title": "Potential SIEP copy",
+                        "message": "The LLM policy review found political language requiring SIEP review.",
+                        "evidence": {"policyTrace": ["Meta SIEP policy"]},
+                    },
+                    {
+                        "ruleId": "META-COPY-005",
+                        "status": "failed",
+                        "title": "Negative self-perception",
+                        "message": "The LLM policy review found copy that could generate negative self-perception.",
+                        "evidence": {"policyTrace": ["Meta health and wellness policy"]},
+                    },
+                ],
+                "revisionGuidance": ["Rewrite the ad without personal-attribute or shame framing."],
+            },
+        },
     )
     db_session.add(asset)
     db_session.commit()
@@ -733,7 +786,10 @@ def test_meta_campaign_paid_ads_qa_defaults_to_latest_generation_scope(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"creativeGenerationBatchId": "batch-older", "assetBriefId": older_brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(
+            creativeGenerationBatchId="batch-older",
+            assetBriefId=older_brief_id,
+        ),
         created_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
     latest_asset = Asset(
@@ -754,7 +810,10 @@ def test_meta_campaign_paid_ads_qa_defaults_to_latest_generation_scope(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"creativeGenerationBatchId": "batch-latest", "assetBriefId": latest_brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(
+            creativeGenerationBatchId="batch-latest",
+            assetBriefId=latest_brief_id,
+        ),
         created_at=datetime.now(timezone.utc),
     )
     db_session.add_all([older_asset, latest_asset])
@@ -872,7 +931,10 @@ def test_meta_campaign_paid_ads_qa_scopes_generation_to_requested_funnel(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"creativeGenerationBatchId": "batch-funnel-scope", "assetBriefId": brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(
+            creativeGenerationBatchId="batch-funnel-scope",
+            assetBriefId=brief_id,
+        ),
         created_at=datetime.now(timezone.utc),
     )
     other_funnel_asset = Asset(
@@ -893,7 +955,10 @@ def test_meta_campaign_paid_ads_qa_scopes_generation_to_requested_funnel(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"creativeGenerationBatchId": "batch-funnel-scope", "assetBriefId": other_brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(
+            creativeGenerationBatchId="batch-funnel-scope",
+            assetBriefId=other_brief_id,
+        ),
         created_at=datetime.now(timezone.utc),
     )
     db_session.add_all([scoped_asset, other_funnel_asset])
@@ -1003,7 +1068,7 @@ def test_meta_campaign_paid_ads_qa_resolves_relative_review_paths_with_explicit_
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"assetBriefId": brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(assetBriefId=brief_id),
     )
     db_session.add(asset)
     db_session.commit()
@@ -1122,7 +1187,7 @@ def test_meta_campaign_paid_ads_qa_defaults_review_base_url_from_selected_storef
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"assetBriefId": brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(assetBriefId=brief_id),
     )
     db_session.add(asset)
     db_session.commit()
@@ -1288,7 +1353,7 @@ def test_meta_campaign_paid_ads_qa_reads_public_funnel_payload_for_privacy_marke
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"assetBriefId": brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(assetBriefId=brief_id),
     )
     db_session.add(asset)
     db_session.commit()
@@ -1383,7 +1448,7 @@ def test_meta_campaign_paid_ads_qa_rejects_mismatched_explicit_review_base_url(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"assetBriefId": brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(assetBriefId=brief_id),
     )
     db_session.add(asset)
     db_session.commit()
@@ -1488,7 +1553,7 @@ def test_meta_campaign_paid_ads_qa_refreshes_live_profile_before_scoring(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"assetBriefId": brief_id},
+        ai_metadata=_passed_llm_policy_review_metadata(assetBriefId=brief_id),
     )
     db_session.add(asset)
     db_session.commit()

@@ -158,35 +158,35 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (Number.isFinite(numberValue)) target[key] = numberValue;
   };
 
-    const assignBooleanProp = (target, key, value) => {
-      if (typeof value === "boolean") target[key] = value;
-    };
+  const assignBooleanProp = (target, key, value) => {
+    if (typeof value === "boolean") target[key] = value;
+  };
 
-    const getSearchParam = (name) => {
-      try {
-        return cleanText(new URLSearchParams(window.location.search).get(name));
-      } catch (_) {
-        return null;
-      }
-    };
+  const getSearchParam = (name) => {
+    try {
+      return cleanText(new URLSearchParams(window.location.search).get(name));
+    } catch (_) {
+      return null;
+    }
+  };
 
-    const resolveCanonicalSessionId = () =>
-      getSearchParam("session_id") || getSearchParam(RMBC_SESSION_PARAM) || cleanText(config.sessionId);
+  const resolveCanonicalSessionId = () =>
+    getSearchParam("session_id") || getSearchParam(RMBC_SESSION_PARAM) || cleanText(config.sessionId);
 
-    const resolveCanonicalAnonymousId = () =>
-      getSearchParam("anonymous_id") ||
-      getSearchParam("visitor_id") ||
-      getSearchParam(RMBC_ANONYMOUS_PARAM) ||
-      cleanText(config.visitorId);
+  const resolveCanonicalAnonymousId = () =>
+    getSearchParam("anonymous_id") ||
+    getSearchParam("visitor_id") ||
+    getSearchParam(RMBC_ANONYMOUS_PARAM) ||
+    cleanText(config.visitorId);
 
-    const resolvePresalesSourcePageType = () => {
-      const explicitType = getSearchParam("source_page_type") || getSearchParam("sourcePageType");
-      if (explicitType) return explicitType;
-      const artifactKind = cleanText(config.htmlArtifactKind);
-      if (artifactKind === "quiz") return "quiz_presell";
-      if (artifactKind === "listicle" || artifactKind === "listicle_hybrid") return "listicle_presell";
-      return cleanText(config.pageStage) === "pre_sales" ? "pre_sales" : null;
-    };
+  const resolvePresalesSourcePageType = () => {
+    const explicitType = getSearchParam("source_page_type") || getSearchParam("sourcePageType");
+    if (explicitType) return explicitType;
+    const artifactKind = cleanText(config.htmlArtifactKind);
+    if (artifactKind === "quiz") return "quiz_presell";
+    if (artifactKind === "listicle" || artifactKind === "listicle_hybrid") return "listical_presell";
+    return cleanText(config.pageStage) === "pre_sales" ? "pre_sales" : null;
+  };
 
   const buildDeclaredTargetProps = (target) => {
     const props = {};
@@ -272,7 +272,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
   };
 
-    const resolveMetaExternalId = () => resolveCanonicalAnonymousId();
+  const resolveMetaExternalId = () => resolveCanonicalAnonymousId();
 
   const resolveMetaAdvancedMatchingProps = () => {
     const props = {};
@@ -287,15 +287,18 @@ function buildStandaloneImportedHtmlRuntimeScript({
     assignCleanProp(props, "em", readStoredMetaEmailHash());
     assignCleanProp(props, "fbp", readCookie("_fbp"));
     assignCleanProp(props, "fbc", readCookie("_fbc"));
-      const currentUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
-      assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
-      assignCleanProp(props, "session_id", currentUrl.searchParams.get("session_id") || currentUrl.searchParams.get(RMBC_SESSION_PARAM) || resolveCanonicalSessionId());
-      assignCleanProp(props, "anonymous_id", currentUrl.searchParams.get("anonymous_id") || currentUrl.searchParams.get("visitor_id") || currentUrl.searchParams.get(RMBC_ANONYMOUS_PARAM) || resolveCanonicalAnonymousId());
-      assignCleanProp(props, "click_id", currentUrl.searchParams.get("click_id") || currentUrl.searchParams.get(RMBC_CLICK_PARAM));
-      assignCleanProp(props, "source_page_type", currentUrl.searchParams.get("source_page_type") || currentUrl.searchParams.get("sourcePageType"));
-      assignCleanProp(props, "rmbc_session_id", currentUrl.searchParams.get(RMBC_SESSION_PARAM));
-      assignCleanProp(props, "rmbc_anonymous_id", currentUrl.searchParams.get(RMBC_ANONYMOUS_PARAM));
-      assignCleanProp(props, "rmbc_click_id", currentUrl.searchParams.get(RMBC_CLICK_PARAM));
+    const currentUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+    assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
+    assignCleanProp(props, "session_id", currentUrl.searchParams.get("session_id") || currentUrl.searchParams.get(RMBC_SESSION_PARAM) || resolveCanonicalSessionId());
+    assignCleanProp(props, "anonymous_id", currentUrl.searchParams.get("anonymous_id") || currentUrl.searchParams.get("visitor_id") || currentUrl.searchParams.get(RMBC_ANONYMOUS_PARAM) || resolveCanonicalAnonymousId());
+    assignCleanProp(props, "visitor_id", currentUrl.searchParams.get("visitor_id") || currentUrl.searchParams.get("anonymous_id") || currentUrl.searchParams.get(RMBC_ANONYMOUS_PARAM) || resolveCanonicalAnonymousId());
+    assignCleanProp(props, "click_id", currentUrl.searchParams.get("click_id") || currentUrl.searchParams.get(RMBC_CLICK_PARAM));
+    assignCleanProp(props, "source_page_type", currentUrl.searchParams.get("source_page_type") || currentUrl.searchParams.get("sourcePageType"));
+    assignCleanProp(props, "from_stage", currentUrl.searchParams.get("from_stage") || currentUrl.searchParams.get("fromStage"));
+    assignCleanProp(props, "to_stage", currentUrl.searchParams.get("to_stage") || currentUrl.searchParams.get("toStage"));
+    assignCleanProp(props, "rmbc_session_id", currentUrl.searchParams.get(RMBC_SESSION_PARAM));
+    assignCleanProp(props, "rmbc_anonymous_id", currentUrl.searchParams.get(RMBC_ANONYMOUS_PARAM));
+    assignCleanProp(props, "rmbc_click_id", currentUrl.searchParams.get(RMBC_CLICK_PARAM));
     assignCleanProp(props, "event_source_url", currentUrl.href);
     assignCleanProp(props, "$raw_user_agent", window.navigator && window.navigator.userAgent);
     return props;
@@ -341,7 +344,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       cleanText(eventType) || "event",
       cleanText(config.publicationId) || "publication",
       cleanText(config.pageId) || "page",
-      cleanText(config.sessionId) || "session",
+      resolveCanonicalSessionId() || "session",
       String(index),
       randomEventIdSegment(),
     ].join(":");
@@ -362,7 +365,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       cleanText(eventType) || "event",
       cleanText(config.publicationId) || "publication",
       cleanText(config.pageId) || "page",
-      cleanText(config.sessionId) || "session",
+      resolveCanonicalSessionId() || "session",
       randomEventIdSegment(),
     ].join(":");
   };
@@ -430,20 +433,20 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   const resolveRuntimeContextProps = (props) => {
-      const pageStage = cleanText((props && props.pageStage) || config.pageStage);
-      const experimentId = resolveExperimentId();
-      const externalId = resolveMetaExternalId();
-      const emailHash = readStoredMetaEmailHash();
-      const pageType = resolvePageType(pageStage);
-      const pageVariant = cleanText(config.pageSlug);
-      const visitorId = resolveCanonicalAnonymousId();
-      const sessionId = resolveCanonicalSessionId();
-      const deviceType = resolveDeviceType();
-      const clickAttribution = resolveClickAttribution();
-      const sourcePageType = resolvePresalesSourcePageType();
-      const fromStage = getSearchParam("from_stage") || getSearchParam("fromStage");
-      const toStage = getSearchParam("to_stage") || getSearchParam("toStage");
-      return {
+    const pageStage = cleanText((props && props.pageStage) || config.pageStage);
+    const experimentId = resolveExperimentId();
+    const externalId = resolveMetaExternalId();
+    const emailHash = readStoredMetaEmailHash();
+    const pageType = resolvePageType(pageStage);
+    const pageVariant = cleanText(config.pageSlug);
+    const visitorId = resolveCanonicalAnonymousId();
+    const sessionId = resolveCanonicalSessionId();
+    const deviceType = resolveDeviceType();
+    const clickAttribution = resolveClickAttribution();
+    const sourcePageType = resolvePresalesSourcePageType();
+    const fromStage = getSearchParam("from_stage") || getSearchParam("fromStage");
+    const toStage = getSearchParam("to_stage") || getSearchParam("toStage");
+    return {
       productSlug: cleanText(config.productSlug),
       product_slug: cleanText(config.productSlug),
       funnelSlug: cleanText(config.funnelSlug),
@@ -464,34 +467,34 @@ function buildStandaloneImportedHtmlRuntimeScript({
       html_deploy_schema_version: cleanText(config.htmlDeploySchemaVersion),
       pageVariant,
       page_variant: pageVariant,
-        visitorId,
-        visitor_id: visitorId,
-        anonymous_id: visitorId,
-        sessionId,
-        session_id: sessionId,
+      visitorId,
+      visitor_id: visitorId,
+      anonymous_id: visitorId,
+      sessionId,
+      session_id: sessionId,
       path: window.location.pathname + window.location.search,
       referrer: document.referrer || undefined,
       deviceType,
       device_type: deviceType,
       browserUserAgent: window.navigator && window.navigator.userAgent,
       browser_user_agent: window.navigator && window.navigator.userAgent,
-        ...(externalId ? { external_id: externalId } : {}),
-        ...(emailHash ? { em: emailHash } : {}),
-        ...(experimentId ? { experimentId, experiment_id: experimentId } : {}),
-        ...(sourcePageType ? { sourcePageType, source_page_type: sourcePageType } : {}),
-        ...(fromStage ? { fromStage, from_stage: fromStage } : {}),
-        ...(toStage ? { toStage, to_stage: toStage } : {}),
-        ...clickAttribution,
-        ...(clickAttribution.clickId ? { click_id: clickAttribution.clickId } : {}),
-        ...(clickAttribution.clickIdType ? { click_id_type: clickAttribution.clickIdType } : {}),
-        ...(getSearchParam(RMBC_SESSION_PARAM)
-          ? { rmbc_session_id: getSearchParam(RMBC_SESSION_PARAM) }
-          : {}),
-        ...(getSearchParam(RMBC_ANONYMOUS_PARAM)
-          ? { rmbc_anonymous_id: getSearchParam(RMBC_ANONYMOUS_PARAM) }
-          : {}),
-      };
+      ...(externalId ? { external_id: externalId } : {}),
+      ...(emailHash ? { em: emailHash } : {}),
+      ...(experimentId ? { experimentId, experiment_id: experimentId } : {}),
+      ...(sourcePageType ? { sourcePageType, source_page_type: sourcePageType } : {}),
+      ...(fromStage ? { fromStage, from_stage: fromStage } : {}),
+      ...(toStage ? { toStage, to_stage: toStage } : {}),
+      ...clickAttribution,
+      ...(clickAttribution.clickId ? { click_id: clickAttribution.clickId } : {}),
+      ...(clickAttribution.clickIdType ? { click_id_type: clickAttribution.clickIdType } : {}),
+      ...(getSearchParam(RMBC_SESSION_PARAM)
+        ? { rmbc_session_id: getSearchParam(RMBC_SESSION_PARAM) }
+        : {}),
+      ...(getSearchParam(RMBC_ANONYMOUS_PARAM)
+        ? { rmbc_anonymous_id: getSearchParam(RMBC_ANONYMOUS_PARAM) }
+        : {}),
     };
+  };
 
   const posthogTrackingConfig = isRecord(config.tracking) ? config.tracking : null;
   const PRESALE_SOURCE_PARAM = "src";
@@ -574,22 +577,23 @@ function buildStandaloneImportedHtmlRuntimeScript({
     nextUrl.search = currentUrl.search;
     if (isPresaleToSalesNavigation(options && options.fromStage, options && options.toStage)) {
       nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);
-        const bridgeSessionId = cleanText(options && options.sessionId) || cleanText(config.sessionId);
-        const bridgeAnonymousId = cleanText(options && options.anonymousId) || cleanText(config.visitorId);
-        const bridgeClickId = cleanText(options && options.clickId);
-        const sourcePageType = cleanText(options && options.sourcePageType) || resolvePresalesSourcePageType();
-        if (bridgeSessionId) nextUrl.searchParams.set(RMBC_SESSION_PARAM, bridgeSessionId);
-        if (bridgeSessionId) nextUrl.searchParams.set("session_id", bridgeSessionId);
-        if (bridgeAnonymousId) nextUrl.searchParams.set(RMBC_ANONYMOUS_PARAM, bridgeAnonymousId);
-        if (bridgeAnonymousId) nextUrl.searchParams.set("anonymous_id", bridgeAnonymousId);
-        if (bridgeClickId) nextUrl.searchParams.set(RMBC_CLICK_PARAM, bridgeClickId);
-        if (bridgeClickId) nextUrl.searchParams.set("click_id", bridgeClickId);
-        if (bridgeClickId) nextUrl.searchParams.set("click_id_type", RMBC_CLICK_PARAM);
-        if (sourcePageType) nextUrl.searchParams.set("source_page_type", sourcePageType);
-        nextUrl.searchParams.set("from_stage", "pre_sales");
-        nextUrl.searchParams.set("to_stage", "sales");
-        if (cleanText(config.pageSlug)) nextUrl.searchParams.set("source_page", cleanText(config.pageSlug));
-      }
+      const bridgeSessionId = cleanText(options && options.sessionId) || cleanText(config.sessionId);
+      const bridgeAnonymousId = cleanText(options && options.anonymousId) || cleanText(config.visitorId);
+      const bridgeClickId = cleanText(options && options.clickId);
+      const sourcePageType = cleanText(options && options.sourcePageType) || resolvePresalesSourcePageType();
+      if (bridgeSessionId) nextUrl.searchParams.set(RMBC_SESSION_PARAM, bridgeSessionId);
+      if (bridgeSessionId) nextUrl.searchParams.set("session_id", bridgeSessionId);
+      if (bridgeAnonymousId) nextUrl.searchParams.set(RMBC_ANONYMOUS_PARAM, bridgeAnonymousId);
+      if (bridgeAnonymousId) nextUrl.searchParams.set("anonymous_id", bridgeAnonymousId);
+      if (bridgeAnonymousId) nextUrl.searchParams.set("visitor_id", bridgeAnonymousId);
+      if (bridgeClickId) nextUrl.searchParams.set(RMBC_CLICK_PARAM, bridgeClickId);
+      if (bridgeClickId) nextUrl.searchParams.set("click_id", bridgeClickId);
+      if (bridgeClickId) nextUrl.searchParams.set("click_id_type", RMBC_CLICK_PARAM);
+      if (sourcePageType) nextUrl.searchParams.set("source_page_type", sourcePageType);
+      nextUrl.searchParams.set("from_stage", "pre_sales");
+      nextUrl.searchParams.set("to_stage", "sales");
+      if (cleanText(config.pageSlug)) nextUrl.searchParams.set("source_page", cleanText(config.pageSlug));
+    }
     return nextUrl.toString();
   };
 
@@ -1076,12 +1080,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
             {
               eventId: canonicalEventId,
               eventType,
-                occurredAt: new Date().toISOString(),
-                publicationId: config.publicationId,
-                pageId: config.pageId,
-                visitorId: resolveCanonicalAnonymousId(),
-                sessionId: resolveCanonicalSessionId(),
-                path: window.location.pathname + window.location.search,
+              occurredAt: new Date().toISOString(),
+              publicationId: config.publicationId,
+              pageId: config.pageId,
+              visitorId: resolveCanonicalAnonymousId(),
+              sessionId: resolveCanonicalSessionId(),
+              path: window.location.pathname + window.location.search,
               referrer: document.referrer || undefined,
               utm: getUtmParams(),
               props: {
@@ -3114,12 +3118,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
           const targetPath = config.pagePathById[String(binding.targetPageId || "")];
           const targetStage = cleanText(config.pageStageById && config.pageStageById[String(binding.targetPageId || "")]);
           if (targetPath) {
-              element.href = buildInternalNavigationUrl(targetPath, {
-                fromStage: config.pageStage,
-                toStage: targetStage || "custom",
-                sessionId: resolveCanonicalSessionId(),
-                anonymousId: resolveCanonicalAnonymousId(),
-              });
+            element.href = buildInternalNavigationUrl(targetPath, {
+              fromStage: config.pageStage,
+              toStage: targetStage || "custom",
+              sessionId: resolveCanonicalSessionId(),
+              anonymousId: resolveCanonicalAnonymousId(),
+            });
           }
         }
         element.dataset.mosStandaloneImportedHtmlBound = "true";
@@ -3154,37 +3158,37 @@ function buildStandaloneImportedHtmlRuntimeScript({
               if (!targetPath) {
                 throw new Error("Target page path is missing for binding '" + String(binding.id || "unknown") + "'.");
               }
-                const ctaPosition = matchIndex + 1;
-                const isPresaleSalesClick = isPresaleToSalesNavigation(config.pageStage, targetStage || "custom");
-                const bridgeClickId = isPresaleSalesClick ? buildBridgeClickId(binding.id, ctaPosition) : null;
-                const sourcePageType = isPresaleSalesClick ? resolvePresalesSourcePageType() : null;
-                const destinationUrl = buildInternalNavigationUrl(targetPath, {
-                  fromStage: config.pageStage,
-                  toStage: targetStage || "custom",
-                  sessionId: resolveCanonicalSessionId(),
-                  anonymousId: resolveCanonicalAnonymousId(),
-                  clickId: bridgeClickId,
-                  sourcePageType,
-                });
-                trackEvent(binding.trackEventType || "custom_page_click", {
-                  fromStage: config.pageStage,
-                  from_stage: config.pageStage,
-                  toStage: targetStage || "custom",
-                  to_stage: targetStage || "custom",
-                  ...(sourcePageType ? { sourcePageType, source_page_type: sourcePageType } : {}),
-                  sourcePage: config.pageSlug,
-                  source_page: config.pageSlug,
-                  sessionId: resolveCanonicalSessionId(),
-                  session_id: resolveCanonicalSessionId(),
-                  visitorId: resolveCanonicalAnonymousId(),
-                  visitor_id: resolveCanonicalAnonymousId(),
-                  anonymous_id: resolveCanonicalAnonymousId(),
-                  targetPageId: binding.targetPageId,
-                  target_page_id: binding.targetPageId,
-                  bindingId: binding.id,
-                  binding_id: binding.id,
-                  ctaId: binding.id,
-                  cta_id: binding.id,
+              const ctaPosition = matchIndex + 1;
+              const isPresaleSalesClick = isPresaleToSalesNavigation(config.pageStage, targetStage || "custom");
+              const bridgeClickId = isPresaleSalesClick ? buildBridgeClickId(binding.id, ctaPosition) : null;
+              const sourcePageType = isPresaleSalesClick ? resolvePresalesSourcePageType() : null;
+              const destinationUrl = buildInternalNavigationUrl(targetPath, {
+                fromStage: config.pageStage,
+                toStage: targetStage || "custom",
+                sessionId: resolveCanonicalSessionId(),
+                anonymousId: resolveCanonicalAnonymousId(),
+                clickId: bridgeClickId,
+                sourcePageType,
+              });
+              trackEvent(binding.trackEventType || "custom_page_click", {
+                fromStage: config.pageStage,
+                from_stage: config.pageStage,
+                toStage: targetStage || "custom",
+                to_stage: targetStage || "custom",
+                ...(sourcePageType ? { sourcePageType, source_page_type: sourcePageType } : {}),
+                sourcePage: config.pageSlug,
+                source_page: config.pageSlug,
+                sessionId: resolveCanonicalSessionId(),
+                session_id: resolveCanonicalSessionId(),
+                visitorId: resolveCanonicalAnonymousId(),
+                visitor_id: resolveCanonicalAnonymousId(),
+                anonymous_id: resolveCanonicalAnonymousId(),
+                targetPageId: binding.targetPageId,
+                target_page_id: binding.targetPageId,
+                bindingId: binding.id,
+                binding_id: binding.id,
+                ctaId: binding.id,
+                cta_id: binding.id,
                 ctaPosition,
                 cta_position: ctaPosition,
                 ctaText: buttonText || undefined,
@@ -3242,19 +3246,19 @@ function buildStandaloneImportedHtmlRuntimeScript({
               binding,
             );
             const transitionId = buildCanonicalEventId("checkout_transition");
-              const checkoutEventProps = {
-                fromStage: config.pageStage,
-                from_stage: config.pageStage,
-                toStage: "checkout",
-                to_stage: "checkout",
-                bindingId,
-                binding_id: bindingId,
-                ctaId: bindingId,
-                cta_id: bindingId,
-                transitionId,
-                transition_id: transitionId,
-                buttonText: buttonText || undefined,
-                button_text: buttonText || undefined,
+            const checkoutEventProps = {
+              fromStage: config.pageStage,
+              from_stage: config.pageStage,
+              toStage: "checkout",
+              to_stage: "checkout",
+              bindingId,
+              binding_id: bindingId,
+              ctaId: bindingId,
+              cta_id: bindingId,
+              transitionId,
+              transition_id: transitionId,
+              buttonText: buttonText || undefined,
+              button_text: buttonText || undefined,
               ...(resolvedVariantId ? { variantId: resolvedVariantId } : {}),
               ...(variant && typeof variant.price === "number" ? { value: Math.round(variant.price) / 100 } : {}),
               ...(variant && variant.currency ? { currency: variant.currency } : {}),

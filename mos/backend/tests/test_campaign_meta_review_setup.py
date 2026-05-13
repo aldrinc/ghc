@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
 from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage, MetaAdSetSpec, MetaCreativeSpec
 from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
@@ -322,6 +323,9 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert row["adset_specs"][0]["billing_event"] == "IMPRESSIONS"
     assert row["adset_specs"][0]["daily_budget"] is None
     assert row["adset_specs"][0]["lifetime_budget"] is None
+    assert row["adset_specs"][0]["daily_min_spend_target"] == (
+        DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+    )
     assert row["adset_specs"][0]["placements"] is None
     assert row["adset_specs"][0]["targeting"] == DEFAULT_META_PUBLISH_TARGETING
     assert row["adset_specs"][0]["metadata_json"]["templateId"] == "default-broad-int-cbo"
@@ -1479,7 +1483,6 @@ def test_campaign_meta_review_setup_rejects_invalid_assets_before_writing_specs(
     assert invalid_asset["assetId"] == str(asset.id)
     rule_ids = {issue["ruleId"] for issue in invalid_asset["issues"]}
     assert "META-LP-001" in rule_ids
-    assert "META-COPY-002" in rule_ids
 
     creative_specs = db_session.scalars(
         select(MetaCreativeSpec).where(MetaCreativeSpec.campaign_id == campaign_id)

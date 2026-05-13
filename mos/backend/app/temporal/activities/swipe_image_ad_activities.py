@@ -1271,19 +1271,23 @@ def _load_required_product_offer_pricing_snapshot(
     client_id: str,
     product_id: str,
     funnel_id: str | None,
+    selected_offer_id: str | None = None,
 ) -> Dict[str, Any]:
     selected_offer: ProductOffer | None = None
-    if funnel_id:
+    effective_selected_offer_id = selected_offer_id
+    if funnel_id and effective_selected_offer_id is None:
         funnel = session.get(Funnel, funnel_id)
         if funnel is None:
             raise ValueError(f"Funnel not found: {funnel_id}")
         if funnel.selected_offer_id:
-            selected_offer = session.get(ProductOffer, funnel.selected_offer_id)
-            if selected_offer is None:
-                raise ValueError(
-                    "Funnel selected_offer_id is set but the offer could not be found "
-                    f"(funnel_id={funnel_id}, selected_offer_id={funnel.selected_offer_id})."
-                )
+            effective_selected_offer_id = str(funnel.selected_offer_id)
+    if effective_selected_offer_id:
+        selected_offer = session.get(ProductOffer, effective_selected_offer_id)
+        if selected_offer is None:
+            raise ValueError(
+                "Selected offer is set but the offer could not be found "
+                f"(funnel_id={funnel_id}, selected_offer_id={effective_selected_offer_id})."
+            )
 
     if selected_offer is None:
         offers = list(
@@ -1304,9 +1308,10 @@ def _load_required_product_offer_pricing_snapshot(
             )
         if len(offers) > 1:
             raise ValueError(
-                "Multiple product offers found and no funnel.selected_offer_id is set; "
+                "Multiple product offers found and no selected_offer_id is set; "
                 "cannot deterministically choose offer_pricing snapshot for swipe stage-1 RAG context. "
-                f"product_id={product_id}, funnel_id={funnel_id}, offer_ids={[str(item.id) for item in offers]}."
+                f"product_id={product_id}, funnel_id={funnel_id}, selected_offer_id={effective_selected_offer_id}, "
+                f"offer_ids={[str(item.id) for item in offers]}."
             )
         selected_offer = offers[0]
 
@@ -1382,6 +1387,7 @@ def _load_required_swipe_stage1_rag_docs(
     product_id: str,
     campaign_id: str | None,
     funnel_id: str | None,
+    selected_offer_id: str | None,
     asset_brief_artifact_id: str,
 ) -> list[Dict[str, Any]]:
     artifacts_repo = ArtifactsRepository(session)
@@ -1518,6 +1524,7 @@ def _load_required_swipe_stage1_rag_docs(
         client_id=client_id,
         product_id=product_id,
         funnel_id=funnel_id,
+        selected_offer_id=selected_offer_id,
     )
 
     asset_brief_artifact = artifacts_repo.get(org_id=org_id, artifact_id=asset_brief_artifact_id)
@@ -1687,6 +1694,7 @@ def _resolve_swipe_stage1_gemini_file_search_context(
     product_id: str,
     campaign_id: str | None,
     funnel_id: str | None,
+    selected_offer_id: str | None = None,
     asset_brief_artifact_id: str,
 ) -> tuple[list[str], list[str], list[str], list[str]]:
     if not is_gemini_file_search_enabled():
@@ -1702,6 +1710,7 @@ def _resolve_swipe_stage1_gemini_file_search_context(
         product_id=product_id,
         campaign_id=campaign_id,
         funnel_id=funnel_id,
+        selected_offer_id=selected_offer_id,
         asset_brief_artifact_id=asset_brief_artifact_id,
     )
 
@@ -3703,6 +3712,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             brief=brief,
         )
         funnel_id = brief_scope.funnel_id
+        selected_offer_id = (
+            str(params.get("selected_offer_id")).strip()
+            if isinstance(params.get("selected_offer_id"), str) and str(params.get("selected_offer_id")).strip()
+            else None
+        )
         campaign_delivery_config = brief_scope.campaign_delivery_config
 
         requirements_raw = brief.get("requirements") or []
@@ -3869,6 +3883,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 product_id=product_id,
                 campaign_id=campaign_id,
                 funnel_id=funnel_id,
+                selected_offer_id=selected_offer_id,
                 asset_brief_artifact_id=brief_artifact_id,
             )
             linked_ad_copy_pack_context = _resolve_linked_ad_copy_pack_context(

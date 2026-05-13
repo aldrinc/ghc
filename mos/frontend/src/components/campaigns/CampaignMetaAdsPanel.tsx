@@ -36,6 +36,8 @@ type CampaignMetaAdsPanelProps = {
   assetBriefs: AssetBrief[];
 };
 
+const DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS = 1000;
+
 type MetaPackageView = "review" | "final";
 
 type MetaPublishCampaignForm = {
@@ -54,6 +56,7 @@ type MetaPublishAdSetForm = {
   placementsJson: string;
   dailyBudget: string;
   lifetimeBudget: string;
+  dailyMinSpendTarget: string;
   startTime: string;
   endTime: string;
   promotedObjectJson: string;
@@ -337,6 +340,14 @@ function toLocalDateTimeValue(value?: string | null): string {
   return offsetDate.toISOString().slice(0, 16);
 }
 
+function defaultNextDayLocalStartTimeValue(now = new Date()): string {
+  const next = new Date(now);
+  next.setDate(next.getDate() + 1);
+  next.setHours(0, 1, 0, 0);
+  const offsetDate = new Date(next.getTime() - next.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
 function fromLocalDateTimeValue(value: string): string | null {
   const cleaned = value.trim();
   if (!cleaned) return null;
@@ -366,7 +377,11 @@ function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
     placementsJson: formatJsonInput(spec.placements),
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
-    startTime: toLocalDateTimeValue(spec.start_time),
+    dailyMinSpendTarget:
+      spec.daily_min_spend_target != null
+        ? String(spec.daily_min_spend_target)
+        : String(DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS),
+    startTime: toLocalDateTimeValue(spec.start_time) || defaultNextDayLocalStartTimeValue(),
     endTime: toLocalDateTimeValue(spec.end_time),
     promotedObjectJson: formatJsonInput(spec.promoted_object),
     conversionDomain: spec.conversion_domain || "",
@@ -1013,6 +1028,10 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         placements: parseJsonObjectInput(form.placementsJson, `${spec.name || spec.id} placements`),
         dailyBudget: parseIntegerInput(form.dailyBudget, `${spec.name || spec.id} daily budget`),
         lifetimeBudget: parseIntegerInput(form.lifetimeBudget, `${spec.name || spec.id} lifetime budget`),
+        dailyMinSpendTarget: parseIntegerInput(
+          form.dailyMinSpendTarget,
+          `${spec.name || spec.id} daily min spend target`,
+        ),
         bidAmount: null,
         startTime: fromLocalDateTimeValue(form.startTime),
         endTime: fromLocalDateTimeValue(form.endTime),
@@ -1560,7 +1579,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                         />
                       </label>
                       <div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-content-muted">
-                        This publish path creates the Meta campaign, ad sets, and ads in <span className="font-semibold text-content">PAUSED</span> status.
+                        This publish path creates the Meta campaign in <span className="font-semibold text-content">PAUSED</span> status, while ad sets and ads are created <span className="font-semibold text-content">ACTIVE</span>.
                       </div>
                     </div>
                   </div>
@@ -1620,6 +1639,14 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                                     value={form.lifetimeBudget}
                                     onChange={(event) => updatePublishAdSetField(spec.id, "lifetimeBudget", event.target.value)}
                                     placeholder="Leave blank to use daily budget"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Daily Min Spend Target</div>
+                                  <Input
+                                    value={form.dailyMinSpendTarget}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "dailyMinSpendTarget", event.target.value)}
+                                    placeholder="1000"
                                   />
                                 </label>
                                 <label className="block space-y-1">

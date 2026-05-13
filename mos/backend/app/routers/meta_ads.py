@@ -49,6 +49,7 @@ from app.db.repositories.experiments import ExperimentsRepository
 from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
+from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.meta_ads import (
     MetaAdAccountConnectionResponse,
     MetaAdAccountConnectionUpsertRequest,
@@ -115,6 +116,7 @@ from app.services.meta_management_service import (
 from app.services.meta_management_reports import render_meta_management_report
 from app.services.meta_management_schedule import reconcile_campaign_meta_management_schedule
 from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     default_meta_publish_attribution_spec,
@@ -173,11 +175,31 @@ _META_CTA_LABEL_ALIASES = {
     "SIGN UP": "SIGN_UP",
 }
 _META_MIN_DAILY_BUDGET_MINOR_UNITS = 100
+_META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS = (
+    DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+)
 _META_MULTI_ASPECT_METADATA_KEY = "multiAspectSpec"
 _META_MULTI_ASPECT_ALLOWED_RATIOS = ("1:1", "4:5", "9:16")
 _META_MULTI_ASPECT_DEFAULT_RATIO = "1:1"
 _META_MULTI_ASPECT_FEED_RATIO = "4:5"
 _META_MULTI_ASPECT_STORY_RATIO = "9:16"
+_META_MULTI_ASPECT_SQUARE_RULE = {
+    "publisher_platforms": ["facebook", "audience_network"],
+    "facebook_positions": ["feed", "marketplace", "search", "right_hand_column"],
+    "audience_network_positions": ["classic"],
+}
+_META_MULTI_ASPECT_FEED_RULE = {
+    "publisher_platforms": ["facebook", "instagram", "audience_network"],
+    "facebook_positions": ["video_feeds", "profile_feed"],
+    "instagram_positions": ["stream", "explore", "explore_home", "profile_feed", "ig_search"],
+    "audience_network_positions": ["instream_video"],
+}
+_META_MULTI_ASPECT_STORY_RULE = {
+    "publisher_platforms": ["facebook", "instagram", "messenger"],
+    "facebook_positions": ["story", "facebook_reels", "facebook_reels_overlay"],
+    "instagram_positions": ["story", "reels"],
+    "messenger_positions": ["story"],
+}
 
 class _MetaEventMappingsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -761,41 +783,16 @@ def _multi_aspect_creative_payload(
         "link_urls": [{"website_url": link_url}],
         "asset_customization_rules": [
             {
-                "customization_spec": {
-                    "publisher_platforms": ["facebook", "instagram", "messenger"],
-                    "facebook_positions": [
-                        "story",
-                        "facebook_reels",
-                        "facebook_reels_overlay",
-                    ],
-                    "instagram_positions": ["story", "reels"],
-                    "messenger_positions": ["story"],
-                },
-                "image_label": {"name": story_variant["label"]},
+                "customization_spec": dict(_META_MULTI_ASPECT_SQUARE_RULE),
+                "image_label": {"name": default_variant["label"]},
             },
             {
-                "customization_spec": {
-                    "publisher_platforms": ["facebook", "instagram"],
-                    "facebook_positions": [
-                        "feed",
-                        "marketplace",
-                        "search",
-                        "video_feeds",
-                        "profile_feed",
-                    ],
-                    "instagram_positions": [
-                        "stream",
-                        "explore",
-                        "explore_home",
-                        "profile_feed",
-                        "ig_search",
-                    ],
-                },
+                "customization_spec": dict(_META_MULTI_ASPECT_FEED_RULE),
                 "image_label": {"name": feed_variant["label"]},
             },
             {
-                "is_default": True,
-                "image_label": {"name": default_variant["label"]},
+                "customization_spec": dict(_META_MULTI_ASPECT_STORY_RULE),
+                "image_label": {"name": story_variant["label"]},
             },
         ],
     }
@@ -836,6 +833,35 @@ def _validate_meta_adset_budget_fields(
     if int(daily_budget) <= _META_MIN_DAILY_BUDGET_MINOR_UNITS:
         return [_meta_daily_budget_too_low_message(scope_label)]
     return []
+
+
+def _validate_meta_adset_daily_min_spend_target_fields(
+    *,
+    daily_min_spend_target: Any,
+    scope_label: str,
+    required: bool = False,
+) -> list[str]:
+    if daily_min_spend_target is None:
+        if required:
+            return [
+                (
+                    f"{scope_label} dailyMinSpendTarget is required and must be at least "
+                    f"{_META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS} minor units. "
+                    "For USD accounts, that means at least $10.00/day."
+                )
+            ]
+        return []
+    if int(daily_min_spend_target) < _META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS:
+        return [
+            (
+                f"{scope_label} dailyMinSpendTarget must be at least "
+                f"{_META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS} minor units. "
+                "For USD accounts, that means at least $10.00/day."
+            )
+        ]
+    return []
+
+
 _META_PLACEMENT_TARGETING_KEYS = frozenset(
     {
         "device_platforms",
@@ -1783,6 +1809,7 @@ def _build_launch_plan_payload(
                     "billingEvent": adset_spec.billing_event,
                     "dailyBudget": adset_spec.daily_budget,
                     "lifetimeBudget": adset_spec.lifetime_budget,
+                    "dailyMinSpendTarget": adset_spec.daily_min_spend_target,
                     "dsaBeneficiary": adset_spec.dsa_beneficiary,
                     "dsaPayor": adset_spec.dsa_payor,
                     "targeting": adset_spec.targeting,
@@ -2040,6 +2067,7 @@ def _create_publish_run_item_record(
         "assetPublicId": str(asset.public_id),
         "creativeSpecName": creative_spec.name,
         "adsetSpecName": adset_spec.name,
+        "adsetDailyMinSpendTarget": adset_spec.daily_min_spend_target,
         "bucketIndex": resolved.get("bucket_index"),
         "groupKey": resolved.get("group_key"),
         "variantAssetIds": [
@@ -2089,6 +2117,55 @@ def _create_publish_run_item_record(
         error_message=None,
         metadata_json=base_metadata,
     )
+
+
+def _paid_ads_qa_publish_gate_blocker(
+    *,
+    session: Session,
+    org_id: str,
+    campaign_id: str,
+    generation_key: str,
+    selected_asset_ids: list[str],
+) -> str | None:
+    qa_repo = PaidAdsQaRepository(session)
+    latest_meta_run = next(
+        (
+            run
+            for run in qa_repo.list_runs(
+                org_id=org_id,
+                campaign_id=campaign_id,
+                subject_type="campaign",
+                limit=10,
+            )
+            if run.platform == "meta"
+        ),
+        None,
+    )
+    if latest_meta_run is None:
+        return "Meta publish is blocked until full paid ads QA has been run for this campaign generation."
+    metadata = dict(latest_meta_run.metadata_json) if isinstance(latest_meta_run.metadata_json, dict) else {}
+    if latest_meta_run.ruleset_version != RULESET_VERSION:
+        return (
+            "Meta publish is blocked because the latest paid ads QA run used ruleset "
+            f"{latest_meta_run.ruleset_version}; rerun QA with {RULESET_VERSION}."
+        )
+    qa_generation_key = _clean_optional_text(metadata.get("generationKey"))
+    if qa_generation_key != generation_key:
+        return (
+            "Meta publish is blocked because the latest paid ads QA run does not match "
+            f"generationKey {generation_key}."
+        )
+    qa_asset_ids = metadata.get("generationAssetIds")
+    if not isinstance(qa_asset_ids, list) or not set(selected_asset_ids).issubset(
+        {str(asset_id) for asset_id in qa_asset_ids}
+    ):
+        return "Meta publish is blocked because the latest paid ads QA run does not cover every selected creative."
+    if latest_meta_run.status != "passed":
+        return (
+            "Meta publish is blocked because the latest paid ads QA run status is "
+            f"{latest_meta_run.status}; resolve findings and rerun QA."
+        )
+    return None
 
 
 def _validate_publish_plan(
@@ -2176,6 +2253,17 @@ def _validate_publish_plan(
             blockers.append("No campaign assets were found for this publish generation.")
     elif not selected_assets:
         blockers.append("All creatives are excluded from the final Meta package for this generation.")
+
+    if selected_assets:
+        qa_blocker = _paid_ads_qa_publish_gate_blocker(
+            session=session,
+            org_id=auth.org_id,
+            campaign_id=str(campaign.id),
+            generation_key=payload.generationKey,
+            selected_asset_ids=[str(asset.id) for asset in selected_assets],
+        )
+        if qa_blocker:
+            blockers.append(qa_blocker)
 
     resolved_meta_config = _resolve_meta_workspace_context_for_campaign(
         session=session,
@@ -2375,6 +2463,13 @@ def _validate_publish_plan(
                     _validate_meta_adset_budget_fields(
                         daily_budget=adset_spec.daily_budget,
                         scope_label="Linked Meta ad set spec",
+                    )
+                )
+                item_blockers.extend(
+                    _validate_meta_adset_daily_min_spend_target_fields(
+                        daily_min_spend_target=adset_spec.daily_min_spend_target,
+                        scope_label="Linked Meta ad set spec",
+                        required=True,
                     )
                 )
                 if adset_spec.start_time and adset_spec.end_time and adset_spec.end_time <= adset_spec.start_time:
@@ -3078,6 +3173,12 @@ def _create_meta_adset_internal(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=payload.dailyMinSpendTarget,
+        scope_label="Meta ad set",
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     request_payload: dict[str, Any] = {
         "name": payload.name,
@@ -3096,6 +3197,8 @@ def _create_meta_adset_internal(
         request_payload["daily_budget"] = payload.dailyBudget
     if payload.lifetimeBudget is not None:
         request_payload["lifetime_budget"] = payload.lifetimeBudget
+    if payload.dailyMinSpendTarget is not None:
+        request_payload["daily_min_spend_target"] = payload.dailyMinSpendTarget
     if payload.startTime:
         request_payload["start_time"] = payload.startTime
     if payload.endTime:
@@ -3228,6 +3331,13 @@ def _update_meta_adset_internal(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    daily_min_spend_target = update_fields.get("dailyMinSpendTarget")
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=daily_min_spend_target,
+        scope_label="Meta ad set",
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     request_payload: dict[str, Any] = {}
     if "name" in update_fields:
@@ -3238,6 +3348,8 @@ def _update_meta_adset_internal(
         request_payload["daily_budget"] = update_fields["dailyBudget"]
     if "lifetimeBudget" in update_fields:
         request_payload["lifetime_budget"] = update_fields["lifetimeBudget"]
+    if "dailyMinSpendTarget" in update_fields:
+        request_payload["daily_min_spend_target"] = update_fields["dailyMinSpendTarget"]
     if update_fields.get("clearBidAmount"):
         request_payload["bid_strategy"] = (
             _clean_optional_text(update_fields.get("bidStrategy")) or "LOWEST_COST_WITHOUT_CAP"
@@ -4208,6 +4320,18 @@ def create_meta_adset_spec(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    daily_min_spend_target = (
+        payload.dailyMinSpendTarget
+        if payload.dailyMinSpendTarget is not None
+        else DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+    )
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=daily_min_spend_target,
+        scope_label="Meta ad set spec",
+        required=True,
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     repo = MetaAdsRepository(session)
     record = repo.create_adset_spec(
@@ -4222,6 +4346,7 @@ def create_meta_adset_spec(
         placements=payload.placements,
         daily_budget=payload.dailyBudget,
         lifetime_budget=payload.lifetimeBudget,
+        daily_min_spend_target=daily_min_spend_target,
         bid_amount=None,
         dsa_beneficiary=_clean_optional_text(payload.dsaBeneficiary),
         dsa_payor=_clean_optional_text(payload.dsaPayor),
@@ -4284,6 +4409,17 @@ def update_meta_adset_spec(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    daily_min_spend_target = update_fields.get(
+        "dailyMinSpendTarget",
+        record.daily_min_spend_target,
+    )
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=daily_min_spend_target,
+        scope_label="Meta ad set spec",
+        required=True,
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     start_time = update_fields.get("startTime", record.start_time)
     end_time = update_fields.get("endTime", record.end_time)
@@ -4310,6 +4446,7 @@ def update_meta_adset_spec(
         placements=update_fields["placements"] if "placements" in update_fields else record.placements,
         daily_budget=daily_budget,
         lifetime_budget=lifetime_budget,
+        daily_min_spend_target=daily_min_spend_target,
         bid_amount=update_fields["bidAmount"] if "bidAmount" in update_fields else record.bid_amount,
         dsa_beneficiary=(
             _clean_optional_text(update_fields["dsaBeneficiary"])
@@ -4967,9 +5104,10 @@ def create_meta_publish_run(
                             metaConfigId=str(resolved_meta_config.workspace_config.id),
                             campaignId=meta_campaign_id or "",
                             name=_clean_optional_text(adset_spec.name) or adset_spec_id,
-                            status="PAUSED",
+                            status="ACTIVE",
                             dailyBudget=adset_spec.daily_budget if publish_budget_scope == "adset" else None,
                             lifetimeBudget=adset_spec.lifetime_budget if publish_budget_scope == "adset" else None,
+                            dailyMinSpendTarget=adset_spec.daily_min_spend_target,
                             billingEvent=_clean_optional_text(adset_spec.billing_event) or "",
                             optimizationGoal=_clean_optional_text(adset_spec.optimization_goal) or "",
                             targeting=adset_spec.targeting or {},
@@ -5152,7 +5290,7 @@ def create_meta_publish_run(
                         adsetId=meta_adset_id,
                         creativeId=meta_creative_id,
                         name=_clean_optional_text(creative_spec.name) or str(asset.public_id),
-                        status="PAUSED",
+                        status="ACTIVE",
                         trackingSpecs=None,
                         conversionDomain=_clean_optional_text(adset_spec.conversion_domain),
                         validateOnly=False,

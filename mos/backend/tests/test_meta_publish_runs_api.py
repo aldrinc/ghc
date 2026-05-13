@@ -41,6 +41,7 @@ from app.db.models import (
     MetaPublishRun,
     MetaCreativeSpec,
     MetaWorkspaceAdConfig,
+    PaidAdsQaRun,
     ProductOffer,
     ProductVariant,
 )
@@ -59,6 +60,7 @@ from app.services.meta_media_buying import (
 from app.services.meta_management_service import run_meta_management_monitoring_snapshot
 from app.services.integration_secrets import encrypt_secret_json
 from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
@@ -269,6 +271,7 @@ def _create_meta_publish_inputs(
             placements=None,
             daily_budget=None,
             lifetime_budget=None,
+            daily_min_spend_target=DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
             bid_amount=None,
             start_time=None,
             end_time=None,
@@ -290,7 +293,92 @@ def _create_meta_publish_inputs(
     ]
     for adset_spec in adset_specs:
         db_session.refresh(adset_spec)
+    batch_id = asset.ai_metadata.get("creativeGenerationBatchId") if isinstance(asset.ai_metadata, dict) else None
+    generation_key = f"batch:{batch_id}" if batch_id else "batch:latest-run"
+    qa_asset_ids = [
+        str(row.id)
+        for row in db_session.scalars(
+            select(Asset).where(
+                Asset.org_id == TEST_ORG_ID,
+                Asset.campaign_id == campaign_id,
+            )
+        ).all()
+    ]
+    db_session.add(
+        PaidAdsQaRun(
+            org_id=TEST_ORG_ID,
+            client_id=str(asset.client_id),
+            campaign_id=campaign_id,
+            platform="meta",
+            subject_type="campaign",
+            subject_id=campaign_id,
+            ruleset_version=RULESET_VERSION,
+            status="passed",
+            blocker_count=0,
+            high_count=0,
+            medium_count=0,
+            low_count=0,
+            needs_manual_review_count=0,
+            checked_rule_ids=[
+                "META-POLICY-LLM-001",
+                "META-COPY-006",
+                "META-UBP-001",
+                "META-IMAGE-001",
+                "META-LP-007",
+            ],
+            report_markdown="# Paid Ads QA Report\n\nStatus: passed",
+            metadata_json={
+                "generationKey": generation_key,
+                "generationAssetIds": qa_asset_ids,
+                "policyClassificationMethod": "llm",
+            },
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
     return creative_spec, adset_specs[0]
+
+
+def _seed_passed_paid_ads_qa_run(
+    db_session,
+    *,
+    client_id: str,
+    campaign_id: str,
+    generation_key: str,
+    asset_ids: list[str],
+) -> None:
+    db_session.add(
+        PaidAdsQaRun(
+            org_id=TEST_ORG_ID,
+            client_id=client_id,
+            campaign_id=campaign_id,
+            platform="meta",
+            subject_type="campaign",
+            subject_id=campaign_id,
+            ruleset_version=RULESET_VERSION,
+            status="passed",
+            blocker_count=0,
+            high_count=0,
+            medium_count=0,
+            low_count=0,
+            needs_manual_review_count=0,
+            checked_rule_ids=[
+                "META-POLICY-LLM-001",
+                "META-COPY-006",
+                "META-UBP-001",
+                "META-IMAGE-001",
+                "META-LP-007",
+            ],
+            report_markdown="# Paid Ads QA Report\n\nStatus: passed",
+            metadata_json={
+                "generationKey": generation_key,
+                "generationAssetIds": asset_ids,
+                "policyClassificationMethod": "llm",
+            },
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
 
 
 def _seed_meta_workspace_config(db_session, *, client_id: str) -> MetaWorkspaceAdConfig:
@@ -1069,9 +1157,12 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
 
         def create_adset(self, **kwargs):
             adset_counter["count"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             assert kwargs["payload"]["dsa_beneficiary"] == "Test Page"
             assert kwargs["payload"]["dsa_payor"] == "Test Page"
+            assert kwargs["payload"]["daily_min_spend_target"] == (
+                DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+            )
             assert kwargs["payload"]["targeting"]["geo_locations"]["countries"] == list(DEFAULT_META_PUBLISH_TARGETING["geo_locations"]["countries"])
             assert kwargs["payload"]["targeting"]["brand_safety_content_filter_levels"] == ["FACEBOOK_RELAXED"]
             assert kwargs["payload"]["targeting"]["targeting_automation"]["advantage_audience"] == 1
@@ -1098,7 +1189,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
             return {"id": "meta_creative_123"}
 
         def create_ad(self, **kwargs):
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             return {"id": "meta_ad_123", "status": "PAUSED"}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
@@ -1267,6 +1358,12 @@ def test_publish_meta_run_groups_multi_aspect_variants_into_one_meta_ad(
             }
             rules = asset_feed_spec["asset_customization_rules"]
             assert len(rules) == 3
+            square_rule = next(
+                rule
+                for rule in rules
+                if rule.get("customization_spec", {}).get("facebook_positions")
+                == ["feed", "marketplace", "search", "right_hand_column"]
+            )
             story_rule = next(
                 rule
                 for rule in rules
@@ -1276,17 +1373,18 @@ def test_publish_meta_run_groups_multi_aspect_variants_into_one_meta_ad(
                 rule
                 for rule in rules
                 if rule.get("customization_spec", {}).get("facebook_positions")
-                == ["feed", "marketplace", "search", "video_feeds", "profile_feed"]
+                == ["video_feeds", "profile_feed"]
             )
-            default_rule = next(rule for rule in rules if rule.get("is_default") is True)
+            assert square_rule["customization_spec"]["audience_network_positions"] == ["classic"]
+            assert feed_rule["customization_spec"]["audience_network_positions"] == ["instream_video"]
             assert label_to_hash[story_rule["image_label"]["name"]] == "hash_9x16"
             assert label_to_hash[feed_rule["image_label"]["name"]] == "hash_4x5"
-            assert label_to_hash[default_rule["image_label"]["name"]] == "hash_square"
+            assert label_to_hash[square_rule["image_label"]["name"]] == "hash_square"
             return {"id": "meta_creative_multi_aspect"}
 
         def create_ad(self, **kwargs):
             ad_counter["count"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             return {"id": f"meta_ad_multi_aspect_{ad_counter['count']}", "status": "PAUSED"}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
@@ -2155,7 +2253,10 @@ def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
 
         def create_adset(self, **kwargs):
             counters["create_adset"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
+            assert kwargs["payload"]["daily_min_spend_target"] == (
+                DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+            )
             return {"id": f"meta_adset_{counters['create_adset']}", "status": "PAUSED"}
 
         def create_adcreative(self, **kwargs):
@@ -2164,7 +2265,7 @@ def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
 
         def create_ad(self, **kwargs):
             counters["create_ad"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             return {"id": f"meta_ad_{counters['create_ad']}", "status": "PAUSED"}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
@@ -2292,6 +2393,7 @@ def test_update_meta_adset_spec_rejects_bid_amount(api_client, db_session) -> No
         placements={"publisher_platforms": ["facebook"]},
         daily_budget=None,
         lifetime_budget=None,
+        daily_min_spend_target=DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
         bid_amount=None,
         start_time=None,
         end_time=None,
@@ -2565,6 +2667,68 @@ def test_validate_meta_publish_plan_blocks_daily_budget_under_meta_minimum(api_c
     assert meta_ads_router._meta_daily_budget_too_low_message("Linked Meta ad set spec") in payload["items"][0]["blockers"]
 
 
+def test_validate_meta_publish_plan_blocks_daily_min_spend_target_under_default(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-low-min-spend",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-low-min-spend"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-low-min-spend",
+        asset_brief_id=brief_id,
+    )
+    _creative_spec, adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-low-min-spend",
+        with_targeting=True,
+    )
+    adset_spec.daily_min_spend_target = (
+        DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS - 1
+    )
+    db_session.add(adset_spec)
+    db_session.commit()
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["items"][0]["status"] == "blocked"
+    assert any(
+        "Linked Meta ad set spec dailyMinSpendTarget must be at least 1000 minor units." in blocker
+        for blocker in payload["items"][0]["blockers"]
+    )
+
+
 def test_validate_meta_publish_plan_blocks_duplicate_placement_keys(api_client, db_session) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(
         api_client,
@@ -2717,6 +2881,7 @@ def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(
             placements={"publisher_platforms": ["facebook"]},
             daily_budget=None,
             lifetime_budget=None,
+            daily_min_spend_target=DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
             bid_amount=None,
             start_time=None,
             end_time=None,
@@ -2729,6 +2894,13 @@ def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(
     db_session.add(creative_spec)
     db_session.add_all(adset_specs)
     db_session.commit()
+    _seed_passed_paid_ads_qa_run(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        generation_key="batch:latest-run",
+        asset_ids=[str(asset.id)],
+    )
 
     _upsert_meta_profile(api_client, client_id=client_id)
 
@@ -2856,6 +3028,7 @@ def test_validate_meta_publish_plan_supports_manual_creative_context_without_lau
             placements={"publisher_platforms": ["facebook"]},
             daily_budget=None,
             lifetime_budget=None,
+            daily_min_spend_target=DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
             bid_amount=None,
             start_time=None,
             end_time=None,
@@ -2868,6 +3041,13 @@ def test_validate_meta_publish_plan_supports_manual_creative_context_without_lau
     db_session.add(creative_spec)
     db_session.add_all(adset_specs)
     db_session.commit()
+    _seed_passed_paid_ads_qa_run(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        generation_key="batch:latest-run",
+        asset_ids=[str(asset.id)],
+    )
 
     _upsert_meta_profile(api_client, client_id=client_id)
 

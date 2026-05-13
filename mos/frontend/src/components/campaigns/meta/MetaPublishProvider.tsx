@@ -60,6 +60,7 @@ export type MetaPublishAdSetForm = {
   attributionSpecJson: string;
   dailyBudget: string;
   lifetimeBudget: string;
+  dailyMinSpendTarget: string;
   dsaBeneficiary: string;
   dsaPayor: string;
   startTime: string;
@@ -105,6 +106,7 @@ export type GroupedPipelineEntry = {
 
 const apiBaseUrl = resolveRequiredApiBaseUrl();
 const DEFAULT_META_PUBLISH_BUCKET_COUNT = 5;
+const DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS = 1000;
 const MAX_META_PUBLISH_BUCKET_COUNT = 8;
 
 export function formatDate(value?: string | null) {
@@ -269,6 +271,14 @@ export function toLocalDateTimeValue(value?: string | null): string {
   return offsetDate.toISOString().slice(0, 16);
 }
 
+export function defaultNextDayLocalStartTimeValue(now = new Date()): string {
+  const next = new Date(now);
+  next.setDate(next.getDate() + 1);
+  next.setHours(0, 1, 0, 0);
+  const offsetDate = new Date(next.getTime() - next.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
 export function fromLocalDateTimeValue(value: string): string | null {
   const cleaned = value.trim();
   if (!cleaned) return null;
@@ -324,9 +334,13 @@ export function buildAdSetForm(
     attributionSpecJson: formatJsonArrayInput(resolveAdSetAttributionSpec(spec)),
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
+    dailyMinSpendTarget:
+      spec.daily_min_spend_target != null
+        ? String(spec.daily_min_spend_target)
+        : String(DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS),
     dsaBeneficiary: readString(spec.dsa_beneficiary) || defaultPageName,
     dsaPayor: readString(spec.dsa_payor) || defaultPageName,
-    startTime: toLocalDateTimeValue(spec.start_time),
+    startTime: toLocalDateTimeValue(spec.start_time) || defaultNextDayLocalStartTimeValue(),
     endTime: toLocalDateTimeValue(spec.end_time),
     promotedPixelId: readString(promotedObject?.pixel_id) || "",
     promotedCustomEventType: readString(promotedObject?.custom_event_type) || "",
@@ -1194,6 +1208,10 @@ export function MetaPublishProvider({
         placements: parseJsonObjectInput(form.placementsJson, `${spec.name || spec.id} placements`),
         dailyBudget: parseIntegerInput(form.dailyBudget, `${spec.name || spec.id} daily budget`),
         lifetimeBudget: parseIntegerInput(form.lifetimeBudget, `${spec.name || spec.id} lifetime budget`),
+        dailyMinSpendTarget: parseIntegerInput(
+          form.dailyMinSpendTarget,
+          `${spec.name || spec.id} daily min spend target`,
+        ),
         bidAmount: null,
         dsaBeneficiary: form.dsaBeneficiary.trim() || readString(config?.pageName) || null,
         dsaPayor: form.dsaPayor.trim() || readString(config?.pageName) || null,

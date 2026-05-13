@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -16,6 +17,12 @@ const OUT_DIR = path.join(FULL_LAUNCH_DIR, "problem-aware-full-campaign");
 const GENERATED_DIR = path.join(OUT_DIR, "generated");
 const REVIEW_DIR = path.join(OUT_DIR, "review");
 const AUTH_FILE = path.join(ROOT, ".env.mos-test-auth");
+const AUTH_STATE_CANDIDATES = [
+  path.join(ROOT, ".local/playwright-home/prod-moshq-auth-state.json"),
+  path.join(ROOT, ".local/playwright-home/mos-auth-state.json"),
+  path.join(ROOT, ".local/playwright-home/prod-mos-auth-state.json"),
+  path.join(ROOT, ".local/playwright-home/mos-prod-auth-state.json"),
+];
 const STATE_PATH = path.join(OUT_DIR, "campaign-state.json");
 const REVIEW_PATH = path.join(FULL_LAUNCH_DIR, "destination-congruence-review-v2.json");
 const MANIFEST_PATH = path.join(OUT_DIR, "problem-aware-full-manifest.json");
@@ -40,6 +47,7 @@ const GLP_BRIEF_ID = "brief_glp_listicle_swipe_image2";
 const QUIZ_BRIEF_ID = "brief_quiz_funnel_swipe_image2";
 const STAGING_FUNNEL_ID = "be65d76e-ced9-4948-9465-18723c8446fd";
 const STAGING_PAGE_ID = "ab3102f4-a179-410a-9eb0-66aa3020cafc";
+const SELECTED_OFFER_ID = "dae03db4-5464-4b06-841f-53639520ab51";
 const STAGE_ONE_MODEL = "gemini-3.1-pro-preview";
 const RENDER_MODEL_ID = "gpt-image-2";
 const NANOBANANA_RENDER_MODEL_ID = "gemini-3.1-flash-image-preview";
@@ -63,8 +71,27 @@ const QUIZ_PRESALE_URL = "https://shoptenorco.com/8b89a76d/daily-drive-essential
 const SALES_URL =
   "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039";
 const GENERATE_CONCURRENCY = Number(process.env.GENERATE_CONCURRENCY || "4");
+const GENERATE_MAX_PASSES = Number(process.env.GENERATE_MAX_PASSES || "1");
+const GENERATE_DOWNLOAD_ASSETS = process.env.GENERATE_DOWNLOAD_ASSETS !== "0";
 const FORCE_NANOBANANA_FALLBACK_FOR_PENDING = process.env.FORCE_NANOBANANA_FALLBACK_FOR_PENDING === "1";
 const CONTINUE_ON_FAILURE = process.env.CONTINUE_ON_FAILURE === "1";
+const GENERATE_ASPECT_RATIO_FILTER = (process.env.GENERATE_ASPECT_RATIO_FILTER || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const GENERATE_ENTRY_KEY_FILTER = (process.env.GENERATE_ENTRY_KEY_FILTER || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const GENERATE_ASPECT_RATIO_PRIORITY = (process.env.GENERATE_ASPECT_RATIO_PRIORITY || "1:1,4:5,9:16")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const GENERATE_ASPECT_RATIO_PRIORITY_ORDER = new Map(
+  GENERATE_ASPECT_RATIO_PRIORITY.map((aspectRatio, index) => [aspectRatio, index]),
+);
+const GENERATE_ASPECT_RATIO_FILTER_SET = new Set(GENERATE_ASPECT_RATIO_FILTER);
+const GENERATE_ENTRY_KEY_FILTER_SET = new Set(GENERATE_ENTRY_KEY_FILTER);
 const TENOR_PRODUCT_REFERENCE_CREATIVE_IDS = new Set([
   "C005",
   "C006",
@@ -106,6 +133,8 @@ const NORMALIZED_OFFER = Object.freeze({
 });
 
 let cachedToken = null;
+let cachedTokenPromise = null;
+let providedTokenConsumed = false;
 
 function aspectRatioKey(aspectRatio) {
   return String(aspectRatio).replaceAll(":", "x");
@@ -211,25 +240,118 @@ function loadAuthEnv() {
   return env;
 }
 
+function decodeJwtPayload(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) return null;
+  return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+}
+
+function loadStoredClerkSession() {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  let best = null;
+  for (const authStatePath of AUTH_STATE_CANDIDATES) {
+    if (!existsSync(authStatePath)) continue;
+    let state;
+    try {
+      state = JSON.parse(readFileSync(authStatePath, "utf8"));
+    } catch {
+      continue;
+    }
+    const cookies = Array.isArray(state.cookies)
+      ? state.cookies.filter((cookie) => String(cookie.domain || "").includes("moshq.app"))
+      : [];
+    if (!cookies.length) continue;
+    const byName = Object.fromEntries(cookies.map((cookie) => [cookie.name, cookie.value]));
+    const sessionToken = byName.__session;
+    const dbJwt = byName.__clerk_db_jwt;
+    if (!sessionToken || !dbJwt) continue;
+    let sessionPayload;
+    try {
+      sessionPayload = decodeJwtPayload(sessionToken);
+    } catch {
+      continue;
+    }
+    const sessionId = sessionPayload?.sid;
+    const expiresAt = Number(sessionPayload?.exp || 0);
+    if (!sessionId || !Number.isFinite(expiresAt) || expiresAt <= nowSeconds + 60) continue;
+    const cookieHeader = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+    const candidate = {
+      authStatePath,
+      dbJwt,
+      sessionId,
+      expiresAt,
+      cookieHeader,
+    };
+    if (!best || candidate.expiresAt > best.expiresAt) {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
 async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-      ...(options.headers || {}),
-    },
-  });
-  const text = await response.text();
-  if (!response.ok) {
+  const isClerkRequest = url.startsWith(CLERK_BASE);
+  const maxAttempts = isClerkRequest ? 6 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        Accept: "application/json",
+        ...(options.headers || {}),
+      },
+    });
+    const text = await response.text();
+    if (response.ok) return text ? JSON.parse(text) : null;
+    if (isClerkRequest && response.status === 429 && attempt < maxAttempts) {
+      const retryAfterSeconds = Number(response.headers.get("retry-after") || "0");
+      const delayMs = retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : attempt * 5000;
+      console.warn(
+        `Clerk rate limit on attempt ${attempt}/${maxAttempts}; retrying in ${Math.ceil(delayMs / 1000)}s`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      continue;
+    }
     const error = new Error(`${options.method || "GET"} ${url} failed (${response.status}): ${text.slice(0, 4000)}`);
     error.status = response.status;
     error.body = text;
     throw error;
   }
-  return text ? JSON.parse(text) : null;
+  throw new Error(`Unhandled request retry state for ${url}`);
 }
 
 async function getBackendToken() {
+  const providedToken = String(process.env.MOS_BACKEND_BEARER_TOKEN || "").trim();
+  if (providedToken && !providedTokenConsumed) {
+    providedTokenConsumed = true;
+    cachedToken = providedToken;
+    return cachedToken;
+  }
+  if (cachedToken) return cachedToken;
+  if (cachedTokenPromise) return cachedTokenPromise;
+  cachedTokenPromise = (async () => {
+  const storedSession = loadStoredClerkSession();
+  if (storedSession) {
+    try {
+      const storedToken = await requestJson(
+        `${CLERK_BASE}/client/sessions/${storedSession.sessionId}/tokens/backend?${CLERK_QUERY}&__clerk_db_jwt=${storedSession.dbJwt}`,
+        {
+          method: "POST",
+          headers: {
+            ...ORIGIN_HEADERS,
+            Cookie: storedSession.cookieHeader,
+          },
+        },
+      );
+      if (storedToken?.jwt) {
+        cachedToken = storedToken.jwt;
+        return storedToken.jwt;
+      }
+    } catch (error) {
+      console.warn(
+        `Stored Clerk session token exchange failed for ${storedSession.authStatePath}: ${error?.message || String(error)}`,
+      );
+    }
+  }
   const auth = loadAuthEnv();
   const dev = await requestJson(`${CLERK_BASE}/dev_browser?${CLERK_QUERY}`, {
     method: "POST",
@@ -256,6 +378,12 @@ async function getBackendToken() {
   if (!token?.jwt) throw new Error("Clerk backend token response did not include jwt.");
   cachedToken = token.jwt;
   return token.jwt;
+  })();
+  try {
+    return await cachedTokenPromise;
+  } finally {
+    cachedTokenPromise = null;
+  }
 }
 
 async function authed(apiPath, options = {}) {
@@ -309,14 +437,27 @@ async function uploadSourceFile(filePath) {
   };
 }
 
-async function waitForWorkflow(workflowRunId, timeoutMs = 40 * 60 * 1000) {
+async function waitForWorkflow(workflowRunId, timeoutMs = 60 * 60 * 1000) {
   const started = Date.now();
+  let failedObservedAt = null;
   while (Date.now() - started < timeoutMs) {
     const detail = await authed(`/workflows/${encodeURIComponent(workflowRunId)}`);
     const status = detail?.run?.status;
+    const succeededSwipe = (detail?.logs || []).find(
+      (log) => log.step === "swipe_image_ad" && log.status === "succeeded",
+    );
+    if (succeededSwipe) return detail;
     if (status === "completed") return detail;
     if (status === "failed" || status === "cancelled") {
+      if (!failedObservedAt) failedObservedAt = Date.now();
       const errors = (detail?.logs || []).map((log) => log.error).filter(Boolean).join("\n");
+      if (!errors && Date.now() - failedObservedAt < 15 * 60 * 1000) {
+        console.warn(
+          `Workflow ${workflowRunId} is ${status} without error detail; waiting for a late swipe asset log before failing.`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+        continue;
+      }
       throw new Error(`Workflow ${workflowRunId} ended with ${status}: ${errors || "no error detail"}`);
     }
     console.log(`Workflow ${workflowRunId} is ${status}; waiting...`);
@@ -897,6 +1038,7 @@ function buildBasePayload({ state, entry, congruenceBlock }) {
       clientId: CLIENT_ID,
       productId: PRODUCT_ID,
       campaignId: state.campaignId,
+      selectedOfferId: SELECTED_OFFER_ID,
       assetBriefId: assetBriefIdForDestinationKey(entry.destinationKey),
       requirementIndex: 0,
       swipeRequiresProductImage: entry.productReferenceRequired,
@@ -1196,19 +1338,39 @@ function validateManifest(manifest, { requireResults }) {
 async function generateOneEntry(manifest, entry, renderModelId = RENDER_MODEL_ID) {
   const payload = { ...entry.payload, renderModelId };
   validatePayload(payload);
-  const started = await authed("/swipes/generate-image-ad", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const detail = await waitForWorkflow(started.workflow_run_id);
+  let started = entry.workflow?.workflowRunId ? {
+    workflow_run_id: entry.workflow.workflowRunId,
+    temporal_workflow_id: entry.workflow.temporalWorkflowId || null,
+  } : null;
+  if (!started) {
+    started = await authed("/swipes/generate-image-ad", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    entry.workflow = {
+      workflowRunId: started.workflow_run_id,
+      temporalWorkflowId: started.temporal_workflow_id,
+      workflowUrl: `https://moshq.app/workflows/${started.workflow_run_id}`,
+    };
+    persistManifest(manifest);
+  }
+  let detail;
+  try {
+    detail = await waitForWorkflow(started.workflow_run_id);
+  } catch (error) {
+    throw error;
+  }
   const workflowPath = path.join(OUT_DIR, `workflow-${entry.key}.json`);
   writeFileSync(workflowPath, JSON.stringify(detail, null, 2) + "\n");
   const { assetId, payloadOut } = extractAssetId(detail);
   const asset = await resolveAsset(manifest.campaignId, assetId);
   const extension = (asset.content_type || "image/png").includes("jpeg") ? "jpg" : "png";
-  const localPath = path.join(GENERATED_DIR, `${entry.key}.${extension}`);
-  downloadPublicAsset(asset.public_id, localPath);
+  let localPath = null;
+  if (GENERATE_DOWNLOAD_ASSETS) {
+    localPath = path.join(GENERATED_DIR, `${entry.key}.${extension}`);
+    downloadPublicAsset(asset.public_id, localPath);
+  }
   return {
     payload,
     workflow: {
@@ -1250,8 +1412,102 @@ function expectedRendererFor(renderModelId) {
   throw new Error(`No approved renderer expectation for ${renderModelId}`);
 }
 
+function mergeDefined(baseValue, nextValue) {
+  if (!baseValue && !nextValue) return nextValue ?? baseValue;
+  if (!baseValue) return nextValue;
+  if (!nextValue) return baseValue;
+  return { ...baseValue, ...nextValue };
+}
+
+function mergeEntryState(baseEntry, nextEntry) {
+  const merged = { ...baseEntry, ...nextEntry };
+  merged.payload = nextEntry.payload || baseEntry.payload;
+  merged.workflow = mergeDefined(baseEntry.workflow, nextEntry.workflow);
+  merged.result = mergeDefined(baseEntry.result, nextEntry.result);
+  if (baseEntry.primaryOpenAiFailure || nextEntry.primaryOpenAiFailure) {
+    merged.primaryOpenAiFailure = mergeDefined(baseEntry.primaryOpenAiFailure, nextEntry.primaryOpenAiFailure);
+  }
+  if ("error" in nextEntry || "error" in baseEntry) {
+    merged.error = nextEntry.error ?? baseEntry.error;
+  }
+  return merged;
+}
+
+function mergeManifestState(baseManifest, nextManifest) {
+  if (!baseManifest || manifestNeedsRebuild(baseManifest)) return nextManifest;
+  const nextEntryMap = new Map((nextManifest.entries || []).map((entry) => [entry.key, entry]));
+  const mergedEntries = (baseManifest.entries || []).map((entry) => {
+    const nextEntry = nextEntryMap.get(entry.key);
+    return nextEntry ? mergeEntryState(entry, nextEntry) : entry;
+  });
+  return {
+    ...baseManifest,
+    ...nextManifest,
+    groups: nextManifest.groups || baseManifest.groups,
+    entries: mergedEntries,
+  };
+}
+
+function applySnapshotInPlace(target, source) {
+  for (const key of Object.keys(target)) {
+    if (!(key in source)) delete target[key];
+  }
+  for (const [key, value] of Object.entries(source)) {
+    target[key] = value;
+  }
+}
+
+function syncManifestObjectInPlace(targetManifest, sourceManifest) {
+  targetManifest.updatedAt = sourceManifest.updatedAt;
+  targetManifest.createdAt = sourceManifest.createdAt;
+  targetManifest.note = sourceManifest.note;
+  targetManifest.campaignId = sourceManifest.campaignId;
+  targetManifest.campaignName = sourceManifest.campaignName;
+  targetManifest.metaCampaignName = sourceManifest.metaCampaignName;
+  targetManifest.batchId = sourceManifest.batchId;
+  targetManifest.generationKey = sourceManifest.generationKey;
+  targetManifest.stageOneModel = sourceManifest.stageOneModel;
+  targetManifest.renderModelId = sourceManifest.renderModelId;
+  targetManifest.groupedCreativePlan = sourceManifest.groupedCreativePlan;
+  targetManifest.targetPublishPlan = sourceManifest.targetPublishPlan;
+  targetManifest.destinations = sourceManifest.destinations;
+  targetManifest.sourceCollections = sourceManifest.sourceCollections;
+  targetManifest.copyAssignmentPlan = sourceManifest.copyAssignmentPlan;
+  targetManifest.expectedCounts = sourceManifest.expectedCounts;
+
+  targetManifest.groups = sourceManifest.groups;
+
+  const currentEntries = Array.isArray(targetManifest.entries) ? targetManifest.entries : [];
+  const currentByKey = new Map(currentEntries.map((entry) => [entry.key, entry]));
+  const nextEntries = [];
+  for (const sourceEntry of sourceManifest.entries || []) {
+    const currentEntry = currentByKey.get(sourceEntry.key);
+    if (currentEntry) {
+      applySnapshotInPlace(currentEntry, sourceEntry);
+      nextEntries.push(currentEntry);
+    } else {
+      nextEntries.push(sourceEntry);
+    }
+  }
+  targetManifest.entries = nextEntries;
+}
+
 function persistManifest(manifest) {
-  writeFileSync(MANIFEST_PATH, JSON.stringify({ ...manifest, updatedAt: new Date().toISOString() }, null, 2) + "\n");
+  let latest = null;
+  if (existsSync(MANIFEST_PATH)) {
+    try {
+      latest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+    } catch {
+      latest = null;
+    }
+  }
+  const mergedManifest = mergeManifestState(latest, manifest);
+  const serialized = JSON.stringify({ ...mergedManifest, updatedAt: new Date().toISOString() }, null, 2) + "\n";
+  const tempPath = `${MANIFEST_PATH}.${process.pid}.tmp`;
+  writeFileSync(tempPath, serialized);
+  renameSync(tempPath, MANIFEST_PATH);
+  const writtenManifest = JSON.parse(serialized);
+  syncManifestObjectInPlace(manifest, writtenManifest);
 }
 
 function isModerationError(error) {
@@ -1276,23 +1532,61 @@ function manifestNeedsRebuild(manifest) {
   return false;
 }
 
-async function generateAll() {
-  let manifest;
-  if (existsSync(MANIFEST_PATH)) {
-    manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
-  }
-  if (!manifest || manifestNeedsRebuild(manifest)) {
-    manifest = await buildManifest();
-  }
-  validateManifest(manifest, { requireResults: false });
+function generationPriorityForEntry(entry) {
+  const aspectRatio = entry?.payload?.aspectRatio || entry?.aspectRatio || "";
+  const aspectPriority = GENERATE_ASPECT_RATIO_PRIORITY_ORDER.get(aspectRatio) ?? Number.MAX_SAFE_INTEGER;
+  const destinationPriority = entry.destinationKey === "glp" ? 0 : 1;
+  return [aspectPriority, destinationPriority, entry.groupKey || entry.key || ""];
+}
 
-  const pending = manifest.entries.filter((entry) => !entry.result?.assetId);
+function compareGenerationPriority(left, right) {
+  const leftPriority = generationPriorityForEntry(left);
+  const rightPriority = generationPriorityForEntry(right);
+  for (let index = 0; index < leftPriority.length; index += 1) {
+    if (leftPriority[index] < rightPriority[index]) return -1;
+    if (leftPriority[index] > rightPriority[index]) return 1;
+  }
+  return 0;
+}
+
+function selectedEntriesForRun(manifest) {
+  return manifest.entries
+    .filter((entry) => {
+      if (GENERATE_ASPECT_RATIO_FILTER_SET.size && !GENERATE_ASPECT_RATIO_FILTER_SET.has(entry.aspectRatio)) {
+        return false;
+      }
+      if (GENERATE_ENTRY_KEY_FILTER_SET.size && !GENERATE_ENTRY_KEY_FILTER_SET.has(entry.key)) {
+        return false;
+      }
+      return true;
+    });
+}
+
+function pendingEntriesForPass(manifest) {
+  return selectedEntriesForRun(manifest)
+    .filter((entry) => !entry.result?.assetId)
+    .sort(compareGenerationPriority);
+}
+
+function summarizeFailures(failures) {
+  return failures
+    .map((failure) => `${failure.key}: ${failure.error?.message || String(failure.error)}`)
+    .join("; ");
+}
+
+async function runGeneratePass(manifest, passIndex, passCount) {
+  const prioritizedPending = pendingEntriesForPass(manifest);
+  console.log(
+    `Starting generate pass ${passIndex}/${passCount} with ${prioritizedPending.length} pending ` +
+      `(priority=${GENERATE_ASPECT_RATIO_PRIORITY.join(" -> ")}, filter=${GENERATE_ASPECT_RATIO_FILTER.join(",") || "all"})`,
+  );
   let nextIndex = 0;
   const failures = [];
   let stopped = false;
+  let completedThisPass = 0;
   async function worker(workerIndex) {
     while (!stopped) {
-      const entry = pending[nextIndex];
+      const entry = prioritizedPending[nextIndex];
       nextIndex += 1;
       if (!entry) return;
       if (entry.result?.assetId) {
@@ -1323,6 +1617,7 @@ async function generateAll() {
           }
         }
         persistManifest(manifest);
+        completedThisPass += 1;
         console.log(`Completed ${entry.key} on worker ${workerIndex}.`);
       } catch (error) {
         failures.push({ key: entry.key, error });
@@ -1332,11 +1627,61 @@ async function generateAll() {
     }
   }
   await Promise.all(Array.from({ length: GENERATE_CONCURRENCY }, (_, index) => worker(index + 1)));
-  if (failures.length) {
-    const summary = failures
-      .map((failure) => `${failure.key}: ${failure.error?.message || String(failure.error)}`)
-      .join("; ");
-    throw new Error(`Generation failed for ${failures.length} asset variant(s): ${summary}`);
+  const pendingAfterPass = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId).length;
+  console.log(
+    `Finished generate pass ${passIndex}/${passCount}: completed=${completedThisPass}, ` +
+      `failures=${failures.length}, pending=${pendingAfterPass}`,
+  );
+  persistManifest(manifest);
+  return { completedThisPass, failures, pendingAfterPass };
+}
+
+async function generateAll() {
+  let manifest;
+  if (existsSync(MANIFEST_PATH)) {
+    manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+  }
+  if (!manifest || manifestNeedsRebuild(manifest)) {
+    manifest = await buildManifest();
+  }
+  validateManifest(manifest, { requireResults: false });
+  await getBackendToken();
+  const selectedEntries = selectedEntriesForRun(manifest);
+  if (!selectedEntries.length) {
+    throw new Error(
+      `No manifest entries matched the requested filters. aspectRatios=${GENERATE_ASPECT_RATIO_FILTER.join(",") || "all"} ` +
+        `entryKeys=${GENERATE_ENTRY_KEY_FILTER.join(",") || "all"}`,
+    );
+  }
+
+  let allFailures = [];
+  for (let passIndex = 1; passIndex <= GENERATE_MAX_PASSES; passIndex += 1) {
+    const pendingBeforePass = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId).length;
+    if (pendingBeforePass === 0) break;
+    const { completedThisPass, failures, pendingAfterPass } = await runGeneratePass(
+      manifest,
+      passIndex,
+      GENERATE_MAX_PASSES,
+    );
+    allFailures = failures;
+    if (pendingAfterPass === 0) break;
+    if (!CONTINUE_ON_FAILURE && failures.length) {
+      throw new Error(`Generation failed for ${failures.length} asset variant(s): ${summarizeFailures(failures)}`);
+    }
+    if (completedThisPass === 0) {
+      throw new Error(
+        `Generation made no progress on pass ${passIndex}; ${pendingAfterPass} asset variant(s) remain pending. ` +
+          `Latest failures: ${summarizeFailures(failures) || "none recorded"}`,
+      );
+    }
+  }
+
+  const remaining = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId);
+  if (remaining.length) {
+    throw new Error(
+      `Generation stopped with ${remaining.length} asset variant(s) still pending after ${GENERATE_MAX_PASSES} pass(es). ` +
+        `Latest failures: ${summarizeFailures(allFailures) || "none recorded"}`,
+    );
   }
   validateManifest(manifest, { requireResults: true });
   persistManifest(manifest);
@@ -1346,6 +1691,107 @@ async function generateAll() {
     logicalGroupCount: manifest.groups.length,
     rawAssetCount: manifest.entries.length,
     concurrency: GENERATE_CONCURRENCY,
+    passes: GENERATE_MAX_PASSES,
+    aspectRatioFilter: GENERATE_ASPECT_RATIO_FILTER,
+    entryKeyFilter: GENERATE_ENTRY_KEY_FILTER,
+    aspectRatioPriority: GENERATE_ASPECT_RATIO_PRIORITY,
+  }, null, 2));
+}
+
+async function reconcileManifest() {
+  if (!existsSync(MANIFEST_PATH)) {
+    throw new Error(`Missing manifest: ${MANIFEST_PATH}. Run manifest first.`);
+  }
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+  if (manifestNeedsRebuild(manifest)) {
+    throw new Error(`Manifest at ${MANIFEST_PATH} is stale for generationKey ${GENERATION_KEY}. Rebuild it with the manifest command first.`);
+  }
+  validateManifest(manifest, { requireResults: false });
+  await getBackendToken();
+
+  const unresolvedEntries = selectedEntriesForRun(manifest).filter((entry) => !entry.result?.assetId);
+  let completed = 0;
+  let reset = 0;
+  let stillRunning = 0;
+  let skipped = 0;
+
+  for (const entry of unresolvedEntries) {
+    const workflowRunId = entry.workflow?.workflowRunId;
+    if (!workflowRunId) {
+      skipped += 1;
+      continue;
+    }
+
+    const detail = await authed(`/workflows/${encodeURIComponent(workflowRunId)}`);
+    const status = detail?.run?.status;
+    if (status === "running" || status === "queued" || status === "pending") {
+      stillRunning += 1;
+      continue;
+    }
+
+    if (status === "failed" || status === "cancelled") {
+      delete entry.workflow;
+      persistManifest(manifest);
+      reset += 1;
+      continue;
+    }
+
+    if (status !== "completed") {
+      continue;
+    }
+
+    const workflowPath = path.join(OUT_DIR, `workflow-${entry.key}.json`);
+    writeFileSync(workflowPath, JSON.stringify(detail, null, 2) + "\n");
+    const { assetId, payloadOut } = extractAssetId(detail);
+    const asset = await resolveAsset(manifest.campaignId, assetId);
+    const extension = (asset.content_type || "image/png").includes("jpeg") ? "jpg" : "png";
+    let localPath = entry.result?.localPath || null;
+    if (GENERATE_DOWNLOAD_ASSETS && !localPath) {
+      localPath = path.join(GENERATED_DIR, `${entry.key}.${extension}`);
+      downloadPublicAsset(asset.public_id, localPath);
+    }
+
+    entry.workflow = {
+      workflowRunId,
+      temporalWorkflowId: entry.workflow?.temporalWorkflowId || null,
+      workflowUrl: `https://moshq.app/workflows/${workflowRunId}`,
+      workflowDetailPath: workflowPath,
+      payloadOut,
+      ...(entry.workflow?.primaryOpenAiFailure ? { primaryOpenAiFailure: entry.workflow.primaryOpenAiFailure } : {}),
+    };
+    entry.result = {
+      assetId,
+      publicId: asset.public_id,
+      publicUrl: `${API_BASE}/public/assets/${asset.public_id}`,
+      contentType: asset.content_type,
+      width: asset.width,
+      height: asset.height,
+      localPath,
+      remoteJobId: payloadOut?.job_id || null,
+      renderProvider: payloadOut?.swipe_render_provider || null,
+      renderModelIdRequested: entry.payload.renderModelId,
+      renderModelIdUsed: payloadOut?.swipe_render_model_id || entry.payload.renderModelId,
+      usedAuthorizedFallback: entry.payload.renderModelId !== RENDER_MODEL_ID,
+      expectedRenderer: expectedRendererFor(entry.payload.renderModelId),
+      productReferenceRequired: Boolean(entry.payload.swipeRequiresProductImage),
+      productReferenceAttached: Boolean(payloadOut?.product_reference_attached),
+      productReferenceRenderAssetIds: payloadOut?.product_reference_render_asset_ids || [],
+      productReferenceImageUrlsSelected: payloadOut?.product_reference_image_urls_selected || [],
+    };
+    persistManifest(manifest);
+    completed += 1;
+  }
+
+  console.log(JSON.stringify({
+    manifestPath: MANIFEST_PATH,
+    campaignId: manifest.campaignId,
+    unresolvedScanned: unresolvedEntries.length,
+    completed,
+    reset,
+    stillRunning,
+    skipped,
+    aspectRatioFilter: GENERATE_ASPECT_RATIO_FILTER,
+    entryKeyFilter: GENERATE_ENTRY_KEY_FILTER,
   }, null, 2));
 }
 
@@ -1968,6 +2414,7 @@ function usage() {
     "  setup",
     "  manifest",
     "  generate",
+    "  reconcile",
     "  stamp-batch",
     "  create-specs",
     "  validate-publish",
@@ -1997,6 +2444,7 @@ async function main() {
     return;
   }
   if (command === "generate") return generateAll();
+  if (command === "reconcile") return reconcileManifest();
   if (command === "stamp-batch") return stampBatch();
   if (command === "create-specs") return createSpecs();
   if (command === "validate-publish") return validatePublish();

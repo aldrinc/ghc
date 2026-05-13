@@ -29,6 +29,7 @@ export type MetaAdSetSpec = {
   placements?: Record<string, unknown> | null;
   daily_budget?: number | null;
   lifetime_budget?: number | null;
+  daily_min_spend_target?: number | null;
   bid_amount?: number | null;
   dsa_beneficiary?: string | null;
   dsa_payor?: string | null;
@@ -105,6 +106,7 @@ export type MetaAdSetSpecUpdatePayload = {
   placements?: Record<string, unknown> | null;
   dailyBudget?: number | null;
   lifetimeBudget?: number | null;
+  dailyMinSpendTarget?: number | null;
   bidAmount?: number | null;
   dsaBeneficiary?: string | null;
   dsaPayor?: string | null;
