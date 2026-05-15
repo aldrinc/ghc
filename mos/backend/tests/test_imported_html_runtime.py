@@ -69,6 +69,100 @@ def test_validate_imported_html_document_manifest_accepts_sales_checkout_binding
     assert normalized["bindings"][0]["checkout"]["variantResolver"]["variantId"] == "variant-1"
 
 
+def test_validate_imported_html_document_manifest_accepts_custom_content_page():
+    html_document = """
+    <!doctype html>
+    <html>
+      <body>
+        <main>
+          <h1>About Tenor</h1>
+          <p>Company content copied from a published footer page.</p>
+        </main>
+      </body>
+    </html>
+    """
+    manifest = {
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "custom",
+        "pageStage": "custom",
+        "bindings": [],
+    }
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=html_document,
+        instrumentation_manifest=manifest,
+        current_page_stage="custom",
+        current_page_id="page-about",
+        available_target_page_ids={"page-about"},
+        checkout_ready_variants=[],
+        require_stage_bindings=False,
+    )
+
+    assert normalized["htmlArtifactKind"] == "custom"
+    assert normalized["pageStage"] == "custom"
+
+
+def test_validate_imported_html_document_manifest_accepts_sales_add_to_cart_target():
+    html_document = """
+    <!doctype html>
+    <html>
+      <body>
+        <button id="add-to-cart">Try it now</button>
+        <button id="secure-checkout">Secure checkout</button>
+      </body>
+    </html>
+    """
+    variant = ProductVariant(
+        product_id="product-1",
+        title="Default",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+    )
+    variant.id = "variant-1"
+    manifest = {
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "sales",
+        "pageStage": "sales",
+        "addToCartTargets": [
+            {
+                "id": "primary-add-to-cart",
+                "selector": "#add-to-cart",
+                "event": "click",
+                "trackEventType": "add_to_cart",
+                "label": "Primary add to cart",
+            }
+        ],
+        "bindings": [
+            {
+                "id": "secure-checkout",
+                "type": "checkout",
+                "selector": "#secure-checkout",
+                "event": "click",
+                "trackEventType": "sales_to_checkout_click",
+                "checkout": {
+                    "mode": "public_checkout",
+                    "variantResolver": {"type": "fixed", "variantId": "variant-1"},
+                },
+            }
+        ],
+    }
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=html_document,
+        instrumentation_manifest=manifest,
+        current_page_stage="sales",
+        current_page_id="page-sales",
+        available_target_page_ids={"page-sales"},
+        checkout_ready_variants=[variant],
+        require_stage_bindings=True,
+    )
+
+    assert normalized["addToCartTargets"][0]["trackEventType"] == "add_to_cart"
+    assert normalized["bindings"][0]["selector"] == "#secure-checkout"
+
+
 def test_validate_imported_html_document_manifest_accepts_checkout_started_binding():
     html_document = """
     <!doctype html>

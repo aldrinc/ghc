@@ -837,7 +837,10 @@ def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle():
   </body>
 </html>
 """
-    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    app = _artifact_app(
+        render_mode="html_deploy",
+        html_document=html_document,
+    )
     deployer, uploaded, commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -908,6 +911,13 @@ def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle():
     assert "rmbcAnonymousId" not in entry_html
     assert "rmbcClickId" not in entry_html
     assert "https://connect.facebook.net/en_US/fbevents.js" in entry_html
+    assert "metaPixelScriptLoadPromise" in entry_html
+    assert "waitForMetaPixelTrackedEventFlush" in entry_html
+    assert "META_PIXEL_EVENT_NETWORK_WINDOW_MS" in entry_html
+    assert "void loadMetaPixelScript();" in entry_html
+    assert 'activeFbq.callMethod(...args);' in entry_html
+    assert "isDeployTrackingValidationSession" in entry_html
+    assert "opt_out_useragent_filter: true" in entry_html
     assert "/__mos/meta/fbevents.js" not in entry_html
     assert 'window.fbq("init", pixelId' in entry_html
     assert "location = /__mos/meta/fbevents.js" not in conf
@@ -929,6 +939,34 @@ def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle():
     assert uploaded[asset_path] == _PRIMARY_ASSET_BYTES
     assert uploaded[public_asset_path] == _PRIMARY_ASSET_BYTES
     assert runtime_page_path not in uploaded
+
+
+def test_funnel_artifact_site_writes_html_deploy_static_asset_payloads():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <style>@font-face{font-family:Example;src:url('/cdn/shop/files/example-font.woff2') format('woff2')}</style>
+  </head>
+  <body><a id="main-cta" href="#shop">Start</a></body>
+</html>
+"""
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    font_bytes = b"font-bytes"
+    app.source_ref.artifact["assets"]["staticItems"] = {
+        "/cdn/shop/files/example-font.woff2": {
+            "contentType": "font/woff2",
+            "sizeBytes": len(font_bytes),
+            "sha256": hashlib.sha256(font_bytes).hexdigest(),
+            "bytesBase64": base64.b64encode(font_bytes).decode("ascii"),
+        }
+    }
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    assert uploaded[
+        "/opt/apps/landing-artifact/site/cdn/shop/files/example-font.woff2"
+    ] == font_bytes
 
 
 def test_html_deploy_attaches_production_analytics_harness_for_listicle_quiz_and_sales():
@@ -1066,10 +1104,17 @@ def test_html_deploy_attaches_production_analytics_harness_for_listicle_quiz_and
         stage="sales",
         artifact_kind="sales",
         html_document="""<!DOCTYPE html><html><head><title>Sales</title></head><body>
-<main><section id="offer">Offer</section><a id="checkout" href="#checkout">Checkout</a></main>
+<main><section id="offer">Offer</section><button id="add-to-cart" data-variant-id="variant-1">Add to cart</button><a id="checkout" href="#checkout">Checkout</a></main>
 </body></html>""",
         manifest_overrides={
             "sections": [{"id": "offer", "selector": "#offer"}],
+            "addToCartTargets": [
+                {
+                    "id": "primary-add-to-cart",
+                    "selector": "#add-to-cart",
+                    "trackEventType": "add_to_cart",
+                }
+            ],
             "bindings": [
                 {
                     "id": "primary-checkout",
@@ -1159,6 +1204,13 @@ def test_html_deploy_attaches_production_analytics_harness_for_listicle_quiz_and
         for token in required_tokens:
             assert token in html_document
 
+    assert "addToCartTargets" in route_html["sales"]
+    assert "initializeAddToCartTrackingSafely();" in route_html["sales"]
+    assert 'trackEvent(target.trackEventType || "add_to_cart"' in route_html["sales"]
+    assert 'normalizedEventType !== "add_to_cart"' in route_html["sales"]
+    assert "AddToCart" in route_html["sales"]
+    assert "sales_to_checkout_click" in route_html["sales"]
+
     assert route_html["listicle"] == uploaded["/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"]
     assert "/example-product/example-funnel/sales-page/" in route_html["listicle"]
     assert "/example-product/example-funnel/sales-page/" in route_html["quiz"]
@@ -1193,7 +1245,11 @@ def test_funnel_artifact_site_standalone_can_defer_activation_for_candidate_vali
   <body><a id="main-cta" href="#shop">Start</a></body>
 </html>
 """
-    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    app = _artifact_app(
+        render_mode="html_deploy",
+        html_document=html_document,
+        workspace_server_names=["shoptenor.example"],
+    )
     app.source_ref.release_metadata = {
         "htmlDeployActivationMode": "candidate_only",
         "htmlDeployCandidateReleaseId": "candidate-123",
@@ -1206,15 +1262,85 @@ def test_funnel_artifact_site_standalone_can_defer_activation_for_candidate_vali
     assert "/__mos/html-deploy-candidates/" in conf
     assert "root /opt/apps/landing-artifact/site-releases;" in conf
     assert "$arg_mos_deploy_candidate_release" in conf
-    assert "$cookie_mos_deploy_candidate_release" in conf
-    assert 'Set-Cookie "mos_deploy_candidate_release=$mos_candidate_release; Path=/; SameSite=Lax"' in conf
+    assert "$http_referer ~ \"[?&]mos_deploy_candidate_release=" in conf
+    assert "$http_referer ~ \"/__mos/html-deploy-candidates/(" in conf
+    assert "$mos_direct_ip_request" in conf
+    assert "return 302 https://shoptenor.example$request_uri;" in conf
+    assert 'add_header Cache-Control "no-store" always;' in conf
+    assert "location ^~ /assets/ {" in conf
+    assert 'try_files $mos_candidate_asset_prefix$uri /site$uri =404;' in conf
+    assert 'set $mos_candidate_asset_prefix "/site-releases/$1";' in conf
+    assert "/__mos/html-deploy-candidates/$mos_referer_candidate_release/$1 last;" in conf
+    assert "/__mos/html-deploy-candidates/$mos_referer_path_candidate_release/$1 last;" in conf
+    assert "cookie_mos_deploy_candidate_release" not in conf
+    assert "Set-Cookie" not in conf
     assert 'try_files $mos_candidate_asset_prefix$uri /site$uri =404;' in conf
     assert "X-Robots-Tag \"noindex, nofollow, noarchive\"" in conf
+    assert any("mos-release-static-assets-report.json" in cmd for cmd in commands)
+    assert any("https://shoptenor.example" in cmd for cmd in commands)
     assert any(
         cmd.startswith("mkdir -p /opt/apps/landing-artifact/site-releases/candidate-123")
         for cmd in commands
     )
     assert not any("mv -Tf \"$next_link\" \"$live_site\"" in cmd for cmd in commands)
+
+
+def test_funnel_artifact_site_standalone_emits_legacy_sales_page_redirects():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head><title>Standalone Sales</title></head>
+  <body><a id="main-cta" href="#shop">Start</a></body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="html_deploy",
+        html_document=html_document,
+        workspace_server_names=["shoptenorco.com"],
+    )
+    app.source_ref.release_metadata = {
+        "htmlDeployRouteManifest": {
+            "legacyRedirects": [
+                {
+                    "from": "/8b89a76d/daily-drive-essentials/sales-page",
+                    "to": "/8b89a76d/testosterone-support/sales-page/",
+                },
+                {
+                    "from": "/8b89a76d/daily-drive-essentials/sales-page/",
+                    "to": "/8b89a76d/testosterone-support/sales-page/",
+                },
+            ]
+        }
+    }
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert "location = /8b89a76d/daily-drive-essentials/sales-page {" in conf
+    assert "location = /8b89a76d/daily-drive-essentials/sales-page/ {" in conf
+    assert (
+        "return 302 https://shoptenorco.com/8b89a76d/testosterone-support/sales-page/$is_args$args;"
+        in conf
+    )
+    assert 'add_header Cache-Control "no-store" always;' in conf
+
+    manifest = json.loads(
+        uploaded["/opt/apps/landing-artifact/site/mos-release-manifest.json"]
+    )
+    assert manifest["routeManifest"]["legacyRedirects"] == [
+        {
+            "from": "/8b89a76d/daily-drive-essentials/sales-page",
+            "to": "/8b89a76d/testosterone-support/sales-page/",
+            "status": 302,
+            "preserveQuery": True,
+        },
+        {
+            "from": "/8b89a76d/daily-drive-essentials/sales-page/",
+            "to": "/8b89a76d/testosterone-support/sales-page/",
+            "status": 302,
+            "preserveQuery": True,
+        },
+    ]
 
 
 def test_activate_funnel_artifact_candidate_release_promotes_named_release():
@@ -2746,6 +2872,78 @@ def test_remote_tree_contains_text_handles_shell_sensitive_tracker_snippets(tmp_
     ).stdout
 
     assert deployer._remote_tree_contains_text(root_path=str(site_dir), text='fbq("init"') is True
+
+
+def test_validate_html_deploy_release_asset_closure_fails_missing_same_origin_asset(
+    tmp_path: Path,
+):
+    site_dir = tmp_path / "site"
+    site_dir.mkdir(parents=True)
+    (site_dir / "index.html").write_text(
+        '<!doctype html><link rel="stylesheet" href="/assets/missing.css">',
+        encoding="utf-8",
+    )
+
+    deployer = object.__new__(ServerDeployer)
+
+    def run(cmd: str, cwd: str = None, mask=None) -> str:
+        completed = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise ValueError(completed.stderr)
+        return completed.stdout
+
+    deployer.run = run
+
+    with pytest.raises(ValueError, match="missing local release asset"):
+        deployer._validate_html_deploy_release_asset_closure(site_dir=str(site_dir))
+
+    report = json.loads((site_dir / "mos-release-integrity-report.json").read_text())
+    assert report["status"] == "failed"
+    assert report["missing"][0]["url"] == "/assets/missing.css"
+
+
+def test_validate_html_deploy_release_asset_closure_accepts_present_assets(tmp_path: Path):
+    site_dir = tmp_path / "site"
+    (site_dir / "assets").mkdir(parents=True)
+    (site_dir / "assets" / "app.css").write_text(
+        "@font-face{src:url('/assets/font.woff2')} .noise{filter:url('/assets/#noise')}",
+        encoding="utf-8",
+    )
+    (site_dir / "assets" / "font.woff2").write_bytes(b"font")
+    (site_dir / "index.html").write_text(
+        '<!doctype html><link rel="stylesheet" href="/assets/app.css">',
+        encoding="utf-8",
+    )
+
+    deployer = object.__new__(ServerDeployer)
+
+    def run(cmd: str, cwd: str = None, mask=None) -> str:
+        completed = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise ValueError(completed.stderr)
+        return completed.stdout
+
+    deployer.run = run
+
+    deployer._validate_html_deploy_release_asset_closure(site_dir=str(site_dir))
+
+    report = json.loads((site_dir / "mos-release-integrity-report.json").read_text())
+    assert report["status"] == "passed"
+    assert report["checkedReferences"] == 2
 
 
 def test_path_exists_handles_shell_sensitive_paths(tmp_path: Path):

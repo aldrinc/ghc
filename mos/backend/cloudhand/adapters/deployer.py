@@ -181,7 +181,10 @@ _STANDALONE_COMPRESSED_IMAGE_MIN_BYTES = 64 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_BYTES = 4 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_RATIO = 0.03
 _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES = 16 * 1024
-# Keep standalone imports byte-stable; optional image rewrites are too slow/risky for paid-traffic deploys.
+# The deployer should make an HTML artifact deployable, not silently redesign or optimize it.
+# Keep optimization off until the optimization pipeline and validator are rebuilt as a stable,
+# explicit pre-deploy transform.
+_STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION = False
 _STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 0
 _STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 0
 _STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 0
@@ -287,6 +290,205 @@ def _should_defer_funnel_artifact_activation(*, source: FunnelArtifactSourceSpec
         or ""
     ).strip()
     return activation_mode == _FUNNEL_ARTIFACT_ACTIVATION_MODE_CANDIDATE_ONLY
+
+
+def _normalize_html_deploy_redirect_path(*, value: str, field_label: str) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        raise ValueError(f"HTML deploy redirect {field_label} must be non-empty.")
+    parsed = urlsplit(raw_value)
+    if parsed.scheme or parsed.netloc:
+        raise ValueError(
+            f"HTML deploy redirect {field_label} must be a same-origin absolute path, got '{raw_value}'."
+        )
+    path = parsed.path.strip()
+    if not path.startswith("/"):
+        raise ValueError(
+            f"HTML deploy redirect {field_label} must start with '/', got '{raw_value}'."
+        )
+    normalized_path = posixpath.normpath(path)
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    if path.endswith("/") and not normalized_path.endswith("/"):
+        normalized_path = f"{normalized_path}/"
+    if normalized_path != path:
+        raise ValueError(
+            f"HTML deploy redirect {field_label} must be normalized, got '{raw_value}'."
+        )
+    return normalized_path
+
+
+def _html_deploy_legacy_redirect_specs(
+    *, source: FunnelArtifactSourceSpec
+) -> list[dict[str, Any]]:
+    release_metadata = source.release_metadata if isinstance(source.release_metadata, dict) else {}
+    route_manifest = release_metadata.get("htmlDeployRouteManifest")
+    if not isinstance(route_manifest, dict):
+        route_manifest = release_metadata.get("routeManifest")
+    raw_redirects = (
+        route_manifest.get("legacyRedirects") if isinstance(route_manifest, dict) else None
+    )
+    if raw_redirects is None:
+        raw_redirects = release_metadata.get("htmlDeployLegacyRedirects")
+    if raw_redirects is None:
+        return []
+    if not isinstance(raw_redirects, list):
+        raise ValueError("HTML deploy legacy redirects must be a list.")
+    redirects: list[dict[str, Any]] = []
+    seen_sources: set[str] = set()
+    for index, raw_redirect in enumerate(raw_redirects):
+        if not isinstance(raw_redirect, dict):
+            raise ValueError(f"HTML deploy legacy redirect at index {index} must be an object.")
+        source_path = _normalize_html_deploy_redirect_path(
+            value=str(raw_redirect.get("from") or raw_redirect.get("source") or ""),
+            field_label=f"from at index {index}",
+        )
+        target_path = _normalize_html_deploy_redirect_path(
+            value=str(raw_redirect.get("to") or raw_redirect.get("target") or ""),
+            field_label=f"to at index {index}",
+        )
+        if source_path in seen_sources:
+            raise ValueError(f"HTML deploy legacy redirect duplicates source path '{source_path}'.")
+        if source_path == target_path:
+            raise ValueError(
+                f"HTML deploy legacy redirect source and target cannot match: '{source_path}'."
+            )
+        seen_sources.add(source_path)
+        status_code = int(raw_redirect.get("status") or 302)
+        if status_code not in {301, 302, 307, 308}:
+            raise ValueError(
+                f"HTML deploy legacy redirect '{source_path}' has unsupported status {status_code}."
+            )
+        redirects.append(
+            {
+                "from": source_path,
+                "to": target_path,
+                "status": status_code,
+                "preserveQuery": raw_redirect.get("preserveQuery") is not False,
+            }
+        )
+    return redirects
+
+
+def _html_deploy_route_alias_specs(
+    *, source: FunnelArtifactSourceSpec
+) -> list[dict[str, str]]:
+    release_metadata = source.release_metadata if isinstance(source.release_metadata, dict) else {}
+    route_manifest = release_metadata.get("htmlDeployRouteManifest")
+    if not isinstance(route_manifest, dict):
+        route_manifest = release_metadata.get("routeManifest")
+    raw_aliases = route_manifest.get("routeAliases") if isinstance(route_manifest, dict) else None
+    if raw_aliases is None and isinstance(route_manifest, dict):
+        raw_aliases = route_manifest.get("legacyAliases")
+    if raw_aliases is None:
+        raw_aliases = release_metadata.get("htmlDeployRouteAliases")
+    if raw_aliases is None:
+        return []
+    if not isinstance(raw_aliases, list):
+        raise ValueError("HTML deploy route aliases must be a list.")
+    aliases: list[dict[str, str]] = []
+    seen_sources: set[str] = set()
+    for index, raw_alias in enumerate(raw_aliases):
+        if not isinstance(raw_alias, dict):
+            raise ValueError(f"HTML deploy route alias at index {index} must be an object.")
+        source_path = _normalize_html_deploy_redirect_path(
+            value=str(raw_alias.get("from") or raw_alias.get("source") or ""),
+            field_label=f"alias from at index {index}",
+        )
+        target_path = _normalize_html_deploy_redirect_path(
+            value=str(raw_alias.get("to") or raw_alias.get("target") or ""),
+            field_label=f"alias to at index {index}",
+        )
+        if source_path in seen_sources:
+            raise ValueError(f"HTML deploy route alias duplicates source path '{source_path}'.")
+        if source_path == target_path:
+            raise ValueError(
+                f"HTML deploy route alias source and target cannot match: '{source_path}'."
+            )
+        seen_sources.add(source_path)
+        aliases.append({"from": source_path, "to": target_path})
+    return aliases
+
+
+def _normalize_html_deploy_funnel_path_alias_token(*, value: str, field_label: str) -> str:
+    token = str(value or "").strip().lower()
+    if not token:
+        raise ValueError(f"HTML deploy funnel path alias {field_label} must be non-empty.")
+    if "/" in token or "\\" in token:
+        raise ValueError(
+            f"HTML deploy funnel path alias {field_label} must be a single path segment, got '{value}'."
+        )
+    if quote(token, safe="") != token:
+        raise ValueError(
+            f"HTML deploy funnel path alias {field_label} must already be URL-safe, got '{value}'."
+        )
+    return token
+
+
+def _html_deploy_funnel_path_alias_specs(
+    *, source: FunnelArtifactSourceSpec
+) -> list[dict[str, str]]:
+    release_metadata = source.release_metadata if isinstance(source.release_metadata, dict) else {}
+    route_manifest = release_metadata.get("htmlDeployRouteManifest")
+    if not isinstance(route_manifest, dict):
+        route_manifest = release_metadata.get("routeManifest")
+    raw_aliases = (
+        route_manifest.get("funnelPathAliases") if isinstance(route_manifest, dict) else None
+    )
+    if raw_aliases is None:
+        raw_aliases = release_metadata.get("htmlDeployFunnelPathAliases")
+    if raw_aliases is None:
+        return []
+    if not isinstance(raw_aliases, list):
+        raise ValueError("HTML deploy funnel path aliases must be a list.")
+
+    aliases: list[dict[str, str]] = []
+    seen_aliases: set[tuple[str, str, str]] = set()
+    for index, raw_alias in enumerate(raw_aliases):
+        if isinstance(raw_alias, str):
+            alias_spec = {"alias": raw_alias}
+        elif isinstance(raw_alias, dict):
+            alias_spec = raw_alias
+        else:
+            raise ValueError(
+                f"HTML deploy funnel path alias at index {index} must be a string or object."
+            )
+        alias = _normalize_html_deploy_funnel_path_alias_token(
+            value=str(
+                alias_spec.get("alias")
+                or alias_spec.get("pathToken")
+                or alias_spec.get("funnelPathToken")
+                or ""
+            ),
+            field_label=f"alias at index {index}",
+        )
+        product_slug = str(alias_spec.get("productSlug") or "").strip().lower()
+        funnel_slug = str(alias_spec.get("funnelSlug") or "").strip().lower()
+        funnel_id = str(alias_spec.get("funnelId") or "").strip().lower()
+        publication_id = str(alias_spec.get("publicationId") or "").strip().lower()
+        key = (product_slug, funnel_slug or funnel_id or publication_id, alias)
+        if key in seen_aliases:
+            raise ValueError(
+                f"HTML deploy funnel path alias duplicates alias '{alias}' at index {index}."
+            )
+        seen_aliases.add(key)
+        aliases.append(
+            {
+                "alias": alias,
+                "productSlug": product_slug,
+                "funnelSlug": funnel_slug,
+                "funnelId": funnel_id,
+                "publicationId": publication_id,
+            }
+        )
+    return aliases
+
+
+def _html_deploy_index_path_for_route(*, site_dir: str, route_path: str) -> str:
+    normalized_path = str(route_path or "").strip()
+    if normalized_path == "/":
+        return f"{site_dir}/index.html"
+    return f"{site_dir}/{normalized_path.strip('/')}/index.html"
 
 
 def _normalize_uploaded_env_line(raw_line: str) -> str | None:
@@ -602,7 +804,9 @@ def _optimize_standalone_imported_html_document(html_document: str) -> str:
         attributes_to_add: list[tuple[str, str]] = []
         if not existing_loading:
             attributes_to_add.append(("loading", "eager" if should_remain_eager else "lazy"))
-        if not _html_tag_has_attribute(raw_tag, "decoding"):
+        if _html_tag_has_attribute(raw_tag, "decoding"):
+            raw_tag = _set_html_tag_attribute(raw_tag, "decoding", "async")
+        else:
             attributes_to_add.append(("decoding", "async"))
         if not existing_fetchpriority:
             attributes_to_add.append(("fetchpriority", "high" if should_remain_eager else "low"))
@@ -1308,6 +1512,28 @@ def _normalize_html_image_source_route(raw_src: str) -> str:
     if parsed.scheme or parsed.netloc:
         return parsed.path or ""
     return candidate
+
+
+def _normalize_standalone_static_asset_reference_route(raw_src: str) -> str:
+    candidate = str(raw_src or "").strip()
+    if not candidate:
+        return ""
+    parsed = urlsplit(candidate)
+    if parsed.scheme or parsed.netloc:
+        path = parsed.path or ""
+    else:
+        path = parsed.path or candidate
+    path = str(path or "").strip()
+    if not path:
+        return ""
+    if path.startswith("./"):
+        path = path[1:]
+    if not path.startswith("/"):
+        path = f"/{path}"
+    normalized = posixpath.normpath(path)
+    if path.endswith("/") and not normalized.endswith("/"):
+        normalized += "/"
+    return normalized
 
 
 def _resolve_responsive_image_sizes_attr(*, viewport_widths: dict[str, int]) -> str | None:
@@ -2431,20 +2657,27 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                         context_label=context_label,
                     )
                 else:
-                    payload, content_type, local_url = self._resolve_local_standalone_image_asset(
-                        asset_url=candidate_url,
-                        context_label=context_label,
+                    static_asset_route = _normalize_standalone_static_asset_reference_route(
+                        candidate_url
                     )
-                    self._write_standalone_route_asset(
-                        site_dir=site_dir,
-                        route_path=local_url,
-                        payload=payload,
-                        content_type=content_type,
-                        uploaded_target_paths=mirrored_target_paths,
-                        standalone_served_assets=standalone_served_assets,
-                        standalone_image_sources=standalone_image_sources,
-                        context_label=context_label,
-                    )
+                    served_static_asset = standalone_served_assets.get(static_asset_route)
+                    if served_static_asset is not None:
+                        local_url = static_asset_route
+                    else:
+                        payload, content_type, local_url = self._resolve_local_standalone_image_asset(
+                            asset_url=candidate_url,
+                            context_label=context_label,
+                        )
+                        self._write_standalone_route_asset(
+                            site_dir=site_dir,
+                            route_path=local_url,
+                            payload=payload,
+                            content_type=content_type,
+                            uploaded_target_paths=mirrored_target_paths,
+                            standalone_served_assets=standalone_served_assets,
+                            standalone_image_sources=standalone_image_sources,
+                            context_label=context_label,
+                        )
                 mirrored_url_map[candidate_url] = local_url
             rewritten_document = rewritten_document.replace(candidate_url, local_url)
 
@@ -2484,6 +2717,8 @@ fs.writeFileSync(outputPath, result.css, "utf8");
     ) -> _StandaloneImageSource | None:
         normalized_content_type = str(content_type or "").split(";", 1)[0].strip().lower()
         if normalized_content_type and not normalized_content_type.startswith("image/"):
+            return None
+        if normalized_content_type == "image/svg+xml":
             return None
 
         from PIL import Image, ImageOps
@@ -4349,6 +4584,53 @@ WantedBy=multi-user.target
                 funnel_path_tokens.append(short_funnel_id_token)
         return funnel_path_tokens
 
+    def _resolve_funnel_path_tokens_for_source(
+        self,
+        *,
+        source: FunnelArtifactSourceSpec,
+        product_slug: str,
+        funnel_slug: str,
+        funnel_meta: Dict[str, Any],
+    ) -> list[str]:
+        funnel_path_tokens = self._resolve_funnel_path_tokens(
+            product_slug=product_slug,
+            funnel_slug=funnel_slug,
+            funnel_meta=funnel_meta,
+        )
+        funnel_id_token = str(funnel_meta.get("funnelId") or "").strip().lower()
+        publication_id_token = str(funnel_meta.get("publicationId") or "").strip().lower()
+        short_funnel_id_token = ""
+        try:
+            short_funnel_id_token = str(UUID(funnel_id_token)).split("-", 1)[0]
+        except ValueError:
+            short_funnel_id_token = ""
+        funnel_match_tokens = {
+            str(funnel_slug or "").strip().lower(),
+            str(funnel_meta.get("funnelSlug") or "").strip().lower(),
+            funnel_id_token,
+            short_funnel_id_token,
+        }
+        funnel_match_tokens.discard("")
+
+        for alias_spec in _html_deploy_funnel_path_alias_specs(source=source):
+            alias_product_slug = str(alias_spec.get("productSlug") or "").strip().lower()
+            if alias_product_slug and alias_product_slug != str(product_slug).strip().lower():
+                continue
+            alias_funnel_slug = str(alias_spec.get("funnelSlug") or "").strip().lower()
+            if alias_funnel_slug and alias_funnel_slug not in funnel_match_tokens:
+                continue
+            alias_funnel_id = str(alias_spec.get("funnelId") or "").strip().lower()
+            if alias_funnel_id and alias_funnel_id not in {funnel_id_token, short_funnel_id_token}:
+                continue
+            alias_publication_id = str(alias_spec.get("publicationId") or "").strip().lower()
+            if alias_publication_id and alias_publication_id != publication_id_token:
+                continue
+            alias = str(alias_spec.get("alias") or "").strip().lower()
+            if alias and alias not in funnel_path_tokens:
+                funnel_path_tokens.append(alias)
+
+        return funnel_path_tokens
+
     def _canonical_funnel_artifact_page_slug(self, raw_slug: object) -> str:
         normalized_slug = str(raw_slug or "").strip().lower()
         if normalized_slug == "pre-sales":
@@ -4521,7 +4803,8 @@ WantedBy=multi-user.target
                 if not preload_asset_public_id:
                     continue
 
-                for funnel_path_token in self._resolve_funnel_path_tokens(
+                for funnel_path_token in self._resolve_funnel_path_tokens_for_source(
+                    source=source,
                     product_slug=product_slug,
                     funnel_slug=funnel_slug,
                     funnel_meta=funnel_meta,
@@ -4555,9 +4838,13 @@ WantedBy=multi-user.target
     def _funnel_artifact_declares_posthog_tracking(
         self, *, source: FunnelArtifactSourceSpec
     ) -> bool:
-        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
-            source=source
-        )
+        (
+            _artifact,
+            _meta,
+            products,
+            _asset_items,
+            _static_asset_items,
+        ) = self._resolve_funnel_artifact_payload_sections(source=source)
         for product_payload in products.values():
             if not isinstance(product_payload, dict):
                 continue
@@ -4583,9 +4870,13 @@ WantedBy=multi-user.target
         return False
 
     def _funnel_artifact_declares_meta_tracking(self, *, source: FunnelArtifactSourceSpec) -> bool:
-        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
-            source=source
-        )
+        (
+            _artifact,
+            _meta,
+            products,
+            _asset_items,
+            _static_asset_items,
+        ) = self._resolve_funnel_artifact_payload_sections(source=source)
         for product_payload in products.values():
             if not isinstance(product_payload, dict):
                 continue
@@ -4616,6 +4907,691 @@ WantedBy=multi-user.target
             f"grep -R -F -q -- {safe_text} {safe_root} >/dev/null 2>&1 && echo yes || true"
         )
         return out.strip() == "yes"
+
+    def _validate_html_deploy_release_asset_closure(
+        self,
+        *,
+        site_dir: str,
+    ) -> None:
+        script = r'''
+import json
+import os
+import posixpath
+import re
+import sys
+from urllib.parse import unquote, urljoin, urlsplit
+
+site_dir = os.path.abspath(sys.argv[1])
+report_path = os.path.join(site_dir, "mos-release-integrity-report.json")
+required_prefixes = (
+    "/assets/",
+    "/public/assets/",
+    "/api/public/assets/",
+    "/_standalone-assets/",
+    "/cdn/shop/files/",
+    "/favicon",
+)
+fragment_only_roots = {
+    "/assets",
+    "/public/assets",
+    "/api/public/assets",
+    "/_standalone-assets",
+    "/cdn/shop/files",
+}
+extension_candidates = (
+    "",
+    ".webp",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".svg",
+    ".avif",
+    ".css",
+    ".js",
+    ".mjs",
+    ".woff2",
+    ".woff",
+    ".ttf",
+    ".otf",
+    ".eot",
+    ".ico",
+    ".json",
+)
+scan_extensions = (".html", ".css", ".js", ".mjs", ".json", ".svg")
+report_file_names = {
+    "mos-release-integrity-report.json",
+    "mos-release-static-assets-report.json",
+}
+attr_url_re = re.compile(
+    r"""(?:src|href|poster|data-src|data-href|srcset|imagesrcset)\s*=\s*["']([^"']+)["']""",
+    re.IGNORECASE,
+)
+css_url_re = re.compile(r"""url\(\s*['"]?([^'")]+)['"]?\s*\)""", re.IGNORECASE)
+quoted_path_re = re.compile(
+    r"""["']((?:/(?:assets|public/assets|api/public/assets|_standalone-assets|cdn/shop/files)/|/favicon)[^"']*)["']""",
+    re.IGNORECASE,
+)
+
+
+def clean_reference(raw):
+    value = str(raw or "").strip()
+    if not value:
+        return ""
+    lower = value.lower()
+    if any(
+        marker in lower
+        for marker in (
+            "/assets/#",
+            "/public/assets/#",
+            "/api/public/assets/#",
+            "/_standalone-assets/#",
+            "/cdn/shop/files/#",
+        )
+    ):
+        return ""
+    if (
+        lower.startswith("data:")
+        or lower.startswith("blob:")
+        or lower.startswith("mailto:")
+        or lower.startswith("tel:")
+        or lower.startswith("javascript:")
+        or lower.startswith("#")
+    ):
+        return ""
+    return value
+
+
+def split_srcset(raw):
+    for candidate in str(raw or "").split(","):
+        token = candidate.strip().split()
+        if token:
+            yield token[0]
+
+
+def path_from_reference(raw, *, base_path):
+    value = clean_reference(raw)
+    if not value:
+        return ""
+    parsed = urlsplit(value)
+    path = parsed.path if parsed.scheme or parsed.netloc else value.split("?", 1)[0].split("#", 1)[0]
+    path = unquote(path.strip())
+    if not path:
+        return ""
+    path = path.split()[0]
+    if not path.startswith("/"):
+        joined_path = posixpath.normpath(posixpath.join(posixpath.dirname(base_path), path))
+        path = joined_path if joined_path.startswith("/") else "/" + joined_path
+    if not path.startswith("/"):
+        return ""
+    lower_path = path.lower()
+    if parsed.fragment and lower_path.rstrip("/") in fragment_only_roots:
+        return ""
+    if not should_validate_asset_path(path):
+        return ""
+    return path
+
+
+def should_validate_asset_path(path):
+    lower_path = str(path or "").lower()
+    _base, ext = os.path.splitext(lower_path)
+    has_deployable_extension = bool(ext and ext in extension_candidates)
+    if lower_path.startswith("/assets/"):
+        return has_deployable_extension
+    if lower_path.startswith(("/_standalone-assets/", "/cdn/shop/files/")):
+        return has_deployable_extension
+    if lower_path.startswith(("/public/assets/", "/api/public/assets/", "/favicon")):
+        return True
+    if "/assets/" in lower_path and not lower_path.startswith("/cdn/shop/t/"):
+        return has_deployable_extension
+    return False
+
+
+def candidate_paths(path):
+    candidates = []
+
+    def add(candidate):
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    add(path)
+    if path.startswith("/public/assets/"):
+        add("/api" + path)
+    if path.startswith("/api/public/assets/"):
+        add(path.removeprefix("/api"))
+    base, ext = os.path.splitext(path)
+    if not ext:
+        for extension in extension_candidates:
+            add(path + extension)
+            if path.startswith("/public/assets/"):
+                add("/api" + path + extension)
+            if path.startswith("/api/public/assets/"):
+                add(path.removeprefix("/api") + extension)
+    return [os.path.join(site_dir, candidate.lstrip("/")) for candidate in candidates]
+
+
+def exists_locally(path):
+    return any(os.path.isfile(candidate) for candidate in candidate_paths(path))
+
+
+missing = []
+scanned_files = 0
+checked_references = 0
+for root, _dirs, files in os.walk(site_dir):
+    for file_name in files:
+        if file_name in report_file_names:
+            continue
+        if not file_name.lower().endswith(scan_extensions):
+            continue
+        file_path = os.path.join(root, file_name)
+        rel_path = "/" + os.path.relpath(file_path, site_dir)
+        try:
+            text = open(file_path, "r", encoding="utf-8", errors="ignore").read()
+        except OSError as exc:
+            missing.append({"file": rel_path, "url": "<read>", "reason": str(exc)})
+            continue
+        scanned_files += 1
+        raw_refs = []
+        raw_refs.extend(match.group(1) for match in attr_url_re.finditer(text))
+        raw_refs.extend(match.group(1) for match in css_url_re.finditer(text))
+        raw_refs.extend(match.group(1) for match in quoted_path_re.finditer(text))
+        expanded_refs = []
+        for raw_ref in raw_refs:
+            if "," in str(raw_ref) and ("srcset" in text.lower() or "imagesrcset" in text.lower()):
+                expanded_refs.extend(split_srcset(raw_ref))
+            expanded_refs.append(raw_ref)
+        seen_paths = set()
+        for raw_ref in expanded_refs:
+            path = path_from_reference(raw_ref, base_path=rel_path)
+            if not path:
+                continue
+            if "#" in path:
+                continue
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
+            checked_references += 1
+            if not exists_locally(path):
+                missing.append({"file": rel_path, "url": path, "reason": "missing local release asset"})
+
+status = "failed" if missing else "passed"
+report = {
+    "status": status,
+    "scannedFiles": scanned_files,
+    "checkedReferences": checked_references,
+    "missing": missing[:100],
+}
+with open(report_path, "w", encoding="utf-8") as handle:
+    json.dump(report, handle, indent=2, sort_keys=True)
+if missing:
+    print(json.dumps(report, indent=2, sort_keys=True), file=sys.stderr)
+    sys.exit(1)
+print(json.dumps(report, sort_keys=True))
+'''
+        self.run(
+            "python3 - "
+            + shlex.quote(site_dir)
+            + " <<'PY'\n"
+            + script
+            + "\nPY"
+        )
+
+    def _materialize_html_deploy_release_static_dependencies(
+        self,
+        *,
+        site_dir: str,
+        public_server_names: list[str],
+    ) -> None:
+        origins: list[str] = []
+        seen_origins: set[str] = set()
+        for raw_name in public_server_names:
+            server_name = str(raw_name or "").strip()
+            if not server_name:
+                continue
+            parsed = urlsplit(server_name if "://" in server_name else f"https://{server_name}")
+            host = parsed.netloc.strip().lower()
+            if not host:
+                continue
+            scheme = parsed.scheme.strip().lower() or "https"
+            origin = f"{scheme}://{host}".rstrip("/")
+            if origin in seen_origins:
+                continue
+            seen_origins.add(origin)
+            origins.append(origin)
+        script = r'''
+import glob
+import json
+import mimetypes
+import os
+import posixpath
+import re
+import shutil
+import sys
+import urllib.error
+import urllib.request
+from urllib.parse import unquote, urljoin, urlsplit
+
+site_dir = os.path.abspath(sys.argv[1])
+origins = json.loads(sys.argv[2])
+report_path = os.path.join(site_dir, "mos-release-static-assets-report.json")
+required_prefixes = (
+    "/assets/",
+    "/public/assets/",
+    "/api/public/assets/",
+    "/_standalone-assets/",
+    "/cdn/shop/files/",
+    "/favicon",
+)
+fragment_only_roots = {
+    "/assets",
+    "/public/assets",
+    "/api/public/assets",
+    "/_standalone-assets",
+    "/cdn/shop/files",
+}
+materializable_prefixes = (
+    "/assets/",
+    "/public/assets/",
+    "/api/public/assets/",
+    "/cdn/shop/files/",
+    "/favicon",
+)
+extension_candidates = (
+    "",
+    ".webp",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".svg",
+    ".avif",
+    ".css",
+    ".js",
+    ".mjs",
+    ".woff2",
+    ".woff",
+    ".ttf",
+    ".otf",
+    ".eot",
+    ".ico",
+    ".json",
+)
+scan_extensions = (".html", ".css", ".js", ".mjs", ".json", ".svg")
+report_file_names = {
+    "mos-release-integrity-report.json",
+    "mos-release-static-assets-report.json",
+}
+attr_url_re = re.compile(
+    r"""(?:src|href|poster|data-src|data-href|srcset|imagesrcset)\s*=\s*["']([^"']+)["']""",
+    re.IGNORECASE,
+)
+css_url_re = re.compile(r"""url\(\s*['"]?([^'")]+)['"]?\s*\)""", re.IGNORECASE)
+quoted_path_re = re.compile(
+    r"""["']((?:/(?:assets|public/assets|api/public/assets|_standalone-assets|cdn/shop/files)/|/favicon)[^"']*)["']""",
+    re.IGNORECASE,
+)
+
+
+def clean_reference(raw):
+    value = str(raw or "").strip()
+    if not value:
+        return ""
+    lower = value.lower()
+    if any(
+        marker in lower
+        for marker in (
+            "/assets/#",
+            "/public/assets/#",
+            "/api/public/assets/#",
+            "/_standalone-assets/#",
+            "/cdn/shop/files/#",
+        )
+    ):
+        return ""
+    if (
+        lower.startswith("data:")
+        or lower.startswith("blob:")
+        or lower.startswith("mailto:")
+        or lower.startswith("tel:")
+        or lower.startswith("javascript:")
+        or lower.startswith("#")
+    ):
+        return ""
+    return value
+
+
+def split_srcset(raw):
+    for candidate in str(raw or "").split(","):
+        token = candidate.strip().split()
+        if token:
+            yield token[0]
+
+
+def path_from_reference(raw, *, base_path):
+    value = clean_reference(raw)
+    if not value:
+        return ""
+    parsed = urlsplit(value)
+    path = parsed.path if parsed.scheme or parsed.netloc else value.split("?", 1)[0].split("#", 1)[0]
+    path = unquote(path.strip())
+    if not path:
+        return ""
+    path = path.split()[0]
+    if not path.startswith("/"):
+        joined_path = posixpath.normpath(posixpath.join(posixpath.dirname(base_path), path))
+        path = joined_path if joined_path.startswith("/") else "/" + joined_path
+    if not path.startswith("/"):
+        return ""
+    lower_path = path.lower()
+    if parsed.fragment and lower_path.rstrip("/") in fragment_only_roots:
+        return ""
+    if not should_validate_asset_path(path):
+        return ""
+    return path
+
+
+def should_validate_asset_path(path):
+    lower_path = str(path or "").lower()
+    _base, ext = os.path.splitext(lower_path)
+    has_deployable_extension = bool(ext and ext in extension_candidates)
+    if lower_path.startswith("/assets/"):
+        return has_deployable_extension
+    if lower_path.startswith(("/_standalone-assets/", "/cdn/shop/files/")):
+        return has_deployable_extension
+    if lower_path.startswith(("/public/assets/", "/api/public/assets/", "/favicon")):
+        return True
+    if "/assets/" in lower_path and not lower_path.startswith("/cdn/shop/t/"):
+        return has_deployable_extension
+    return False
+
+
+def route_local_asset_equivalent(path):
+    normalized_path = str(path or "")
+    marker = "/assets/"
+    if normalized_path.startswith(marker):
+        return None
+    marker_index = normalized_path.find(marker)
+    if marker_index <= 0:
+        return None
+    return normalized_path[marker_index:]
+
+
+def should_materialize_asset_path(path):
+    lower_path = str(path or "").lower()
+    if any(lower_path.startswith(prefix) for prefix in materializable_prefixes):
+        return True
+    if lower_path.startswith("/cdn/shop/t/"):
+        return False
+    return route_local_asset_equivalent(lower_path) is not None
+
+
+def candidate_paths(path):
+    candidates = []
+
+    def add(candidate):
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    add(path)
+    if path.startswith("/public/assets/"):
+        add("/api" + path)
+    if path.startswith("/api/public/assets/"):
+        add(path.removeprefix("/api"))
+    base, ext = os.path.splitext(path)
+    if not ext:
+        for extension in extension_candidates:
+            add(path + extension)
+            if path.startswith("/public/assets/"):
+                add("/api" + path + extension)
+            if path.startswith("/api/public/assets/"):
+                add(path.removeprefix("/api") + extension)
+    return [os.path.join(site_dir, candidate.lstrip("/")) for candidate in candidates]
+
+
+def exists_locally(path):
+    return any(os.path.isfile(candidate) for candidate in candidate_paths(path))
+
+
+def scan_missing():
+    missing = []
+    scanned_files = 0
+    checked_references = 0
+    for root, _dirs, files in os.walk(site_dir):
+        for file_name in files:
+            if file_name in report_file_names:
+                continue
+            if not file_name.lower().endswith(scan_extensions):
+                continue
+            file_path = os.path.join(root, file_name)
+            rel_path = "/" + os.path.relpath(file_path, site_dir)
+            try:
+                text = open(file_path, "r", encoding="utf-8", errors="ignore").read()
+            except OSError as exc:
+                missing.append({"file": rel_path, "url": "<read>", "reason": str(exc)})
+                continue
+            scanned_files += 1
+            raw_refs = []
+            raw_refs.extend(match.group(1) for match in attr_url_re.finditer(text))
+            raw_refs.extend(match.group(1) for match in css_url_re.finditer(text))
+            raw_refs.extend(match.group(1) for match in quoted_path_re.finditer(text))
+            expanded_refs = []
+            for raw_ref in raw_refs:
+                if "," in str(raw_ref) and ("srcset" in text.lower() or "imagesrcset" in text.lower()):
+                    expanded_refs.extend(split_srcset(raw_ref))
+                expanded_refs.append(raw_ref)
+            seen_paths = set()
+            for raw_ref in expanded_refs:
+                path = path_from_reference(raw_ref, base_path=rel_path)
+                if not path:
+                    continue
+                if "#" in path:
+                    continue
+                if path in seen_paths:
+                    continue
+                seen_paths.add(path)
+                checked_references += 1
+                if not exists_locally(path):
+                    missing.append({"file": rel_path, "url": path, "reason": "missing local release asset"})
+    return {
+        "scannedFiles": scanned_files,
+        "checkedReferences": checked_references,
+        "missing": missing,
+    }
+
+
+def write_report(status, *, scanned, checked, missing, materialized, unresolved):
+    report = {
+        "status": status,
+        "origins": origins,
+        "scannedFiles": scanned,
+        "checkedReferences": checked,
+        "materializedCount": len(materialized),
+        "materialized": materialized[:200],
+        "unresolvedCount": len(unresolved),
+        "unresolved": unresolved[:200],
+        "remainingMissingCount": len(missing),
+        "remainingMissing": missing[:200],
+    }
+    with open(report_path, "w", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2, sort_keys=True)
+    return report
+
+
+def reject_html_payload(path, content_type):
+    lower_type = str(content_type or "").split(";", 1)[0].strip().lower()
+    if not lower_type:
+        return False
+    if lower_type != "text/html":
+        return False
+    lower_path = path.lower()
+    return not lower_path.endswith((".html", ".htm"))
+
+
+def fetch_to_path(path):
+    if not origins:
+        return None
+    accept = "*/*"
+    if path.lower().endswith((".css", ".js", ".mjs", ".json")):
+        accept = "text/css,application/javascript,application/json,*/*;q=0.1"
+    elif path.lower().endswith((".woff2", ".woff", ".ttf", ".otf", ".eot")):
+        accept = "font/woff2,font/woff,font/ttf,font/otf,application/octet-stream,*/*;q=0.1"
+    elif path.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".svg", ".ico")):
+        accept = "image/avif,image/webp,image/svg+xml,image/*,*/*;q=0.1"
+    errors = []
+    for origin in origins:
+        url = urljoin(origin.rstrip("/") + "/", path.lstrip("/"))
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": accept,
+                "User-Agent": "MOS-html-deploy-v1-static-materializer/1.0",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                status = getattr(response, "status", 200)
+                content_type = response.headers.get("Content-Type", "")
+                payload = response.read()
+        except Exception as exc:  # noqa: BLE001 - report every attempted origin.
+            errors.append(f"{url}: {exc}")
+            continue
+        if status < 200 or status >= 300:
+            errors.append(f"{url}: HTTP {status}")
+            continue
+        if not payload:
+            errors.append(f"{url}: empty response")
+            continue
+        if reject_html_payload(path, content_type):
+            errors.append(f"{url}: refused HTML response for static asset")
+            continue
+        normalized_content_type = str(content_type or "").split(";", 1)[0].strip().lower()
+        target_path = path
+        if path.startswith(("/public/assets/", "/api/public/assets/")) and not os.path.splitext(path)[1]:
+            if normalized_content_type == "image/webp":
+                target_path = path + ".webp"
+            elif normalized_content_type in {"image/jpeg", "image/jpg"}:
+                target_path = path + ".jpg"
+            elif normalized_content_type == "image/png":
+                target_path = path + ".png"
+            elif normalized_content_type == "image/gif":
+                target_path = path + ".gif"
+            elif normalized_content_type == "image/svg+xml":
+                target_path = path + ".svg"
+            elif normalized_content_type == "image/avif":
+                target_path = path + ".avif"
+        target = os.path.join(site_dir, target_path.lstrip("/"))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "wb") as handle:
+            handle.write(payload)
+        if path.startswith("/public/assets/"):
+            api_target = os.path.join(site_dir, "api", target_path.lstrip("/"))
+            os.makedirs(os.path.dirname(api_target), exist_ok=True)
+            shutil.copyfile(target, api_target)
+        elif path.startswith("/api/public/assets/"):
+            public_target = os.path.join(site_dir, target_path.removeprefix("/api").lstrip("/"))
+            os.makedirs(os.path.dirname(public_target), exist_ok=True)
+            shutil.copyfile(target, public_target)
+        return {"url": path, "source": url, "contentType": content_type or mimetypes.guess_type(path)[0] or "application/octet-stream", "sizeBytes": len(payload)}
+    return {"url": path, "error": "; ".join(errors) or "no origin succeeded"}
+
+
+def copy_equivalent_asset(path):
+    candidates = []
+    if path.startswith("/cdn/shop/files/"):
+        name = os.path.basename(path)
+        stem, ext = os.path.splitext(name)
+        if not stem:
+            return None
+        asset_dir = os.path.join(site_dir, "assets")
+        exact_asset = os.path.join(asset_dir, name)
+        if os.path.isfile(exact_asset):
+            candidates.append(exact_asset)
+        if ext:
+            candidates.extend(sorted(glob.glob(os.path.join(asset_dir, f"{stem}-*{ext}"))))
+    equivalent_asset_path = route_local_asset_equivalent(path)
+    if equivalent_asset_path:
+        equivalent_source = os.path.join(site_dir, equivalent_asset_path.lstrip("/"))
+        if os.path.isfile(equivalent_source):
+            candidates.append(equivalent_source)
+    for source_path in candidates:
+        if not os.path.isfile(source_path):
+            continue
+        target = os.path.join(site_dir, path.lstrip("/"))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(source_path, target)
+        return {
+            "url": path,
+            "source": "/" + os.path.relpath(source_path, site_dir),
+            "contentType": mimetypes.guess_type(source_path)[0] or "application/octet-stream",
+            "sizeBytes": os.path.getsize(target),
+        }
+    return None
+
+
+materialized = []
+unresolved = []
+last_scan = scan_missing()
+for _iteration in range(4):
+    missing_paths = []
+    seen = set()
+    for item in last_scan["missing"]:
+        path = str(item.get("url") or "")
+        if not path or path in seen:
+            continue
+        if "#" in path:
+            continue
+        if not should_materialize_asset_path(path):
+            continue
+        seen.add(path)
+        missing_paths.append(path)
+    if not missing_paths:
+        break
+    changed = False
+    missing_paths.sort(key=lambda value: (0 if value.startswith("/assets/") else 1, value))
+    for path in missing_paths:
+        if exists_locally(path):
+            continue
+        copied = copy_equivalent_asset(path)
+        if copied is not None:
+            materialized.append(copied)
+            changed = True
+            continue
+        fetched = fetch_to_path(path)
+        if fetched and "error" not in fetched:
+            materialized.append(fetched)
+            changed = True
+        elif fetched:
+            unresolved.append(fetched)
+    next_scan = scan_missing()
+    if len(next_scan["missing"]) >= len(last_scan["missing"]) and not changed:
+        last_scan = next_scan
+        break
+    last_scan = next_scan
+
+remaining = last_scan["missing"]
+status = "passed" if not remaining else "failed"
+report = write_report(
+    status,
+    scanned=last_scan["scannedFiles"],
+    checked=last_scan["checkedReferences"],
+    missing=remaining,
+    materialized=materialized,
+    unresolved=unresolved,
+)
+if remaining:
+    print(json.dumps(report, indent=2, sort_keys=True), file=sys.stderr)
+    sys.exit(1)
+print(json.dumps(report, sort_keys=True))
+'''
+        self.run(
+            "python3 - "
+            + shlex.quote(site_dir)
+            + " "
+            + shlex.quote(json.dumps(origins))
+            + " <<'PY'\n"
+            + script
+            + "\nPY"
+        )
 
     def _validate_funnel_artifact_site_output(
         self,
@@ -4725,6 +5701,23 @@ WantedBy=multi-user.target
                         '  echo "missing built standalone site: $built_site" >&2',
                         "  exit 1",
                         "fi",
+                        'if [ ! -s "$built_site/mos-release-manifest.json" ]; then',
+                        '  echo "missing html-deploy release manifest: $built_site/mos-release-manifest.json" >&2',
+                        "  exit 1",
+                        "fi",
+                        'if [ ! -s "$built_site/mos-release-integrity-report.json" ]; then',
+                        '  echo "missing html-deploy release integrity report: $built_site/mos-release-integrity-report.json" >&2',
+                        "  exit 1",
+                        "fi",
+                        "python3 - \"$built_site/mos-release-integrity-report.json\" <<'PY'",
+                        "import json, sys",
+                        "report_path = sys.argv[1]",
+                        "with open(report_path, 'r', encoding='utf-8') as handle:",
+                        "    report = json.load(handle)",
+                        "if report.get('status') != 'passed':",
+                        "    print(f\"html-deploy release integrity did not pass: {report_path}\", file=sys.stderr)",
+                        "    sys.exit(1)",
+                        "PY",
                         'if [ -e "$live_site" ] && [ ! -L "$live_site" ]; then',
                         '  rm -rf "$legacy_site"',
                         '  mv "$live_site" "$legacy_site"',
@@ -4807,14 +5800,10 @@ WantedBy=multi-user.target
                 if not entry_slug:
                     return None
 
+                canonical_funnel_slug = (
+                    str(canonical_funnel_meta.get("funnelSlug") or "").strip() or funnel_slug
+                )
                 funnel_id_token = str(canonical_funnel_meta.get("funnelId") or "").strip().lower()
-                if funnel_id_token:
-                    try:
-                        canonical_funnel_slug = str(UUID(funnel_id_token)).split("-", 1)[0]
-                    except ValueError:
-                        canonical_funnel_slug = funnel_slug
-                else:
-                    canonical_funnel_slug = funnel_slug
 
                 candidate = {
                     "productSlug": product_slug,
@@ -4992,7 +5981,13 @@ WantedBy=multi-user.target
         self,
         *,
         source: FunnelArtifactSourceSpec,
-    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, object]]:
+    ) -> tuple[
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, object],
+        dict[str, object],
+    ]:
         artifact = source.artifact or {}
         meta = artifact.get("meta")
         products = artifact.get("products")
@@ -5006,6 +6001,7 @@ WantedBy=multi-user.target
             raise ValueError("source_ref.artifact.assets must be an object when provided.")
 
         asset_items: dict[str, object] = {}
+        static_asset_items: dict[str, object] = {}
         if isinstance(assets, dict):
             raw_items = assets.get("items")
             if raw_items is None:
@@ -5016,8 +6012,17 @@ WantedBy=multi-user.target
                 raise ValueError(
                     "source_ref.artifact.assets.items must be an object when provided."
                 )
+            raw_static_items = assets.get("staticItems")
+            if raw_static_items is None:
+                static_asset_items = {}
+            elif isinstance(raw_static_items, dict):
+                static_asset_items = raw_static_items
+            else:
+                raise ValueError(
+                    "source_ref.artifact.assets.staticItems must be an object when provided."
+                )
 
-        return artifact, meta, products, asset_items
+        return artifact, meta, products, asset_items, static_asset_items
 
     def _write_funnel_artifact_assets(
         self,
@@ -5028,9 +6033,13 @@ WantedBy=multi-user.target
         standalone_served_assets: dict[str, _StandaloneServedAsset] | None = None,
         standalone_image_sources: dict[str, _StandaloneImageSource] | None = None,
     ) -> None:
-        _artifact, _meta, _products, asset_items = self._resolve_funnel_artifact_payload_sections(
-            source=source
-        )
+        (
+            _artifact,
+            _meta,
+            _products,
+            asset_items,
+            static_asset_items,
+        ) = self._resolve_funnel_artifact_payload_sections(source=source)
 
         assets_roots = (
             f"{site_dir}/api/public/assets",
@@ -5111,6 +6120,92 @@ WantedBy=multi-user.target
                     payload=decoded_bytes,
                     content_type=content_type,
                     context_label=f"Artifact asset '{normalized_public_id}'",
+                )
+
+        allowed_static_prefixes = (
+            "/_standalone-assets/",
+            "/assets/",
+            "/cdn/shop/files/",
+            "/favicon",
+        )
+        for raw_asset_path, raw_asset_payload in static_asset_items.items():
+            asset_path = str(raw_asset_path or "").strip()
+            if (
+                not asset_path.startswith("/")
+                or "://" in asset_path
+                or asset_path.startswith("//")
+                or "?" in asset_path
+                or "#" in asset_path
+                or posixpath.normpath(asset_path) != asset_path
+                or not any(
+                    asset_path.lower().startswith(prefix)
+                    for prefix in allowed_static_prefixes
+                )
+            ):
+                raise ValueError(
+                    f"Invalid artifact static asset path '{asset_path}'. Expected a normalized "
+                    "same-origin path under /assets/, /cdn/shop/files/, or /favicon."
+                )
+            if not isinstance(raw_asset_payload, dict):
+                raise ValueError(
+                    f"Artifact static asset payload for '{asset_path}' must be an object."
+                )
+            raw_content_type = raw_asset_payload.get("contentType")
+            if not isinstance(raw_content_type, str) or not raw_content_type.strip():
+                raise ValueError(
+                    f"Artifact static asset '{asset_path}' must include non-empty contentType."
+                )
+            content_type = raw_content_type.strip().lower()
+            raw_bytes_base64 = raw_asset_payload.get("bytesBase64")
+            if not isinstance(raw_bytes_base64, str) or not raw_bytes_base64.strip():
+                raise ValueError(
+                    f"Artifact static asset '{asset_path}' must include bytesBase64."
+                )
+            try:
+                decoded_bytes = base64.b64decode(raw_bytes_base64, validate=True)
+            except binascii.Error as exc:
+                raise ValueError(
+                    f"Artifact static asset '{asset_path}' has invalid bytesBase64."
+                ) from exc
+            if not decoded_bytes:
+                raise ValueError(f"Artifact static asset '{asset_path}' decoded to empty bytes.")
+            declared_size = raw_asset_payload.get("sizeBytes")
+            if declared_size is not None:
+                if not isinstance(declared_size, int) or declared_size < 0:
+                    raise ValueError(
+                        f"Artifact static asset '{asset_path}' sizeBytes must be a non-negative integer."
+                    )
+                if declared_size != len(decoded_bytes):
+                    raise ValueError(
+                        f"Artifact static asset '{asset_path}' sizeBytes ({declared_size}) does not match decoded byte length ({len(decoded_bytes)})."
+                    )
+            declared_sha256 = str(raw_asset_payload.get("sha256") or "").strip().lower()
+            actual_sha256 = hashlib.sha256(decoded_bytes).hexdigest()
+            if declared_sha256 and declared_sha256 != actual_sha256:
+                raise ValueError(
+                    f"Artifact static asset '{asset_path}' sha256 does not match bytes."
+                )
+
+            target_path = f"{site_dir}{asset_path}"
+            if uploaded_target_paths is None or target_path not in uploaded_target_paths:
+                self.upload_bytes(decoded_bytes, target_path)
+                if uploaded_target_paths is not None:
+                    uploaded_target_paths.add(target_path)
+            if standalone_served_assets is not None:
+                self._register_standalone_served_asset(
+                    served_assets=standalone_served_assets,
+                    route_path=asset_path,
+                    payload=decoded_bytes,
+                    content_type=content_type,
+                    context_label=f"Artifact static asset '{asset_path}'",
+                )
+            if standalone_image_sources is not None and content_type.startswith("image/"):
+                self._register_standalone_image_source(
+                    image_sources=standalone_image_sources,
+                    route_path=asset_path,
+                    payload=decoded_bytes,
+                    content_type=content_type,
+                    context_label=f"Artifact static asset '{asset_path}'",
                 )
 
     def _extract_standalone_imported_html_props(
@@ -5859,6 +6954,10 @@ WantedBy=multi-user.target
 		  const META_ATTRIBUTION_WAIT_POLL_MS = 50;
 		  const META_EMAIL_HASH_STORAGE_KEY = "mos_meta_em";
 		  const TRACKING_NAVIGATION_FLUSH_DELAY_MS = 250;
+		  const META_PIXEL_EVENT_LOAD_TIMEOUT_MS = 2000;
+		  const META_PIXEL_EVENT_NETWORK_WINDOW_MS = 1500;
+		  const POSTHOG_NAVIGATION_EVENT_LOAD_TIMEOUT_MS = 8000;
+		  const POSTHOG_NAVIGATION_EVENT_NETWORK_WINDOW_MS = 1000;
 			  const SESSION_PARAM = "session_id";
 			  const VISITOR_PARAM = "visitor_id";
 			  const CLICK_PARAM = "click_id";
@@ -5881,10 +6980,20 @@ WantedBy=multi-user.target
   const normalizeText = (value) => String(value || "").replace(/\\s+/g, " ").trim();
   const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
   const isNonEmptyRecord = (value) => isRecord(value) && Object.keys(value).length > 0;
-  const waitForTrackingNavigationFlush = () =>
+  let metaPixelScriptLoadPromise = null;
+  let metaPixelLastTrackedAt = 0;
+  const posthogNavigationFlushPromises = [];
+  const waitMs = (durationMs) =>
     new Promise((resolve) => {
-      window.setTimeout(resolve, TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+      window.setTimeout(resolve, Math.max(0, Number(durationMs) || 0));
     });
+  const waitForTrackingNavigationFlush = async () => {
+    await waitMs(TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+    await Promise.allSettled([
+      waitForPostHogNavigationEventFlush(),
+      waitForMetaPixelTrackedEventFlush(),
+    ]);
+  };
   const readCookie = (name) => {
     const prefix = String(name || "") + "=";
     const match = document.cookie
@@ -5987,6 +7096,82 @@ WantedBy=multi-user.target
     assignBooleanProp(props, "subscriptionFlag", target.subscriptionFlag);
     assignBooleanProp(props, "subscription_flag", target.subscriptionFlag);
     return props;
+  };
+  const firstManifestTarget = (key) => {
+    const manifest = config.manifest && typeof config.manifest === "object" ? config.manifest : {};
+    const targets = manifest[key];
+    if (!Array.isArray(targets)) return null;
+    return targets.find((target) => target && typeof target === "object") || null;
+  };
+  const mergeMissingProps = (...sources) => {
+    const merged = {};
+    sources.forEach((source) => {
+      if (!source || typeof source !== "object") return;
+      Object.entries(source).forEach(([key, value]) => {
+        if ((merged[key] === undefined || merged[key] === null || merged[key] === "") && value !== undefined && value !== null && value !== "") {
+          merged[key] = value;
+        }
+      });
+    });
+    return merged;
+  };
+  const resolveQuizManifestEventDefaults = (eventType, props) => {
+    if (cleanText(config.htmlArtifactKind) !== "quiz") return {};
+    const manifest = config.manifest && typeof config.manifest === "object" ? config.manifest : {};
+    const normalizedEventType = cleanText(eventType);
+    const quizId = cleanText(manifest.quizId || manifest.quiz_id);
+    const quizVersion = cleanText(manifest.quizVersion || manifest.quiz_version);
+    const quizVariant = cleanText(manifest.quizVariant || manifest.quiz_variant);
+    const quizIdentity = {
+      ...(quizId ? { quizId, quiz_id: quizId } : {}),
+      ...(quizVersion ? { quizVersion, quiz_version: quizVersion } : {}),
+      ...(quizVariant ? { quizVariant, quiz_variant: quizVariant } : {}),
+    };
+    const leadProps = buildDeclaredTargetProps(firstManifestTarget("quizLeads"));
+    const questionProps = buildDeclaredTargetProps(firstManifestTarget("quizQuestions"));
+    const optionProps = buildDeclaredTargetProps(firstManifestTarget("quizOptions"));
+    const resultProps = buildDeclaredTargetProps(firstManifestTarget("quizResults"));
+    const recommendationProps = buildDeclaredTargetProps(firstManifestTarget("quizRecommendations"));
+    const ctaProps = buildDeclaredTargetProps(firstManifestTarget("ctas"));
+    const bindingProps = buildDeclaredTargetProps(firstManifestTarget("bindings"));
+    const offerProps = mergeMissingProps(ctaProps, recommendationProps, resultProps);
+    const questionCount = Array.isArray(manifest.quizQuestions) ? manifest.quizQuestions.length : 0;
+    const completionProps = questionCount > 0
+      ? { questionCountAnswered: questionCount, question_count_answered: questionCount }
+      : {};
+    if (normalizedEventType === "quiz_lead_viewed" || normalizedEventType === "QuizLeadViewed") {
+      return mergeMissingProps(quizIdentity, leadProps);
+    }
+    if (normalizedEventType === "quiz_question_viewed" || normalizedEventType === "QuizQuestionViewed") {
+      return mergeMissingProps(quizIdentity, questionProps);
+    }
+    if (
+      normalizedEventType === "quiz_option_presented" ||
+      normalizedEventType === "QuizOptionPresented" ||
+      normalizedEventType === "quiz_option_selected" ||
+      normalizedEventType === "QuizOptionSelected"
+    ) {
+      return mergeMissingProps(quizIdentity, optionProps, questionProps);
+    }
+    if (normalizedEventType === "quiz_question_submitted" || normalizedEventType === "QuizQuestionSubmitted") {
+      return mergeMissingProps(quizIdentity, questionProps, optionProps);
+    }
+    if (normalizedEventType === "quiz_completed" || normalizedEventType === "QuizCompleted") {
+      return mergeMissingProps(quizIdentity, resultProps, recommendationProps, completionProps);
+    }
+    if (normalizedEventType === "quiz_result_viewed" || normalizedEventType === "QuizResultViewed") {
+      return mergeMissingProps(quizIdentity, resultProps);
+    }
+    if (normalizedEventType === "quiz_recommendation_viewed" || normalizedEventType === "QuizRecommendationViewed") {
+      return mergeMissingProps(quizIdentity, recommendationProps, resultProps);
+    }
+    if (normalizedEventType === "quiz_cta_viewed" || normalizedEventType === "QuizCtaViewed") {
+      return mergeMissingProps(quizIdentity, ctaProps, bindingProps, offerProps);
+    }
+    if (normalizedEventType === "pre_sales_to_sales_click" || normalizedEventType === "PreSalesToSalesClick" || normalizedEventType === "cta_click") {
+      return mergeMissingProps(quizIdentity, ctaProps, bindingProps, offerProps);
+    }
+    return quizIdentity;
   };
 	  const readStoredMetaEmailHash = () => {
 	    try {
@@ -6186,6 +7371,7 @@ WantedBy=multi-user.target
     return "desktop";
   };
   const resolveRuntimeContextProps = (props) => {
+    const manifest = config.manifest && typeof config.manifest === "object" ? config.manifest : {};
     const pageStage = cleanText((props && props.pageStage) || config.pageStage);
     const experimentId = resolveExperimentId();
     const externalId = resolveMetaExternalId();
@@ -6197,6 +7383,9 @@ WantedBy=multi-user.target
 	    const deviceType = resolveDeviceType();
 	    const clickAttribution = resolveClickAttribution();
 		    const inboundPresaleBridgeContext = resolvePresaleBridgeContext(window.location.href, pageStage);
+    const quizId = cleanText((props && (props.quizId || props.quiz_id)) || manifest.quizId || manifest.quiz_id);
+    const quizVersion = cleanText((props && (props.quizVersion || props.quiz_version)) || manifest.quizVersion || manifest.quiz_version);
+    const quizVariant = cleanText((props && (props.quizVariant || props.quiz_variant)) || manifest.quizVariant || manifest.quiz_variant);
 	    return {
       productSlug: cleanText(config.productSlug),
       product_slug: cleanText(config.productSlug),
@@ -6218,6 +7407,7 @@ WantedBy=multi-user.target
       html_deploy_schema_version: cleanText(config.htmlDeploySchemaVersion),
       pageVariant,
       page_variant: pageVariant,
+      distinct_id: resolvedVisitorId || resolvedSessionId || "anonymous-funnel-visitor",
       visitorId: resolvedVisitorId,
       visitor_id: resolvedVisitorId,
       sessionId: resolvedSessionId,
@@ -6230,6 +7420,9 @@ WantedBy=multi-user.target
       browser_user_agent: window.navigator && window.navigator.userAgent,
       ...(externalId ? { external_id: externalId } : {}),
       ...(emailHash ? { em: emailHash } : {}),
+      ...(quizId ? { quizId, quiz_id: quizId } : {}),
+      ...(quizVersion ? { quizVersion, quiz_version: quizVersion } : {}),
+      ...(quizVariant ? { quizVariant, quiz_variant: quizVariant } : {}),
 	      ...(experimentId ? { experimentId, experiment_id: experimentId } : {}),
 	      ...clickAttribution,
 	      ...(clickAttribution.clickId ? { click_id: clickAttribution.clickId } : {}),
@@ -6295,6 +7488,13 @@ WantedBy=multi-user.target
       out[key] = value;
     }
     return out;
+  };
+  const isDeployTrackingValidationSession = () => {
+    try {
+      return Boolean(cleanText(new URLSearchParams(window.location.search).get("mos_deploy_validation_id")));
+    } catch (_) {
+      return false;
+    }
   };
   const isPresaleToSalesNavigation = (fromStage, toStage) =>
     cleanText(fromStage) === "pre_sales" && cleanText(toStage) === "sales";
@@ -6469,12 +7669,50 @@ WantedBy=multi-user.target
     return params;
   };
   const loadMetaPixelScript = () => {
-    if (document.getElementById(META_PIXEL_SCRIPT_ID)) return;
-    const script = document.createElement("script");
-    script.id = META_PIXEL_SCRIPT_ID;
-    script.async = true;
-    script.src = META_PIXEL_SCRIPT_SRC;
-    document.head.appendChild(script);
+    if (metaPixelScriptLoadPromise) return metaPixelScriptLoadPromise;
+    const existingScript = document.getElementById(META_PIXEL_SCRIPT_ID);
+    if (existingScript) return Promise.resolve();
+    metaPixelScriptLoadPromise = new Promise((resolve) => {
+      const script = document.createElement("script");
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      script.id = META_PIXEL_SCRIPT_ID;
+      script.async = true;
+      script.src = META_PIXEL_SCRIPT_SRC;
+      script.addEventListener("load", settle, { once: true });
+      script.addEventListener("error", settle, { once: true });
+      document.head.appendChild(script);
+    });
+    return metaPixelScriptLoadPromise;
+  };
+  const waitForMetaPixelScriptLoad = async () => {
+    const loadPromise = metaPixelScriptLoadPromise || loadMetaPixelScript();
+    await Promise.race([
+      loadPromise,
+      waitMs(META_PIXEL_EVENT_LOAD_TIMEOUT_MS),
+    ]);
+  };
+  const waitForMetaPixelTrackedEventFlush = async () => {
+    if (!metaPixelLastTrackedAt) return;
+    await waitForMetaPixelScriptLoad();
+    const elapsedMs = Date.now() - metaPixelLastTrackedAt;
+    const remainingMs = META_PIXEL_EVENT_NETWORK_WINDOW_MS - elapsedMs;
+    if (remainingMs > 0) {
+      await waitMs(remainingMs);
+    }
+  };
+  const waitForPostHogNavigationEventFlush = async () => {
+    const pending = posthogNavigationFlushPromises.splice(0);
+    if (!pending.length) return;
+    await Promise.race([
+      Promise.allSettled(pending),
+      waitMs(POSTHOG_NAVIGATION_EVENT_LOAD_TIMEOUT_MS),
+    ]);
+    await waitMs(POSTHOG_NAVIGATION_EVENT_NETWORK_WINDOW_MS);
   };
   const scheduleMetaPixelScriptLoad = () => {
     if (window.__mosMetaPixelLoadScheduled || document.getElementById(META_PIXEL_SCRIPT_ID)) {
@@ -6496,7 +7734,7 @@ WantedBy=multi-user.target
         window.cancelIdleCallback(idleCallbackId);
         idleCallbackId = null;
       }
-      loadMetaPixelScript();
+      void loadMetaPixelScript();
     };
     const listenerOptions = { capture: true, once: true };
     window.addEventListener("pointerdown", flush, listenerOptions);
@@ -6525,6 +7763,11 @@ WantedBy=multi-user.target
     if (!pixelId) return null;
     if (!window.fbq) {
       const fbq = function (...args) {
+        const activeFbq = window.fbq;
+        if (activeFbq && activeFbq !== fbq && typeof activeFbq.callMethod === "function") {
+          activeFbq.callMethod(...args);
+          return;
+        }
         if (typeof fbq.callMethod === "function") {
           fbq.callMethod(...args);
           return;
@@ -6581,6 +7824,7 @@ WantedBy=multi-user.target
         autocapture: false,
         capture_pageview: true,
         capture_pageleave: true,
+        ...(isDeployTrackingValidationSession() ? { opt_out_useragent_filter: true } : {}),
         bootstrap: {
           distinctID: distinctId,
           isIdentifiedID: false,
@@ -6607,13 +7851,103 @@ WantedBy=multi-user.target
 		      ...resolveRuntimeContextProps(props),
 	      utm: getUtmParams(),
 	    };
+			    const navigationCritical = isNavigationCriticalPostHogEvent(eventType);
+	    const directTransportPreferred = navigationCritical || isDirectPostHogTransportEvent(eventType);
+		    let resolveNavigationFlush = null;
+		    const navigationFlushPromise = navigationCritical
+		      ? new Promise((resolve) => {
+		          resolveNavigationFlush = resolve;
+		        })
+		      : null;
+		    if (navigationFlushPromise) {
+		      posthogNavigationFlushPromises.push(navigationFlushPromise);
+		      window.setTimeout(() => {
+		        if (typeof resolveNavigationFlush === "function") {
+		          resolveNavigationFlush();
+		          resolveNavigationFlush = null;
+		        }
+		      }, POSTHOG_NAVIGATION_EVENT_LOAD_TIMEOUT_MS);
+		    }
+		    const markNavigationFlushReady = () => {
+		      if (typeof resolveNavigationFlush === "function") {
+		        resolveNavigationFlush();
+		        resolveNavigationFlush = null;
+		      }
+		    };
 		    const emitCaptures = (additionalEventProps) => {
 		      const captures = resolvePostHogCaptures(eventType, props, baseEventProps, mappedCaptures, eventSourceUrl);
+		      if (!captures.length) {
+		        markNavigationFlushReady();
+		        return;
+		      }
 		      let sent = false;
+		      const sendDirectNavigationCaptures = () => {
+		        if (!directTransportPreferred) return false;
+		        const apiKey = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogProjectApiKey);
+		        const apiHost = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogApiHost);
+		        if (!apiKey || !apiHost) return false;
+		        const endpoint = apiHost.replace(/\/+$/, "") + "/capture/";
+		        const directPayloads = [];
+		        captures.forEach((capture) => {
+		          const directProperties = {
+		            ...capture.eventProps,
+		            ...(additionalEventProps || {}),
+		          };
+		          if (!cleanText(directProperties.distinct_id)) {
+		            directProperties.distinct_id =
+		              cleanText(directProperties.visitor_id) ||
+		              cleanText(directProperties.visitorId) ||
+		              cleanText(visitorId) ||
+		              "anonymous-funnel-visitor";
+		          }
+		          const payload = JSON.stringify({
+		            api_key: apiKey,
+		            event: capture.eventName,
+		            distinct_id: directProperties.distinct_id,
+		            properties: directProperties,
+		          });
+		          directPayloads.push(payload);
+		        });
+		        if (!directPayloads.length) return false;
+		        if (window.fetch) {
+		          Promise.allSettled(directPayloads.map((payload) => {
+		            const fetchOptions = {
+		              method: "POST",
+		              headers: { "Content-Type": "application/json" },
+		              body: payload,
+		            };
+		            if (!navigationCritical) {
+		              fetchOptions.keepalive = true;
+		            }
+		            return window.fetch(endpoint, fetchOptions).catch(() => {});
+		          })).finally(markNavigationFlushReady);
+		          return true;
+		        }
+		        let attemptedBeacon = false;
+		        directPayloads.forEach((payload) => {
+		          try {
+		            if (navigator.sendBeacon) {
+		              const blob = new Blob([payload], { type: "application/json" });
+		              if (navigator.sendBeacon(endpoint, blob)) attemptedBeacon = true;
+		            }
+		          } catch (_error) {}
+		        });
+		        if (attemptedBeacon) markNavigationFlushReady();
+		        return attemptedBeacon;
+		      };
 		      const sendCaptures = () => {
 		        if (sent) return;
+		        if (directTransportPreferred && sendDirectNavigationCaptures()) {
+		          sent = true;
+		          return;
+		        }
 		        const posthog = ensurePostHogInstance();
-		        if (!posthog || posthog.__loaded !== true || typeof posthog.capture !== "function") return;
+		        if (!posthog || posthog.__loaded !== true || typeof posthog.capture !== "function") {
+		          if (sendDirectNavigationCaptures()) {
+		            sent = true;
+		          }
+		          return;
+		        }
 		        sent = true;
 		        captures.forEach((capture) => {
 		          posthog.capture(capture.eventName, {
@@ -6621,6 +7955,7 @@ WantedBy=multi-user.target
 		            ...(additionalEventProps || {}),
 		          });
 		        });
+		        markNavigationFlushReady();
 		      };
 		      sendCaptures();
 		      if (!sent) {
@@ -6635,17 +7970,18 @@ WantedBy=multi-user.target
 			      Array.isArray(mappedCaptures) &&
 			      mappedCaptures.length &&
 			      !resolveMetaAttributionReady(eventSourceUrl) &&
-			      !isNavigationCriticalPostHogEvent(eventType)
+			      !navigationCritical
 			    ) {
 		      waitForMetaAttribution(eventSourceUrl).then(({ elapsedMs, timedOut }) => {
-		        emitCaptures({
+	        emitCaptures({
 		          meta_cookie_wait_ms: elapsedMs,
 	          ...(timedOut ? { meta_cookie_wait_timed_out: true } : {}),
 	        });
 	      });
-	      return;
+	      return navigationFlushPromise || Promise.resolve();
 	    }
 	    emitCaptures();
+	    return navigationFlushPromise || Promise.resolve();
 	  };
   const resolveMetaPixelPageStage = (props) => {
     const pageStage = cleanText(props && props.pageStage);
@@ -6698,11 +8034,35 @@ WantedBy=multi-user.target
       content_type: "product",
       num_items: 1,
     };
-    const variantId = cleanText(props && props.variantId);
+    const variantId = cleanText(
+      props &&
+        (
+          props.variantId ||
+          props.variant_id ||
+          props.contentId ||
+          props.content_id ||
+          (Array.isArray(props.content_ids) ? props.content_ids[0] : "")
+        ),
+    );
     if (variantId) {
       params.content_ids = [variantId];
     }
+    const value = props && typeof props.value === "number" ? props.value : null;
+    const currency = cleanText(props && props.currency);
+    if (value !== null) {
+      params.value = value;
+    }
+    if (currency) {
+      params.currency = currency;
+    }
     return params;
+  };
+  const hasDeclaredAddToCartTargets = () => {
+    const manifest = config.manifest;
+    if (!manifest || typeof manifest !== "object") return false;
+    if (Array.isArray(manifest.addToCartTargets) && manifest.addToCartTargets.length > 0) return true;
+    if (Array.isArray(manifest.add_to_cart_targets) && manifest.add_to_cart_targets.length > 0) return true;
+    return false;
   };
   const resolveMappedMetaEvents = (eventType, props) => {
     const pageStage = resolveMetaPixelPageStage(props);
@@ -6746,8 +8106,17 @@ WantedBy=multi-user.target
     }
     if (eventType === "sales_to_checkout_click") {
       const variantId = cleanText(props && props.variantId);
+      const transitionId = cleanText(props && (props.transitionId || props.transition_id));
+      const checkoutUrl = cleanText(props && (props.checkoutUrl || props.checkout_url));
+      const salesToCheckoutParams = {
+        ...resolveProductMetaParams(props),
+        from_stage: "sales",
+        to_stage: "checkout",
+        ...(transitionId ? { transition_id: transitionId } : {}),
+        ...(checkoutUrl ? { checkout_url: checkoutUrl } : {}),
+      };
       return [
-        ...(variantId
+        ...(variantId && !hasDeclaredAddToCartTargets()
           ? [{
               method: "track",
               eventName: "AddToCart",
@@ -6761,18 +8130,12 @@ WantedBy=multi-user.target
         {
           method: "trackCustom",
           eventName: "SalesToCheckoutClick",
-          params: {
-            from_stage: "sales",
-            to_stage: "checkout",
-          },
+          params: salesToCheckoutParams,
         },
         {
           method: "trackCustom",
           eventName: "SalesToCheckoutClicked",
-          params: {
-            from_stage: "sales",
-            to_stage: "checkout",
-          },
+          params: salesToCheckoutParams,
         },
       ];
     }
@@ -6807,7 +8170,10 @@ WantedBy=multi-user.target
       names.push("presell_page_view");
     }
     if (normalized === "pre_sales_to_sales_click") {
-      names.push("cta_click");
+      names.push("PreSalesToSalesClick", "cta_click");
+    }
+    if (normalized === "sales_to_checkout_click") {
+      names.push("SalesToCheckoutClick", "SalesToCheckoutClicked", "checkout_click");
     }
     if (Array.isArray(rmbcAliasesByEventType[normalized])) {
       rmbcAliasesByEventType[normalized].forEach((alias) => names.push(alias));
@@ -6817,16 +8183,20 @@ WantedBy=multi-user.target
 	  const isNavigationCriticalPostHogEvent = (eventType) => {
 	    const normalized = cleanText(eventType);
 	    return (
-	      normalized === "pre_sales_page_view" ||
-	      normalized === "presell_page_view" ||
-	      normalized === "sales_page_view" ||
-	      normalized === "offer_page_view" ||
-	      normalized === "custom_page_view" ||
 	      normalized === "pre_sales_to_sales_click" ||
 	      normalized === "sales_to_checkout_click" ||
 	      normalized === "checkout_started"
 	    );
 	  };
+  const isDirectPostHogTransportEvent = (eventType) => {
+    const normalized = cleanText(eventType);
+    return (
+      normalized === "quiz_option_selected" ||
+      normalized === "quiz_question_submitted" ||
+      normalized === "quiz_completed" ||
+      normalized === "quiz_cta_viewed"
+    );
+  };
 	  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {
     const sanitizedProps = sanitizePostHogProps(props);
     const canonicalEventId = cleanText(props && props.eventId);
@@ -6837,18 +8207,18 @@ WantedBy=multi-user.target
     const mappedCaptures = Array.isArray(providedMappedCaptures)
       ? providedMappedCaptures
       : resolveMappedMetaEvents(eventType, props);
-    const buildEventProps = (eventName, role, eventId, extraProps) => {
-      const eventProps = {
-        ...baseEventProps,
-        ...sanitizedProps,
-        ...(isRecord(extraProps) ? extraProps : {}),
-        internal_event_type: eventType,
-        canonical_event_type: role === "platform_alias" ? eventType : eventName,
-        posthog_event_role: role,
-        ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
-        ...attributionProps,
-        $event_id: eventId,
-      };
+	    const buildEventProps = (eventName, role, eventId, extraProps) => {
+	      const eventProps = {
+	        ...baseEventProps,
+	        ...attributionProps,
+	        ...sanitizedProps,
+	        ...(isRecord(extraProps) ? extraProps : {}),
+	        internal_event_type: eventType,
+	        canonical_event_type: role === "platform_alias" ? eventType : eventName,
+	        posthog_event_role: role,
+	        ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
+	        $event_id: eventId,
+	      };
       if (contentCategory) {
         eventProps.content_category = contentCategory;
       }
@@ -6886,15 +8256,22 @@ WantedBy=multi-user.target
   const trackMetaPixelCaptures = (mappedCaptures, eventProps) => {
     const pixelId = ensureMetaPixelBootstrap();
     if (!pixelId || typeof window.fbq !== "function") return;
-    const eventParamProps = isRecord(eventProps) ? eventProps : {};
+    if (Array.isArray(mappedCaptures) && mappedCaptures.length) {
+      metaPixelLastTrackedAt = Date.now();
+      void loadMetaPixelScript();
+    }
+    const eventParamProps = {
+      ...resolveRuntimeContextProps(eventProps),
+      ...(isRecord(eventProps) ? eventProps : {}),
+    };
     const attributionParams = resolveMetaAttributionProps(window.location.href);
-    mappedCaptures.forEach((capture) => {
-      trackMetaPixel(capture.method, capture.eventName, {
-        ...eventParamProps,
-        ...(isRecord(capture.params) ? capture.params : {}),
-        ...attributionParams,
-      }, capture.eventId);
-    });
+	    mappedCaptures.forEach((capture) => {
+	      trackMetaPixel(capture.method, capture.eventName, {
+	        ...attributionParams,
+	        ...eventParamProps,
+	        ...(isRecord(capture.params) ? capture.params : {}),
+	      }, capture.eventId);
+	    });
   };
   const postTrackingPayload = (payload) => {
     if (typeof payload !== "string" || !payload) return;
@@ -6931,21 +8308,33 @@ WantedBy=multi-user.target
     }
   };
   const quizCompletedDedupeKeys = {};
+  const addToCartDedupeKeys = {};
+  const QUIZ_COMPLETED_DEDUPE_STORAGE_KEY = "__mos_quiz_completed_dedupe__";
+  const readStoredQuizCompletedDedupeKeys = () => {
+    try {
+      const raw = window.sessionStorage && window.sessionStorage.getItem(QUIZ_COMPLETED_DEDUPE_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+  const writeStoredQuizCompletedDedupeKey = (dedupeKey) => {
+    try {
+      if (!window.sessionStorage) return;
+      const storedKeys = readStoredQuizCompletedDedupeKeys();
+      storedKeys[dedupeKey] = true;
+      window.sessionStorage.setItem(QUIZ_COMPLETED_DEDUPE_STORAGE_KEY, JSON.stringify(storedKeys));
+    } catch (_error) {}
+  };
   const buildQuizCompletedDedupeKey = (props) => [
     cleanText(props && (props.session_id || props.sessionId)) || cleanText(sessionId) || "session",
-    cleanText(props && (props.quiz_id || props.quizId)) || cleanText(config.quizId) || "quiz",
-    cleanText(props && (props.quiz_version || props.quizVersion)) || cleanText(config.quizVersion) || "version",
-    cleanText(
-      props &&
-        (
-          props.answer_path_id ||
-          props.answerPathId ||
-          props.result_id ||
-          props.resultId ||
-          props.segment_id ||
-          props.segmentId
-        ),
-    ) || "completion",
+    cleanText(props && (props.quiz_id || props.quizId)) ||
+      cleanText(config.manifest && (config.manifest.quizId || config.manifest.quiz_id)) ||
+      "quiz",
+    cleanText(props && (props.quiz_version || props.quizVersion)) ||
+      cleanText(config.manifest && (config.manifest.quizVersion || config.manifest.quiz_version)) ||
+      "version",
   ].join(":");
   const shouldSuppressDuplicateQuizCompleted = (eventType, eventProps) => {
     const normalizedEventType = cleanText(eventType);
@@ -6953,23 +8342,52 @@ WantedBy=multi-user.target
       return false;
     }
     const dedupeKey = buildQuizCompletedDedupeKey(eventProps || {});
-    if (quizCompletedDedupeKeys[dedupeKey] === true) {
+    const storedDedupeKeys = readStoredQuizCompletedDedupeKeys();
+    if (quizCompletedDedupeKeys[dedupeKey] === true || storedDedupeKeys[dedupeKey] === true) {
       window.__mosQuizCompletedDuplicateCount = (window.__mosQuizCompletedDuplicateCount || 0) + 1;
       return true;
     }
     quizCompletedDedupeKeys[dedupeKey] = true;
+    writeStoredQuizCompletedDedupeKey(dedupeKey);
     eventProps.dedupe_key = dedupeKey;
     eventProps.dedupeKey = dedupeKey;
     eventProps.dedupe_strategy = "session_quiz_completion";
+    return false;
+  };
+  const buildAddToCartDedupeKey = (props) => [
+    cleanText(props && (props.session_id || props.sessionId)) || cleanText(sessionId) || "session",
+    cleanText(props && (props.variant_id || props.variantId || props.content_id || props.contentId)) || "variant",
+    cleanText(props && (props.button_text || props.buttonText || props.cta_text || props.ctaText)) || "button",
+  ].join(":");
+  const shouldSuppressDuplicateAddToCart = (eventType, eventProps) => {
+    const normalizedEventType = cleanText(eventType);
+    if (normalizedEventType !== "add_to_cart" && normalizedEventType !== "AddToCart") {
+      return false;
+    }
+    const dedupeKey = buildAddToCartDedupeKey(eventProps || {});
+    const now = Date.now();
+    const lastTrackedAt = addToCartDedupeKeys[dedupeKey] || 0;
+    if (lastTrackedAt && now - lastTrackedAt < 1000) {
+      window.__mosAddToCartDuplicateCount = (window.__mosAddToCartDuplicateCount || 0) + 1;
+      return true;
+    }
+    addToCartDedupeKeys[dedupeKey] = now;
+    eventProps.dedupe_key = dedupeKey;
+    eventProps.dedupeKey = dedupeKey;
+    eventProps.dedupe_strategy = "session_add_to_cart_click";
     return false;
   };
   const trackEvent = (eventType, props) => {
     const canonicalEventId = cleanText(props && props.eventId) || buildCanonicalEventId(eventType);
     const eventProps = {
       eventId: canonicalEventId,
+      ...resolveQuizManifestEventDefaults(eventType, props || {}),
       ...(props || {}),
     };
     if (shouldSuppressDuplicateQuizCompleted(eventType, eventProps)) {
+      return;
+    }
+    if (shouldSuppressDuplicateAddToCart(eventType, eventProps)) {
       return;
     }
     const mappedCaptures = resolveMappedMetaEvents(eventType, eventProps).map((capture, index) => ({
@@ -6977,7 +8395,7 @@ WantedBy=multi-user.target
       eventId: cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index),
     }));
     trackMetaPixelCaptures(mappedCaptures, eventProps);
-    trackPostHogEvent(eventType, eventProps, mappedCaptures);
+    const posthogFlushPromise = trackPostHogEvent(eventType, eventProps, mappedCaptures);
     postTrackingPayload(
       JSON.stringify({
         events: [
@@ -7011,12 +8429,23 @@ WantedBy=multi-user.target
         ],
       }),
     );
+    if (isNavigationCriticalPostHogEvent(eventType)) {
+      return Promise.race([
+        Promise.allSettled([
+          posthogFlushPromise || Promise.resolve(),
+          waitForMetaPixelTrackedEventFlush(),
+        ]),
+        waitMs(POSTHOG_NAVIGATION_EVENT_LOAD_TIMEOUT_MS),
+      ]);
+    }
+    return Promise.resolve();
   };
   const installTrackEventBridge = () => {
     if (window.__mosStandaloneTrackEventBridgeInstalled) return;
     window.__mosStandaloneTrackEventBridgeInstalled = true;
     window.MOSStandaloneAnalytics = {
       trackEvent,
+      waitForNavigationFlush: waitForTrackingNavigationFlush,
     };
     window.addEventListener("mos:track-event", (event) => {
       const detail = event && event.detail;
@@ -7684,6 +9113,144 @@ WantedBy=multi-user.target
       });
     });
   };
+  const addToCartTargetsFromManifest = () => {
+    const manifest = config.manifest || {};
+    const rawTargets = Array.isArray(manifest.addToCartTargets)
+      ? manifest.addToCartTargets
+      : (Array.isArray(manifest.add_to_cart_targets) ? manifest.add_to_cart_targets : []);
+    return rawTargets
+      .map((target) => {
+        if (!target || typeof target !== "object") return null;
+        const id = cleanText(target.id);
+        const selector = cleanText(target.selector);
+        if (!id || !selector) return null;
+        return {
+          id,
+          selector,
+          label: cleanText(target.label),
+          event: target.event === "input" || target.event === "change" ? target.event : "click",
+          trackEventType: cleanText(target.trackEventType || target.track_event_type) || "add_to_cart",
+          ctaPosition: Number.isFinite(Number(target.ctaPosition || target.cta_position))
+            ? Number(target.ctaPosition || target.cta_position)
+            : undefined,
+          variantId: cleanText(target.variantId || target.variant_id || target.productVariantId || target.product_variant_id),
+          declaredProps: buildDeclaredTargetProps(target),
+        };
+      })
+      .filter(Boolean);
+  };
+  const resolveAddToCartTargetVariantId = (target, element) => {
+    const targetVariantId = cleanText(target && target.variantId);
+    if (targetVariantId) return targetVariantId;
+    if (!(element instanceof HTMLElement)) return "";
+    return cleanText(
+      element.getAttribute("data-variant-id") ||
+        element.getAttribute("data-product-variant-id") ||
+        element.getAttribute("data-price-point-id") ||
+        element.dataset.variantId ||
+        element.dataset.productVariantId ||
+        element.dataset.pricePointId,
+    );
+  };
+  const resolveAddToCartTargetVariant = (target, element, variantId) => {
+    const exactVariantId = cleanText(variantId);
+    if (exactVariantId) {
+      const exactVariant = variants.find((candidate) => candidate.id === exactVariantId) || null;
+      if (exactVariant) return exactVariant;
+    }
+    const manifest = config.manifest || {};
+    const checkoutBindings = Array.isArray(manifest.bindings)
+      ? manifest.bindings.filter((binding) => binding && binding.type === "checkout" && binding.checkout)
+      : [];
+    for (const binding of checkoutBindings) {
+      try {
+        const checkoutState = resolveCheckoutState(binding);
+        if (checkoutState && checkoutState.variant) return checkoutState.variant;
+      } catch (_error) {
+        // Checkout activation reports resolver failures; add-to-cart keeps its own event deterministic.
+      }
+    }
+    if (variants.length === 1) return variants[0];
+    return null;
+  };
+  const trackAddToCartTarget = (target, element, index) => {
+    const buttonText = normalizeText(element.textContent || "");
+    const variantId = resolveAddToCartTargetVariantId(target, element);
+    const variant = resolveAddToCartTargetVariant(target, element, variantId);
+    const ctaPosition = target.ctaPosition || index + 1;
+    trackEvent(target.trackEventType || "add_to_cart", {
+      fromStage: config.pageStage,
+      from_stage: config.pageStage,
+      toStage: "cart",
+      to_stage: "cart",
+      targetId: target.id,
+      target_id: target.id,
+      selector: target.selector,
+      label: target.label || undefined,
+      bindingId: target.id,
+      binding_id: target.id,
+      ctaId: target.id,
+      cta_id: target.id,
+      ctaPosition,
+      cta_position: ctaPosition,
+      ctaText: buttonText || undefined,
+      cta_text: buttonText || undefined,
+      buttonText: buttonText || undefined,
+      button_text: buttonText || undefined,
+      activeTimeMs: Math.round(currentActiveTimeMs()),
+      maxScrollDepthPct,
+      ...(variantId ? { variantId, variant_id: variantId, contentId: variantId, content_id: variantId } : {}),
+      ...(variant && typeof variant.price === "number" ? { value: Math.round(variant.price) / 100 } : {}),
+      ...(variant && variant.currency ? { currency: variant.currency } : {}),
+      ...(target.declaredProps || {}),
+    });
+  };
+  const initializeAddToCartTracking = () => {
+    const targets = addToCartTargetsFromManifest();
+    if (!targets.length) return;
+    targets.forEach((target) => {
+      const windowKey = [target.id, target.selector, target.event, "window"].join(":");
+      window.__mosAddToCartWindowTargetKeys = window.__mosAddToCartWindowTargetKeys || {};
+      if (window.__mosAddToCartWindowTargetKeys[windowKey] !== true) {
+        window.__mosAddToCartWindowTargetKeys[windowKey] = true;
+        window.addEventListener(target.event, (event) => {
+          try {
+            const eventTarget = event && event.target;
+            const element = eventTarget instanceof Element ? eventTarget.closest(target.selector) : null;
+            if (element instanceof HTMLElement) {
+              trackAddToCartTarget(target, element, 0);
+            }
+          } catch (_error) {
+            // Invalid selectors are reported by the explicit querySelectorAll check below.
+          }
+        }, {
+          capture: true,
+          passive: true,
+        });
+      }
+      const matches = Array.from(document.querySelectorAll(target.selector));
+      if (matches.length < 1) {
+        console.error(
+          "[HtmlDeployArtifact] Add-to-cart target '" +
+            String(target.id || "unknown") +
+            "' selector '" +
+            target.selector +
+            "' matched no elements.",
+        );
+        return;
+      }
+      matches.forEach((element, index) => {
+        if (!(element instanceof HTMLElement)) return;
+        const key = [target.id, target.selector, String(index), target.event].join(":");
+        if (element.dataset.mosAddToCartTargetBound === key) return;
+        element.dataset.mosAddToCartTargetBound = key;
+        element.addEventListener(target.event, () => trackAddToCartTarget(target, element, index), {
+          capture: true,
+          passive: true,
+        });
+      });
+    });
+  };
   const initializeEngagementTrackingSafely = () => {
     try {
       initializeEngagementTracking();
@@ -7703,6 +9270,13 @@ WantedBy=multi-user.target
       initializeInteractionTracking();
     } catch (error) {
       console.error("[HtmlDeployArtifact] Failed to initialize interaction tracking.", error);
+    }
+  };
+  const initializeAddToCartTrackingSafely = () => {
+    try {
+      initializeAddToCartTracking();
+    } catch (error) {
+      console.error("[HtmlDeployArtifact] Failed to initialize add-to-cart tracking.", error);
     }
   };
   const handleCheckoutReturn = () => {
@@ -7879,6 +9453,10 @@ WantedBy=multi-user.target
   };
   const checkoutAttributeMap = ({ variantId, selection, ctaId, transitionId }) => {
     const attribution = checkoutAttributionProps({ ctaId, transitionId });
+    const checkoutAttributeVariantId =
+      cleanText(document.querySelector(".mos-sales-checkout-button[data-variant-id]")?.getAttribute("data-variant-id")) ||
+      cleanText(document.querySelector("[data-price-point-id]")?.getAttribute("data-price-point-id")) ||
+      cleanText(variantId);
     return {
       funnel_slug: cleanText(config.funnelSlug),
       funnel_id: cleanText(config.funnelId),
@@ -7886,8 +9464,8 @@ WantedBy=multi-user.target
       page_id: cleanText(config.pageId),
       visitor_id: cleanText(visitorId),
       session_id: cleanText(sessionId),
-      variant_id: cleanText(variantId),
-      price_point_id: cleanText(variantId),
+      variant_id: checkoutAttributeVariantId,
+      price_point_id: checkoutAttributeVariantId,
       selection: selection || {},
       utm: getUtmParams(),
       url_params: getUrlParams(),
@@ -8750,6 +10328,41 @@ WantedBy=multi-user.target
                 anonymousId: visitorId,
                 clickId: bridgeClickId,
               });
+              if (isPresaleSalesClick && cleanText(config.htmlArtifactKind) === "quiz") {
+                trackEvent("quiz_cta_viewed", {
+                  fromStage: "pre_sales",
+                  from_stage: "pre_sales",
+                  toStage: "sales",
+                  to_stage: "sales",
+                  targetPageId: binding.targetPageId,
+                  bindingId: binding.id,
+                  binding_id: binding.id,
+                  ctaId: binding.id,
+                  cta_id: binding.id,
+                  ctaPosition,
+                  cta_position: ctaPosition,
+                  ctaText: buttonText || undefined,
+                  cta_text: buttonText || undefined,
+                  buttonText: buttonText || undefined,
+                  button_text: buttonText || undefined,
+                  destinationUrl,
+                  destination_url: destinationUrl,
+                  ...(bridgeClickId
+                    ? {
+                        clickId: bridgeClickId,
+                        click_id: bridgeClickId,
+                        clickIdType: CLICK_PARAM,
+                        click_id_type: CLICK_PARAM,
+                      }
+                    : {}),
+                  sessionId: sessionId,
+                  session_id: sessionId,
+                  visitorId: visitorId,
+                  visitor_id: visitorId,
+                  sourcePageType: bridgeSourcePageType,
+                  source_page_type: bridgeSourcePageType,
+                });
+              }
               trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",
@@ -8817,17 +10430,24 @@ WantedBy=multi-user.target
             const { variantId, variant, selection, cacheKey } = resolveCheckoutState(binding);
             const bindingId = String(binding.id || "unknown");
             const transitionId = buildCanonicalEventId("checkout_transition");
-            const checkoutEventProps = {
-              fromStage: config.pageStage,
-              toStage: "checkout",
-              bindingId,
-              ctaId: bindingId,
-              transitionId,
-              buttonText: buttonText || undefined,
-              ...(variantId ? { variantId } : {}),
-              ...(variant && typeof variant.price === "number" ? { value: Math.round(variant.price) / 100 } : {}),
-              ...(variant && variant.currency ? { currency: variant.currency } : {}),
-            };
+	            const checkoutEventProps = {
+	              fromStage: config.pageStage,
+	              from_stage: config.pageStage,
+	              toStage: "checkout",
+	              to_stage: "checkout",
+	              bindingId,
+	              binding_id: bindingId,
+	              ctaId: bindingId,
+	              cta_id: bindingId,
+	              transitionId,
+	              transition_id: transitionId,
+	              buttonText: buttonText || undefined,
+	              button_text: buttonText || undefined,
+	              ...(variantId ? { variantId } : {}),
+	              ...(variantId ? { variant_id: variantId, contentId: variantId, content_id: variantId } : {}),
+	              ...(variant && typeof variant.price === "number" ? { value: Math.round(variant.price) / 100 } : {}),
+	              ...(variant && variant.currency ? { currency: variant.currency } : {}),
+	            };
             const checkoutTrackEventType =
               cleanText(window.__mosCheckoutTrackEventTypeOverride) ||
               binding.trackEventType ||
@@ -8835,7 +10455,13 @@ WantedBy=multi-user.target
             if (cleanText(window.__mosCheckoutTrackEventTypeOverride)) {
               window.__mosCheckoutTrackEventTypeOverride = "";
             }
-            trackEvent(checkoutTrackEventType, checkoutEventProps);
+            if (hasDeclaredAddToCartTargets()) {
+              trackEvent("add_to_cart", {
+                ...checkoutEventProps,
+                toStage: "cart",
+                to_stage: "cart",
+              });
+            }
             if (binding.checkout.mode === "external_checkout_url") {
               const checkoutUrl = resolveExternalCheckoutUrlForVariant(
                 binding.checkout.externalUrlsByVariant || [],
@@ -8856,7 +10482,7 @@ WantedBy=multi-user.target
                   provider: variant.provider,
                 });
               }
-              window.location.href = appendCurrentUrlParams(
+              const resolvedCheckoutUrl = appendCurrentUrlParams(
                 appendCheckoutAttributesToCartUrl(
                   checkoutUrl,
                   checkoutAttributeMap({
@@ -8867,6 +10493,13 @@ WantedBy=multi-user.target
                   }),
                 ),
               );
+              trackEvent(checkoutTrackEventType, {
+                ...checkoutEventProps,
+                checkoutUrl: resolvedCheckoutUrl,
+                checkout_url: resolvedCheckoutUrl,
+              });
+              await waitForTrackingNavigationFlush();
+              window.location.href = resolvedCheckoutUrl;
               return;
             }
             const checkout = await ensurePreparedCheckoutForClick({
@@ -8889,7 +10522,14 @@ WantedBy=multi-user.target
                 provider: variant.provider,
               });
             }
-            window.location.href = appendCurrentUrlParams(checkout.checkoutUrl);
+            const resolvedCheckoutUrl = appendCurrentUrlParams(checkout.checkoutUrl);
+            trackEvent(checkoutTrackEventType, {
+              ...checkoutEventProps,
+              checkoutUrl: resolvedCheckoutUrl,
+              checkout_url: resolvedCheckoutUrl,
+            });
+            await waitForTrackingNavigationFlush();
+            window.location.href = resolvedCheckoutUrl;
           } catch (error) {
             console.error(
               "[HtmlDeployArtifact] Binding '" + String(binding.id || "unknown") + "' failed.",
@@ -8897,7 +10537,7 @@ WantedBy=multi-user.target
             );
             setElementBusy(element, false);
           }
-        });
+        }, { capture: true });
       }
     }
   };
@@ -8968,6 +10608,7 @@ WantedBy=multi-user.target
       initializeEngagementTrackingSafely();
       initializeViewTrackingSafely();
       initializeInteractionTrackingSafely();
+      initializeAddToCartTrackingSafely();
     } catch (error) {
       console.error("[HtmlDeployArtifact] Failed to initialize.", error);
     }
@@ -9116,70 +10757,66 @@ WantedBy=multi-user.target
                 html_document = _inject_head_html_block(
                     html_document=html_document, block=origin_hints
                 )
-        image_rewrite_baseline_html = html_document
-        html_document = self._rewrite_standalone_imported_html_compressed_images(
-            site_dir=site_dir,
-            html_document=html_document,
-            standalone_served_assets=standalone_served_assets,
-            standalone_image_sources=standalone_image_sources,
-            uploaded_target_paths=mirrored_target_paths,
-            context_label=context_label,
-            page_stage=page_stage,
-        )
-        html_document = self._rewrite_standalone_imported_html_responsive_images(
-            site_dir=site_dir,
-            html_document=html_document,
-            standalone_served_assets=standalone_served_assets,
-            standalone_image_sources=standalone_image_sources,
-            uploaded_target_paths=mirrored_target_paths,
-            context_label=context_label,
-            page_stage=page_stage,
-        )
-        if not _is_presales_stage(page_stage) and html_document != image_rewrite_baseline_html:
-            try:
+        if _STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION and page_stage != "sales":
+            image_rewrite_baseline_html = html_document
+            html_document = self._rewrite_standalone_imported_html_compressed_images(
+                site_dir=site_dir,
+                html_document=html_document,
+                standalone_served_assets=standalone_served_assets,
+                standalone_image_sources=standalone_image_sources,
+                uploaded_target_paths=mirrored_target_paths,
+                context_label=context_label,
+                page_stage=page_stage,
+            )
+            html_document = self._rewrite_standalone_imported_html_responsive_images(
+                site_dir=site_dir,
+                html_document=html_document,
+                standalone_served_assets=standalone_served_assets,
+                standalone_image_sources=standalone_image_sources,
+                uploaded_target_paths=mirrored_target_paths,
+                context_label=context_label,
+                page_stage=page_stage,
+            )
+            if not _is_presales_stage(page_stage) and html_document != image_rewrite_baseline_html:
                 self._validate_html_deploy_visual_parity(
                     before_html=image_rewrite_baseline_html,
                     after_html=html_document,
                     standalone_served_assets=standalone_served_assets,
                     context_label=context_label,
                 )
-            except ValueError as exc:
-                if "visual parity failed" not in str(exc):
-                    raise
-                print(f"Warning: {exc} Reverting to baseline imported HTML for {context_label}.")
-                html_document = image_rewrite_baseline_html
-        html_document = _optimize_standalone_imported_html_document(html_document)
-        render_optimization_css = _build_standalone_render_optimization_css(page_stage=page_stage)
-        if render_optimization_css:
-            html_document = _inject_head_html_block(
-                html_document=html_document,
-                block=f'<style data-mos-render-optimization="true">{render_optimization_css}</style>',
-            )
-        preload_image_spec = _resolve_imported_html_preload_image_spec(html_document)
-        if preload_image_spec:
-            preload_href = escape(str(preload_image_spec.get("href") or ""), quote=True)
-            preload_imagesrcset_value = str(preload_image_spec.get("imagesrcset") or "").strip()
-            preload_imagesizes_value = str(preload_image_spec.get("imagesizes") or "").strip()
-            preload_imagesrcset = (
-                f'imagesrcset="{escape(preload_imagesrcset_value, quote=True)}" '
-                if preload_imagesrcset_value
-                else ""
-            )
-            preload_imagesizes = (
-                f'imagesizes="{escape(preload_imagesizes_value, quote=True)}" '
-                if preload_imagesizes_value
-                else ""
-            )
-            preload_block = (
-                f'<link rel="preload" as="image" fetchpriority="high" '
-                f'href="{preload_href}" '
-                f"{preload_imagesrcset}"
-                f"{preload_imagesizes}"
-                'data-mos-standalone-entry-preload="true">'
-            )
-            html_document = _inject_head_html_block(
-                html_document=html_document, block=preload_block
-            )
+        if _STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION:
+            html_document = _optimize_standalone_imported_html_document(html_document)
+            render_optimization_css = _build_standalone_render_optimization_css(page_stage=page_stage)
+            if render_optimization_css:
+                html_document = _inject_head_html_block(
+                    html_document=html_document,
+                    block=f'<style data-mos-render-optimization="true">{render_optimization_css}</style>',
+                )
+            preload_image_spec = _resolve_imported_html_preload_image_spec(html_document)
+            if preload_image_spec:
+                preload_href = escape(str(preload_image_spec.get("href") or ""), quote=True)
+                preload_imagesrcset_value = str(preload_image_spec.get("imagesrcset") or "").strip()
+                preload_imagesizes_value = str(preload_image_spec.get("imagesizes") or "").strip()
+                preload_imagesrcset = (
+                    f'imagesrcset="{escape(preload_imagesrcset_value, quote=True)}" '
+                    if preload_imagesrcset_value
+                    else ""
+                )
+                preload_imagesizes = (
+                    f'imagesizes="{escape(preload_imagesizes_value, quote=True)}" '
+                    if preload_imagesizes_value
+                    else ""
+                )
+                preload_block = (
+                    f'<link rel="preload" as="image" fetchpriority="high" '
+                    f'href="{preload_href}" '
+                    f"{preload_imagesrcset}"
+                    f"{preload_imagesizes}"
+                    'data-mos-standalone-entry-preload="true">'
+                )
+                html_document = _inject_head_html_block(
+                    html_document=html_document, block=preload_block
+                )
         return html_document
 
     def _prepare_standalone_imported_html_document(
@@ -9221,9 +10858,13 @@ WantedBy=multi-user.target
         standalone_served_assets: dict[str, _StandaloneServedAsset],
         standalone_image_sources: dict[str, _StandaloneImageSource],
     ) -> None:
-        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
-            source=source
-        )
+        (
+            _artifact,
+            _meta,
+            products,
+            _asset_items,
+            _static_asset_items,
+        ) = self._resolve_funnel_artifact_payload_sections(source=source)
         preferred_export_target = self._resolve_preferred_funnel_artifact_export_target(
             source=source
         )
@@ -9235,6 +10876,7 @@ WantedBy=multi-user.target
                 preferred_funnel_payload = preferred_export_target["funnelPayload"]
 
         written_route_paths: set[str] = set()
+        route_html_by_path: dict[str, str] = {}
         mirrored_url_map: dict[str, str] = {}
         for raw_product_slug, product_payload in products.items():
             product_slug = str(raw_product_slug or "").strip()
@@ -9358,7 +11000,8 @@ WantedBy=multi-user.target
                         f"Artifact funnel '{product_slug}/{funnel_slug}' entrySlug '{entry_slug}' was not found in pages."
                     )
 
-                funnel_path_tokens = self._resolve_funnel_path_tokens(
+                funnel_path_tokens = self._resolve_funnel_path_tokens_for_source(
+                    source=source,
                     product_slug=product_slug,
                     funnel_slug=funnel_slug,
                     funnel_meta=canonical_funnel_meta,
@@ -9406,6 +11049,7 @@ WantedBy=multi-user.target
                         )
                     self.upload_file(entry_html_document, entry_route_path)
                     written_route_paths.add(entry_route_path)
+                    route_html_by_path[entry_route_path] = entry_html_document
 
                     for page_slug, html_document in rendered_pages.items():
                         page_route_dir = f"{entry_route_dir}/{page_slug}"
@@ -9416,13 +11060,40 @@ WantedBy=multi-user.target
                             )
                         self.upload_file(html_document, page_route_path)
                         written_route_paths.add(page_route_path)
+                        route_html_by_path[page_route_path] = html_document
+
+        for alias in _html_deploy_route_alias_specs(source=source):
+            source_index_path = _html_deploy_index_path_for_route(
+                site_dir=site_dir,
+                route_path=alias["from"],
+            )
+            target_index_path = _html_deploy_index_path_for_route(
+                site_dir=site_dir,
+                route_path=alias["to"],
+            )
+            if source_index_path in written_route_paths:
+                raise ValueError(
+                    f"HTML deploy route alias source '{alias['from']}' conflicts with a generated route."
+                )
+            target_html_document = route_html_by_path.get(target_index_path)
+            if target_html_document is None:
+                raise ValueError(
+                    f"HTML deploy route alias '{alias['from']}' targets missing route '{alias['to']}'."
+                )
+            self.upload_file(target_html_document, source_index_path)
+            written_route_paths.add(source_index_path)
+            route_html_by_path[source_index_path] = target_html_document
 
     def _write_funnel_artifact_payload(
         self, *, site_dir: str, source: FunnelArtifactSourceSpec
     ) -> None:
-        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
-            source=source
-        )
+        (
+            _artifact,
+            _meta,
+            products,
+            _asset_items,
+            _static_asset_items,
+        ) = self._resolve_funnel_artifact_payload_sections(source=source)
         self._write_funnel_artifact_assets(site_dir=site_dir, source=source)
 
         base_root = f"{site_dir}/api/public/funnels"
@@ -9646,6 +11317,11 @@ WantedBy=multi-user.target
                 "segments": default_route,
                 "path": "/" + "/".join(default_route) + "/" if default_route else None,
             },
+            "routeManifest": {
+                "legacyRedirects": _html_deploy_legacy_redirect_specs(source=source),
+                "routeAliases": _html_deploy_route_alias_specs(source=source),
+                "funnelPathAliases": _html_deploy_funnel_path_alias_specs(source=source),
+            },
             "upstreamApiOriginHost": upstream_host or None,
             "tracking": {
                 "posthog": has_posthog,
@@ -9768,6 +11444,10 @@ WantedBy=multi-user.target
                 render_mode=render_mode,
             )
         elif render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
+            public_server_names = (
+                self._normalize_server_names(app.workspace_server_names)
+                or self._normalize_server_names(app.service_config.server_names)
+            )
             self._write_funnel_artifact_assets(
                 site_dir=build_site_dir,
                 source=source,
@@ -9778,10 +11458,7 @@ WantedBy=multi-user.target
             self._write_funnel_artifact_standalone_html_routes(
                 site_dir=build_site_dir,
                 source=source,
-                public_server_names=(
-                    self._normalize_server_names(app.workspace_server_names)
-                    or self._normalize_server_names(app.service_config.server_names)
-                ),
+                public_server_names=public_server_names,
                 mirrored_target_paths=standalone_uploaded_target_paths,
                 standalone_served_assets=standalone_served_assets,
                 standalone_image_sources=standalone_image_sources,
@@ -9792,6 +11469,11 @@ WantedBy=multi-user.target
                 source=source,
                 render_mode=render_mode,
             )
+            self._materialize_html_deploy_release_static_dependencies(
+                site_dir=build_site_dir,
+                public_server_names=public_server_names,
+            )
+            self._validate_html_deploy_release_asset_closure(site_dir=build_site_dir)
             self._validate_funnel_artifact_site_output(
                 site_dir=build_site_dir,
                 source=source,
@@ -9833,10 +11515,37 @@ WantedBy=multi-user.target
             canonical_redirect_host = server_names[0]
             canonical_redirect_scheme = "https" if app.service_config.https else "http"
 
+        canonical_host_guard = ""
+        if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML and canonical_redirect_host:
+            canonical_redirect_origin = (
+                f"{canonical_redirect_scheme}://{canonical_redirect_host}"
+            )
+            canonical_host_guard = f"""    set $mos_direct_ip_request 0;
+    if ($http_host ~* "^[0-9]{{1,3}}(?:\\.[0-9]{{1,3}}){{3}}(?::[0-9]+)?$") {{
+        set $mos_direct_ip_request 1;
+    }}
+    if ($http_via ~* "BunnyCDN") {{
+        set $mos_direct_ip_request 0;
+    }}
+    if ($mos_direct_ip_request = 1) {{
+        return 302 {canonical_redirect_origin}$request_uri;
+    }}
+
+"""
+
         default_route_location = ""
+        legacy_redirect_locations = ""
         if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
+            route_aliases = _html_deploy_route_alias_specs(source=source)
+            has_root_route_alias = any(alias["from"] == "/" for alias in route_aliases)
             default_route = self._resolve_funnel_artifact_default_route(source=source)
-            if default_route:
+            if has_root_route_alias:
+                default_route_location = (
+                    "    location = / {\n"
+                    "        try_files /index.html =404;\n"
+                    "    }\n\n"
+                )
+            elif default_route:
                 default_route_path = "/" + "/".join(
                     quote(segment, safe="") for segment in default_route
                 )
@@ -9847,11 +11556,52 @@ WantedBy=multi-user.target
                         f"{default_route_path}$is_args$args"
                     )
                 default_route_location = (
-                    "    location = / {\n" f"        return 302 {redirect_target};\n" "    }\n\n"
+                    "    location = / {\n"
+                    '        add_header Cache-Control "no-store" always;\n'
+                    f"        return 302 {redirect_target};\n"
+                    "    }\n\n"
                 )
+            legacy_redirect_blocks: list[str] = []
+            for redirect in _html_deploy_legacy_redirect_specs(source=source):
+                source_path = str(redirect["from"])
+                target_path = str(redirect["to"])
+                status_code = int(redirect["status"])
+                redirect_target = target_path
+                if canonical_redirect_host:
+                    redirect_target = (
+                        f"{canonical_redirect_scheme}://{canonical_redirect_host}"
+                        f"{target_path}"
+                    )
+                if bool(redirect.get("preserveQuery", True)):
+                    redirect_target = f"{redirect_target}$is_args$args"
+                legacy_redirect_blocks.append(
+                    "    location = "
+                    + source_path
+                    + " {\n"
+                    + '        add_header Cache-Control "no-store" always;\n'
+                    + f"        return {status_code} {redirect_target};\n"
+                    + "    }\n\n"
+                )
+            legacy_redirect_locations = "".join(legacy_redirect_blocks)
 
+        candidate_release_nginx_pattern = r"[A-Za-z0-9][A-Za-z0-9_.-]*"
         candidate_route_location = ""
         candidate_query_rewrite = ""
+        api_public_asset_location = """    location ^~ /api/public/assets/ {
+        try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+"""
+        public_asset_location = """    location ^~ /public/assets/ {
+        try_files /api$uri /api$uri.webp /api$uri.jpg /api$uri.jpeg /api$uri.png =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+"""
+        root_asset_location = """    location ^~ /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+"""
         standalone_asset_location = f"""    location ^~ {_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/ {{
         try_files $uri =404;
         add_header Cache-Control "public, max-age=31536000, immutable";
@@ -9859,25 +11609,108 @@ WantedBy=multi-user.target
 """
         if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
             releases_root = f"{app_dir}/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}"
+            api_public_asset_location = f"""    location ^~ /api/public/assets/ {{
+        set $mos_candidate_asset_prefix "";
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=({candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($http_referer ~ "{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/({candidate_release_nginx_pattern})/") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}/$1 last;
+        }}
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=(?<mos_referer_candidate_release>{candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_referer_candidate_release/$1 last;
+        }}
+        root {app_dir};
+        try_files $mos_candidate_asset_prefix$uri $mos_candidate_asset_prefix$uri.webp $mos_candidate_asset_prefix$uri.jpg $mos_candidate_asset_prefix$uri.jpeg $mos_candidate_asset_prefix$uri.png /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.webp /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.jpg /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.jpeg /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.png =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }}
+"""
+            public_asset_location = f"""    location ^~ /public/assets/ {{
+        set $mos_candidate_asset_prefix "";
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=({candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($http_referer ~ "{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/({candidate_release_nginx_pattern})/") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}/$1 last;
+        }}
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=(?<mos_referer_candidate_release>{candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_referer_candidate_release/$1 last;
+        }}
+        root {app_dir};
+        try_files $mos_candidate_asset_prefix/api$uri $mos_candidate_asset_prefix/api$uri.webp $mos_candidate_asset_prefix/api$uri.jpg $mos_candidate_asset_prefix/api$uri.jpeg $mos_candidate_asset_prefix/api$uri.png $mos_candidate_asset_prefix$uri $mos_candidate_asset_prefix$uri.webp $mos_candidate_asset_prefix$uri.jpg $mos_candidate_asset_prefix$uri.jpeg $mos_candidate_asset_prefix$uri.png /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}/api$uri /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}/api$uri.webp /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}/api$uri.jpg /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}/api$uri.jpeg /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}/api$uri.png /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.webp /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.jpg /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.jpeg /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri.png =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }}
+"""
+            root_asset_location = f"""    location ^~ /assets/ {{
+        set $mos_candidate_asset_prefix "";
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=({candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($http_referer ~ "{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/({candidate_release_nginx_pattern})/") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}/$1 last;
+        }}
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=(?<mos_referer_candidate_release>{candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_referer_candidate_release/$1 last;
+        }}
+        root {app_dir};
+        try_files $mos_candidate_asset_prefix$uri /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }}
+"""
             candidate_route_location = f"""
-    location ~ ^{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/(?<mos_candidate_release>[A-Za-z0-9][A-Za-z0-9_.-]{{0,127}})/ {{
+    location ~ "^{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/(?<mos_candidate_release>{candidate_release_nginx_pattern})/" {{
         add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
         add_header Cache-Control "no-store" always;
-        add_header Set-Cookie "{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=$mos_candidate_release; Path=/; SameSite=Lax" always;
         rewrite ^{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/(.*)$ /$1 break;
         root {releases_root};
-        try_files $uri $uri/index.html $uri/ =404;
+        try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png $uri/index.html $uri/ =404;
     }}
 
 """
-            candidate_query_rewrite = f"""        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^[A-Za-z0-9][A-Za-z0-9_.-]{{0,127}}$") {{
+            candidate_query_rewrite = f"""        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
             rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}/$1 last;
+        }}
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=(?<mos_referer_candidate_release>{candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_referer_candidate_release/$1 last;
+        }}
+        if ($http_referer ~ "{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/(?<mos_ref_path_rel>{candidate_release_nginx_pattern})/") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_ref_path_rel/$1 last;
         }}
 """
             standalone_asset_location = f"""    location ^~ {_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/ {{
         set $mos_candidate_asset_prefix "";
-        if ($cookie_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^([A-Za-z0-9][A-Za-z0-9_.-]{{0,127}})$") {{
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=({candidate_release_nginx_pattern})(?:[&#]|$)") {{
             set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($http_referer ~ "{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/({candidate_release_nginx_pattern})/") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$1";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            set $mos_candidate_asset_prefix "/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}";
+        }}
+        if ($arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM} ~ "^{candidate_release_nginx_pattern}$") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$arg_{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}/$1 last;
+        }}
+        if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=(?<mos_referer_candidate_release>{candidate_release_nginx_pattern})(?:[&#]|$)") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_referer_candidate_release/$1 last;
         }}
         root {app_dir};
         try_files $mos_candidate_asset_prefix$uri /{_FUNNEL_ARTIFACT_LIVE_DIRNAME}$uri =404;
@@ -9900,16 +11733,10 @@ WantedBy=multi-user.target
     gzip_proxied any;
     gzip_types text/plain text/css text/javascript application/javascript application/json application/xml image/svg+xml;
 
-    location ^~ /api/public/assets/ {{
-        try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;
-        add_header Cache-Control "public, max-age=31536000, immutable";
-    }}
-
-    location ^~ /public/assets/ {{
-        try_files /api$uri /api$uri.webp /api$uri.jpg /api$uri.jpeg /api$uri.png =404;
-        add_header Cache-Control "public, max-age=31536000, immutable";
-    }}
-
+{canonical_host_guard}\
+{api_public_asset_location}
+{public_asset_location}
+{root_asset_location}
 {standalone_asset_location}
 {candidate_route_location}\
     location ^~ /api/ {{
@@ -9923,6 +11750,7 @@ WantedBy=multi-user.target
     }}
 
 {default_route_location}
+{legacy_redirect_locations}
     location / {{
 {candidate_query_rewrite}\
         try_files $uri $uri/index.html $uri/ =404;

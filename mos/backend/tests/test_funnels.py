@@ -1230,6 +1230,60 @@ def test_published_public_funnel_page_defaults_posthog_person_profiles_to_always
     assert public_page.json()["tracking"]["posthogPersonProfiles"] == "always"
 
 
+def test_published_public_funnel_page_prefers_client_posthog_settings(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_ENABLED", True)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PROJECT_API_KEY", "global_project_key")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_API_HOST", "https://us.i.posthog.com")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_UI_HOST", None)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_DEFAULTS", "2026-01-30")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PERSON_PROFILES", "always")
+
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Client PostHog Settings Funnel",
+    )
+
+    funnel = db_session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
+    assert funnel is not None
+
+    settings_resp = api_client.put(
+        f"/clients/{funnel.client_id}/analytics/posthog",
+        json={
+            "enabled": True,
+            "projectApiKey": "client_project_key",
+            "apiHost": "https://beacon.example-brand.com",
+            "uiHost": "https://app.posthog.com",
+            "defaults": "2026-02-01",
+            "personProfiles": "identified_only",
+            "sourceMode": "structured",
+        },
+    )
+    assert settings_resp.status_code == 200
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    entry_slug = meta.json()["entrySlug"]
+
+    public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{entry_slug}")
+    assert public_page.status_code == 200
+    assert public_page.json()["tracking"] == {
+        "provider": "posthog",
+        "mode": "public_funnel_runtime",
+        "posthogProjectApiKey": "client_project_key",
+        "posthogApiHost": "https://beacon.example-brand.com",
+        "posthogUiHost": "https://app.posthog.com",
+        "posthogDefaults": "2026-02-01",
+        "posthogPersonProfiles": "identified_only",
+    }
+
+
 def test_published_public_funnel_page_prefers_posthog_managed_proxy_override(
     api_client: TestClient,
     db_session,

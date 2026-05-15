@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ from sqlalchemy import select
 from app.auth.dependencies import AuthContext, get_current_user
 from app.main import app
 from app.db.models import (
+    Asset,
     Client,
     Funnel,
     FunnelPage,
@@ -22,6 +24,7 @@ from app.db.models import (
     OrgDeployDomain,
     Product,
 )
+from app.db.enums import AssetSourceEnum, AssetStatusEnum
 from app.services import deploy as deploy_service
 from tests.conftest import TEST_ORG_ID
 
@@ -226,6 +229,9 @@ async def test_apply_plan_scopes_materialization_and_cli_to_selected_workload(tm
     assert "--workload-name" in subprocess_args
     assert subprocess_args.count("--workload-name") == 1
     assert subprocess_args[-2:] == ["--workload-name", "brand-funnels-tenor"]
+    subprocess_kwargs = captured["subprocess_kwargs"]
+    assert subprocess_kwargs["cwd"] == str(cloudhand_dir.parent)
+    assert str(Path(deploy_service.__file__).resolve().parents[2]) in subprocess_kwargs["env"]["PYTHONPATH"]
 
 
 @pytest.mark.asyncio
@@ -783,6 +789,238 @@ def test_validate_funnel_artifact_identity_accepts_built_payload(db_session, aut
     assert audit["funnels"][0]["pages"] == [
         {"pageId": fixture["page_id"], "slug": "sales-page", "stage": "sales"}
     ]
+
+
+def test_html_deploy_runtime_artifact_uses_inline_asset_bytes_without_storage_download(
+    db_session, auth_context, monkeypatch
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = uuid4()
+    product_id = uuid4()
+    funnel_id = uuid4()
+    page_id = uuid4()
+    version_id = uuid4()
+    publication_id = uuid4()
+    asset_public_id = uuid4()
+    product_slug = str(product_id).split("-")[0]
+    image_bytes = b"\x89PNG\r\n\x1a\ninline-image"
+    image_bytes_base64 = base64.b64encode(image_bytes).decode("ascii")
+    font_bytes = b"font-bytes"
+    font_bytes_base64 = base64.b64encode(font_bytes).decode("ascii")
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Inline Asset Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Inline Asset Product",
+        )
+    )
+    db_session.flush()
+    db_session.add(
+        Asset(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            source_type=AssetSourceEnum.upload,
+            status=AssetStatusEnum.approved,
+            public_id=asset_public_id,
+            asset_kind="image",
+            channel_id="html-deploy",
+            format="png",
+            content={},
+            storage_key="orig/inline-asset.png",
+            content_type="image/png",
+            size_bytes=999,
+            file_status="ready",
+        )
+    )
+    funnel = Funnel(
+        id=funnel_id,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        name="Inline Asset Funnel",
+        route_slug="inline-asset-funnel",
+    )
+    db_session.add(funnel)
+    db_session.add(
+        FunnelPage(
+            id=page_id,
+            funnel_id=funnel_id,
+            name="Sales Page",
+            slug="sales-page",
+            template_id="sales-pdp",
+        )
+    )
+    db_session.add(
+        FunnelPageVersion(
+            id=version_id,
+            page_id=page_id,
+            puck_data={
+                "root": {"props": {"title": "Sales Page"}},
+                "content": [
+                    {
+                        "type": "ImportedHtmlDocument",
+                        "props": {
+                            "htmlDocument": (
+                                f"<html><body><img src='/public/assets/{asset_public_id}'></body></html>"
+                            ),
+                            "instrumentationManifest": {
+                                "schemaVersion": "html-deploy-v1",
+                                "htmlArtifactKind": "sales",
+                                "pageStage": "sales",
+                            },
+                            "htmlDeployAssetPayloads": {
+                                str(asset_public_id): {
+                                    "contentType": "image/png",
+                                    "sizeBytes": len(image_bytes),
+                                    "bytesBase64": image_bytes_base64,
+                                }
+                            },
+                            "htmlDeployStaticAssetPayloads": {
+                                "/cdn/shop/files/example-font.woff2": {
+                                    "contentType": "font/woff2",
+                                    "sizeBytes": len(font_bytes),
+                                    "bytesBase64": font_bytes_base64,
+                                    "sha256": hashlib.sha256(font_bytes).hexdigest(),
+                                }
+                            },
+                        },
+                    }
+                ],
+            },
+        )
+    )
+    db_session.add(
+        FunnelPublication(
+            id=publication_id,
+            funnel_id=funnel_id,
+            entry_page_id=page_id,
+            created_by="codex",
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication_id,
+            page_id=page_id,
+            page_version_id=version_id,
+            slug_at_publish="sales-page",
+            title_at_publish="Sales Page",
+        )
+    )
+    db_session.flush()
+    funnel.entry_page_id = page_id
+    funnel.active_publication_id = publication_id
+    db_session.commit()
+
+    import app.services.media_storage as media_storage_module
+
+    monkeypatch.setattr(
+        media_storage_module,
+        "MediaStorage",
+        lambda: pytest.fail("Inline html-deploy assets must not be downloaded from storage."),
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "build_public_page_metadata_for_context",
+        lambda **_: {"title": "Sales Page"},
+    )
+
+    payload = deploy_service.build_client_funnel_runtime_artifact_payload(
+        session=db_session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        updated_from_funnel_id=str(funnel_id),
+        updated_from_publication_id=str(publication_id),
+    )
+
+    asset_payload = payload["assets"]["items"][str(asset_public_id)]
+    assert asset_payload["serveMode"] == "embedded"
+    assert asset_payload["contentType"] == "image/png"
+    assert asset_payload["sizeBytes"] == len(image_bytes)
+    assert asset_payload["bytesBase64"] == image_bytes_base64
+    static_payload = payload["assets"]["staticItems"]["/cdn/shop/files/example-font.woff2"]
+    assert static_payload["serveMode"] == "embedded"
+    assert static_payload["contentType"] == "font/woff2"
+    assert static_payload["sizeBytes"] == len(font_bytes)
+    assert static_payload["bytesBase64"] == font_bytes_base64
+    page_props = payload["products"][product_slug]["funnels"]["inline-asset-funnel"]["pages"][
+        "sales-page"
+    ]["puckData"]["content"][0]["props"]
+    assert "htmlDeployAssetPayloads" not in page_props
+    assert "htmlDeployStaticAssetPayloads" not in page_props
+
+
+def test_html_deploy_inline_asset_payloads_fail_when_referenced_bytes_are_missing(
+    db_session, auth_context, monkeypatch
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = uuid4()
+    product_id = uuid4()
+    included_public_id = uuid4()
+    missing_public_id = uuid4()
+    image_bytes = b"\x89PNG\r\n\x1a\ninline-image"
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Inline Asset Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Inline Asset Product",
+        )
+    )
+    db_session.flush()
+    for public_id in (included_public_id, missing_public_id):
+        db_session.add(
+            Asset(
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                source_type=AssetSourceEnum.upload,
+                status=AssetStatusEnum.approved,
+                public_id=public_id,
+                asset_kind="image",
+                channel_id="html-deploy",
+                format="png",
+                content={},
+                storage_key=f"orig/{public_id}.png",
+                content_type="image/png",
+                size_bytes=len(image_bytes),
+                file_status="ready",
+            )
+        )
+    db_session.commit()
+
+    import app.services.media_storage as media_storage_module
+
+    monkeypatch.setattr(
+        media_storage_module,
+        "MediaStorage",
+        lambda: pytest.fail("Missing inline html-deploy assets must fail before storage download."),
+    )
+
+    with pytest.raises(
+        deploy_service.DeployError,
+        match="requires inline image bytes",
+    ):
+        deploy_service._build_funnel_artifact_asset_payload(
+            session=db_session,
+            org_id=str(org_id),
+            client_id=str(client_id),
+            public_ids=[str(included_public_id), str(missing_public_id)],
+            embed_bytes=True,
+            inline_asset_payloads={
+                str(included_public_id): {
+                    "contentType": "image/png",
+                    "sizeBytes": len(image_bytes),
+                    "bytesBase64": base64.b64encode(image_bytes).decode("ascii"),
+                }
+            },
+            required_inline_public_ids={str(included_public_id), str(missing_public_id)},
+        )
 
 
 def test_validate_funnel_artifact_identity_rejects_page_map_drift(db_session, auth_context, monkeypatch):
@@ -2763,6 +3001,76 @@ def test_materialize_funnel_artifacts_for_apply_skips_empty_inline_artifacts_wit
     assert materialized == plan_file
 
 
+def test_materialize_funnel_artifacts_for_apply_scopes_selected_workload_before_validation(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "stale-invalid-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "client_id": "client-old",
+                                        "artifact_render_mode": "standalone_imported_html",
+                                        "artifact": {"meta": {"clientId": "client-old"}},
+                                    },
+                                },
+                                {
+                                    "name": "selected-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "client_id": "client-new",
+                                        "artifact_render_mode": "html_deploy",
+                                        "upstream_api_base_root": "https://api.moshq.app",
+                                        "artifact": {"meta": {"clientId": "client-new"}, "products": {}},
+                                    },
+                                },
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(
+        plan_file=plan_file,
+        workload_names={"selected-workload"},
+    )
+
+    assert materialized != plan_file
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    workloads = payload["new_spec"]["instances"][0]["workloads"]
+    assert [workload["name"] for workload in workloads] == ["selected-workload"]
+    assert workloads[0]["source_ref"]["artifact_render_mode"] == "html_deploy"
+
+
+def test_materialize_funnel_artifacts_for_apply_rejects_missing_selected_workload(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps({"new_spec": {"instances": [{"name": "mos-ghc-1", "workloads": []}]}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(deploy_service.DeployError, match="Selected deploy workload"):
+        deploy_service._materialize_funnel_artifacts_for_apply(
+            plan_file=plan_file,
+            workload_names={"selected-workload"},
+        )
+
+
 def test_materialize_funnel_artifacts_for_apply_hydrates_from_artifact_id(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
 
@@ -3911,8 +4219,9 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "EnteredSales",
         "ViewContent",
         "offer_page_view",
-        "sales_to_checkout_click",
         "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
@@ -3929,6 +4238,8 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "sales_page_view",
         "EnteredSales",
         "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
@@ -4007,6 +4318,8 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
         "sales_page_view",
         "EnteredSales",
         "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
@@ -4037,6 +4350,8 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
                 "sales_page_view",
                 "EnteredSales",
                 "AddToCart",
+                "sales_to_checkout_click",
+                "checkout_click",
                 "SalesToCheckoutClick",
                 "SalesToCheckoutClicked",
             },
@@ -4069,6 +4384,8 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
                 "sales_page_view",
                 "EnteredSales",
                 "AddToCart",
+                "sales_to_checkout_click",
+                "checkout_click",
                 "SalesToCheckoutClick",
                 "SalesToCheckoutClicked",
             },
@@ -4081,6 +4398,8 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
                 "sales_page_view",
                 "EnteredSales",
                 "AddToCart",
+                "sales_to_checkout_click",
+                "checkout_click",
                 "SalesToCheckoutClick",
                 "SalesToCheckoutClicked",
             },
@@ -4380,6 +4699,100 @@ def test_run_html_deploy_optimization_validation_checks_candidate_pages(monkeypa
     assert all("mos_deploy_candidate_release=candidate-123" in url for url in page_requests)
 
 
+def test_html_deploy_validation_targets_include_tracked_presales_sales_handoff_url():
+    pre_sales_page = {
+        "url": "https://shop.example.com/quiz/",
+        "stage": "pre_sales",
+        "html_artifact_kind": "quiz",
+    }
+    sales_page = {
+        "url": "https://shop.example.com/sales-page/",
+        "stage": "sales",
+        "html_artifact_kind": "sales",
+    }
+
+    targets = deploy_service._html_deploy_validation_targets(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [pre_sales_page, sales_page],
+            "path_plans": [
+                {
+                    "start_page": pre_sales_page,
+                    "sales_page": sales_page,
+                    "pre_sales_click_selectors": ["#to-sales"],
+                }
+            ],
+        }
+    )
+
+    urls = [target["url"] for target in targets]
+    assert any("source_page_type=quiz_presell" in url for url in urls)
+    assert any("from_stage=pre_sales" in url for url in urls)
+    assert any("to_stage=sales" in url for url in urls)
+    assert all("mos_deploy_candidate_release=candidate-123" in url for url in urls)
+
+
+def test_run_html_deploy_optimization_validation_checks_tracked_sales_handoff_resources(
+    monkeypatch,
+):
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            raw_url = str(url)
+            if "/assets/broken.css" in raw_url:
+                return _HtmlDeployOptimizationFakeResponse(
+                    status_code=404,
+                    content_type="text/css",
+                )
+            if "/assets/" in raw_url:
+                return _HtmlDeployOptimizationFakeResponse(content_type="image/webp")
+            html = _optimized_html_fixture()
+            if "source_page_type=quiz_presell" in raw_url:
+                html = html.replace(
+                    "</head>",
+                    '<link rel="stylesheet" href="/assets/broken.css"></head>',
+                )
+            return _HtmlDeployOptimizationFakeResponse(text=html)
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    pre_sales_page = {
+        "url": "https://shop.example.com/quiz/",
+        "stage": "pre_sales",
+        "html_artifact_kind": "quiz",
+    }
+    sales_page = {
+        "url": "https://shop.example.com/sales-page/",
+        "stage": "sales",
+        "html_artifact_kind": "sales",
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="source_page_type=quiz_presell"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [pre_sales_page, sales_page],
+                "path_plans": [
+                    {
+                        "start_page": pre_sales_page,
+                        "sales_page": sales_page,
+                        "pre_sales_click_selectors": ["#to-sales"],
+                    }
+                ],
+            }
+        )
+
+
 def test_run_html_deploy_optimization_validation_fails_without_render_marker(monkeypatch):
     class FakeClient:
         def __init__(self, **kwargs):
@@ -4532,12 +4945,61 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
         "EnteredSales",
         "ViewContent",
         "offer_page_view",
-        "sales_to_checkout_click",
         "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
     assert [page["slug"] for page in plan["pages_to_validate"]] == ["sales-page"]
+
+
+def test_build_funnel_tracking_validation_plan_for_sales_cart_drawer_flow():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
+    sales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"][
+        "puckData"
+    ]["content"][0]["props"]["instrumentationManifest"]
+    sales_manifest["addToCartTargets"] = [
+        {
+            "id": "primary-add-to-cart",
+            "selector": "#add-to-cart",
+            "event": "click",
+            "trackEventType": "add_to_cart",
+        }
+    ]
+    sales_manifest["bindings"][0]["selector"] = ".cart-secure-checkout"
+
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    path_plan = plan["path_plans"][0]
+    assert [target["selector"] for target in path_plan["add_to_cart_targets"]] == ["#add-to-cart"]
+    assert [target["selector"] for target in path_plan["checkout_targets"]] == [
+        ".cart-secure-checkout"
+    ]
+    assert path_plan["expected_internal_events"][-2:] == [
+        "add_to_cart",
+        "sales_to_checkout_click",
+    ]
+    assert path_plan["expected_meta_events"][-3:] == [
+        "AddToCart",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
+    ]
+    assert "add_to_cart" in path_plan["expected_posthog_events"]
+    assert "checkout_click" in path_plan["expected_posthog_events"]
+    assert path_plan["required_posthog_readback_events"][-5:] == [
+        "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
+    ]
 
 
 def test_build_funnel_tracking_validation_plan_for_checkout_started_flow():
@@ -4677,6 +5139,7 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
+                ["checkout_click", {}],
                 ["AddToCart", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
@@ -4736,6 +5199,7 @@ def test_validate_observed_tracking_events_rejects_extra_sales_entry_meta_events
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
+                ["checkout_click", {}],
                 ["AddToCart", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
@@ -4796,6 +5260,7 @@ def test_validate_observed_tracking_events_rejects_missing_sales_posthog_context
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
+                ["checkout_click", {}],
                 ["AddToCart", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
@@ -4911,6 +5376,7 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
+                ["checkout_click", {}],
                 ["AddToCart", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
@@ -5571,7 +6037,7 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
     class FakePlaywrightManager:
         def __enter__(self):
             calls.append(("playwright_enter",))
-            return SimpleNamespace(chromium=SimpleNamespace(launch=lambda: FakeBrowser()))
+            return SimpleNamespace(chromium=SimpleNamespace(launch=lambda **kwargs: FakeBrowser()))
 
         def __exit__(self, exc_type, exc, tb):
             calls.append(("playwright_exit", exc_type.__name__ if exc_type else None))

@@ -18,12 +18,13 @@ HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION = "html-deploy-v1"
 LEGACY_IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = "imported-html-instrumentation-v1"
 IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION
 ImportedHtmlPageStage = Literal["pre_sales", "sales", "checkout", "thank_you", "custom"]
-HtmlDeployArtifactKind = Literal["listicle", "listicle_hybrid", "quiz", "sales"]
+HtmlDeployArtifactKind = Literal["listicle", "listicle_hybrid", "quiz", "sales", "custom"]
 ImportedHtmlBindingEvent = Literal["click"]
 ImportedHtmlTargetEvent = Literal["click", "change", "input"]
 ImportedHtmlTargetSource = Literal["value", "text", "checked"]
 ImportedHtmlTrackEventType = Literal[
     "pre_sales_to_sales_click",
+    "add_to_cart",
     "sales_to_checkout_click",
     "checkout_started",
     "selector_interaction",
@@ -284,6 +285,7 @@ class ImportedHtmlViewTarget(BaseModel):
     destinationUrl: str | None = Field(default=None, max_length=4096)
     elementId: str | None = Field(default=None, max_length=120)
     subscriptionFlag: bool | None = None
+    trackEventType: ImportedHtmlTrackEventType | None = None
 
 
 class ImportedHtmlInstrumentationManifest(BaseModel):
@@ -296,6 +298,7 @@ class ImportedHtmlInstrumentationManifest(BaseModel):
     quizVersion: str | None = Field(default=None, max_length=120)
     quizVariant: str | None = Field(default=None, max_length=120)
     bindings: list[ImportedHtmlBinding] = Field(default_factory=list)
+    addToCartTargets: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     sections: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     proofs: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     ctas: list[ImportedHtmlViewTarget] = Field(default_factory=list)
@@ -321,6 +324,8 @@ class ImportedHtmlInstrumentationManifest(BaseModel):
             )
         if self.htmlArtifactKind == "sales" and self.pageStage != "sales":
             raise ValueError("htmlArtifactKind 'sales' requires pageStage 'sales'.")
+        if self.htmlArtifactKind == "custom" and self.pageStage != "custom":
+            raise ValueError("htmlArtifactKind 'custom' requires pageStage 'custom'.")
         if self.htmlArtifactKind == "quiz":
             missing = [
                 field_name
@@ -432,6 +437,7 @@ def validate_imported_html_document_manifest(
 
     view_target_groups = (
         ("section", manifest.sections),
+        ("add_to_cart", manifest.addToCartTargets),
         ("proof", manifest.proofs),
         ("cta", manifest.ctas),
         ("offer_stack", manifest.offerStacks),
@@ -546,7 +552,7 @@ def build_imported_html_generation_context(
         )
     return {
         "schemaVersion": IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION,
-        "supportedHtmlArtifactKinds": ["listicle", "listicle_hybrid", "quiz", "sales"],
+        "supportedHtmlArtifactKinds": ["listicle", "listicle_hybrid", "quiz", "sales", "custom"],
         "defaultHtmlArtifactKind": "sales" if current_page_stage == "sales" else "listicle",
         "currentPageStage": current_page_stage,
         "currentPageId": current_page_id,

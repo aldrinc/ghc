@@ -1216,6 +1216,7 @@ async def publish_funnel_route(
             ),
             default_route_policy=deploy.defaultRoutePolicy,
             default_page_slug=deploy.defaultPageSlug,
+            release_metadata=deploy.releaseMetadata,
         )
         if edge_backed_artifact:
             workload_patch["workspace_server_names"] = server_names
