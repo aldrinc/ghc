@@ -969,6 +969,33 @@ def test_funnel_artifact_site_writes_html_deploy_static_asset_payloads():
     ] == font_bytes
 
 
+def test_funnel_artifact_site_writes_route_scoped_html_deploy_static_asset_payloads():
+    static_asset_path = "/example-product/example-funnel/presales/assets/optimized/theme.css"
+    html_document = f"""<!DOCTYPE html>
+<html>
+  <head><link rel="stylesheet" href="{static_asset_path}"></head>
+  <body><a id="main-cta" href="#shop">Start</a></body>
+</html>
+"""
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    css_bytes = b".quiz-shell{display:block}"
+    app.source_ref.artifact["assets"]["staticItems"] = {
+        static_asset_path: {
+            "contentType": "text/css",
+            "sizeBytes": len(css_bytes),
+            "sha256": hashlib.sha256(css_bytes).hexdigest(),
+            "bytesBase64": base64.b64encode(css_bytes).decode("ascii"),
+        }
+    }
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    assert uploaded[
+        f"/opt/apps/landing-artifact/site{static_asset_path}"
+    ] == css_bytes
+
+
 def test_html_deploy_attaches_production_analytics_harness_for_listicle_quiz_and_sales():
     tracking = {
         "provider": "meta",

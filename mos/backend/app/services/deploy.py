@@ -99,6 +99,14 @@ _HTML_DEPLOY_STATIC_ASSET_PREFIXES = (
     "/cdn/shop/files/",
     "/favicon",
 )
+_HTML_DEPLOY_ROUTE_SCOPED_STATIC_ASSET_RE = re.compile(
+    r"^/[A-Za-z0-9][A-Za-z0-9_-]*"
+    r"/[A-Za-z0-9][A-Za-z0-9_-]*"
+    r"/[A-Za-z0-9][A-Za-z0-9_-]*/assets/"
+)
+_FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS = int(
+    os.getenv("FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS", "300")
+)
 _DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS = int(
     os.getenv("DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS", "30000")
 )
@@ -1584,10 +1592,15 @@ def _normalize_html_deploy_static_asset_path(
             f"{context_label} static asset path '{path}' must be normalized; expected '{normalized}'."
         )
     lowered = path.lower()
-    if not any(lowered.startswith(prefix) for prefix in _HTML_DEPLOY_STATIC_ASSET_PREFIXES):
+    route_scoped_static_asset = _HTML_DEPLOY_ROUTE_SCOPED_STATIC_ASSET_RE.match(path) is not None
+    if (
+        not any(lowered.startswith(prefix) for prefix in _HTML_DEPLOY_STATIC_ASSET_PREFIXES)
+        and not route_scoped_static_asset
+    ):
         raise DeployError(
             f"{context_label} static asset path '{path}' must start with one of: "
             + ", ".join(_HTML_DEPLOY_STATIC_ASSET_PREFIXES)
+            + ", or a route-scoped /<product>/<funnel>/<page>/assets/ path"
         )
     return path
 
@@ -1687,6 +1700,23 @@ def _normalize_html_deploy_static_asset_payload(
         "serveMode": "embedded",
         "sha256": hashlib.sha256(decoded_bytes).hexdigest(),
         "bytesBase64": base64.b64encode(decoded_bytes).decode("ascii"),
+    }
+
+
+def _normalize_release_metadata_string_set(
+    *,
+    release_metadata: dict[str, Any],
+    key: str,
+) -> set[str] | None:
+    raw_values = release_metadata.get(key)
+    if raw_values is None:
+        return None
+    if not isinstance(raw_values, list):
+        raise DeployError(f"release_metadata.{key} must be a list when provided.")
+    return {
+        str(value or "").strip()
+        for value in raw_values
+        if str(value or "").strip()
     }
 
 
@@ -2121,6 +2151,7 @@ def build_client_funnel_runtime_artifact_payload(
     updated_from_publication_id: str,
     publication_id_overrides: dict[str, str] | None = None,
     asset_reference_mode: bool = False,
+    included_funnel_ids: set[str] | None = None,
     included_page_slugs: set[str] | None = None,
     included_page_stages: set[str] | None = None,
 ) -> dict[str, Any]:
@@ -2179,6 +2210,23 @@ def build_client_funnel_runtime_artifact_payload(
     )
     if not client_funnels:
         raise DeployError("No published funnels found for client deploy artifact.")
+
+    normalized_included_funnel_ids = {
+        str(value or "").strip()
+        for value in (included_funnel_ids or set())
+        if str(value or "").strip()
+    }
+    if normalized_included_funnel_ids:
+        client_funnels = [
+            client_funnel
+            for client_funnel in client_funnels
+            if str(client_funnel.id) in normalized_included_funnel_ids
+        ]
+        if not client_funnels:
+            raise DeployError(
+                "No published funnels matched deploy artifact funnel filter: "
+                + ", ".join(sorted(normalized_included_funnel_ids))
+            )
 
     product_ids: set[str] = set()
     normalized_publication_overrides = {
@@ -2525,6 +2573,8 @@ def build_client_funnel_runtime_artifact_payload(
         meta_payload["includedPublicationPageIds"] = sorted(included_publication_page_ids)
         meta_payload["includedPageSlugs"] = sorted(normalized_included_page_slugs)
         meta_payload["includedPageStages"] = sorted(normalized_included_page_stages)
+    if normalized_included_funnel_ids:
+        meta_payload["includedFunnelIds"] = sorted(normalized_included_funnel_ids)
 
     return {
         "meta": meta_payload,
@@ -2541,6 +2591,9 @@ def _build_embedded_client_funnel_runtime_artifact_payload(
     updated_from_funnel_id: str,
     updated_from_publication_id: str,
     publication_id_overrides: dict[str, str] | None = None,
+    included_funnel_ids: set[str] | None = None,
+    included_page_slugs: set[str] | None = None,
+    included_page_stages: set[str] | None = None,
 ) -> dict[str, Any]:
     return build_client_funnel_runtime_artifact_payload(
         session=session,
@@ -2550,6 +2603,9 @@ def _build_embedded_client_funnel_runtime_artifact_payload(
         updated_from_publication_id=updated_from_publication_id,
         publication_id_overrides=publication_id_overrides,
         asset_reference_mode=False,
+        included_funnel_ids=included_funnel_ids,
+        included_page_slugs=included_page_slugs,
+        included_page_stages=included_page_stages,
     )
 
 
@@ -2762,6 +2818,7 @@ def persist_client_funnel_runtime_artifact(
     funnel_id: str,
     publication_id: str,
     created_by_user_id: str | None = None,
+    included_funnel_ids: set[str] | None = None,
     included_page_slugs: set[str] | None = None,
     included_page_stages: set[str] | None = None,
 ) -> dict[str, Any]:
@@ -2785,6 +2842,7 @@ def persist_client_funnel_runtime_artifact(
         updated_from_funnel_id=str(funnel.id),
         updated_from_publication_id=publication_id,
         publication_id_overrides={str(funnel.id): publication_id},
+        included_funnel_ids=included_funnel_ids,
         included_page_slugs=included_page_slugs,
         included_page_stages=included_page_stages,
     )
@@ -6957,18 +7015,31 @@ def hydrate_funnel_artifact_workload_patch(
         if isinstance(source_ref.get("release_metadata"), dict)
         else {}
     )
-    raw_included_page_slugs = release_metadata.get("htmlDeployIncludedPageSlugs")
-    included_page_slugs = {
-        str(value or "").strip().lower()
-        for value in raw_included_page_slugs
-        if str(value or "").strip()
-    } if isinstance(raw_included_page_slugs, list) else None
-    raw_included_page_stages = release_metadata.get("htmlDeployIncludedPageStages")
-    included_page_stages = {
-        str(value or "").strip().lower()
-        for value in raw_included_page_stages
-        if str(value or "").strip()
-    } if isinstance(raw_included_page_stages, list) else None
+    raw_render_mode = str(source_ref.get("artifact_render_mode") or "").strip().lower()
+    included_funnel_ids = _normalize_release_metadata_string_set(
+        release_metadata=release_metadata,
+        key="htmlDeployIncludedFunnelIds",
+    )
+    if raw_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_HTML_DEPLOY and included_funnel_ids is None:
+        included_funnel_ids = {str(funnel_id)}
+    included_page_slugs_raw = _normalize_release_metadata_string_set(
+        release_metadata=release_metadata,
+        key="htmlDeployIncludedPageSlugs",
+    )
+    included_page_slugs = (
+        {value.lower() for value in included_page_slugs_raw}
+        if included_page_slugs_raw is not None
+        else None
+    )
+    included_page_stages_raw = _normalize_release_metadata_string_set(
+        release_metadata=release_metadata,
+        key="htmlDeployIncludedPageStages",
+    )
+    included_page_stages = (
+        {value.lower() for value in included_page_stages_raw}
+        if included_page_stages_raw is not None
+        else None
+    )
 
     artifact_ref = persist_client_funnel_runtime_artifact(
         session=session,
@@ -6976,6 +7047,7 @@ def hydrate_funnel_artifact_workload_patch(
         funnel_id=funnel_id,
         publication_id=publication_id,
         created_by_user_id=created_by_user_id,
+        included_funnel_ids=included_funnel_ids,
         included_page_slugs=included_page_slugs,
         included_page_stages=included_page_stages,
     )
@@ -9416,6 +9488,30 @@ def _activate_html_deploy_candidate_release(
     }
 
 
+def _hydrate_funnel_artifact_workload_patch_isolated(
+    *,
+    org_id: str,
+    funnel_id: str,
+    publication_id: str,
+    workload_patch: dict[str, Any],
+    created_by_user_id: str | None,
+) -> dict[str, Any]:
+    from app.db.base import SessionLocal
+
+    session = SessionLocal()
+    try:
+        return hydrate_funnel_artifact_workload_patch(
+            session=session,
+            org_id=org_id,
+            funnel_id=funnel_id,
+            publication_id=publication_id,
+            workload_patch=workload_patch,
+            created_by_user_id=created_by_user_id,
+        )
+    finally:
+        session.close()
+
+
 async def _run_apply_plan_job(job_id: str) -> None:
     job = _read_job(job_id)
     path = _job_path(job_id)
@@ -9515,14 +9611,25 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                 if not isinstance(workload_patch, dict):
                     raise DeployError("Publish deploy request is missing workload_patch.")
 
-                workload_patch = hydrate_funnel_artifact_workload_patch(
-                    session=session,
-                    org_id=org_id,
-                    funnel_id=funnel_id,
-                    publication_id=str(publication.id),
-                    workload_patch=workload_patch,
-                    created_by_user_id=user_id,
-                )
+                job["phase"] = "artifact_hydrating"
+                _write_json_atomic(path, job)
+                try:
+                    workload_patch = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            _hydrate_funnel_artifact_workload_patch_isolated,
+                            org_id=org_id,
+                            funnel_id=funnel_id,
+                            publication_id=str(publication.id),
+                            workload_patch=workload_patch,
+                            created_by_user_id=user_id,
+                        ),
+                        timeout=_FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS,
+                    )
+                except asyncio.TimeoutError as exc:
+                    raise DeployError(
+                        "Funnel artifact hydration timed out after "
+                        f"{_FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS} seconds."
+                    ) from exc
 
                 hydrated_source_ref = workload_patch.get("source_ref")
                 if isinstance(hydrated_source_ref, dict):

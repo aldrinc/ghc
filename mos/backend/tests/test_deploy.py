@@ -807,6 +807,11 @@ def test_html_deploy_runtime_artifact_uses_inline_asset_bytes_without_storage_do
     image_bytes_base64 = base64.b64encode(image_bytes).decode("ascii")
     font_bytes = b"font-bytes"
     font_bytes_base64 = base64.b64encode(font_bytes).decode("ascii")
+    css_bytes = b".quiz-shell{display:block}"
+    css_bytes_base64 = base64.b64encode(css_bytes).decode("ascii")
+    route_scoped_css_path = (
+        f"/{product_slug}/inline-asset-funnel/sales-page/assets/optimized/theme.css"
+    )
 
     db_session.add(Client(id=client_id, org_id=org_id, name="Inline Asset Client"))
     db_session.add(
@@ -885,6 +890,12 @@ def test_html_deploy_runtime_artifact_uses_inline_asset_bytes_without_storage_do
                                     "sizeBytes": len(font_bytes),
                                     "bytesBase64": font_bytes_base64,
                                     "sha256": hashlib.sha256(font_bytes).hexdigest(),
+                                },
+                                route_scoped_css_path: {
+                                    "contentType": "text/css",
+                                    "sizeBytes": len(css_bytes),
+                                    "bytesBase64": css_bytes_base64,
+                                    "sha256": hashlib.sha256(css_bytes).hexdigest(),
                                 }
                             },
                         },
@@ -946,6 +957,11 @@ def test_html_deploy_runtime_artifact_uses_inline_asset_bytes_without_storage_do
     assert static_payload["contentType"] == "font/woff2"
     assert static_payload["sizeBytes"] == len(font_bytes)
     assert static_payload["bytesBase64"] == font_bytes_base64
+    route_static_payload = payload["assets"]["staticItems"][route_scoped_css_path]
+    assert route_static_payload["serveMode"] == "embedded"
+    assert route_static_payload["contentType"] == "text/css"
+    assert route_static_payload["sizeBytes"] == len(css_bytes)
+    assert route_static_payload["bytesBase64"] == css_bytes_base64
     page_props = payload["products"][product_slug]["funnels"]["inline-asset-funnel"]["pages"][
         "sales-page"
     ]["puckData"]["content"][0]["props"]
@@ -1368,6 +1384,162 @@ def test_build_client_funnel_runtime_artifact_payload_prefers_explicit_publicati
     assert funnel_payload["meta"]["publicationId"] == str(new_publication_id)
     assert funnel_payload["meta"]["entrySlug"] == "sales-page"
     assert sales_page["publicationId"] == str(new_publication_id)
+
+
+def _add_published_sales_funnel(
+    db_session,
+    *,
+    org_id,
+    client_id,
+    product_id,
+    funnel_id,
+    route_slug,
+):
+    page_id = uuid4()
+    version_id = uuid4()
+    publication_id = uuid4()
+    funnel = Funnel(
+        id=funnel_id,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        name=route_slug,
+        route_slug=route_slug,
+    )
+    db_session.add(funnel)
+    db_session.add(
+        FunnelPage(
+            id=page_id,
+            funnel_id=funnel_id,
+            name="Sales Page",
+            slug="sales-page",
+            template_id="sales-pdp",
+        )
+    )
+    db_session.add(
+        FunnelPageVersion(
+            id=version_id,
+            page_id=page_id,
+            puck_data={"root": {"props": {"title": "Sales Page"}}, "content": []},
+        )
+    )
+    db_session.add(
+        FunnelPublication(
+            id=publication_id,
+            funnel_id=funnel_id,
+            entry_page_id=page_id,
+            created_by="codex",
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication_id,
+            page_id=page_id,
+            page_version_id=version_id,
+            slug_at_publish="sales-page",
+            title_at_publish="Sales Page",
+        )
+    )
+    db_session.flush()
+    funnel.entry_page_id = page_id
+    funnel.active_publication_id = publication_id
+    return publication_id
+
+
+def test_build_client_funnel_runtime_artifact_payload_scopes_to_included_funnel_ids(
+    db_session, monkeypatch
+):
+    org_id = TEST_ORG_ID
+    client_id = uuid4()
+    product_id = uuid4()
+    product_slug = str(product_id).split("-")[0]
+    target_funnel_id = uuid4()
+    other_funnel_id = uuid4()
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Scoped Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Scoped Product",
+        )
+    )
+    db_session.flush()
+
+    target_publication_id = _add_published_sales_funnel(
+        db_session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        funnel_id=target_funnel_id,
+        route_slug="target-flow",
+    )
+    _add_published_sales_funnel(
+        db_session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        funnel_id=other_funnel_id,
+        route_slug="other-flow",
+    )
+    db_session.commit()
+
+    monkeypatch.setattr(
+        deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Sales Page"}
+    )
+
+    payload = deploy_service.build_client_funnel_runtime_artifact_payload(
+        session=db_session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        updated_from_funnel_id=str(target_funnel_id),
+        updated_from_publication_id=str(target_publication_id),
+        publication_id_overrides={str(target_funnel_id): str(target_publication_id)},
+        included_funnel_ids={str(target_funnel_id)},
+    )
+
+    assert payload["meta"]["includedFunnelIds"] == [str(target_funnel_id)]
+    assert set(payload["products"][product_slug]["funnels"]) == {"target-flow"}
+
+
+def test_build_client_funnel_runtime_artifact_payload_fails_when_funnel_scope_matches_nothing(
+    db_session
+):
+    org_id = TEST_ORG_ID
+    client_id = uuid4()
+    product_id = uuid4()
+    funnel_id = uuid4()
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Scoped Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Scoped Product",
+        )
+    )
+    db_session.flush()
+    _add_published_sales_funnel(
+        db_session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        funnel_id=funnel_id,
+        route_slug="other-flow",
+    )
+    db_session.commit()
+
+    with pytest.raises(deploy_service.DeployError, match="No published funnels matched"):
+        deploy_service.build_client_funnel_runtime_artifact_payload(
+            session=db_session,
+            org_id=str(org_id),
+            client_id=str(client_id),
+            updated_from_funnel_id=str(uuid4()),
+            updated_from_publication_id=str(uuid4()),
+            included_funnel_ids={str(uuid4())},
+        )
 
 
 def test_resolve_publish_job_workspace_server_names_prefers_workload_scoped_domains(
@@ -3522,14 +3694,20 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
         "assets": {"items": {"asset-1": {"sizeBytes": 12, "bytesBase64": "YWJj"}}},
     }
 
-    monkeypatch.setattr(
-        deploy_service,
-        "persist_client_funnel_runtime_artifact",
-        lambda **_: {
+    captured_persist_kwargs = {}
+
+    def _persist_runtime_artifact(**kwargs):
+        captured_persist_kwargs.update(kwargs)
+        return {
             "artifact_id": "artifact-123",
             "artifact_version": 7,
             "client_id": "client-1",
-        },
+        }
+
+    monkeypatch.setattr(
+        deploy_service,
+        "persist_client_funnel_runtime_artifact",
+        _persist_runtime_artifact,
     )
 
     import app.db.repositories.artifacts as artifacts_module
@@ -3550,6 +3728,7 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
         "source_type": "funnel_artifact",
         "source_ref": {
             "upstream_api_base_root": "https://api.moshq.app",
+            "artifact_render_mode": "html_deploy",
             "artifact": {"meta": {"clientId": "client-1"}, "products": {}},
         },
     }
@@ -3569,6 +3748,7 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
     assert hydrated["source_ref"]["artifact"] == artifact_payload
     assert hydrated["source_ref"]["artifact"] is not artifact_payload
     assert hydrated["source_ref"]["artifact"]["meta"]["artifactId"] == "artifact-123"
+    assert captured_persist_kwargs["included_funnel_ids"] == {"funnel-1"}
 
 
 def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens():
@@ -6362,6 +6542,34 @@ async def test_run_funnel_publish_job_validates_candidate_before_activation(tmp_
         "status": "activated",
         "releaseId": "candidate-123",
     }
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_reports_artifact_hydration_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+    monkeypatch.setattr(
+        deploy_service,
+        "_hydrate_funnel_artifact_workload_patch_isolated",
+        lambda **kwargs: (_ for _ in ()).throw(deploy_service.DeployError("hydration failed")),
+    )
+
+    job_id = "publish-job-artifact-hydration-failure"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": True,
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "failed"
+    assert job["phase"] == "artifact_hydrating"
+    assert job["error"] == "hydration failed"
 
 
 @pytest.mark.asyncio

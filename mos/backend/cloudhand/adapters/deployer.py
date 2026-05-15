@@ -6128,8 +6128,18 @@ print(json.dumps(report, sort_keys=True))
             "/cdn/shop/files/",
             "/favicon",
         )
+        route_scoped_static_asset_re = re.compile(
+            r"^/[A-Za-z0-9][A-Za-z0-9_-]*"
+            r"/[A-Za-z0-9][A-Za-z0-9_-]*"
+            r"/[A-Za-z0-9][A-Za-z0-9_-]*/assets/"
+        )
         for raw_asset_path, raw_asset_payload in static_asset_items.items():
             asset_path = str(raw_asset_path or "").strip()
+            has_allowed_static_prefix = any(
+                asset_path.lower().startswith(prefix)
+                for prefix in allowed_static_prefixes
+            )
+            has_route_scoped_static_prefix = route_scoped_static_asset_re.match(asset_path) is not None
             if (
                 not asset_path.startswith("/")
                 or "://" in asset_path
@@ -6137,14 +6147,12 @@ print(json.dumps(report, sort_keys=True))
                 or "?" in asset_path
                 or "#" in asset_path
                 or posixpath.normpath(asset_path) != asset_path
-                or not any(
-                    asset_path.lower().startswith(prefix)
-                    for prefix in allowed_static_prefixes
-                )
+                or (not has_allowed_static_prefix and not has_route_scoped_static_prefix)
             ):
                 raise ValueError(
                     f"Invalid artifact static asset path '{asset_path}'. Expected a normalized "
-                    "same-origin path under /assets/, /cdn/shop/files/, or /favicon."
+                    "same-origin path under /assets/, /cdn/shop/files/, /favicon, or "
+                    "/<product>/<funnel>/<page>/assets/."
                 )
             if not isinstance(raw_asset_payload, dict):
                 raise ValueError(
