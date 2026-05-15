@@ -1678,10 +1678,30 @@ class ServerDeployer:
                 display_cmd = display_cmd.replace(m, "***")
         print(f"[{self.ip}] Running: {display_cmd}")
         stdin, stdout, stderr = self.client.exec_command(final_cmd)
+        try:
+            stdin.close()
+        except Exception:
+            pass
 
-        exit_code = stdout.channel.recv_exit_status()
-        out = stdout.read().decode().strip()
-        err = stderr.read().decode().strip()
+        channel = stdout.channel
+        out_chunks: list[bytes] = []
+        err_chunks: list[bytes] = []
+        while True:
+            while channel.recv_ready():
+                out_chunks.append(channel.recv(65536))
+            while channel.recv_stderr_ready():
+                err_chunks.append(channel.recv_stderr(65536))
+            if channel.exit_status_ready():
+                break
+            time.sleep(0.05)
+
+        exit_code = channel.recv_exit_status()
+        while channel.recv_ready():
+            out_chunks.append(channel.recv(65536))
+        while channel.recv_stderr_ready():
+            err_chunks.append(channel.recv_stderr(65536))
+        out = b"".join(out_chunks).decode(errors="replace").strip()
+        err = b"".join(err_chunks).decode(errors="replace").strip()
 
         if exit_code != 0:
             raise Exception(f"Command failed: {final_cmd}\nError: {err}")
