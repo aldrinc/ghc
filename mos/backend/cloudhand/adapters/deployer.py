@@ -7284,6 +7284,7 @@ print(json.dumps(report, sort_keys=True))
 				    const currentClickId = readFirstSearchParam(currentUrl.searchParams, CLICK_PARAM_NAMES);
 				    assignCleanProp(props, "click_id", currentClickId);
 				    assignCleanProp(props, "clickId", currentClickId);
+				    Object.assign(props, resolveFirstClassAttribution());
 				    Object.assign(props, resolvePresaleBridgeContext(currentUrl.href, config.pageStage));
 			    assignCleanProp(props, "event_source_url", currentUrl.href);
 			    assignCleanProp(props, "$raw_user_agent", window.navigator && window.navigator.userAgent);
@@ -7332,6 +7333,16 @@ print(json.dumps(report, sort_keys=True))
     ].join(":");
   };
   const CLICK_ID_KEYS = ["fbclid", "gclid", "ttclid", "msclkid", "twclid", "li_fat_id"];
+  const ATTRIBUTION_PARAM_GROUPS = [
+    { keys: ["campaign_id", "campaignId"], params: ["campaign_id", "campaignId", "utm_campaign"] },
+    { keys: ["ad_id", "adId"], params: ["ad_id", "adId", "utm_ad_id", "ad"] },
+    { keys: ["adset_id", "adsetId"], params: ["adset_id", "adsetId", "ad_set_id", "adSetId", "utm_adset_id"] },
+    { keys: ["utm_source", "utmSource"], params: ["utm_source"] },
+    { keys: ["utm_medium", "utmMedium"], params: ["utm_medium"] },
+    { keys: ["utm_campaign", "utmCampaign"], params: ["utm_campaign"] },
+    { keys: ["utm_content", "utmContent"], params: ["utm_content"] },
+    { keys: ["utm_term", "utmTerm"], params: ["utm_term"] },
+  ];
   const buildCanonicalEventId = (eventType) => {
     return [
       "mos",
@@ -7377,6 +7388,18 @@ print(json.dumps(report, sort_keys=True))
     }
     return {};
   };
+  const resolveFirstClassAttribution = () => {
+    const params = new URLSearchParams(window.location.search);
+    const attribution = {};
+    for (const group of ATTRIBUTION_PARAM_GROUPS) {
+      const value = readFirstSearchParam(params, group.params);
+      if (!value) continue;
+      for (const key of group.keys) {
+        attribution[key] = value;
+      }
+    }
+    return attribution;
+  };
   const resolvePageType = (stage) => {
     if (stage === "pre_sales") return "presell";
     if (stage === "sales") return "offer";
@@ -7410,6 +7433,7 @@ print(json.dumps(report, sort_keys=True))
 	    const resolvedSessionId = cleanText(sessionId);
 	    const deviceType = resolveDeviceType();
 	    const clickAttribution = resolveClickAttribution();
+	    const firstClassAttribution = resolveFirstClassAttribution();
 		    const inboundPresaleBridgeContext = resolvePresaleBridgeContext(window.location.href, pageStage);
     const quizId = cleanText((props && (props.quizId || props.quiz_id)) || manifest.quizId || manifest.quiz_id);
     const quizVersion = cleanText((props && (props.quizVersion || props.quiz_version)) || manifest.quizVersion || manifest.quiz_version);
@@ -7452,6 +7476,7 @@ print(json.dumps(report, sort_keys=True))
       ...(quizVersion ? { quizVersion, quiz_version: quizVersion } : {}),
       ...(quizVariant ? { quizVariant, quiz_variant: quizVariant } : {}),
 	      ...(experimentId ? { experimentId, experiment_id: experimentId } : {}),
+	      ...firstClassAttribution,
 	      ...clickAttribution,
 	      ...(clickAttribution.clickId ? { click_id: clickAttribution.clickId } : {}),
 	      ...(clickAttribution.clickIdType ? { click_id_type: clickAttribution.clickIdType } : {}),

@@ -161,6 +161,12 @@ _POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
     ("anonymousId", "properties['anonymousId']"),
     ("click_id", "properties['click_id']"),
     ("clickId", "properties['clickId']"),
+    ("campaign_id", "properties['campaign_id']"),
+    ("campaignId", "properties['campaignId']"),
+    ("ad_id", "properties['ad_id']"),
+    ("adId", "properties['adId']"),
+    ("adset_id", "properties['adset_id']"),
+    ("adsetId", "properties['adsetId']"),
     ("source_page_type", "properties['source_page_type']"),
     ("sourcePageType", "properties['sourcePageType']"),
     ("from_stage", "properties['from_stage']"),
@@ -4457,6 +4463,8 @@ def _html_deploy_validation_targets(*, validation_plan: dict[str, Any]) -> list[
                 "session_id": f"deploy-validation-session-{index + 1}",
                 "visitor_id": f"deploy-validation-visitor-{index + 1}",
                 "click_id": f"deploy-validation-click-{index + 1}",
+                "campaign_id": f"deploy-validation-campaign-{index + 1}",
+                "ad_id": f"deploy-validation-ad-{index + 1}",
             },
         )
         add_target(
@@ -5038,6 +5046,37 @@ def _assert_props_include_canonical_handoff_values(
         )
 
 
+def _assert_props_include_expected_attribution_values(
+    *,
+    props: dict[str, Any],
+    expected_campaign_id: str = "",
+    expected_ad_id: str = "",
+    expected_fbclid: str = "",
+    label: str,
+) -> None:
+    expected = {
+        "campaign_id": _clean_tracking_value(expected_campaign_id),
+        "ad_id": _clean_tracking_value(expected_ad_id),
+        "fbclid": _clean_tracking_value(expected_fbclid),
+    }
+    observed = {
+        "campaign_id": _first_tracking_prop(props, "campaign_id", "campaignId"),
+        "ad_id": _first_tracking_prop(props, "ad_id", "adId"),
+        "fbclid": _first_tracking_prop(props, "fbclid"),
+    }
+    mismatches = [
+        f"{field} expected {expected_value!r}, observed {observed[field]!r}"
+        for field, expected_value in expected.items()
+        if expected_value and observed[field] != expected_value
+    ]
+    if mismatches:
+        raise DeployError(
+            f"Post-deploy tracking validation failed for {label}: event did not preserve first-class "
+            "attribution fields across the presales-to-sales handoff; "
+            + "; ".join(mismatches)
+        )
+
+
 def _expected_presales_source_page_type(*, path_plan: dict[str, Any]) -> str:
     start_page = path_plan.get("start_page") if isinstance(path_plan, dict) else {}
     artifact_kind = (
@@ -5143,6 +5182,9 @@ def _assert_presales_to_sales_bridge_stitched(
         "click_id",
         "clickId",
     )
+    expected_campaign_id = _first_tracking_prop(click_props, "campaign_id", "campaignId")
+    expected_ad_id = _first_tracking_prop(click_props, "ad_id", "adId")
+    expected_fbclid = _first_tracking_prop(click_props, "fbclid")
     missing_click_bridge_values = []
     if not expected_session_id:
         missing_click_bridge_values.append("session_id")
@@ -5160,6 +5202,13 @@ def _assert_presales_to_sales_bridge_stitched(
     _assert_sales_event_presales_source_context(
         props=click_props,
         expected_source_page_type=expected_source_page_type,
+        label="pre_sales_to_sales_click internal event",
+    )
+    _assert_props_include_expected_attribution_values(
+        props=click_props,
+        expected_campaign_id=expected_campaign_id,
+        expected_ad_id=expected_ad_id,
+        expected_fbclid=expected_fbclid,
         label="pre_sales_to_sales_click internal event",
     )
     _assert_url_includes_handoff_values(
@@ -5183,6 +5232,13 @@ def _assert_presales_to_sales_bridge_stitched(
         expected_source_page_type=expected_source_page_type,
         label="sales_page_view internal event",
     )
+    _assert_props_include_expected_attribution_values(
+        props=sales_props_items[-1],
+        expected_campaign_id=expected_campaign_id,
+        expected_ad_id=expected_ad_id,
+        expected_fbclid=expected_fbclid,
+        label="sales_page_view internal event",
+    )
 
     for posthog_event_name in ("pre_sales_to_sales_click", "cta_click", "PreSalesToSalesClick"):
         posthog_props_items = _extract_recorded_posthog_event_props(
@@ -5201,6 +5257,13 @@ def _assert_presales_to_sales_bridge_stitched(
         _assert_sales_event_presales_source_context(
             props=posthog_props_items[-1],
             expected_source_page_type=expected_source_page_type,
+            label=f"{posthog_event_name} PostHog capture",
+        )
+        _assert_props_include_expected_attribution_values(
+            props=posthog_props_items[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
             label=f"{posthog_event_name} PostHog capture",
         )
 
@@ -5223,6 +5286,13 @@ def _assert_presales_to_sales_bridge_stitched(
             expected_source_page_type=expected_source_page_type,
             label=f"{posthog_event_name} PostHog capture",
         )
+        _assert_props_include_expected_attribution_values(
+            props=posthog_props_items[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
+            label=f"{posthog_event_name} PostHog capture",
+        )
 
     presales_click_meta_params = _extract_recorded_meta_event_params(
         observed_state=observed_state,
@@ -5239,6 +5309,13 @@ def _assert_presales_to_sales_bridge_stitched(
         _assert_sales_event_presales_source_context(
             props=presales_click_meta_params[-1],
             expected_source_page_type=expected_source_page_type,
+            label="PreSalesToSalesClick Meta event",
+        )
+        _assert_props_include_expected_attribution_values(
+            props=presales_click_meta_params[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
             label="PreSalesToSalesClick Meta event",
         )
 
@@ -5269,6 +5346,13 @@ def _assert_presales_to_sales_bridge_stitched(
         _assert_sales_event_presales_source_context(
             props=entered_sales_meta_params[-1],
             expected_source_page_type=expected_source_page_type,
+            label="EnteredSales Meta event",
+        )
+        _assert_props_include_expected_attribution_values(
+            props=entered_sales_meta_params[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
             label="EnteredSales Meta event",
         )
 
@@ -6073,6 +6157,10 @@ def _readback_row_contains_validation_id(*, row: dict[str, Any], validation_id: 
         row.get("path"),
         row.get("utm_content"),
         row.get("utm_campaign"),
+        row.get("campaign_id"),
+        row.get("campaignId"),
+        row.get("ad_id"),
+        row.get("adId"),
         row.get("fbclid"),
         row.get("mos_deploy_validation_id"),
         row.get("mosDeployValidationId"),
@@ -6176,6 +6264,9 @@ def _assert_readback_presales_handoff(
     expected_session_id = _readback_prop(click_row, "session_id", "sessionId")
     expected_visitor_id = _readback_prop(click_row, "visitor_id", "visitorId")
     expected_click_id = _readback_prop(click_row, "click_id", "clickId")
+    expected_campaign_id = _readback_prop(click_row, "campaign_id", "campaignId")
+    expected_ad_id = _readback_prop(click_row, "ad_id", "adId")
+    expected_fbclid = _readback_prop(click_row, "fbclid")
     missing = []
     if not expected_session_id:
         missing.append("session_id")
@@ -6211,6 +6302,13 @@ def _assert_readback_presales_handoff(
             expected_source_page_type=expected_source_page_type,
             label=f"live PostHog readback {str(row.get('event') or '').strip()}",
         )
+        _assert_props_include_expected_attribution_values(
+            props=row,
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
+            label=f"live PostHog readback {str(row.get('event') or '').strip()}",
+        )
 
     for event_name in ("sales_page_view", "EnteredSales"):
         for row in _readback_rows_for_event(rows=rows, event_name=event_name):
@@ -6224,6 +6322,13 @@ def _assert_readback_presales_handoff(
             _assert_sales_event_presales_source_context(
                 props=row,
                 expected_source_page_type=expected_source_page_type,
+                label=f"live PostHog readback {event_name}",
+            )
+            _assert_props_include_expected_attribution_values(
+                props=row,
+                expected_campaign_id=expected_campaign_id,
+                expected_ad_id=expected_ad_id,
+                expected_fbclid=expected_fbclid,
                 label=f"live PostHog readback {event_name}",
             )
 
@@ -6246,6 +6351,9 @@ def _assert_readback_sales_action_attributes(
     expected_session_id = _readback_prop(handoff_row, "session_id", "sessionId")
     expected_visitor_id = _readback_prop(handoff_row, "visitor_id", "visitorId")
     expected_click_id = _readback_prop(handoff_row, "click_id", "clickId")
+    expected_campaign_id = _readback_prop(handoff_row, "campaign_id", "campaignId")
+    expected_ad_id = _readback_prop(handoff_row, "ad_id", "adId")
+    expected_fbclid = _readback_prop(handoff_row, "fbclid")
 
     event_names: list[str] = []
     if path_plan.get("add_to_cart_targets"):
@@ -6272,6 +6380,13 @@ def _assert_readback_sales_action_attributes(
                 expected_source_page_type=expected_source_page_type,
                 expected_from_stage="sales",
                 expected_to_stage=expected_to_stage,
+            )
+            _assert_props_include_expected_attribution_values(
+                props=row,
+                expected_campaign_id=expected_campaign_id,
+                expected_ad_id=expected_ad_id,
+                expected_fbclid=expected_fbclid,
+                label=f"live PostHog readback '{validation_id}' {event_name}",
             )
 
 
@@ -6501,6 +6616,8 @@ def _run_single_tracking_path_validation(
         "utm_campaign": validation_id,
         "utm_content": validation_id,
         "mos_deploy_validation_id": validation_id,
+        "campaign_id": validation_id,
+        "ad_id": validation_id,
         "fbclid": validation_id,
         _HTML_DEPLOY_VALIDATION_CACHE_BUST_QUERY_PARAM: validation_id,
         _HTML_DEPLOY_CDN_CACHE_BUST_QUERY_PARAM: validation_id,
