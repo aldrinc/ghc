@@ -2822,10 +2822,10 @@ def persist_client_funnel_runtime_artifact(
     included_page_slugs: set[str] | None = None,
     included_page_stages: set[str] | None = None,
 ) -> dict[str, Any]:
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from app.db.enums import ArtifactTypeEnum
-    from app.db.models import Funnel
+    from app.db.models import Artifact, Funnel
     from app.db.repositories.artifacts import ArtifactsRepository
 
     funnel = session.scalars(
@@ -2852,25 +2852,36 @@ def persist_client_funnel_runtime_artifact(
         artifact_payload=payload,
     )
 
-    artifacts_repo = ArtifactsRepository(session)
-    latest = artifacts_repo.get_latest_by_type(
-        org_id=org_id,
-        client_id=client_id,
-        artifact_type=ArtifactTypeEnum.funnel_runtime_bundle,
+    latest_version = session.scalar(
+        select(func.max(Artifact.version)).where(
+            Artifact.org_id == org_id,
+            Artifact.client_id == client_id,
+            Artifact.type == ArtifactTypeEnum.funnel_runtime_bundle,
+        )
     )
-    next_version = int(latest.version) + 1 if latest and latest.version else 1
-    artifact = artifacts_repo.insert(
+    next_version = int(latest_version or 0) + 1
+    resolved_created_by_user = ArtifactsRepository(session)._resolve_created_by_user_id(
+        org_id=org_id,
+        created_by_user=created_by_user_id,
+    )
+    artifact = Artifact(
         org_id=org_id,
         client_id=client_id,
-        artifact_type=ArtifactTypeEnum.funnel_runtime_bundle,
+        type=ArtifactTypeEnum.funnel_runtime_bundle,
         data=payload,
-        created_by_user=created_by_user_id,
+        created_by_user=resolved_created_by_user,
         version=next_version,
     )
+    session.add(artifact)
+    session.flush()
+    artifact_id = str(artifact.id)
+    artifact_version = int(artifact.version or next_version)
+    session.commit()
     return {
-        "artifact_id": str(artifact.id),
-        "artifact_version": int(artifact.version),
+        "artifact_id": artifact_id,
+        "artifact_version": artifact_version,
         "client_id": client_id,
+        "artifact_payload": payload,
     }
 
 
@@ -7051,14 +7062,18 @@ def hydrate_funnel_artifact_workload_patch(
         included_page_slugs=included_page_slugs,
         included_page_stages=included_page_stages,
     )
-    from app.db.repositories.artifacts import ArtifactsRepository
+    artifact_payload = artifact_ref.get("artifact_payload")
+    if artifact_payload is None:
+        from app.db.repositories.artifacts import ArtifactsRepository
 
-    artifact_record = ArtifactsRepository(session).get(org_id=org_id, artifact_id=str(artifact_ref["artifact_id"]))
-    if artifact_record is None:
-        raise DeployError(
-            f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' could not be reloaded for deploy hydration."
+        artifact_record = ArtifactsRepository(session).get(
+            org_id=org_id, artifact_id=str(artifact_ref["artifact_id"])
         )
-    artifact_payload = artifact_record.data
+        if artifact_record is None:
+            raise DeployError(
+                f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' could not be reloaded for deploy hydration."
+            )
+        artifact_payload = artifact_record.data
     if not isinstance(artifact_payload, dict):
         raise DeployError(
             f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' has an invalid payload."
@@ -7067,7 +7082,7 @@ def hydrate_funnel_artifact_workload_patch(
     source_ref["client_id"] = str(artifact_ref["client_id"])
     source_ref["artifact_id"] = str(artifact_ref["artifact_id"])
     source_ref["artifact_version"] = int(artifact_ref["artifact_version"])
-    source_ref["artifact"] = copy.deepcopy(artifact_payload)
+    source_ref["artifact"] = artifact_payload
     workload_patch["source_ref"] = source_ref
     return workload_patch
 
@@ -9640,9 +9655,13 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         raise DeployError(
                             "Hydrated funnel deploy workload is missing source_ref.artifact_id."
                         )
-                    artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
-                        artifact_id=artifact_id
-                    )
+                    inline_artifact_payload = hydrated_source_ref.get("artifact")
+                    if isinstance(inline_artifact_payload, dict):
+                        artifact_payload = inline_artifact_payload
+                    else:
+                        artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
+                            artifact_id=artifact_id
+                        )
                     hydrated_artifact_payload = artifact_payload
                     workload_patch = _apply_publish_job_artifact_render_mode(
                         workload_patch=workload_patch,

@@ -3746,7 +3746,6 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
     assert hydrated["source_ref"]["artifact_id"] == "artifact-123"
     assert hydrated["source_ref"]["artifact_version"] == 7
     assert hydrated["source_ref"]["artifact"] == artifact_payload
-    assert hydrated["source_ref"]["artifact"] is not artifact_payload
     assert hydrated["source_ref"]["artifact"]["meta"]["artifactId"] == "artifact-123"
     assert captured_persist_kwargs["included_funnel_ids"] == {"funnel-1"}
 
