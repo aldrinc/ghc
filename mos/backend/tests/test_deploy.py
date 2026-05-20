@@ -5360,6 +5360,162 @@ def test_assert_posthog_readback_rows_rejects_duplicate_quiz_completed():
         )
 
 
+def test_quiz_scroll_targets_require_declared_breakpoints():
+    manifest = {
+        "quizScrollTargets": [
+            {
+                "id": "summary-scroll",
+                "selector": "#app",
+                "screenIndex": 17,
+                "screenName": "ScreenSummaryBrand",
+            }
+        ]
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="requiredBreakpoints"):
+        deploy_service._quiz_scroll_targets_from_manifest(manifest=manifest)
+
+
+def test_quiz_scroll_target_url_preserves_tracking_params():
+    url = deploy_service._quiz_scroll_target_url(
+        entry_url=(
+            "https://shop.example.com/8b89a76d/testosterone-support/quiz/"
+            "?utm_campaign=deploy-validation-123&screen=0#quiz"
+        ),
+        target={
+            "screen_index": 19,
+            "route": "protocol-ready",
+            "hash": "",
+        },
+    )
+
+    assert url == (
+        "https://shop.example.com/8b89a76d/testosterone-support/quiz/"
+        "?utm_campaign=deploy-validation-123&screen=19#protocol-ready"
+    )
+
+
+def test_readback_quiz_scroll_targets_require_each_declared_breakpoint():
+    path_plan = {
+        "start_page": {
+            "manifest": {
+                "quizScrollTargets": [
+                    {
+                        "id": "summary-scroll",
+                        "selector": "#app",
+                        "screenIndex": 17,
+                        "screenName": "ScreenSummaryBrand",
+                        "requiredBreakpoints": [10, 25],
+                    }
+                ]
+            }
+        }
+    }
+    row = dict(
+        zip(
+            deploy_service._POSTHOG_READBACK_COLUMNS,
+            _posthog_readback_raw_row(
+                "scroll_depth",
+                current_url=(
+                    "https://shop.example.com/quiz/"
+                    "?screen=17&mos_deploy_validation_id=deploy-validation-123"
+                ),
+                event_source_url=(
+                    "https://shop.example.com/quiz/"
+                    "?screen=17&mos_deploy_validation_id=deploy-validation-123"
+                ),
+                path="/quiz/?screen=17&mos_deploy_validation_id=deploy-validation-123",
+                scrollDepthPct=10,
+            ),
+        )
+    )
+
+    with pytest.raises(deploy_service.DeployError, match="summary-scroll"):
+        deploy_service._assert_posthog_readback_rows(
+            rows=[row],
+            required_events=["scroll_depth"],
+            validation_id="deploy-validation-123",
+            path_plan=path_plan,
+        )
+
+
+def test_readback_quiz_scroll_targets_accept_declared_breakpoints():
+    path_plan = {
+        "start_page": {
+            "manifest": {
+                "quizScrollTargets": [
+                    {
+                        "id": "summary-scroll",
+                        "selector": "#app",
+                        "screenIndex": 17,
+                        "screenName": "ScreenSummaryBrand",
+                        "requiredBreakpoints": [10, 25],
+                    }
+                ]
+            }
+        }
+    }
+    rows = []
+    for breakpoint in (10, 25):
+        rows.append(
+            dict(
+                zip(
+                    deploy_service._POSTHOG_READBACK_COLUMNS,
+                    _posthog_readback_raw_row(
+                        "scroll_depth",
+                        current_url=(
+                            "https://shop.example.com/quiz/"
+                            "?screen=17&mos_deploy_validation_id=deploy-validation-123"
+                        ),
+                        event_source_url=(
+                            "https://shop.example.com/quiz/"
+                            "?screen=17&mos_deploy_validation_id=deploy-validation-123"
+                        ),
+                        path="/quiz/?screen=17&mos_deploy_validation_id=deploy-validation-123",
+                        scroll_depth_pct=breakpoint,
+                    ),
+                )
+            )
+        )
+
+    deploy_service._assert_posthog_readback_rows(
+        rows=rows,
+        required_events=["scroll_depth"],
+        validation_id="deploy-validation-123",
+        path_plan=path_plan,
+    )
+
+
+def test_browser_scroll_breakpoint_counts_are_screen_scoped():
+    observed_state = {
+        "posthog": {
+            "captures": [
+                [
+                    "scroll_depth",
+                    {"scrollDepthPct": 10, "current_url": "https://shop.example.com/quiz/?screen=17"},
+                ],
+                [
+                    "scroll_depth",
+                    {"depthPct": 25, "current_url": "https://shop.example.com/quiz/?screen=19"},
+                ],
+                [
+                    "scroll_depth",
+                    {"scroll_depth_pct": 50, "url_params": {"screen": ["17"]}},
+                ],
+            ]
+        }
+    }
+
+    assert deploy_service._recorded_posthog_scroll_depth_counts(
+        observed_state=observed_state,
+        screen_index=17,
+    ) == {10: 1, 50: 1}
+    assert deploy_service._recorded_posthog_scroll_depth_counts(
+        observed_state=observed_state,
+        screen_index=19,
+    ) == {25: 1}
+
+
 def test_validate_deployed_tracking_html_checks_direct_meta_pixel_bootstrap(monkeypatch):
     requested_urls: list[str] = []
 
@@ -5536,7 +5692,7 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
             calls.append(("expect_request", getattr(pattern, "pattern", str(pattern))))
             return FakeExpectRequest()
 
-        def evaluate(self, script):
+        def evaluate(self, script, arg=None):
             calls.append(("page_evaluate",))
             return {
                 "internal": [],

@@ -97,6 +97,7 @@ _DEPLOY_TRACKING_VALIDATION_ASSERTION_POLL_MS = int(
     os.getenv("DEPLOY_TRACKING_VALIDATION_ASSERTION_POLL_MS", "1500")
 )
 _DEPLOY_TRACKING_VALIDATION_STORAGE_KEY = "__mos_deploy_tracking_validation__"
+_DEPLOY_TRACKING_SCROLL_BREAKPOINTS = (10, 25, 50, 75, 90)
 _HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM = "mos_deploy_candidate_release"
 _HTML_DEPLOY_CANDIDATE_ACTIVATION_MODE = "candidate_only"
 _HTML_DEPLOY_CANDIDATE_RELEASE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -121,6 +122,12 @@ _POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
     ("destination_url", "properties['destination_url']"),
     ("url_params", "properties['url_params']"),
     ("path", "properties['path']"),
+    ("scrollDepthPct", "properties['scrollDepthPct']"),
+    ("scroll_depth_pct", "properties['scroll_depth_pct']"),
+    ("depthPct", "properties['depthPct']"),
+    ("depth_pct", "properties['depth_pct']"),
+    ("maxScrollDepthPct", "properties['maxScrollDepthPct']"),
+    ("max_scroll_depth_pct", "properties['max_scroll_depth_pct']"),
     ("utm_source", "properties['utm_source']"),
     ("utm_medium", "properties['utm_medium']"),
     ("utm_content", "properties['utm_content']"),
@@ -2851,6 +2858,100 @@ def _dedupe_preserving_order(values: list[str]) -> list[str]:
     return deduped
 
 
+def _normalize_scroll_breakpoints(*, value: Any, target_id: str) -> list[int]:
+    if not isinstance(value, list) or not value:
+        raise DeployError(
+            "Post-deploy tracking validation failed: quiz scroll target "
+            f"{target_id!r} must declare non-empty requiredBreakpoints."
+        )
+    breakpoints: list[int] = []
+    seen: set[int] = set()
+    for raw_breakpoint in value:
+        try:
+            breakpoint = int(raw_breakpoint)
+        except (TypeError, ValueError) as exc:
+            raise DeployError(
+                "Post-deploy tracking validation failed: quiz scroll target "
+                f"{target_id!r} has invalid scroll breakpoint {raw_breakpoint!r}."
+            ) from exc
+        if breakpoint < 1 or breakpoint > 100:
+            raise DeployError(
+                "Post-deploy tracking validation failed: quiz scroll target "
+                f"{target_id!r} has out-of-range scroll breakpoint {breakpoint}; "
+                "expected 1-100."
+            )
+        if breakpoint in seen:
+            raise DeployError(
+                "Post-deploy tracking validation failed: quiz scroll target "
+                f"{target_id!r} declares duplicate scroll breakpoint {breakpoint}."
+            )
+        seen.add(breakpoint)
+        breakpoints.append(breakpoint)
+    return breakpoints
+
+
+def _quiz_scroll_targets_from_manifest(*, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    if not isinstance(manifest, dict):
+        return []
+    raw_targets = manifest.get("quizScrollTargets")
+    if raw_targets is None:
+        return []
+    if not isinstance(raw_targets, list):
+        raise DeployError(
+            "Post-deploy tracking validation failed: quizScrollTargets must be an array."
+        )
+    targets: list[dict[str, Any]] = []
+    for index, raw_target in enumerate(raw_targets):
+        if not isinstance(raw_target, dict):
+            raise DeployError(
+                "Post-deploy tracking validation failed: "
+                f"quizScrollTargets[{index}] must be an object."
+            )
+        target_id = str(raw_target.get("id") or "").strip()
+        if not target_id:
+            raise DeployError(
+                "Post-deploy tracking validation failed: "
+                f"quizScrollTargets[{index}] is missing id."
+            )
+        try:
+            screen_index = int(raw_target.get("screenIndex"))
+        except (TypeError, ValueError) as exc:
+            raise DeployError(
+                "Post-deploy tracking validation failed: quiz scroll target "
+                f"{target_id!r} must declare integer screenIndex."
+            ) from exc
+        if screen_index < 0:
+            raise DeployError(
+                "Post-deploy tracking validation failed: quiz scroll target "
+                f"{target_id!r} must declare a non-negative screenIndex."
+            )
+        screen_name = str(raw_target.get("screenName") or "").strip()
+        title_contains = str(raw_target.get("titleContains") or "").strip()
+        selector = str(raw_target.get("selector") or "").strip()
+        if not screen_name and not title_contains and not selector:
+            raise DeployError(
+                "Post-deploy tracking validation failed: quiz scroll target "
+                f"{target_id!r} must declare screenName, titleContains, or selector "
+                "so the validator can verify the active screen."
+            )
+        targets.append(
+            {
+                "id": target_id,
+                "screen_index": screen_index,
+                "screen_name": screen_name,
+                "route": str(raw_target.get("route") or "").strip(),
+                "hash": str(raw_target.get("hash") or "").strip(),
+                "title_contains": title_contains,
+                "selector": selector,
+                "required_breakpoints": _normalize_scroll_breakpoints(
+                    value=raw_target.get("requiredBreakpoints"),
+                    target_id=target_id,
+                ),
+            }
+        )
+    return targets
+
+
 def _build_required_posthog_readback_events(
     *,
     expected_posthog_events: list[str],
@@ -3872,6 +3973,108 @@ def _first_tracking_prop(props: dict[str, Any], *keys: str) -> str:
     return ""
 
 
+def _tracking_value_contains_screen_index(*, value: Any, screen_index: int) -> bool:
+    expected = str(screen_index)
+    if isinstance(value, dict):
+        for key in ("screen", "screenIndex", "screen_index"):
+            raw_screen_value = value.get(key)
+            if isinstance(raw_screen_value, list):
+                if expected in {str(item or "").strip() for item in raw_screen_value}:
+                    return True
+            if str(raw_screen_value or "").strip() == expected:
+                return True
+        return any(
+            _tracking_value_contains_screen_index(value=item, screen_index=screen_index)
+            for item in value.values()
+        )
+    if isinstance(value, list):
+        return any(
+            _tracking_value_contains_screen_index(value=item, screen_index=screen_index)
+            for item in value
+        )
+    text = str(value or "").strip()
+    if not text:
+        return False
+    if text.startswith("{") or text.startswith("["):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = None
+        if parsed is not None and _tracking_value_contains_screen_index(
+            value=parsed,
+            screen_index=screen_index,
+        ):
+            return True
+    if re.search(rf"(?:^|[?&#])screen={re.escape(expected)}(?:$|[&#])", text):
+        return True
+    try:
+        parsed_url = urlsplit(
+            text
+            if re.match(r"^[a-z][a-z0-9+.-]*://", text, flags=re.IGNORECASE)
+            else f"https://mos.invalid{text if text.startswith('/') else '/' + text}"
+        )
+    except ValueError:
+        return False
+    return expected in {
+        str(item or "").strip()
+        for item in parse_qs(parsed_url.query, keep_blank_values=True).get("screen", [])
+    }
+
+
+def _tracking_scroll_breakpoint_from_props(props: dict[str, Any]) -> int | None:
+    for key in (
+        "scrollDepthPct",
+        "scroll_depth_pct",
+        "depthPct",
+        "depth_pct",
+        "maxScrollDepthPct",
+        "max_scroll_depth_pct",
+    ):
+        raw_value = props.get(key)
+        if raw_value is None:
+            continue
+        try:
+            return int(round(float(raw_value)))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _tracking_props_match_screen_index(*, props: dict[str, Any], screen_index: int) -> bool:
+    return any(
+        _tracking_value_contains_screen_index(value=props.get(key), screen_index=screen_index)
+        for key in (
+            "current_url",
+            "$current_url",
+            "event_source_url",
+            "source_url",
+            "destination_url",
+            "url_params",
+            "path",
+        )
+    )
+
+
+def _recorded_posthog_scroll_depth_counts(
+    *, observed_state: dict[str, Any], screen_index: int | None = None
+) -> dict[int, int]:
+    counts: dict[int, int] = {}
+    for props in _extract_recorded_posthog_event_props(
+        observed_state=observed_state,
+        event_name="scroll_depth",
+    ):
+        if screen_index is not None and not _tracking_props_match_screen_index(
+            props=props,
+            screen_index=screen_index,
+        ):
+            continue
+        breakpoint = _tracking_scroll_breakpoint_from_props(props)
+        if breakpoint is None:
+            continue
+        counts[breakpoint] = counts.get(breakpoint, 0) + 1
+    return counts
+
+
 def _params_from_url(value: Any) -> dict[str, str]:
     raw_url = _clean_tracking_value(value)
     if not raw_url:
@@ -4461,11 +4664,30 @@ def _assert_meta_pixel_network_requests_succeeded(
         )
 
 
-def _exercise_tracking_page_view_targets(*, page: Any) -> None:
-    page.evaluate(
+def _exercise_tracking_page_view_targets(
+    *,
+    page: Any,
+    breakpoints: list[int] | tuple[int, ...] | None = None,
+    require_scrollable: bool = False,
+    target_label: str = "page",
+    selector: str = "",
+) -> None:
+    normalized_breakpoints = [
+        int(breakpoint)
+        for breakpoint in (
+            breakpoints if breakpoints is not None else _DEPLOY_TRACKING_SCROLL_BREAKPOINTS
+        )
+    ]
+    scroll_points = sorted(
+        {0, 100, *[max(0, min(100, breakpoint)) for breakpoint in normalized_breakpoints]}
+    )
+    result = page.evaluate(
         """
-async () => {
+async (args) => {
   const sleep = (durationMs) => new Promise((resolve) => window.setTimeout(resolve, durationMs));
+  const scrollPoints = Array.isArray(args.scrollPoints) ? args.scrollPoints : [0, 10, 25, 50, 75, 90, 100];
+  const selector = typeof args.selector === "string" ? args.selector.trim() : "";
+  const allowNestedScrollOwner = args.requireScrollable === true || Boolean(selector);
   const doc = document.documentElement;
   const body = document.body;
   const scrollHeight = Math.max(
@@ -4476,15 +4698,224 @@ async () => {
     window.innerHeight || 0,
   );
   const maxScrollY = Math.max(0, scrollHeight - (window.innerHeight || 0));
-  for (const pct of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
-    window.scrollTo(0, Math.round(maxScrollY * pct));
-    window.dispatchEvent(new Event("scroll"));
+  const visible = (element) => {
+    if (!(element instanceof HTMLElement)) return false;
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+  };
+  const scrollable = (element) => (
+    element instanceof HTMLElement &&
+    visible(element) &&
+    Math.max(0, (element.scrollHeight || 0) - (element.clientHeight || 0)) > 8
+  );
+  let owner = "window";
+  let element = null;
+  let maxScroll = maxScrollY;
+  if (allowNestedScrollOwner && maxScrollY <= 8) {
+    const selectorMatches = selector
+      ? Array.from(document.querySelectorAll(selector)).filter(scrollable)
+      : [];
+    const candidates = selectorMatches.length
+      ? selectorMatches
+      : Array.from(document.querySelectorAll("body *")).filter(scrollable);
+    if (candidates.length === 1) {
+      element = candidates[0];
+      owner = selectorMatches.length ? "selector" : "element";
+      maxScroll = Math.max(0, (element.scrollHeight || 0) - (element.clientHeight || 0));
+    } else {
+      return {
+        ok: false,
+        owner: "",
+        maxScroll: 0,
+        reason: candidates.length > 1 ? "ambiguous-scroll-owner" : "no-scrollable-owner",
+      };
+    }
+  }
+  for (const point of scrollPoints) {
+    const pct = Math.max(0, Math.min(100, Number(point) || 0)) / 100;
+    if (element) {
+      element.scrollTop = Math.round(maxScroll * pct);
+      element.dispatchEvent(new Event("scroll", { bubbles: true }));
+    } else {
+      window.scrollTo(0, Math.round(maxScroll * pct));
+      window.dispatchEvent(new Event("scroll"));
+    }
     await sleep(250);
   }
+  return { ok: true, owner, maxScroll };
 }
-"""
+""",
+        {
+            "scrollPoints": scroll_points,
+            "selector": selector,
+            "requireScrollable": require_scrollable,
+        },
     )
+    if require_scrollable and isinstance(result, dict) and result.get("ok") is False:
+        raise DeployError(
+            "Post-deploy tracking validation failed for quiz scroll target "
+            f"{target_label!r}: {str(result.get('reason') or 'not-scrollable')}."
+        )
     page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+
+
+def _quiz_scroll_target_url(*, entry_url: str, target: dict[str, Any]) -> str:
+    parsed = urlsplit(entry_url)
+    query_params = parse_qs(parsed.query, keep_blank_values=True)
+    query_params["screen"] = [str(int(target["screen_index"]))]
+    fragment = str(target.get("hash") or target.get("route") or parsed.fragment or "quiz")
+    return parsed._replace(query=urlencode(query_params, doseq=True), fragment=fragment).geturl()
+
+
+def _assert_quiz_scroll_target_active(*, page: Any, target: dict[str, Any]) -> None:
+    result = page.evaluate(
+        """
+(target) => {
+  const params = new URLSearchParams(window.location.search || "");
+  const screenParam = params.get("screen");
+  const screenIndex = screenParam == null || screenParam === "" ? null : Number(screenParam);
+  const flow = window.__LOCAL_QUIZ_FLOW;
+  const screens = flow && Array.isArray(flow.screens) ? flow.screens : [];
+  const screen = screens.find((item) => item && Number(item.index) === Number(target.screenIndex));
+  const bodyText = document.body && typeof document.body.innerText === "string"
+    ? document.body.innerText
+    : "";
+  const selector = typeof target.selector === "string" ? target.selector.trim() : "";
+  return {
+    screenIndex,
+    screenName: screen && typeof screen.name === "string" ? screen.name : "",
+    route: screen && typeof screen.route === "string" ? screen.route : "",
+    hash: (window.location.hash || "").replace(/^#/, ""),
+    titleMatched: !target.titleContains || bodyText.includes(target.titleContains),
+    selectorMatched: !selector || Boolean(document.querySelector(selector)),
+    hasFlowScreen: Boolean(screen),
+  };
+}
+""",
+        {
+            "screenIndex": target["screen_index"],
+            "screenName": target.get("screen_name") or "",
+            "route": target.get("route") or "",
+            "titleContains": target.get("title_contains") or "",
+            "selector": target.get("selector") or "",
+        },
+    )
+    if not isinstance(result, dict):
+        raise DeployError(
+            "Post-deploy tracking validation failed for quiz scroll target "
+            f"{target['id']!r}: could not verify active screen."
+        )
+    if result.get("screenIndex") != target["screen_index"]:
+        raise DeployError(
+            "Post-deploy tracking validation failed for quiz scroll target "
+            f"{target['id']!r}: expected URL screen={target['screen_index']}, "
+            f"observed {result.get('screenIndex')!r}."
+        )
+    expected_screen_name = str(target.get("screen_name") or "").strip()
+    if expected_screen_name:
+        if result.get("hasFlowScreen") is not True:
+            raise DeployError(
+                "Post-deploy tracking validation failed for quiz scroll target "
+                f"{target['id']!r}: quiz flow metadata was unavailable for screen "
+                f"{target['screen_index']}."
+            )
+        if str(result.get("screenName") or "").strip() != expected_screen_name:
+            raise DeployError(
+                "Post-deploy tracking validation failed for quiz scroll target "
+                f"{target['id']!r}: expected screenName {expected_screen_name!r}, "
+                f"observed {str(result.get('screenName') or '').strip()!r}."
+            )
+    expected_route = str(target.get("route") or "").strip()
+    if expected_route and str(result.get("route") or "").strip() != expected_route:
+        raise DeployError(
+            "Post-deploy tracking validation failed for quiz scroll target "
+            f"{target['id']!r}: expected route {expected_route!r}, "
+            f"observed {str(result.get('route') or '').strip()!r}."
+        )
+    if target.get("title_contains") and result.get("titleMatched") is not True:
+        raise DeployError(
+            "Post-deploy tracking validation failed for quiz scroll target "
+            f"{target['id']!r}: expected visible text containing "
+            f"{str(target.get('title_contains') or '').strip()!r}."
+        )
+    if target.get("selector") and result.get("selectorMatched") is not True:
+        raise DeployError(
+            "Post-deploy tracking validation failed for quiz scroll target "
+            f"{target['id']!r}: expected selector "
+            f"{str(target.get('selector') or '').strip()!r} to match."
+        )
+
+
+def _wait_for_quiz_scroll_breakpoints(
+    *,
+    page: Any,
+    target: dict[str, Any],
+    baseline_counts: dict[int, int],
+) -> None:
+    required_breakpoints = [
+        int(breakpoint) for breakpoint in target.get("required_breakpoints", [])
+    ]
+    timeout_ms = max(100, _DEPLOY_TRACKING_VALIDATION_ASSERTION_TIMEOUT_MS)
+    poll_ms = max(100, _DEPLOY_TRACKING_VALIDATION_ASSERTION_POLL_MS)
+    deadline = time.monotonic() + (timeout_ms / 1000)
+    missing = required_breakpoints
+    while True:
+        observed_state = _collect_tracking_validation_state(page=page)
+        counts = _recorded_posthog_scroll_depth_counts(
+            observed_state=observed_state,
+            screen_index=int(target["screen_index"]),
+        )
+        missing = [
+            breakpoint
+            for breakpoint in required_breakpoints
+            if counts.get(breakpoint, 0) <= baseline_counts.get(breakpoint, 0)
+        ]
+        if not missing:
+            return
+        if time.monotonic() >= deadline:
+            raise DeployError(
+                "Post-deploy tracking validation failed for quiz scroll target "
+                f"{target['id']!r}: missing browser-captured PostHog scroll_depth "
+                f"breakpoints {missing!r}."
+            )
+        page.wait_for_timeout(poll_ms)
+
+
+def _exercise_quiz_scroll_targets(
+    *,
+    page: Any,
+    manifest: dict[str, Any],
+    entry_url: str,
+) -> bool:
+    targets = _quiz_scroll_targets_from_manifest(manifest=manifest)
+    if not targets:
+        return False
+    for target in targets:
+        page.goto(
+            _quiz_scroll_target_url(entry_url=entry_url, target=target),
+            wait_until="domcontentloaded",
+            timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+        )
+        page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+        _assert_quiz_scroll_target_active(page=page, target=target)
+        baseline_counts = _recorded_posthog_scroll_depth_counts(
+            observed_state=_collect_tracking_validation_state(page=page),
+            screen_index=int(target["screen_index"]),
+        )
+        _exercise_tracking_page_view_targets(
+            page=page,
+            breakpoints=target["required_breakpoints"],
+            require_scrollable=True,
+            target_label=target["id"],
+            selector=str(target.get("selector") or ""),
+        )
+        _wait_for_quiz_scroll_breakpoints(
+            page=page,
+            target=target,
+            baseline_counts=baseline_counts,
+        )
+    return True
 
 
 def _exercise_quiz_manifest_interactions(*, page: Any, manifest: dict[str, Any]) -> None:
@@ -4824,6 +5255,66 @@ def _assert_readback_presales_handoff(
             )
 
 
+def _readback_value_contains_screen_index(*, value: Any, screen_index: int) -> bool:
+    return _tracking_value_contains_screen_index(value=value, screen_index=screen_index)
+
+
+def _readback_row_matches_quiz_scroll_target(
+    *, row: dict[str, Any], target: dict[str, Any]
+) -> bool:
+    screen_index = int(target["screen_index"])
+    return any(
+        _readback_value_contains_screen_index(value=row.get(key), screen_index=screen_index)
+        for key in (
+            "current_url",
+            "event_source_url",
+            "destination_url",
+            "url_params",
+            "path",
+        )
+    )
+
+
+def _assert_readback_quiz_scroll_targets(
+    *,
+    rows: list[dict[str, Any]],
+    path_plan: dict[str, Any],
+    validation_id: str,
+) -> None:
+    start_page = path_plan.get("start_page") if isinstance(path_plan, dict) else {}
+    manifest = start_page.get("manifest") if isinstance(start_page, dict) else {}
+    if not isinstance(manifest, dict):
+        return
+    targets = _quiz_scroll_targets_from_manifest(manifest=manifest)
+    if not targets:
+        return
+    scroll_rows = [
+        row
+        for row in rows
+        if isinstance(row, dict) and str(row.get("event") or "").strip() == "scroll_depth"
+    ]
+    for target in targets:
+        observed_breakpoints = {
+            breakpoint
+            for row in scroll_rows
+            if _readback_row_matches_quiz_scroll_target(row=row, target=target)
+            for breakpoint in [_tracking_scroll_breakpoint_from_props(row)]
+            if breakpoint is not None
+        }
+        missing = [
+            breakpoint
+            for breakpoint in target["required_breakpoints"]
+            if breakpoint not in observed_breakpoints
+        ]
+        if missing:
+            raise DeployError(
+                "Post-deploy tracking validation failed for live PostHog readback "
+                f"'{validation_id}': quiz scroll target {target['id']!r} did not emit "
+                f"scroll_depth breakpoints {missing!r}; observed "
+                f"{sorted(observed_breakpoints)!r}."
+            )
+
+
 def _assert_quiz_completed_not_duplicated(
     *,
     event_names: list[str],
@@ -4902,6 +5393,11 @@ def _assert_posthog_readback_rows(
             validation_id=validation_id,
         )
         _assert_readback_presales_handoff(
+            rows=rows,
+            path_plan=path_plan,
+            validation_id=validation_id,
+        )
+        _assert_readback_quiz_scroll_targets(
             rows=rows,
             path_plan=path_plan,
             validation_id=validation_id,
@@ -5143,10 +5639,16 @@ window.__mosPosthogArrayLoaded = true;
         )
         page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
         _exercise_tracking_page_view_targets(page=page)
+        start_manifest = start_page.get("manifest")
         if str(start_page.get("html_artifact_kind") or "").strip().lower() == "quiz":
-            start_manifest = start_page.get("manifest")
             if isinstance(start_manifest, dict):
                 _exercise_quiz_manifest_interactions(page=page, manifest=start_manifest)
+        if isinstance(start_manifest, dict):
+            _exercise_quiz_scroll_targets(
+                page=page,
+                manifest=start_manifest,
+                entry_url=paid_entry_url,
+            )
 
         if str(start_page.get("stage") or "").strip() != "sales":
             initial_state = _collect_tracking_validation_state(page=page)
