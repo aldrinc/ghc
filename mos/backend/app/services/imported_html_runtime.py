@@ -253,6 +253,12 @@ class ImportedHtmlViewTarget(BaseModel):
     optionRole: str | None = Field(default=None, max_length=120)
     resultId: str | None = Field(default=None, max_length=120)
     segmentId: str | None = Field(default=None, max_length=120)
+    screenIndex: int | None = Field(default=None, ge=0)
+    screenName: str | None = Field(default=None, max_length=160)
+    route: str | None = Field(default=None, max_length=160)
+    hash: str | None = Field(default=None, max_length=160)
+    titleContains: str | None = Field(default=None, max_length=500)
+    requiredBreakpoints: list[int] = Field(default_factory=list)
     recommendationId: str | None = Field(default=None, max_length=120)
     offerId: str | None = Field(default=None, max_length=120)
     sku: str | None = Field(default=None, max_length=120)
@@ -310,6 +316,7 @@ class ImportedHtmlInstrumentationManifest(BaseModel):
     quizResults: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     quizMechanisms: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     quizRecommendations: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizScrollTargets: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     productDetails: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     selectors: list[ImportedHtmlViewTarget] = Field(default_factory=list)
 
@@ -445,6 +452,7 @@ def validate_imported_html_document_manifest(
         ("quiz_result", manifest.quizResults),
         ("quiz_mechanism", manifest.quizMechanisms),
         ("quiz_recommendation", manifest.quizRecommendations),
+        ("quiz_scroll", manifest.quizScrollTargets),
         ("product_detail", manifest.productDetails),
         ("selector", manifest.selectors),
     )

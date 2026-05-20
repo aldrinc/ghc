@@ -357,6 +357,7 @@ def test_draft_generate_page_imported_html_mode_preserves_copy_but_keeps_runtime
         "quizResults": [],
         "quizMechanisms": [],
         "quizRecommendations": [],
+        "quizScrollTargets": [],
         "productDetails": [],
         "selectors": [],
     }
