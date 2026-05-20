@@ -90,7 +90,7 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str | None = None
     OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS: float | None = 180.0
-    PAID_ADS_QA_LLM_MODEL: str = "gpt-5.4-mini"
+    PAID_ADS_QA_LLM_MODEL: str = "gpt-5.5"
     PAID_ADS_QA_LLM_REASONING_EFFORT: str = "high"
     PAID_ADS_QA_LLM_TIMEOUT_SECONDS: float = 60.0
     BASETEN_API_KEY: str | None = None

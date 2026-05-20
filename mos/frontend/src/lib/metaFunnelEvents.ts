@@ -117,7 +117,10 @@ export function mapRuntimeEventToMetaPixelEvents(
     ];
   }
   if (event.eventType === "checkout_page_view") {
-    return [{ eventName: "PageView", params: pageViewParams(event) }];
+    return [
+      { eventName: "PageView", params: pageViewParams(event) },
+      { eventName: "InitiateCheckout", params: checkoutParams(event) },
+    ];
   }
   if (event.eventType === "thank_you_page_view") {
     return [{ eventName: "PageView", params: pageViewParams(event) }];

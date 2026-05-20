@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 import pytest
 
@@ -74,6 +75,121 @@ def test_load_usage_from_session_errors_when_usage_missing(tmp_path):
             runtime_home=tmp_path,
             session_id="session-1",
         )
+
+
+def test_load_response_from_state_db_reads_latest_assistant_after_cursor(tmp_path):
+    state_db = tmp_path / "state.db"
+    with sqlite3.connect(state_db) as connection:
+        connection.execute(
+            """
+            create table messages (
+                id integer primary key,
+                session_id text not null,
+                role text not null,
+                content text,
+                timestamp real not null
+            )
+            """
+        )
+        connection.executemany(
+            "insert into messages (id, session_id, role, content, timestamp) values (?, ?, ?, ?, ?)",
+            [
+                (1, "session-1", "assistant", "stale response", 1.0),
+                (2, "session-1", "tool", '{"status":"ok"}', 2.0),
+                (3, "session-1", "assistant", "fresh response", 3.0),
+            ],
+        )
+
+    response = HermesSidecarService._load_response_from_state_db(
+        runtime_home=tmp_path,
+        session_id="session-1",
+        min_message_id=1,
+    )
+
+    assert response == "fresh response"
+
+
+def test_load_latest_state_message_reads_finish_reason(tmp_path):
+    state_db = tmp_path / "state.db"
+    with sqlite3.connect(state_db) as connection:
+        connection.execute(
+            """
+            create table messages (
+                id integer primary key,
+                session_id text not null,
+                role text not null,
+                content text,
+                timestamp real not null,
+                finish_reason text
+            )
+            """
+        )
+        connection.executemany(
+            "insert into messages (id, session_id, role, content, timestamp, finish_reason) values (?, ?, ?, ?, ?, ?)",
+            [
+                (1, "session-1", "assistant", "partial response", 1.0, None),
+                (2, "session-1", "assistant", "final response", 2.0, "stop"),
+            ],
+        )
+
+    message = HermesSidecarService._load_latest_state_message(
+        runtime_home=tmp_path,
+        session_id="session-1",
+    )
+
+    assert message is not None
+    assert message.content == "final response"
+    assert message.finish_reason == "stop"
+
+
+def test_load_usage_from_session_prefers_state_db_usage_when_available(tmp_path):
+    state_db = tmp_path / "state.db"
+    with sqlite3.connect(state_db) as connection:
+        connection.execute(
+            """
+            create table sessions (
+                id text primary key,
+                input_tokens integer,
+                output_tokens integer
+            )
+            """
+        )
+        connection.execute(
+            "insert into sessions (id, input_tokens, output_tokens) values (?, ?, ?)",
+            ("session-1", 210, 34),
+        )
+
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    (sessions_dir / "session_session-1.json").write_text(
+        json.dumps(
+            {
+                "usage": {
+                    "prompt_tokens": 999,
+                    "completion_tokens": 999,
+                    "total_tokens": 1998,
+                    "cache_read_tokens": 0,
+                    "cache_write_tokens": 0,
+                    "api_call_count": 0,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    usage = HermesSidecarService._load_usage_from_session(
+        runtime_home=tmp_path,
+        session_id="session-1",
+    )
+
+    assert usage == {
+        "promptTokens": 210,
+        "completionTokens": 34,
+        "totalTokens": 244,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "apiCallCount": 0,
+    }
 
 
 def test_load_runtime_config_reads_repo_owned_settings(tmp_path):

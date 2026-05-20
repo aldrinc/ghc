@@ -4,7 +4,10 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
+import threading
+import time
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -29,6 +32,23 @@ class HermesRunResult:
     hermes_session_id: str
     raw_output: str
     usage: dict[str, int]
+
+
+@dataclass(frozen=True)
+class HermesStateMessage:
+    id: int
+    role: str
+    content: str | None
+    timestamp: float
+    finish_reason: str | None
+
+
+@dataclass(frozen=True)
+class HermesCommandCapture:
+    raw_output: str
+    session_id: str | None
+    response_text: str
+    terminated_after_response: bool
 
 
 @dataclass(frozen=True)
@@ -215,6 +235,7 @@ class HermesSidecarService:
             raise HermesSidecarError("Hermes query is empty.")
 
         prior_session_ids = self._list_session_ids(runtime_home)
+        prior_message_id = self._state_message_cursor(runtime_home=runtime_home)
         settings = self._load_runtime_settings()
         resolved_toolsets = toolsets or settings.toolsets
         command = ["hermes", "chat", "-Q", "-t", ",".join(resolved_toolsets), "-q", query]
@@ -238,28 +259,15 @@ class HermesSidecarService:
             env.pop("CONTEXT_COMPRESSION_MODEL")
 
         if progress_callback is None:
-            try:
-                completed = subprocess.run(
-                    command,
-                    cwd=self.repo_root,
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=900,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise HermesSidecarError("Hermes sidecar timed out after 900 seconds.") from exc
-
-            raw_stdout = self._strip_ansi(completed.stdout or "")
-            raw_stderr = self._strip_ansi(completed.stderr or "")
-            raw_output = raw_stdout.strip()
-            if raw_stderr.strip():
-                raw_output = f"{raw_output}\n{raw_stderr.strip()}".strip()
-
-            if completed.returncode != 0:
-                detail = raw_output or "Hermes exited without output."
-                raise HermesSidecarError(f"Hermes sidecar failed: {detail}")
+            capture = self._run_command_with_session_monitoring(
+                command=command,
+                env=env,
+                runtime_home=runtime_home,
+                prior_session_ids=prior_session_ids,
+                prior_message_id=prior_message_id,
+                resumed_session_id=hermes_session_id,
+            )
+            raw_output = capture.raw_output
         else:
             raw_output = self._run_turn_with_progress(
                 command=command,
@@ -287,6 +295,12 @@ class HermesSidecarService:
 
         response_text = self._load_response_from_session(runtime_home=runtime_home, session_id=session_id)
         if not response_text:
+            response_text = self._load_response_from_state_db(
+                runtime_home=runtime_home,
+                session_id=session_id,
+                min_message_id=prior_message_id,
+            )
+        if not response_text:
             response_text = self._strip_session_trailer(raw_output).strip()
         if not response_text:
             raise HermesSidecarError("Hermes sidecar returned an empty response.")
@@ -296,6 +310,133 @@ class HermesSidecarService:
             hermes_session_id=session_id,
             raw_output=raw_output,
             usage=self._load_usage_from_session(runtime_home=runtime_home, session_id=session_id),
+        )
+
+    def _run_command_with_session_monitoring(
+        self,
+        *,
+        command: list[str],
+        env: dict[str, str],
+        runtime_home: Path,
+        prior_session_ids: set[str],
+        prior_message_id: int,
+        resumed_session_id: str | None,
+    ) -> HermesCommandCapture:
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=self.repo_root,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+        except OSError as exc:
+            raise HermesSidecarError(f"Hermes sidecar failed to start: {exc}") from exc
+
+        stdout = process.stdout
+        if stdout is None:
+            process.kill()
+            raise HermesSidecarError("Hermes sidecar did not expose stdout.")
+
+        raw_chars: list[str] = []
+        last_output_at = time.monotonic()
+        reader_done = threading.Event()
+        reader_error: list[BaseException] = []
+
+        def _reader() -> None:
+            nonlocal last_output_at
+            try:
+                while True:
+                    chunk = stdout.read(1)
+                    if chunk == "":
+                        break
+                    raw_chars.append(chunk)
+                    last_output_at = time.monotonic()
+            except BaseException as exc:  # pragma: no cover - defensive guard for background reader
+                reader_error.append(exc)
+            finally:
+                reader_done.set()
+                stdout.close()
+
+        reader = threading.Thread(target=_reader, daemon=True)
+        reader.start()
+
+        deadline = time.monotonic() + 900
+        active_session_id = resumed_session_id
+        latest_response = ""
+        latest_response_seen_at: float | None = None
+        terminated_after_response = False
+
+        try:
+            while True:
+                if reader_error:
+                    raise HermesSidecarError(f"Hermes sidecar stdout reader failed: {reader_error[0]}")
+
+                raw_output = self._strip_ansi("".join(raw_chars))
+                if not active_session_id:
+                    active_session_id = self._extract_session_id(raw_output) or self._discover_session_id(
+                        runtime_home=runtime_home,
+                        prior_session_ids=prior_session_ids,
+                    )
+
+                if active_session_id:
+                    latest_message = self._load_latest_state_message(
+                        runtime_home=runtime_home,
+                        session_id=active_session_id,
+                        min_message_id=prior_message_id,
+                    )
+                    if (
+                        latest_message
+                        and latest_message.role == "assistant"
+                        and isinstance(latest_message.content, str)
+                        and latest_message.content.strip()
+                        and latest_message.finish_reason == "stop"
+                    ):
+                        stripped_content = latest_message.content.strip()
+                        if stripped_content != latest_response:
+                            latest_response = stripped_content
+                            latest_response_seen_at = time.monotonic()
+
+                return_code = process.poll()
+                if return_code is not None:
+                    break
+
+                now = time.monotonic()
+                if latest_response and latest_response_seen_at is not None:
+                    if now - latest_response_seen_at >= 2:
+                        terminated_after_response = True
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=5)
+                        break
+
+                if now >= deadline:
+                    process.kill()
+                    raise HermesSidecarError("Hermes sidecar timed out after 900 seconds.")
+
+                time.sleep(0.1)
+        except Exception:
+            process.kill()
+            raise
+        finally:
+            reader_done.wait(timeout=5)
+            reader.join(timeout=5)
+
+        raw_output = self._strip_ansi("".join(raw_chars)).strip()
+        if not terminated_after_response and process.returncode != 0:
+            detail = raw_output or "Hermes exited without output."
+            raise HermesSidecarError(f"Hermes sidecar failed: {detail}")
+
+        return HermesCommandCapture(
+            raw_output=raw_output,
+            session_id=active_session_id,
+            response_text=latest_response,
+            terminated_after_response=terminated_after_response,
         )
 
     def stream_turn(
@@ -1354,8 +1495,93 @@ class HermesSidecarService:
                 return content.strip()
         return ""
 
+    @staticmethod
+    def _state_db_path(runtime_home: Path) -> Path:
+        return runtime_home / "state.db"
+
+    @classmethod
+    def _state_message_cursor(cls, *, runtime_home: Path) -> int:
+        state_db_path = cls._state_db_path(runtime_home)
+        if not state_db_path.exists():
+            return 0
+        try:
+            with sqlite3.connect(state_db_path) as connection:
+                row = connection.execute("select coalesce(max(id), 0) from messages").fetchone()
+        except sqlite3.Error:
+            return 0
+        if not row:
+            return 0
+        return int(row[0] or 0)
+
+    @classmethod
+    def _load_latest_state_message(
+        cls,
+        *,
+        runtime_home: Path,
+        session_id: str,
+        min_message_id: int = 0,
+    ) -> HermesStateMessage | None:
+        state_db_path = cls._state_db_path(runtime_home)
+        if not state_db_path.exists():
+            return None
+        try:
+            with sqlite3.connect(state_db_path) as connection:
+                row = connection.execute(
+                    """
+                    select id, role, content, timestamp, finish_reason
+                    from messages
+                    where session_id = ? and id > ?
+                    order by id desc
+                    limit 1
+                    """,
+                    (session_id, min_message_id),
+                ).fetchone()
+        except sqlite3.Error:
+            return None
+        if row is None:
+            return None
+        return HermesStateMessage(
+            id=int(row[0]),
+            role=str(row[1] or ""),
+            content=row[2],
+            timestamp=float(row[3] or 0),
+            finish_reason=str(row[4]) if row[4] is not None else None,
+        )
+
+    @classmethod
+    def _load_response_from_state_db(
+        cls,
+        *,
+        runtime_home: Path,
+        session_id: str,
+        min_message_id: int = 0,
+    ) -> str:
+        state_db_path = cls._state_db_path(runtime_home)
+        if not state_db_path.exists():
+            return ""
+        try:
+            with sqlite3.connect(state_db_path) as connection:
+                row = connection.execute(
+                    """
+                    select content
+                    from messages
+                    where session_id = ? and role = 'assistant' and id > ?
+                    order by id desc
+                    limit 1
+                    """,
+                    (session_id, min_message_id),
+                ).fetchone()
+        except sqlite3.Error:
+            return ""
+        if row is None or not isinstance(row[0], str) or not row[0].strip():
+            return ""
+        return row[0].strip()
+
     @classmethod
     def _load_usage_from_session(cls, *, runtime_home: Path, session_id: str) -> dict[str, int]:
+        state_db_usage = cls._load_usage_from_state_db(runtime_home=runtime_home, session_id=session_id)
+        if state_db_usage is not None:
+            return state_db_usage
         session_path = runtime_home / "sessions" / f"session_{session_id}.json"
         if not session_path.exists():
             raise HermesSidecarError(
@@ -1403,6 +1629,42 @@ class HermesSidecarService:
             ),
         }
         return telemetry
+
+    @classmethod
+    def _load_usage_from_state_db(
+        cls,
+        *,
+        runtime_home: Path,
+        session_id: str,
+    ) -> dict[str, int] | None:
+        state_db_path = cls._state_db_path(runtime_home)
+        if not state_db_path.exists():
+            return None
+        try:
+            with sqlite3.connect(state_db_path) as connection:
+                row = connection.execute(
+                    """
+                    select input_tokens, output_tokens
+                    from sessions
+                    where id = ?
+                    limit 1
+                    """,
+                    (session_id,),
+                ).fetchone()
+        except sqlite3.Error:
+            return None
+        if row is None:
+            return None
+        prompt_tokens = cls._coerce_usage_int(row[0] or 0, field="input_tokens")
+        completion_tokens = cls._coerce_usage_int(row[1] or 0, field="output_tokens")
+        return {
+            "promptTokens": prompt_tokens,
+            "completionTokens": completion_tokens,
+            "totalTokens": prompt_tokens + completion_tokens,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "apiCallCount": 0,
+        }
 
     @staticmethod
     def _coerce_usage_int(value: Any, *, field: str) -> int:

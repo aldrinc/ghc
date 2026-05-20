@@ -1933,7 +1933,9 @@ class MetaAdSetSpec(Base):
     placements: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     daily_budget: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     lifetime_budget: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    daily_min_spend_target: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1000")
+    daily_min_spend_target: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1000"
+    )
     bid_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     dsa_beneficiary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     dsa_payor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -4058,6 +4060,151 @@ class SiteFunnelStep(Base):
     )
 
 
+class SiteFunnelStepOption(Base):
+    """Page options that can satisfy a funnel step.
+
+    Ads target the parent SiteFunnel. These options define the pages the funnel can route
+    through for testing without changing ad destination scope.
+    """
+
+    __tablename__ = "site_funnel_step_options"
+    __table_args__ = (
+        UniqueConstraint(
+            "site_funnel_step_id",
+            "site_page_id",
+            name="uq_site_funnel_step_options_step_page",
+        ),
+        UniqueConstraint(
+            "site_funnel_step_id",
+            "option_key",
+            name="uq_site_funnel_step_options_step_key",
+        ),
+        sa.Index("idx_site_funnel_step_options_step", "site_funnel_step_id"),
+        sa.Index("idx_site_funnel_step_options_page", "site_page_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_funnel_step_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_steps.id", ondelete="CASCADE"), nullable=False
+    )
+    site_page_id: Mapped[str] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    option_key: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    traffic_weight: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_control: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteFunnelPath(Base):
+    """Named internal page combination for a site funnel.
+
+    This is intentionally not the ad destination. It lets the funnel own routing variants
+    while campaigns, ads, QA, and Meta setup continue to scope to the funnel.
+    """
+
+    __tablename__ = "site_funnel_paths"
+    __table_args__ = (
+        UniqueConstraint("site_funnel_id", "slug", name="uq_site_funnel_paths_funnel_slug"),
+        sa.Index("idx_site_funnel_paths_funnel", "site_funnel_id"),
+        sa.Index("idx_site_funnel_paths_campaign", "campaign_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    traffic_weight: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_control: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
+    experiment_spec_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    variant_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteFunnelPathStep(Base):
+    """Page selected for one step inside a materialized site funnel path."""
+
+    __tablename__ = "site_funnel_path_steps"
+    __table_args__ = (
+        UniqueConstraint(
+            "site_funnel_path_id",
+            "site_funnel_step_id",
+            name="uq_site_funnel_path_steps_path_step",
+        ),
+        UniqueConstraint(
+            "site_funnel_path_id",
+            "ordering",
+            name="uq_site_funnel_path_steps_path_ordering",
+        ),
+        sa.Index("idx_site_funnel_path_steps_path", "site_funnel_path_id"),
+        sa.Index("idx_site_funnel_path_steps_step", "site_funnel_step_id"),
+        sa.Index("idx_site_funnel_path_steps_page", "site_page_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_funnel_path_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_paths.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_step_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_steps.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_step_option_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_step_options.id", ondelete="RESTRICT"), nullable=False
+    )
+    site_page_id: Mapped[str] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    step_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class SiteProductPageBinding(Base):
     """Binding between a site, product, and optionally a specific page role."""
 
@@ -4094,6 +4241,58 @@ class SiteProductPageBinding(Base):
     )
     priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class CampaignSiteFunnel(Base):
+    """Campaign attachment to a site funnel.
+
+    Campaign ads go to the attached funnel. Internal page tests are represented by
+    SiteFunnelStepOption and SiteFunnelPath rows under that funnel.
+    """
+
+    __tablename__ = "campaign_site_funnels"
+    __table_args__ = (
+        UniqueConstraint(
+            "campaign_id",
+            "site_funnel_id",
+            name="uq_campaign_site_funnels_campaign_funnel",
+        ),
+        sa.Index("idx_campaign_site_funnels_campaign", "campaign_id"),
+        sa.Index("idx_campaign_site_funnels_site_funnel", "site_funnel_id"),
+        sa.Index("idx_campaign_site_funnels_site", "site_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False
+    )
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    site_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    is_primary: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
+    routing_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -4487,6 +4686,141 @@ class SitePublicationFunnelStep(Base):
     ordering_at_publish: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     step_role_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     cta_label_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationFunnelStepOption(Base):
+    """Immutable snapshot of a funnel step page option at publish time."""
+
+    __tablename__ = "site_publication_funnel_step_options"
+    __table_args__ = (
+        UniqueConstraint(
+            "publication_funnel_id",
+            "site_funnel_step_option_id",
+            name="uq_site_publication_funnel_step_options_pub_option",
+        ),
+        sa.Index(
+            "idx_site_publication_funnel_step_options_pub",
+            "publication_funnel_id",
+        ),
+        sa.Index(
+            "idx_site_publication_funnel_step_options_step",
+            "site_funnel_step_id_at_publish",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publication_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_step_option_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_step_options.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_step_id_at_publish: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    page_id_at_publish: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    slug_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    option_key_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    label_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    status_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    traffic_weight_at_publish: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_control_at_publish: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    metadata_at_publish: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationFunnelPath(Base):
+    """Immutable snapshot of a site funnel internal path at publish time."""
+
+    __tablename__ = "site_publication_funnel_paths"
+    __table_args__ = (
+        UniqueConstraint(
+            "publication_funnel_id",
+            "site_funnel_path_id",
+            name="uq_site_publication_funnel_paths_pub_path",
+        ),
+        UniqueConstraint(
+            "publication_funnel_id",
+            "slug_at_publish",
+            name="uq_site_publication_funnel_paths_pub_slug",
+        ),
+        sa.Index("idx_site_publication_funnel_paths_pub", "publication_funnel_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publication_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_path_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_paths.id", ondelete="CASCADE"), nullable=False
+    )
+    campaign_id_at_publish: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    name_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    slug_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    status_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    traffic_weight_at_publish: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_control_at_publish: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    experiment_spec_id_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    variant_id_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_at_publish: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationFunnelPathStep(Base):
+    """Immutable snapshot of a selected page inside a published funnel path."""
+
+    __tablename__ = "site_publication_funnel_path_steps"
+    __table_args__ = (
+        UniqueConstraint(
+            "publication_funnel_path_id",
+            "site_funnel_step_id_at_publish",
+            name="uq_site_publication_funnel_path_steps_path_step",
+        ),
+        UniqueConstraint(
+            "publication_funnel_path_id",
+            "ordering_at_publish",
+            name="uq_site_publication_funnel_path_steps_path_ordering",
+        ),
+        sa.Index(
+            "idx_site_publication_funnel_path_steps_path",
+            "publication_funnel_path_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_funnel_path_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publication_funnel_paths.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_path_step_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_path_steps.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_step_id_at_publish: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    site_funnel_step_option_id_at_publish: Mapped[str] = mapped_column(
+        UUID(as_uuid=True), nullable=False
+    )
+    page_id_at_publish: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    slug_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    ordering_at_publish: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    step_role_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

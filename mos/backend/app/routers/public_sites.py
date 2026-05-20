@@ -31,6 +31,9 @@ from app.services.site_publications import (
     list_site_publication_pages,
     list_site_publication_funnels,
     list_site_publication_funnel_steps,
+    list_site_publication_funnel_step_options,
+    list_site_publication_funnel_paths,
+    list_site_publication_funnel_path_steps,
     list_site_publication_product_bindings,
     list_site_publication_links,
 )
@@ -439,6 +442,12 @@ def get_site_funnel(
                 pub_steps = list_site_publication_funnel_steps(
                     session, publication_funnel_id=pub_funnel.id
                 )
+                pub_options = list_site_publication_funnel_step_options(
+                    session, publication_funnel_id=pub_funnel.id
+                )
+                pub_paths = list_site_publication_funnel_paths(
+                    session, publication_funnel_id=pub_funnel.id
+                )
 
                 steps_payload: list[dict[str, Any]] = []
                 for pub_step in pub_steps:
@@ -450,6 +459,53 @@ def get_site_funnel(
                             "ctaLabel": pub_step.cta_label_at_publish,
                         }
                     )
+                options_payload = [
+                    {
+                        "stepId": str(option.site_funnel_step_id_at_publish),
+                        "pageSlug": option.slug_at_publish,
+                        "optionKey": option.option_key_at_publish,
+                        "label": option.label_at_publish,
+                        "status": option.status_at_publish,
+                        "trafficWeight": option.traffic_weight_at_publish,
+                        "isControl": option.is_control_at_publish,
+                        "metadata": option.metadata_at_publish,
+                    }
+                    for option in pub_options
+                ]
+                paths_payload: list[dict[str, Any]] = []
+                for pub_path in pub_paths:
+                    path_steps = list_site_publication_funnel_path_steps(
+                        session,
+                        publication_funnel_path_id=pub_path.id,
+                    )
+                    paths_payload.append(
+                        {
+                            "pathId": str(pub_path.site_funnel_path_id),
+                            "campaignId": (
+                                str(pub_path.campaign_id_at_publish)
+                                if pub_path.campaign_id_at_publish
+                                else None
+                            ),
+                            "name": pub_path.name_at_publish,
+                            "slug": pub_path.slug_at_publish,
+                            "status": pub_path.status_at_publish,
+                            "trafficWeight": pub_path.traffic_weight_at_publish,
+                            "isControl": pub_path.is_control_at_publish,
+                            "experimentSpecId": pub_path.experiment_spec_id_at_publish,
+                            "variantId": pub_path.variant_id_at_publish,
+                            "metadata": pub_path.metadata_at_publish,
+                            "steps": [
+                                {
+                                    "stepId": str(step.site_funnel_step_id_at_publish),
+                                    "optionId": str(step.site_funnel_step_option_id_at_publish),
+                                    "pageSlug": step.slug_at_publish,
+                                    "ordering": step.ordering_at_publish,
+                                    "stepRole": step.step_role_at_publish,
+                                }
+                                for step in path_steps
+                            ],
+                        }
+                    )
 
                 return {
                     "funnelId": funnel_key,
@@ -458,6 +514,8 @@ def get_site_funnel(
                     "entryPageSlug": None,  # Would need page_id mapping
                     "publicationId": str(publication.id),
                     "steps": steps_payload,
+                    "stepOptions": options_payload,
+                    "paths": paths_payload,
                 }
 
         raise HTTPException(

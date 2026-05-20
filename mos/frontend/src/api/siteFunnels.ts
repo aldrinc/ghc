@@ -36,10 +36,72 @@ export interface SiteFunnelStep {
     slug: string;
     pageType: string | null;
   };
+  options?: SiteFunnelStepOption[];
+}
+
+export interface SiteFunnelStepOption {
+  id: string;
+  siteFunnelStepId: string;
+  sitePageId: string;
+  optionKey: string;
+  label: string;
+  status: "draft" | "active" | "paused" | "archived";
+  trafficWeight: number | null;
+  isControl: boolean;
+  metadata: Record<string, unknown>;
+  page: {
+    id: string;
+    name: string;
+    slug: string;
+    pageType: string | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SiteFunnelPathStep {
+  id: string;
+  siteFunnelPathId: string;
+  siteFunnelStepId: string;
+  siteFunnelStepOptionId: string;
+  sitePageId: string;
+  ordering: number;
+  stepRole: string | null;
+  page: {
+    id: string;
+    name: string;
+    slug: string;
+    pageType: string | null;
+  } | null;
+  option: {
+    id: string;
+    optionKey: string;
+    label: string;
+    status: string;
+  } | null;
+  createdAt: string;
+}
+
+export interface SiteFunnelPath {
+  id: string;
+  siteFunnelId: string;
+  campaignId: string | null;
+  name: string;
+  slug: string;
+  status: "draft" | "active" | "paused" | "archived";
+  trafficWeight: number | null;
+  isControl: boolean;
+  experimentSpecId: string | null;
+  variantId: string | null;
+  metadata: Record<string, unknown>;
+  steps: SiteFunnelPathStep[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SiteFunnelDetail extends SiteFunnel {
   steps: SiteFunnelStep[];
+  paths: SiteFunnelPath[];
 }
 
 export interface CreateSiteFunnelRequest {
@@ -67,6 +129,32 @@ export interface CreateSiteFunnelStepRequest {
   stepRole?: string;
   ctaLabel?: string;
   transitionRule?: Record<string, unknown>;
+}
+
+export interface CreateSiteFunnelStepOptionRequest {
+  sitePageId: string;
+  optionKey: string;
+  label: string;
+  status?: "draft" | "active" | "paused" | "archived";
+  trafficWeight?: number | null;
+  isControl?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateSiteFunnelPathRequest {
+  name: string;
+  slug: string;
+  status?: "draft" | "active" | "paused" | "archived";
+  campaignId?: string | null;
+  trafficWeight?: number | null;
+  isControl?: boolean;
+  experimentSpecId?: string | null;
+  variantId?: string | null;
+  metadata?: Record<string, unknown>;
+  steps: Array<{
+    siteFunnelStepId: string;
+    sitePageId: string;
+  }>;
 }
 
 // Get all funnels for a site
@@ -196,6 +284,89 @@ export function useDeleteSiteFunnelStep(siteId: string | null | undefined, funne
     },
     onError: (err: ApiError | Error) => {
       toast.error(getMutationErrorMessage(err, "Failed to remove funnel step"));
+    },
+  });
+}
+
+// Add a page option to a site funnel step
+export function useCreateSiteFunnelStepOption(siteId: string | null | undefined, funnelId: string | null | undefined) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
+
+  return useMutation({
+    mutationFn: ({ stepId, request }: { stepId: string; request: CreateSiteFunnelStepOptionRequest }) =>
+      post<SiteFunnelStepOption>(
+        `/sites/${siteId}/funnels/${funnelId}/steps/${stepId}/options?clientId=${workspace!.id}`,
+        request,
+      ),
+    onSuccess: () => {
+      toast.success("Funnel step option added");
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to add funnel step option"));
+    },
+  });
+}
+
+// Remove a page option from a site funnel step
+export function useDeleteSiteFunnelStepOption(siteId: string | null | undefined, funnelId: string | null | undefined) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
+
+  return useMutation({
+    mutationFn: ({ stepId, optionId }: { stepId: string; optionId: string }) =>
+      request<void>(`/sites/${siteId}/funnels/${funnelId}/steps/${stepId}/options/${optionId}?clientId=${workspace!.id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("Funnel step option removed");
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to remove funnel step option"));
+    },
+  });
+}
+
+// Add an internal path to a site funnel
+export function useCreateSiteFunnelPath(siteId: string | null | undefined, funnelId: string | null | undefined) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
+
+  return useMutation({
+    mutationFn: (request: CreateSiteFunnelPathRequest) =>
+      post<SiteFunnelPath>(`/sites/${siteId}/funnels/${funnelId}/paths?clientId=${workspace!.id}`, request),
+    onSuccess: () => {
+      toast.success("Funnel path created");
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to create funnel path"));
+    },
+  });
+}
+
+// Remove an internal path from a site funnel
+export function useDeleteSiteFunnelPath(siteId: string | null | undefined, funnelId: string | null | undefined) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
+
+  return useMutation({
+    mutationFn: (pathId: string) =>
+      request<void>(`/sites/${siteId}/funnels/${funnelId}/paths/${pathId}?clientId=${workspace!.id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("Funnel path removed");
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to remove funnel path"));
     },
   });
 }

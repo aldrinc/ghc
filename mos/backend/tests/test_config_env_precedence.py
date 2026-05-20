@@ -9,6 +9,10 @@ def test_strategy_v2_reasoning_defaults_use_gpt55():
     assert config_module.Settings.model_fields["STRATEGY_V2_OFFER_MODEL"].default == "gpt-5.5"
 
 
+def test_paid_ads_qa_default_uses_gpt55():
+    assert config_module.Settings.model_fields["PAID_ADS_QA_LLM_MODEL"].default == "gpt-5.5"
+
+
 def test_precanon_reasoning_default_uses_gpt55_xhigh():
     assert precanon_workflow.DEFAULT_REASONING_MODEL == "gpt-5.5"
     assert precanon_workflow.DEFAULT_REASONING_EFFORT == "xhigh"

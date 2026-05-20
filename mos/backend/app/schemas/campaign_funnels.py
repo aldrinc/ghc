@@ -5,6 +5,40 @@ from typing import Dict, List
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class CampaignFunnelPageSpec(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    template_id: str = Field(
+        ...,
+        validation_alias="templateId",
+        serialization_alias="templateId",
+    )
+    name: str
+    slug: str
+    next_page_slug: str | None = Field(
+        default=None,
+        validation_alias="nextPageSlug",
+        serialization_alias="nextPageSlug",
+    )
+
+    @field_validator("template_id", "name", "slug")
+    @classmethod
+    def _validate_required_text(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("templateId, name, and slug must be non-empty strings.")
+        return value.strip()
+
+    @field_validator("next_page_slug")
+    @classmethod
+    def _validate_next_page_slug(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("nextPageSlug must be a non-empty string when provided.")
+        return cleaned
+
+
 class CampaignFunnelGenerationRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -18,6 +52,7 @@ class CampaignFunnelGenerationRequest(BaseModel):
         validation_alias="variantIdsByExperiment",
         serialization_alias="variantIdsByExperiment",
     )
+    pages: List[CampaignFunnelPageSpec] | None = None
     async_media_enrichment: bool = Field(
         default=True,
         validation_alias="asyncMediaEnrichment",
@@ -29,6 +64,27 @@ class CampaignFunnelGenerationRequest(BaseModel):
         serialization_alias="variantActivityConcurrency",
     )
     generateTestimonials: bool = False
+
+    @field_validator("pages")
+    @classmethod
+    def _validate_pages(cls, value: List[CampaignFunnelPageSpec] | None) -> List[CampaignFunnelPageSpec] | None:
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("pages must include at least one page when provided.")
+        seen_slugs: set[str] = set()
+        for page in value:
+            if page.slug in seen_slugs:
+                raise ValueError(f"pages contains duplicate slug '{page.slug}'.")
+            seen_slugs.add(page.slug)
+        next_slugs = {page.next_page_slug for page in value if page.next_page_slug}
+        missing_next_slugs = sorted(next_slugs.difference(seen_slugs))
+        if missing_next_slugs:
+            raise ValueError(
+                "pages contains nextPageSlug values that do not match a page slug: "
+                + ", ".join(missing_next_slugs)
+            )
+        return value
 
     @field_validator("experiment_ids")
     @classmethod

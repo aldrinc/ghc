@@ -5957,6 +5957,9 @@ def build_site_runtime_bundle_artifact_payload(
         list_site_publication_links,
         list_site_publication_funnels,
         list_site_publication_funnel_steps,
+        list_site_publication_funnel_step_options,
+        list_site_publication_funnel_paths,
+        list_site_publication_funnel_path_steps,
         list_site_publication_product_bindings,
     )
 
@@ -6040,6 +6043,14 @@ def build_site_runtime_bundle_artifact_payload(
 
     for pub_funnel in pub_funnels:
         pub_steps = list_site_publication_funnel_steps(session, publication_funnel_id=pub_funnel.id)
+        pub_options = list_site_publication_funnel_step_options(
+            session,
+            publication_funnel_id=pub_funnel.id,
+        )
+        pub_paths = list_site_publication_funnel_paths(
+            session,
+            publication_funnel_id=pub_funnel.id,
+        )
 
         steps_payload: list[dict[str, Any]] = []
         for pub_step in pub_steps:
@@ -6052,6 +6063,56 @@ def build_site_runtime_bundle_artifact_payload(
                 }
             )
 
+        options_payload: list[dict[str, Any]] = []
+        for pub_option in pub_options:
+            options_payload.append(
+                {
+                    "stepId": str(pub_option.site_funnel_step_id_at_publish),
+                    "pageSlug": pub_option.slug_at_publish,
+                    "optionKey": pub_option.option_key_at_publish,
+                    "label": pub_option.label_at_publish,
+                    "status": pub_option.status_at_publish,
+                    "trafficWeight": pub_option.traffic_weight_at_publish,
+                    "isControl": pub_option.is_control_at_publish,
+                    "metadata": pub_option.metadata_at_publish,
+                }
+            )
+
+        paths_payload: list[dict[str, Any]] = []
+        for pub_path in pub_paths:
+            pub_path_steps = list_site_publication_funnel_path_steps(
+                session,
+                publication_funnel_path_id=pub_path.id,
+            )
+            paths_payload.append(
+                {
+                    "pathId": str(pub_path.site_funnel_path_id),
+                    "campaignId": (
+                        str(pub_path.campaign_id_at_publish)
+                        if pub_path.campaign_id_at_publish
+                        else None
+                    ),
+                    "name": pub_path.name_at_publish,
+                    "slug": pub_path.slug_at_publish,
+                    "status": pub_path.status_at_publish,
+                    "trafficWeight": pub_path.traffic_weight_at_publish,
+                    "isControl": pub_path.is_control_at_publish,
+                    "experimentSpecId": pub_path.experiment_spec_id_at_publish,
+                    "variantId": pub_path.variant_id_at_publish,
+                    "metadata": pub_path.metadata_at_publish,
+                    "steps": [
+                        {
+                            "stepId": str(step.site_funnel_step_id_at_publish),
+                            "optionId": str(step.site_funnel_step_option_id_at_publish),
+                            "pageSlug": step.slug_at_publish,
+                            "ordering": step.ordering_at_publish,
+                            "stepRole": step.step_role_at_publish,
+                        }
+                        for step in pub_path_steps
+                    ],
+                }
+            )
+
         funnels_payload[str(pub_funnel.site_funnel_id)] = {
             "name": pub_funnel.name_at_publish,
             "funnelType": pub_funnel.funnel_type_at_publish,
@@ -6061,6 +6122,8 @@ def build_site_runtime_bundle_artifact_payload(
                 else None
             ),
             "steps": steps_payload,
+            "stepOptions": options_payload,
+            "paths": paths_payload,
         }
 
     # Build product bindings payload

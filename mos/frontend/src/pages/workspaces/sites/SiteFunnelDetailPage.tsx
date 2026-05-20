@@ -4,7 +4,16 @@ import { ArrowLeft, Edit, Loader2, Plus, Trash2, Funnel, Save, X } from "lucide-
 
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useSite } from "@/api/sites";
-import { useSiteFunnel, useUpdateSiteFunnel, useCreateSiteFunnelStep, useDeleteSiteFunnelStep } from "@/api/siteFunnels";
+import {
+  useSiteFunnel,
+  useUpdateSiteFunnel,
+  useCreateSiteFunnelStep,
+  useDeleteSiteFunnelStep,
+  useCreateSiteFunnelStepOption,
+  useDeleteSiteFunnelStepOption,
+  useCreateSiteFunnelPath,
+  useDeleteSiteFunnelPath,
+} from "@/api/siteFunnels";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +39,10 @@ export function SiteFunnelDetailPage() {
   const updateFunnel = useUpdateSiteFunnel(siteId || null, funnelId || null);
   const createStep = useCreateSiteFunnelStep(siteId || null, funnelId || null);
   const deleteStep = useDeleteSiteFunnelStep(siteId || null, funnelId || null);
+  const createStepOption = useCreateSiteFunnelStepOption(siteId || null, funnelId || null);
+  const deleteStepOption = useDeleteSiteFunnelStepOption(siteId || null, funnelId || null);
+  const createPath = useCreateSiteFunnelPath(siteId || null, funnelId || null);
+  const deletePath = useDeleteSiteFunnelPath(siteId || null, funnelId || null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -39,6 +52,16 @@ export function SiteFunnelDetailPage() {
   const [selectedPageId, setSelectedPageId] = useState("");
   const [stepRole, setStepRole] = useState("");
   const [deletingStepId, setDeletingStepId] = useState<string | null>(null);
+  const [activeOptionStepId, setActiveOptionStepId] = useState<string | null>(null);
+  const [selectedOptionPageId, setSelectedOptionPageId] = useState("");
+  const [optionKey, setOptionKey] = useState("");
+  const [optionLabel, setOptionLabel] = useState("");
+  const [deletingOptionId, setDeletingOptionId] = useState<string | null>(null);
+  const [showCreatePathForm, setShowCreatePathForm] = useState(false);
+  const [pathName, setPathName] = useState("");
+  const [pathSlug, setPathSlug] = useState("");
+  const [pathSelectionsByStepId, setPathSelectionsByStepId] = useState<Record<string, string>>({});
+  const [deletingPathId, setDeletingPathId] = useState<string | null>(null);
 
   const isLoading = siteLoading || funnelLoading;
 
@@ -123,6 +146,73 @@ export function SiteFunnelDetailPage() {
       await deleteStep.mutateAsync(stepId);
     } finally {
       setDeletingStepId(null);
+    }
+  };
+
+  const handleAddStepOption = async () => {
+    if (!activeOptionStepId || !selectedOptionPageId || !optionKey.trim() || !optionLabel.trim()) return;
+    try {
+      await createStepOption.mutateAsync({
+        stepId: activeOptionStepId,
+        request: {
+          sitePageId: selectedOptionPageId,
+          optionKey: optionKey.trim(),
+          label: optionLabel.trim(),
+          status: "draft",
+        },
+      });
+      setActiveOptionStepId(null);
+      setSelectedOptionPageId("");
+      setOptionKey("");
+      setOptionLabel("");
+    } catch (error) {
+      console.error("Failed to add step option:", error);
+    }
+  };
+
+  const handleDeleteStepOption = async (stepId: string, optionId: string) => {
+    setDeletingOptionId(optionId);
+    try {
+      await deleteStepOption.mutateAsync({ stepId, optionId });
+    } finally {
+      setDeletingOptionId(null);
+    }
+  };
+
+  const sortedSteps = [...(funnel?.steps ?? [])].sort((a, b) => a.ordering - b.ordering);
+  const canCreatePath =
+    pathName.trim().length > 0 &&
+    pathSlug.trim().length > 0 &&
+    sortedSteps.length > 0 &&
+    sortedSteps.every((step) => Boolean(pathSelectionsByStepId[step.id]));
+
+  const handleCreatePath = async () => {
+    if (!canCreatePath) return;
+    try {
+      await createPath.mutateAsync({
+        name: pathName.trim(),
+        slug: pathSlug.trim(),
+        status: "draft",
+        steps: sortedSteps.map((step) => ({
+          siteFunnelStepId: step.id,
+          sitePageId: pathSelectionsByStepId[step.id],
+        })),
+      });
+      setShowCreatePathForm(false);
+      setPathName("");
+      setPathSlug("");
+      setPathSelectionsByStepId({});
+    } catch (error) {
+      console.error("Failed to create funnel path:", error);
+    }
+  };
+
+  const handleDeletePath = async (pathId: string) => {
+    setDeletingPathId(pathId);
+    try {
+      await deletePath.mutateAsync(pathId);
+    } finally {
+      setDeletingPathId(null);
     }
   };
 
@@ -275,9 +365,7 @@ export function SiteFunnelDetailPage() {
               </div>
             ) : (
               <div className="mt-4 space-y-2">
-                {[...funnel.steps]
-                  .sort((a, b) => a.ordering - b.ordering)
-                  .map((step, index) => (
+                {sortedSteps.map((step, index) => (
                     <div
                       key={step.id}
                       className={cn(
@@ -313,6 +401,19 @@ export function SiteFunnelDetailPage() {
                           </Button>
                           <Button
                             size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setActiveOptionStepId(step.id);
+                              setSelectedOptionPageId("");
+                              setOptionKey("");
+                              setOptionLabel("");
+                            }}
+                          >
+                            <Plus className="mr-1 h-3 w-3" />
+                            Option
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="destructive"
                             onClick={() => handleDeleteStep(step.id)}
                             disabled={deletingStepId === step.id}
@@ -324,6 +425,88 @@ export function SiteFunnelDetailPage() {
                             )}
                           </Button>
                         </div>
+                      </div>
+                      <div className="mt-3 border-t border-border pt-3">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-muted">
+                          Page options
+                        </div>
+                        {step.options?.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {step.options.map((option) => (
+                              <div
+                                key={option.id}
+                                className="flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-1 text-xs"
+                              >
+                                <span className="font-medium text-content">{option.label}</span>
+                                <span className="text-content-muted">/{option.page?.slug || option.sitePageId}</span>
+                                {option.isControl ? <Badge tone="neutral">control</Badge> : null}
+                                <Badge tone={formatFunnelStatus(option.status)}>{option.status}</Badge>
+                                {!option.isControl ? (
+                                  <button
+                                    type="button"
+                                    className="text-content-muted hover:text-danger"
+                                    onClick={() => void handleDeleteStepOption(step.id, option.id)}
+                                    disabled={deletingOptionId === option.id}
+                                    aria-label={`Remove option ${option.label}`}
+                                  >
+                                    {deletingOptionId === option.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-content-muted">No page options configured.</div>
+                        )}
+                        {activeOptionStepId === step.id ? (
+                          <div className="mt-3 grid gap-3 md:grid-cols-[1fr_160px_1fr_auto]">
+                            <Select
+                              options={pageOptions}
+                              value={selectedOptionPageId}
+                              onValueChange={setSelectedOptionPageId}
+                              placeholder="Select page"
+                            />
+                            <Input
+                              value={optionKey}
+                              onChange={(e) => setOptionKey(e.target.value)}
+                              placeholder="option-key"
+                            />
+                            <Input
+                              value={optionLabel}
+                              onChange={(e) => setOptionLabel(e.target.value)}
+                              placeholder="Option label"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => void handleAddStepOption()}
+                                disabled={
+                                  !selectedOptionPageId ||
+                                  !optionKey.trim() ||
+                                  !optionLabel.trim() ||
+                                  createStepOption.isPending
+                                }
+                              >
+                                {createStepOption.isPending ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Plus className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setActiveOptionStepId(null)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -376,6 +559,130 @@ export function SiteFunnelDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Funnel Paths */}
+          <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+              <div>
+                <div className="text-sm font-semibold text-content">Internal Paths</div>
+                <div className="text-xs text-content-muted">Funnel page combinations</div>
+              </div>
+              <Button size="sm" onClick={() => setShowCreatePathForm(true)} disabled={!sortedSteps.length}>
+                <Plus className="mr-1 h-4 w-4" />
+                Add Path
+              </Button>
+            </div>
+
+            {funnel.paths?.length ? (
+              <div className="mt-4 space-y-2">
+                {funnel.paths.map((path) => (
+                  <div key={path.id} className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-content">{path.name}</span>
+                          <Badge tone={formatFunnelStatus(path.status)}>{path.status}</Badge>
+                          {path.isControl ? <Badge tone="neutral">control</Badge> : null}
+                        </div>
+                        <div className="mt-1 text-xs text-content-muted">/{path.slug}</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {path.steps.map((step) => (
+                            <span
+                              key={step.id}
+                              className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-content-muted"
+                            >
+                              {step.stepRole || `Step ${step.ordering + 1}`}: /{step.page?.slug || step.sitePageId}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => void handleDeletePath(path.id)}
+                        disabled={deletingPathId === path.id}
+                      >
+                        {deletingPathId === path.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-sm text-content-muted">No internal paths yet.</div>
+            )}
+
+            {showCreatePathForm ? (
+              <div className="mt-4 space-y-4 border-t border-border pt-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-content">Path name</label>
+                    <Input
+                      value={pathName}
+                      onChange={(e) => setPathName(e.target.value)}
+                      placeholder="Presell A to Sales Control"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-content">Path slug</label>
+                    <Input
+                      value={pathSlug}
+                      onChange={(e) => setPathSlug(e.target.value)}
+                      placeholder="presell-a-sales-control"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {sortedSteps.map((step) => (
+                    <div key={step.id} className="space-y-1">
+                      <label className="text-xs font-semibold text-content">
+                        {step.stepRole || `Step ${step.ordering + 1}`}
+                      </label>
+                      <Select
+                        options={[
+                          { label: "Select page option", value: "" },
+                          ...(step.options || []).map((option) => ({
+                            label: `${option.label} (/${option.page?.slug || option.sitePageId})`,
+                            value: option.sitePageId,
+                          })),
+                        ]}
+                        value={pathSelectionsByStepId[step.id] || ""}
+                        onValueChange={(value) =>
+                          setPathSelectionsByStepId((current) => ({ ...current, [step.id]: value }))
+                        }
+                        placeholder="Select page option"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => void handleCreatePath()} disabled={!canCreatePath || createPath.isPending}>
+                    {createPath.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="mr-2 h-4 w-4" />
+                    )}
+                    Create Path
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCreatePathForm(false);
+                      setPathName("");
+                      setPathSlug("");
+                      setPathSelectionsByStepId({});
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
 
           {/* Quick Actions */}
           <div className="rounded-2xl border border-border bg-surface px-4 py-4">

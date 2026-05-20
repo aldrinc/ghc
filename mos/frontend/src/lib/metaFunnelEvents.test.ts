@@ -172,4 +172,23 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
       },
     ]);
   });
+
+  it("maps checkout page views to PageView and Meta InitiateCheckout", () => {
+    expect(
+      mapRuntimeEventToMetaPixelEvents({
+        eventType: "checkout_page_view",
+        props: { pageStage: "checkout", variantId: "variant_123" },
+      }),
+    ).toEqual([
+      { eventName: "PageView", params: { page_stage: "checkout" } },
+      {
+        eventName: "InitiateCheckout",
+        params: {
+          content_ids: ["variant_123"],
+          content_type: "product",
+          num_items: 1,
+        },
+      },
+    ]);
+  });
 });

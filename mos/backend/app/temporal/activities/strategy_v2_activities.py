@@ -12582,7 +12582,7 @@ def _estimate_prompt_input_tokens(prompt: str) -> int:
 
 def _model_prompt_input_token_budget(*, model: str, max_tokens: int | None) -> int | None:
     normalized = model.strip().lower()
-    if normalized.startswith("gpt-5.2"):
+    if normalized.startswith(("gpt-5.2", "gpt-5.4", "gpt-5.5")):
         reserved_output_tokens = max_tokens if isinstance(max_tokens, int) and max_tokens > 0 else _AGENT1_MAX_TOKENS
         budget = _GPT52_CONTEXT_WINDOW_TOKENS - reserved_output_tokens - _PROMPT_INPUT_TOKEN_SAFETY_BUFFER
         return max(budget, 1)

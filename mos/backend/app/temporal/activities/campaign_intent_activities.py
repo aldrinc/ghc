@@ -1444,6 +1444,27 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             )
 
         if resolved_pages:
+            resolved_pages_by_requested_slug: dict[str, FunnelPage] = {}
+            for page_spec, page in zip(pages, resolved_pages):
+                requested_slug = page_spec.get("slug")
+                if isinstance(requested_slug, str) and requested_slug.strip():
+                    resolved_pages_by_requested_slug[requested_slug.strip()] = page
+
+            for page_index, (page_spec, page) in enumerate(zip(pages, resolved_pages)):
+                next_page_slug = page_spec.get("next_page_slug") or page_spec.get("nextPageSlug")
+                if next_page_slug is None:
+                    continue
+                if not isinstance(next_page_slug, str) or not next_page_slug.strip():
+                    raise ValueError("nextPageSlug must be a non-empty string when provided.")
+                target_page = resolved_pages_by_requested_slug.get(next_page_slug.strip())
+                if not target_page:
+                    raise ValueError(
+                        f"nextPageSlug '{next_page_slug}' does not match a generated funnel page slug."
+                    )
+                resolved_pages[page_index] = (
+                    pages_repo.update(page_id=str(page.id), next_page_id=str(target_page.id)) or page
+                )
+
             pre_sales_pages = [
                 page for page in resolved_pages if resolve_funnel_template_category(page.template_id) == "presales"
             ]

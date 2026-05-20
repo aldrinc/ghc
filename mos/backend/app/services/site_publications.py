@@ -26,9 +26,15 @@ from app.db.models import (
     SitePublicationLink,
     SitePublicationFunnel,
     SitePublicationFunnelStep,
+    SitePublicationFunnelPath,
+    SitePublicationFunnelPathStep,
+    SitePublicationFunnelStepOption,
     SitePublicationProductBinding,
     SiteFunnel,
+    SiteFunnelPath,
+    SiteFunnelPathStep,
     SiteFunnelStep,
+    SiteFunnelStepOption,
     SiteLink,
     SiteProductPageBinding,
     Product,
@@ -121,6 +127,77 @@ def validate_site_for_publish(
                     f"Funnel '{funnel.name}' ({funnel.id}) step references "
                     f"non-existent page: {step.site_page_id}"
                 )
+            options = list(
+                session.scalars(
+                    select(SiteFunnelStepOption).where(
+                        SiteFunnelStepOption.site_funnel_step_id == step.id
+                    )
+                ).all()
+            )
+            for option in options:
+                option_page = session.scalars(
+                    select(SitePage).where(
+                        SitePage.id == option.site_page_id,
+                        SitePage.site_id == site_id,
+                    )
+                ).first()
+                if not option_page:
+                    raise SitePublicationError(
+                        f"Funnel '{funnel.name}' ({funnel.id}) step option references "
+                        f"non-existent page: {option.site_page_id}"
+                    )
+
+        step_ids = {str(step.id) for step in steps}
+        paths = list(
+            session.scalars(
+                select(SiteFunnelPath).where(SiteFunnelPath.site_funnel_id == funnel.id)
+            ).all()
+        )
+        for path in paths:
+            path_steps = list(
+                session.scalars(
+                    select(SiteFunnelPathStep).where(
+                        SiteFunnelPathStep.site_funnel_path_id == path.id
+                    )
+                ).all()
+            )
+            path_step_ids = {str(path_step.site_funnel_step_id) for path_step in path_steps}
+            missing_step_ids = sorted(step_ids.difference(path_step_ids))
+            extra_step_ids = sorted(path_step_ids.difference(step_ids))
+            if missing_step_ids:
+                raise SitePublicationError(
+                    f"Funnel path '{path.name}' ({path.id}) is missing step ids: "
+                    + ", ".join(missing_step_ids)
+                )
+            if extra_step_ids:
+                raise SitePublicationError(
+                    f"Funnel path '{path.name}' ({path.id}) includes invalid step ids: "
+                    + ", ".join(extra_step_ids)
+                )
+            for path_step in path_steps:
+                option = session.scalars(
+                    select(SiteFunnelStepOption).where(
+                        SiteFunnelStepOption.id == path_step.site_funnel_step_option_id,
+                        SiteFunnelStepOption.site_funnel_step_id == path_step.site_funnel_step_id,
+                        SiteFunnelStepOption.site_page_id == path_step.site_page_id,
+                    )
+                ).first()
+                if not option:
+                    raise SitePublicationError(
+                        f"Funnel path '{path.name}' ({path.id}) references a page "
+                        "that is not configured as an option for its step."
+                    )
+                path_page = session.scalars(
+                    select(SitePage).where(
+                        SitePage.id == path_step.site_page_id,
+                        SitePage.site_id == site_id,
+                    )
+                ).first()
+                if not path_page:
+                    raise SitePublicationError(
+                        f"Funnel path '{path.name}' ({path.id}) references "
+                        f"non-existent page: {path_step.site_page_id}"
+                    )
 
     # Validate product bindings
     bindings = list(
@@ -292,6 +369,85 @@ def create_site_publication(
             )
             session.add(pub_step)
 
+            options = list(
+                session.scalars(
+                    select(SiteFunnelStepOption)
+                    .where(SiteFunnelStepOption.site_funnel_step_id == step.id)
+                    .order_by(
+                        SiteFunnelStepOption.is_control.desc(),
+                        SiteFunnelStepOption.created_at.asc(),
+                    )
+                ).all()
+            )
+            for option in options:
+                pub_option = SitePublicationFunnelStepOption(
+                    id=str(uuid4()),
+                    publication_funnel_id=pub_funnel.id,
+                    site_funnel_step_option_id=option.id,
+                    site_funnel_step_id_at_publish=option.site_funnel_step_id,
+                    page_id_at_publish=option.site_page_id,
+                    slug_at_publish=page_slug_by_id.get(option.site_page_id, ""),
+                    option_key_at_publish=option.option_key,
+                    label_at_publish=option.label,
+                    status_at_publish=option.status,
+                    traffic_weight_at_publish=option.traffic_weight,
+                    is_control_at_publish=option.is_control,
+                    metadata_at_publish=option.metadata_json,
+                    created_at=now,
+                )
+                session.add(pub_option)
+
+        paths = list(
+            session.scalars(
+                select(SiteFunnelPath)
+                .where(SiteFunnelPath.site_funnel_id == funnel.id)
+                .order_by(
+                    SiteFunnelPath.is_control.desc(),
+                    SiteFunnelPath.created_at.asc(),
+                )
+            ).all()
+        )
+        for path in paths:
+            pub_path = SitePublicationFunnelPath(
+                id=str(uuid4()),
+                publication_funnel_id=pub_funnel.id,
+                site_funnel_path_id=path.id,
+                campaign_id_at_publish=path.campaign_id,
+                name_at_publish=path.name,
+                slug_at_publish=path.slug,
+                status_at_publish=path.status,
+                traffic_weight_at_publish=path.traffic_weight,
+                is_control_at_publish=path.is_control,
+                experiment_spec_id_at_publish=path.experiment_spec_id,
+                variant_id_at_publish=path.variant_id,
+                metadata_at_publish=path.metadata_json,
+                created_at=now,
+            )
+            session.add(pub_path)
+            session.flush()
+
+            path_steps = list(
+                session.scalars(
+                    select(SiteFunnelPathStep)
+                    .where(SiteFunnelPathStep.site_funnel_path_id == path.id)
+                    .order_by(SiteFunnelPathStep.ordering.asc())
+                ).all()
+            )
+            for path_step in path_steps:
+                pub_path_step = SitePublicationFunnelPathStep(
+                    id=str(uuid4()),
+                    publication_funnel_path_id=pub_path.id,
+                    site_funnel_path_step_id=path_step.id,
+                    site_funnel_step_id_at_publish=path_step.site_funnel_step_id,
+                    site_funnel_step_option_id_at_publish=path_step.site_funnel_step_option_id,
+                    page_id_at_publish=path_step.site_page_id,
+                    slug_at_publish=page_slug_by_id.get(path_step.site_page_id, ""),
+                    ordering_at_publish=path_step.ordering,
+                    step_role_at_publish=path_step.step_role,
+                    created_at=now,
+                )
+                session.add(pub_path_step)
+
     # Snapshot product bindings
     bindings = list(
         session.scalars(
@@ -388,6 +544,60 @@ def list_site_publication_funnel_steps(
             select(SitePublicationFunnelStep)
             .where(SitePublicationFunnelStep.publication_funnel_id == publication_funnel_id)
             .order_by(SitePublicationFunnelStep.ordering_at_publish.asc())
+        ).all()
+    )
+
+
+def list_site_publication_funnel_step_options(
+    session: Session,
+    *,
+    publication_funnel_id: str,
+) -> list[SitePublicationFunnelStepOption]:
+    """List all step page options in a publication funnel snapshot."""
+    return list(
+        session.scalars(
+            select(SitePublicationFunnelStepOption)
+            .where(SitePublicationFunnelStepOption.publication_funnel_id == publication_funnel_id)
+            .order_by(
+                SitePublicationFunnelStepOption.is_control_at_publish.desc(),
+                SitePublicationFunnelStepOption.created_at.asc(),
+            )
+        ).all()
+    )
+
+
+def list_site_publication_funnel_paths(
+    session: Session,
+    *,
+    publication_funnel_id: str,
+) -> list[SitePublicationFunnelPath]:
+    """List all internal paths in a publication funnel snapshot."""
+    return list(
+        session.scalars(
+            select(SitePublicationFunnelPath)
+            .where(SitePublicationFunnelPath.publication_funnel_id == publication_funnel_id)
+            .order_by(
+                SitePublicationFunnelPath.is_control_at_publish.desc(),
+                SitePublicationFunnelPath.created_at.asc(),
+            )
+        ).all()
+    )
+
+
+def list_site_publication_funnel_path_steps(
+    session: Session,
+    *,
+    publication_funnel_path_id: str,
+) -> list[SitePublicationFunnelPathStep]:
+    """List selected pages for an internal published funnel path."""
+    return list(
+        session.scalars(
+            select(SitePublicationFunnelPathStep)
+            .where(
+                SitePublicationFunnelPathStep.publication_funnel_path_id
+                == publication_funnel_path_id
+            )
+            .order_by(SitePublicationFunnelPathStep.ordering_at_publish.asc())
         ).all()
     )
 

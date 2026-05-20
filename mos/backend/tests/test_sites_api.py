@@ -467,6 +467,156 @@ def test_create_site_funnel_succeeds(api_client: TestClient):
     assert funnels[0]["id"] == funnel["id"]
 
 
+def test_site_funnel_supports_multiple_step_options_and_paths(api_client: TestClient):
+    """A site funnel should be the ad destination while owning internal page variants."""
+    client_id = _create_client(api_client, name="Site Funnel Variant Workspace")
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Variant Funnel Site",
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+    pages_by_type = {page["pageType"]: page for page in site["pages"]}
+
+    create_response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "Testing Funnel",
+            "entryPageId": pages_by_type["home"]["id"],
+            "steps": [
+                {
+                    "sitePageId": pages_by_type["home"]["id"],
+                    "ordering": 0,
+                    "stepRole": "pre_sales",
+                },
+                {
+                    "sitePageId": pages_by_type["product_detail"]["id"],
+                    "ordering": 1,
+                    "stepRole": "sales",
+                },
+            ],
+        },
+    )
+    assert create_response.status_code == 201
+    funnel = create_response.json()
+    assert len(funnel["steps"]) == 2
+    assert funnel["steps"][0]["options"][0]["optionKey"] == "primary"
+    assert funnel["steps"][0]["options"][0]["isControl"] is True
+
+    pre_sales_step = next(step for step in funnel["steps"] if step["stepRole"] == "pre_sales")
+    sales_step = next(step for step in funnel["steps"] if step["stepRole"] == "sales")
+
+    option_response = api_client.post(
+        f"/sites/{site['id']}/funnels/{funnel['id']}/steps/{pre_sales_step['id']}/options?clientId={client_id}",
+        json={
+            "sitePageId": pages_by_type["category"]["id"],
+            "optionKey": "presell-b",
+            "label": "Presell B",
+            "status": "active",
+            "trafficWeight": 50,
+        },
+    )
+    assert option_response.status_code == 201
+    option = option_response.json()
+    assert option["sitePageId"] == pages_by_type["category"]["id"]
+    assert option["optionKey"] == "presell-b"
+
+    path_response = api_client.post(
+        f"/sites/{site['id']}/funnels/{funnel['id']}/paths?clientId={client_id}",
+        json={
+            "name": "Presell B to Sales",
+            "slug": "presell-b-sales",
+            "status": "active",
+            "steps": [
+                {
+                    "siteFunnelStepId": pre_sales_step["id"],
+                    "sitePageId": pages_by_type["category"]["id"],
+                },
+                {
+                    "siteFunnelStepId": sales_step["id"],
+                    "sitePageId": pages_by_type["product_detail"]["id"],
+                },
+            ],
+        },
+    )
+    assert path_response.status_code == 201
+    path = path_response.json()
+    assert path["siteFunnelId"] == funnel["id"]
+    assert path["slug"] == "presell-b-sales"
+    assert [step["sitePageId"] for step in path["steps"]] == [
+        pages_by_type["category"]["id"],
+        pages_by_type["product_detail"]["id"],
+    ]
+
+    detail_response = api_client.get(
+        f"/sites/{site['id']}/funnels/{funnel['id']}?clientId={client_id}"
+    )
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    detail_pre_sales_step = next(step for step in detail["steps"] if step["id"] == pre_sales_step["id"])
+    assert {option["optionKey"] for option in detail_pre_sales_step["options"]} == {
+        "primary",
+        "presell-b",
+    }
+    assert [path["slug"] for path in detail["paths"]] == ["presell-b-sales"]
+
+
+def test_list_workspace_site_funnels_uses_workspace_route(api_client: TestClient):
+    """Workspace funnel listings should resolve `/sites/funnels` before `/sites/{site_id}`."""
+    client_id = _create_client(api_client, name="Workspace Funnel Listing")
+    product_id = _create_product(api_client, client_id=client_id, title="Workspace Funnel Product")
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Workspace Funnel Site",
+            "productId": product_id,
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+    entry_page = next(page for page in site["pages"] if page["isEntry"])
+
+    create_response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "Workspace Funnel",
+            "entryPageId": entry_page["id"],
+            "productId": product_id,
+        },
+    )
+    assert create_response.status_code == 201
+    funnel = create_response.json()
+
+    response = api_client.get(f"/sites/funnels?clientId={client_id}")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body == [
+        {
+            "id": funnel["id"],
+            "siteId": site["id"],
+            "siteName": "Workspace Funnel Site",
+            "name": "Workspace Funnel",
+            "description": None,
+            "status": "draft",
+            "funnelType": "checkout",
+            "entryPageId": entry_page["id"],
+            "productId": product_id,
+            "selectedOfferId": None,
+            "trackingConfig": None,
+            "stepCount": 0,
+            "createdAt": body[0]["createdAt"],
+            "updatedAt": body[0]["updatedAt"],
+        }
+    ]
+
+
 def test_update_site_funnel_accepts_paused_status(api_client: TestClient):
     """Site funnel status should accept paused to match the frontend workflow."""
     client_id = _create_client(api_client, name="Paused Funnel Workspace")
@@ -719,6 +869,14 @@ def test_get_site_detail_without_client_id_returns_site_for_same_org(api_client:
     assert site["id"] == site_id
     assert site["clientId"] == client_id
     assert site["name"] == "Direct Preview Site"
+
+
+def test_get_site_invalid_site_id_returns_400(api_client: TestClient):
+    """Invalid site ids should fail validation instead of reaching the repository layer."""
+    response = api_client.get("/sites/not-a-uuid")
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "siteId must be a valid UUID."}
 
 
 def test_get_site_validates_workspace_ownership(api_client: TestClient):

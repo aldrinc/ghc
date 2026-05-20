@@ -953,6 +953,11 @@ async def generate_campaign_funnels(
             campaign_id=str(campaign.id),
             experiment_ids=requested_experiment_ids,
             variant_ids_by_experiment=payload.variant_ids_by_experiment,
+            pages=(
+                [page.model_dump(mode="python") for page in payload.pages]
+                if payload.pages
+                else None
+            ),
             variant_activity_concurrency=payload.variant_activity_concurrency,
             async_media_enrichment=bool(payload.async_media_enrichment),
             funnel_name_prefix=f"{campaign.name} Funnel",
@@ -980,6 +985,11 @@ async def generate_campaign_funnels(
             "product_id": str(campaign.product_id),
             "experiment_ids": requested_experiment_ids,
             "variant_ids_by_experiment": payload.variant_ids_by_experiment,
+            "pages": (
+                [page.model_dump(mode="python") for page in payload.pages]
+                if payload.pages
+                else None
+            ),
             "variant_activity_concurrency": payload.variant_activity_concurrency,
             "async_media_enrichment": bool(payload.async_media_enrichment),
         },

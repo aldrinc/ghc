@@ -28,6 +28,58 @@ DEFAULT_FUNNEL_PAGES = [
 ]
 
 
+def _normalize_pages(pages: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    if pages is None:
+        return [dict(page) for page in DEFAULT_FUNNEL_PAGES]
+    if not isinstance(pages, list) or not pages:
+        raise RuntimeError("pages must include at least one page when provided.")
+
+    normalized_pages: List[Dict[str, Any]] = []
+    seen_slugs: set[str] = set()
+    for page in pages:
+        if not isinstance(page, dict):
+            raise RuntimeError("pages entries must be objects.")
+        template_id = page.get("template_id") or page.get("templateId")
+        name = page.get("name")
+        slug = page.get("slug")
+        if not isinstance(template_id, str) or not template_id.strip():
+            raise RuntimeError("Each page requires template_id.")
+        if not isinstance(name, str) or not name.strip():
+            raise RuntimeError("Each page requires name.")
+        if not isinstance(slug, str) or not slug.strip():
+            raise RuntimeError("Each page requires slug.")
+        cleaned_slug = slug.strip()
+        if cleaned_slug in seen_slugs:
+            raise RuntimeError(f"pages contains duplicate slug: {cleaned_slug}")
+        seen_slugs.add(cleaned_slug)
+        next_page_slug = page.get("next_page_slug") or page.get("nextPageSlug")
+        normalized_page = {
+            **page,
+            "template_id": template_id.strip(),
+            "name": name.strip(),
+            "slug": cleaned_slug,
+        }
+        if next_page_slug is not None:
+            if not isinstance(next_page_slug, str) or not next_page_slug.strip():
+                raise RuntimeError("next_page_slug must be a non-empty string when provided.")
+            normalized_page["next_page_slug"] = next_page_slug.strip()
+        normalized_pages.append(normalized_page)
+
+    missing_next_slugs = sorted(
+        {
+            page["next_page_slug"]
+            for page in normalized_pages
+            if isinstance(page.get("next_page_slug"), str)
+        }.difference(seen_slugs)
+    )
+    if missing_next_slugs:
+        raise RuntimeError(
+            "pages contains next_page_slug values that do not match a page slug: "
+            + ", ".join(missing_next_slugs)
+        )
+    return normalized_pages
+
+
 def _normalize_variant_selection(
     *,
     selected_experiment_ids: List[str],
@@ -143,6 +195,7 @@ class CampaignFunnelGenerationInput:
     campaign_id: str
     experiment_ids: List[str]
     variant_ids_by_experiment: Optional[Dict[str, List[str]]] = None
+    pages: Optional[List[Dict[str, Any]]] = None
     variant_activity_concurrency: Optional[int] = None
     async_media_enrichment: bool = True
     funnel_name_prefix: Optional[str] = None
@@ -171,6 +224,7 @@ class CampaignFunnelGenerationWorkflow:
             experiment_specs=raw_experiment_specs,
             variant_ids_by_experiment=input.variant_ids_by_experiment,
         )
+        pages = _normalize_pages(input.pages)
 
         # This activity generates N funnels (each with multiple pages, images, and optionally testimonials).
         # The runtime scales with the number of variants, so size the timeout accordingly.
@@ -214,7 +268,7 @@ class CampaignFunnelGenerationWorkflow:
                         "product_id": input.product_id,
                         "campaign_id": input.campaign_id,
                         "experiment_specs": [per_variant_spec],
-                        "pages": DEFAULT_FUNNEL_PAGES,
+                        "pages": pages,
                         "funnel_name_prefix": input.funnel_name_prefix or "Funnel",
                         "idea_workspace_id": workflow.info().workflow_id,
                         "actor_user_id": "workflow",
