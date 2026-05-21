@@ -109,6 +109,8 @@ def _tracking_note_attributes(note_attributes: dict[str, str]) -> dict[str, str]
         "experiment_id",
         "cta_id",
         "transition_id",
+        "mos_meta_add_to_cart_event_id",
+        "mos_meta_initiate_checkout_event_id",
         "purchase_mode",
     }
     return {

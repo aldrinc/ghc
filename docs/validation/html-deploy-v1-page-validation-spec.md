@@ -70,8 +70,9 @@ Missing image assets must fail deploy validation. Broken browser images must fai
 
 When tracking is configured:
 
-- Meta Pixel must load through the MOS proxy.
-- Direct legacy or foreign Meta scripts are rejected.
+- Meta Pixel must load directly from `https://connect.facebook.net/en_US/fbevents.js`.
+- MOS Meta proxy paths such as `/__mos/meta/*` are rejected.
+- Foreign or stale Meta scripts are rejected.
 - PostHog bootstrap must be present.
 - PostHog `api_host`, `ui_host`, defaults, and person-profile settings must match the published tracking config.
 - `/public/events` requests must return 2xx.
@@ -215,10 +216,60 @@ Quiz funnels must also include quiz-specific readback events:
 ```text
 QuizLeadViewed
 QuizQuestionViewed
+QuizOptionPresented
 QuizOptionSelected
+QuizQuestionSubmitted
 QuizCompleted
 QuizResultViewed
 QuizCtaViewed
+```
+
+### Required Quiz Answer Payloads
+
+Quiz manifests must declare enough answer metadata before deploy for validation to execute a deterministic path and for PostHog to answer response questions without session recording review.
+
+Required `quizQuestions[]` fields:
+
+```text
+id
+selector
+questionId
+questionText
+questionIndex
+questionType
+```
+
+Required `quizOptions[]` fields:
+
+```text
+id
+selector
+questionId
+optionId
+optionText
+optionIndex
+selectionOrder
+```
+
+`selectionOrder` defines the exact answer path the validator clicks. For multi-select questions, declare every selected option with `selectionOrder`; if the question does not submit on option click, add a `quizSubmissions[]` target with `questionId` and `selector`.
+
+Required PostHog properties:
+
+```text
+QuizQuestionViewed.question_id
+QuizQuestionViewed.question_text
+QuizOptionPresented.question_id
+QuizOptionPresented.question_text
+QuizOptionPresented.option_id
+QuizOptionPresented.option_text
+QuizOptionSelected.selected_option_ids
+QuizOptionSelected.selected_option_texts
+QuizQuestionSubmitted.selected_option_ids
+QuizQuestionSubmitted.selected_option_texts
+QuizCompleted.answers[].question_id
+QuizCompleted.answers[].question_text
+QuizCompleted.answers[].selected_option_ids
+QuizCompleted.answers[].selected_option_texts
 ```
 
 ### Required Meta Events

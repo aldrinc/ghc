@@ -51,6 +51,7 @@ class FunnelPublishDeployRequest(BaseModel):
     renderMode: Optional[Literal["runtime_bundle", "html_deploy"]] = None
     defaultRoutePolicy: Literal["entry_page", "prefer_sales", "explicit_slug", "none"] = "entry_page"
     defaultPageSlug: Optional[str] = None
+    releaseMetadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class FunnelPublishRequest(BaseModel):

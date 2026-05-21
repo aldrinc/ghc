@@ -13,7 +13,7 @@ The validator must prove four things before an HTML funnel page is production-va
 1. The artifact is structurally valid and has the correct `html-deploy-v1` instrumentation contract.
 2. The browser runtime can send the required PostHog, Meta, and MOS internal calls with exact event names and required attributes.
 3. PostHog receives the required events with the expected attributes after ingestion.
-4. Meta receives or at minimum is successfully forwarded the expected events through the MOS proxy, with optional Meta test-event confirmation when credentials are configured.
+4. Meta receives the expected browser Pixel events directly, with optional Meta test-event confirmation when credentials are configured.
 
 This directly prevents the regressions we saw:
 
@@ -26,7 +26,7 @@ This directly prevents the regressions we saw:
 
 - **Spec-driven, not heuristic-driven.** The page type contract determines required events, fields, ordering, and relationships.
 - **Fail closed.** Missing config, unsupported page type, missing selector, missing event, or missing destination receipt fails validation with a clear error.
-- **Destination proof matters.** Browser-side send intent is insufficient. PostHog readback is required when configured; Meta proxy delivery must be recorded and validated.
+- **Destination proof matters.** Browser-side send intent is insufficient. PostHog readback is required when configured; direct Meta Pixel network delivery must be recorded and validated.
 - **Contracts are data.** Adding a future page type should require adding a contract, not editing many branches inside deploy code.
 - **Deterministic paths.** Browser actions should come from manifest-declared selectors and validation flows.
 - **Human-reviewable evidence.** Every validation run emits a compact report with phase status, observed events, and failure reasons.
@@ -572,7 +572,8 @@ Responsibility:
 - Fetch deployed HTML for each page.
 - Verify forbidden strings are absent.
 - Verify PostHog and Meta bootstrap config.
-- Verify Meta proxy usage.
+- Verify direct Meta Pixel usage.
+- Reject MOS Meta proxy paths.
 - Verify public asset and image references.
 
 Static checks should use deterministic parsers:
@@ -584,7 +585,8 @@ Static checks should use deterministic parsers:
 Failure cases:
 
 - missing image asset;
-- direct Meta script reference;
+- missing direct Meta script reference;
+- MOS Meta proxy reference;
 - PostHog bootstrap missing configured key or host;
 - legacy Mars or MenGoToMars references;
 - missing manifest.
@@ -617,7 +619,7 @@ Responsibility:
 - Verify the page attempted every required send.
 - Verify exact event names.
 - Verify exact required props.
-- Verify response status for MOS internal events and Meta proxy sends.
+- Verify response status for MOS internal events and direct Meta Pixel sends.
 - Verify forbidden events did not fire before allowed conditions.
 
 This phase proves the artifact can send the calls correctly.
@@ -687,15 +689,15 @@ Failure cases:
 
 Responsibility:
 
-- Verify Meta events are emitted through the MOS proxy.
-- Verify proxy response status is successful.
+- Verify Meta events are emitted through direct Meta Pixel network requests.
+- Verify direct Meta Pixel response status is successful.
 - Verify event names and payload custom data.
 - Optionally confirm event receipt through Meta test-event tooling when credentials are configured.
 
 Required baseline:
 
 ```text
-meta_delivery_proof=proxy_forwarded
+meta_delivery_proof=direct_pixel_network
 ```
 
 Optional strict mode:
@@ -715,8 +717,8 @@ DEPLOY_TRACKING_VALIDATION_META_ACCESS_TOKEN=<optional secret>
 
 Failure cases:
 
-- Meta event bypasses MOS proxy;
-- Meta proxy returns non-2xx;
+- Meta event uses a MOS proxy path;
+- direct Meta Pixel request is missing or returns non-2xx;
 - `EnteredSales` lacks sales `event_source_url`;
 - `SalesToCheckoutClick` lacks value, currency, or CTA fields;
 - strict Meta test-event mode cannot confirm receipt.
@@ -814,7 +816,7 @@ class MetaDeliveryAdapter:
 
 Baseline proof:
 
-- browser request to `/__mos/meta/tr`;
+- browser request to Meta Pixel endpoints;
 - event name parsed from request;
 - custom data parsed from request body/query;
 - response status is 2xx.
@@ -1042,7 +1044,7 @@ Run against a staging route:
 - quiz -> sales;
 - direct sales.
 
-Smoke test must produce a real PostHog readback report and Meta proxy delivery report.
+Smoke test must produce a real PostHog readback report and direct Meta Pixel delivery report.
 
 ## Rollout Plan
 
@@ -1070,7 +1072,7 @@ Smoke test must produce a real PostHog readback report and Meta proxy delivery r
 ### PR 4: Destination Adapters
 
 - Add PostHog readback adapter.
-- Add Meta proxy delivery adapter.
+- Add direct Meta Pixel delivery adapter.
 - Add optional Meta test-event adapter interface.
 - Add mocked adapter tests.
 
@@ -1084,7 +1086,7 @@ Smoke test must produce a real PostHog readback report and Meta proxy delivery r
 ### PR 6: Enforce In Production
 
 - Require PostHog readback in production.
-- Require Meta proxy delivery in production.
+- Require direct Meta Pixel delivery in production.
 - Store validation report in publish job.
 - Fail deploy jobs on validator failure.
 
@@ -1131,7 +1133,7 @@ Mitigation:
 
 Mitigation:
 
-- require MOS proxy delivery proof immediately;
+- require direct Meta Pixel network delivery proof immediately;
 - support Meta test-event confirmation as strict mode;
 - clearly label proof level in report.
 
@@ -1163,7 +1165,7 @@ The implementation is complete when:
 - missing `SalesToCheckoutClicked` fails validation.
 - `EnteredSales` before sales load fails quiz validation.
 - PostHog readback is required and proven in production config.
-- Meta proxy delivery is required and proven in production config.
+- direct Meta Pixel delivery is required and proven in production config.
 - validation report is persisted in publish job result.
 - no production HTML funnel deploy path can bypass `html-deploy-v1`.
 

@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ from sqlalchemy import select
 from app.auth.dependencies import AuthContext, get_current_user
 from app.main import app
 from app.db.models import (
+    Asset,
     Client,
     Funnel,
     FunnelPage,
@@ -22,7 +24,9 @@ from app.db.models import (
     OrgDeployDomain,
     Product,
 )
+from app.db.enums import AssetSourceEnum, AssetStatusEnum
 from app.services import deploy as deploy_service
+from cloudhand.adapters import deployer as deployer_adapter
 from tests.conftest import TEST_ORG_ID
 
 
@@ -74,7 +78,13 @@ def test_deploy_apply_proxies_to_service(api_client, monkeypatch):
     async def fake_apply_plan(*, plan_path=None, workload_names=None):
         assert plan_path is None
         assert workload_names is None
-        return {"returncode": 0, "plan_path": "/tmp/plan.json", "server_ips": {}, "live_url": None, "logs": ""}
+        return {
+            "returncode": 0,
+            "plan_path": "/tmp/plan.json",
+            "server_ips": {},
+            "live_url": None,
+            "logs": "",
+        }
 
     monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
 
@@ -85,7 +95,13 @@ def test_deploy_apply_proxies_to_service(api_client, monkeypatch):
 
 def test_deploy_apply_alias_works(api_client, monkeypatch):
     async def fake_apply_plan(*, plan_path=None, workload_names=None):
-        return {"returncode": 0, "plan_path": "/tmp/plan.json", "server_ips": {}, "live_url": None, "logs": ""}
+        return {
+            "returncode": 0,
+            "plan_path": "/tmp/plan.json",
+            "server_ips": {},
+            "live_url": None,
+            "logs": "",
+        }
 
     monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
 
@@ -161,19 +177,30 @@ def test_deploy_apply_forwards_workload_names(api_client, monkeypatch):
     async def fake_apply_plan(*, plan_path=None, workload_names=None):
         assert plan_path == "/tmp/plan.json"
         assert workload_names == ["brand-funnels-abc", "brand-funnels-def"]
-        return {"returncode": 0, "plan_path": "/tmp/plan.json", "server_ips": {}, "live_url": None, "logs": ""}
+        return {
+            "returncode": 0,
+            "plan_path": "/tmp/plan.json",
+            "server_ips": {},
+            "live_url": None,
+            "logs": "",
+        }
 
     monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
 
     resp = api_client.post(
         "/deploy/plans/apply",
-        json={"plan_path": "/tmp/plan.json", "workload_names": ["brand-funnels-abc", "brand-funnels-def"]},
+        json={
+            "plan_path": "/tmp/plan.json",
+            "workload_names": ["brand-funnels-abc", "brand-funnels-def"],
+        },
     )
     assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_apply_plan_scopes_materialization_and_cli_to_selected_workload(tmp_path, monkeypatch):
+async def test_apply_plan_scopes_materialization_and_cli_to_selected_workload(
+    tmp_path, monkeypatch
+):
     cloudhand_dir = tmp_path / "cloudhand"
     terraform_dir = tmp_path / "terraform"
     cloudhand_dir.mkdir()
@@ -226,6 +253,12 @@ async def test_apply_plan_scopes_materialization_and_cli_to_selected_workload(tm
     assert "--workload-name" in subprocess_args
     assert subprocess_args.count("--workload-name") == 1
     assert subprocess_args[-2:] == ["--workload-name", "brand-funnels-tenor"]
+    subprocess_kwargs = captured["subprocess_kwargs"]
+    assert subprocess_kwargs["cwd"] == str(cloudhand_dir.parent)
+    assert (
+        str(Path(deploy_service.__file__).resolve().parents[2])
+        in subprocess_kwargs["env"]["PYTHONPATH"]
+    )
 
 
 @pytest.mark.asyncio
@@ -290,7 +323,9 @@ def test_deploy_latest_plan_404_on_missing(api_client, monkeypatch):
     assert resp.status_code == 404
 
 
-def test_patch_workload_endpoint_keeps_workload_scoped_deploy_domains(api_client, db_session, monkeypatch):
+def test_patch_workload_endpoint_keeps_workload_scoped_deploy_domains(
+    api_client, db_session, monkeypatch
+):
     db_session.add(
         Client(
             id=UUID("00000000-0000-0000-0000-000000000123"),
@@ -362,7 +397,9 @@ def test_patch_workload_endpoint_keeps_workload_scoped_deploy_domains(api_client
     assert hostnames == []
 
 
-def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_client, db_session, monkeypatch):
+def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(
+    api_client, db_session, monkeypatch
+):
     workspace_id = UUID("00000000-0000-0000-0000-000000000124")
     db_session.add(
         Client(
@@ -498,7 +535,9 @@ def test_get_workload_domains_falls_back_to_workspace_repo_when_plan_has_no_scop
     org_id = UUID(auth_context.org_id)
     client_id = UUID("00000000-0000-0000-0000-000000000126")
     db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
-    db_session.add(OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"))
+    db_session.add(
+        OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com")
+    )
     db_session.commit()
 
     monkeypatch.setattr(
@@ -535,7 +574,9 @@ def test_get_workload_domains_does_not_fall_back_when_plan_clears_scoped_domains
     org_id = UUID(auth_context.org_id)
     client_id = UUID("00000000-0000-0000-0000-000000000127")
     db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
-    db_session.add(OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"))
+    db_session.add(
+        OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com")
+    )
     db_session.commit()
 
     monkeypatch.setattr(
@@ -610,7 +651,9 @@ def test_get_workload_domains_does_not_inherit_workspace_domains_for_missing_wor
     org_id = UUID(auth_context.org_id)
     client_id = UUID("00000000-0000-0000-0000-000000000128")
     db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
-    db_session.add(OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"))
+    db_session.add(
+        OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com")
+    )
     db_session.commit()
 
     monkeypatch.setattr(
@@ -744,7 +787,11 @@ def _build_identity_audit_payload_fixture(db_session, *, org_id: UUID, monkeypat
     funnel.active_publication_id = publication_id
     db_session.commit()
 
-    monkeypatch.setattr(deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Sales Page"})
+    monkeypatch.setattr(
+        deploy_service,
+        "build_public_page_metadata_for_context",
+        lambda **_: {"title": "Sales Page"},
+    )
     payload = deploy_service.build_client_funnel_runtime_artifact_payload(
         session=db_session,
         org_id=str(org_id),
@@ -763,7 +810,9 @@ def _build_identity_audit_payload_fixture(db_session, *, org_id: UUID, monkeypat
     }
 
 
-def test_validate_funnel_artifact_identity_accepts_built_payload(db_session, auth_context, monkeypatch):
+def test_validate_funnel_artifact_identity_accepts_built_payload(
+    db_session, auth_context, monkeypatch
+):
     org_id = UUID(auth_context.org_id)
     payload, fixture = _build_identity_audit_payload_fixture(
         db_session,
@@ -785,7 +834,271 @@ def test_validate_funnel_artifact_identity_accepts_built_payload(db_session, aut
     ]
 
 
-def test_validate_funnel_artifact_identity_rejects_page_map_drift(db_session, auth_context, monkeypatch):
+def test_html_deploy_runtime_artifact_uses_inline_asset_bytes_without_storage_download(
+    db_session, auth_context, monkeypatch
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = uuid4()
+    product_id = uuid4()
+    funnel_id = uuid4()
+    page_id = uuid4()
+    version_id = uuid4()
+    publication_id = uuid4()
+    asset_public_id = uuid4()
+    product_slug = str(product_id).split("-")[0]
+    image_bytes = b"\x89PNG\r\n\x1a\ninline-image"
+    image_bytes_base64 = base64.b64encode(image_bytes).decode("ascii")
+    font_bytes = b"font-bytes"
+    font_bytes_base64 = base64.b64encode(font_bytes).decode("ascii")
+    css_bytes = b".quiz-shell{display:block}"
+    css_bytes_base64 = base64.b64encode(css_bytes).decode("ascii")
+    favicon_bytes = b"<svg></svg>"
+    favicon_bytes_base64 = base64.b64encode(favicon_bytes).decode("ascii")
+    route_scoped_css_path = (
+        f"/{product_slug}/inline-asset-funnel/sales-page/assets/optimized/theme.css"
+    )
+    product_scoped_favicon_path = f"/{product_slug}/assets/tenor-favicon.svg"
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Inline Asset Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Inline Asset Product",
+        )
+    )
+    db_session.flush()
+    db_session.add(
+        Asset(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            source_type=AssetSourceEnum.upload,
+            status=AssetStatusEnum.approved,
+            public_id=asset_public_id,
+            asset_kind="image",
+            channel_id="html-deploy",
+            format="png",
+            content={},
+            storage_key="orig/inline-asset.png",
+            content_type="image/png",
+            size_bytes=999,
+            file_status="ready",
+        )
+    )
+    funnel = Funnel(
+        id=funnel_id,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        name="Inline Asset Funnel",
+        route_slug="inline-asset-funnel",
+    )
+    db_session.add(funnel)
+    db_session.add(
+        FunnelPage(
+            id=page_id,
+            funnel_id=funnel_id,
+            name="Sales Page",
+            slug="sales-page",
+            template_id="sales-pdp",
+        )
+    )
+    db_session.add(
+        FunnelPageVersion(
+            id=version_id,
+            page_id=page_id,
+            puck_data={
+                "root": {"props": {"title": "Sales Page"}},
+                "content": [
+                    {
+                        "type": "ImportedHtmlDocument",
+                        "props": {
+                            "htmlDocument": (
+                                f"<html><body><img src='/public/assets/{asset_public_id}'></body></html>"
+                            ),
+                            "instrumentationManifest": {
+                                "schemaVersion": "html-deploy-v1",
+                                "htmlArtifactKind": "sales",
+                                "pageStage": "sales",
+                            },
+                            "htmlDeployAssetPayloads": {
+                                str(asset_public_id): {
+                                    "contentType": "image/png",
+                                    "sizeBytes": len(image_bytes),
+                                    "bytesBase64": image_bytes_base64,
+                                }
+                            },
+                            "htmlDeployStaticAssetPayloads": {
+                                "/cdn/shop/files/example-font.woff2": {
+                                    "contentType": "font/woff2",
+                                    "sizeBytes": len(font_bytes),
+                                    "bytesBase64": font_bytes_base64,
+                                    "sha256": hashlib.sha256(font_bytes).hexdigest(),
+                                },
+                                route_scoped_css_path: {
+                                    "contentType": "text/css",
+                                    "sizeBytes": len(css_bytes),
+                                    "bytesBase64": css_bytes_base64,
+                                    "sha256": hashlib.sha256(css_bytes).hexdigest(),
+                                },
+                                product_scoped_favicon_path: {
+                                    "contentType": "image/svg+xml",
+                                    "sizeBytes": len(favicon_bytes),
+                                    "bytesBase64": favicon_bytes_base64,
+                                    "sha256": hashlib.sha256(favicon_bytes).hexdigest(),
+                                },
+                            },
+                        },
+                    }
+                ],
+            },
+        )
+    )
+    db_session.add(
+        FunnelPublication(
+            id=publication_id,
+            funnel_id=funnel_id,
+            entry_page_id=page_id,
+            created_by="codex",
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication_id,
+            page_id=page_id,
+            page_version_id=version_id,
+            slug_at_publish="sales-page",
+            title_at_publish="Sales Page",
+        )
+    )
+    db_session.flush()
+    funnel.entry_page_id = page_id
+    funnel.active_publication_id = publication_id
+    db_session.commit()
+
+    import app.services.media_storage as media_storage_module
+
+    monkeypatch.setattr(
+        media_storage_module,
+        "MediaStorage",
+        lambda: pytest.fail("Inline html-deploy assets must not be downloaded from storage."),
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "build_public_page_metadata_for_context",
+        lambda **_: {"title": "Sales Page"},
+    )
+
+    payload = deploy_service.build_client_funnel_runtime_artifact_payload(
+        session=db_session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        updated_from_funnel_id=str(funnel_id),
+        updated_from_publication_id=str(publication_id),
+    )
+
+    asset_payload = payload["assets"]["items"][str(asset_public_id)]
+    assert asset_payload["serveMode"] == "embedded"
+    assert asset_payload["contentType"] == "image/png"
+    assert asset_payload["sizeBytes"] == len(image_bytes)
+    assert asset_payload["bytesBase64"] == image_bytes_base64
+    static_payload = payload["assets"]["staticItems"]["/cdn/shop/files/example-font.woff2"]
+    assert static_payload["serveMode"] == "embedded"
+    assert static_payload["contentType"] == "font/woff2"
+    assert static_payload["sizeBytes"] == len(font_bytes)
+    assert static_payload["bytesBase64"] == font_bytes_base64
+    route_static_payload = payload["assets"]["staticItems"][route_scoped_css_path]
+    assert route_static_payload["serveMode"] == "embedded"
+    assert route_static_payload["contentType"] == "text/css"
+    assert route_static_payload["sizeBytes"] == len(css_bytes)
+    assert route_static_payload["bytesBase64"] == css_bytes_base64
+    product_static_payload = payload["assets"]["staticItems"][product_scoped_favicon_path]
+    assert product_static_payload["serveMode"] == "embedded"
+    assert product_static_payload["contentType"] == "image/svg+xml"
+    assert product_static_payload["sizeBytes"] == len(favicon_bytes)
+    assert product_static_payload["bytesBase64"] == favicon_bytes_base64
+    page_props = payload["products"][product_slug]["funnels"]["inline-asset-funnel"]["pages"][
+        "sales-page"
+    ]["puckData"]["content"][0]["props"]
+    assert "htmlDeployAssetPayloads" not in page_props
+    assert "htmlDeployStaticAssetPayloads" not in page_props
+
+
+def test_html_deploy_inline_asset_payloads_fail_when_referenced_bytes_are_missing(
+    db_session, auth_context, monkeypatch
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = uuid4()
+    product_id = uuid4()
+    included_public_id = uuid4()
+    missing_public_id = uuid4()
+    image_bytes = b"\x89PNG\r\n\x1a\ninline-image"
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Inline Asset Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Inline Asset Product",
+        )
+    )
+    db_session.flush()
+    for public_id in (included_public_id, missing_public_id):
+        db_session.add(
+            Asset(
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                source_type=AssetSourceEnum.upload,
+                status=AssetStatusEnum.approved,
+                public_id=public_id,
+                asset_kind="image",
+                channel_id="html-deploy",
+                format="png",
+                content={},
+                storage_key=f"orig/{public_id}.png",
+                content_type="image/png",
+                size_bytes=len(image_bytes),
+                file_status="ready",
+            )
+        )
+    db_session.commit()
+
+    import app.services.media_storage as media_storage_module
+
+    monkeypatch.setattr(
+        media_storage_module,
+        "MediaStorage",
+        lambda: pytest.fail("Missing inline html-deploy assets must fail before storage download."),
+    )
+
+    with pytest.raises(
+        deploy_service.DeployError,
+        match="requires inline image bytes",
+    ):
+        deploy_service._build_funnel_artifact_asset_payload(
+            session=db_session,
+            org_id=str(org_id),
+            client_id=str(client_id),
+            public_ids=[str(included_public_id), str(missing_public_id)],
+            embed_bytes=True,
+            inline_asset_payloads={
+                str(included_public_id): {
+                    "contentType": "image/png",
+                    "sizeBytes": len(image_bytes),
+                    "bytesBase64": base64.b64encode(image_bytes).decode("ascii"),
+                }
+            },
+            required_inline_public_ids={str(included_public_id), str(missing_public_id)},
+        )
+
+
+def test_validate_funnel_artifact_identity_rejects_page_map_drift(
+    db_session, auth_context, monkeypatch
+):
     org_id = UUID(auth_context.org_id)
     payload, fixture = _build_identity_audit_payload_fixture(
         db_session,
@@ -794,7 +1107,9 @@ def test_validate_funnel_artifact_identity_rejects_page_map_drift(db_session, au
     )
     fixture["page_payload"]["pageMap"][str(uuid4())] = "ghost-page"
 
-    with pytest.raises(deploy_service.DeployError, match="pageMap does not match publication pages"):
+    with pytest.raises(
+        deploy_service.DeployError, match="pageMap does not match publication pages"
+    ):
         deploy_service.validate_funnel_artifact_identity(
             session=db_session,
             org_id=str(org_id),
@@ -815,7 +1130,9 @@ def test_validate_funnel_artifact_identity_rejects_stage_map_key_drift(
     )
     fixture["page_payload"]["pageStageMap"][str(uuid4())] = "sales"
 
-    with pytest.raises(deploy_service.DeployError, match="pageStageMap keys differ from pageMap keys"):
+    with pytest.raises(
+        deploy_service.DeployError, match="pageStageMap keys differ from pageMap keys"
+    ):
         deploy_service.validate_funnel_artifact_identity(
             session=db_session,
             org_id=str(org_id),
@@ -823,7 +1140,9 @@ def test_validate_funnel_artifact_identity_rejects_stage_map_key_drift(
         )
 
 
-def test_runtime_artifact_payload_preserves_published_page_slug(db_session, auth_context, monkeypatch):
+def test_runtime_artifact_payload_preserves_published_page_slug(
+    db_session, auth_context, monkeypatch
+):
     org_id = UUID(auth_context.org_id)
     client_id = uuid4()
     product_id = uuid4()
@@ -892,7 +1211,11 @@ def test_runtime_artifact_payload_preserves_published_page_slug(db_session, auth
     funnel.active_publication_id = publication_id
     db_session.commit()
 
-    monkeypatch.setattr(deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Sales Page"})
+    monkeypatch.setattr(
+        deploy_service,
+        "build_public_page_metadata_for_context",
+        lambda **_: {"title": "Sales Page"},
+    )
 
     payload = deploy_service.build_client_funnel_runtime_artifact_payload(
         session=db_session,
@@ -902,7 +1225,9 @@ def test_runtime_artifact_payload_preserves_published_page_slug(db_session, auth
         updated_from_publication_id=str(publication_id),
     )
 
-    funnel_payload = payload["products"][product_slug]["funnels"]["ember-brain-clarity-protocol-imported-template-3"]
+    funnel_payload = payload["products"][product_slug]["funnels"][
+        "ember-brain-clarity-protocol-imported-template-3"
+    ]
     assert funnel_payload["meta"]["entrySlug"] == "sales-page"
     assert funnel_payload["meta"]["pages"] == [{"pageId": str(page_id), "slug": "sales-page"}]
     assert "sales-page" in funnel_payload["pages"]
@@ -990,7 +1315,9 @@ def test_runtime_artifact_payload_preserves_multiple_presales_page_slugs(
     funnel.active_publication_id = publication_id
     db_session.commit()
 
-    monkeypatch.setattr(deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Page"})
+    monkeypatch.setattr(
+        deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Page"}
+    )
 
     payload = deploy_service.build_client_funnel_runtime_artifact_payload(
         session=db_session,
@@ -1000,7 +1327,9 @@ def test_runtime_artifact_payload_preserves_multiple_presales_page_slugs(
         updated_from_publication_id=str(publication_id),
     )
 
-    funnel_payload = payload["products"][product_slug]["funnels"]["ember-brain-clarity-protocol-imported-template-3"]
+    funnel_payload = payload["products"][product_slug]["funnels"][
+        "ember-brain-clarity-protocol-imported-template-3"
+    ]
     assert set(funnel_payload["pages"]) == {
         "presales",
         "01-personal-transformation",
@@ -1112,7 +1441,9 @@ def test_build_client_funnel_runtime_artifact_payload_prefers_explicit_publicati
     db_session.commit()
 
     monkeypatch.setattr(
-        deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Sales Page"}
+        deploy_service,
+        "build_public_page_metadata_for_context",
+        lambda **_: {"title": "Sales Page"},
     )
 
     payload = deploy_service.build_client_funnel_runtime_artifact_payload(
@@ -1124,7 +1455,9 @@ def test_build_client_funnel_runtime_artifact_payload_prefers_explicit_publicati
         publication_id_overrides={str(funnel_id): str(new_publication_id)},
     )
 
-    funnel_payload = payload["products"][product_slug]["funnels"]["ember-brain-clarity-protocol-imported-template-3"]
+    funnel_payload = payload["products"][product_slug]["funnels"][
+        "ember-brain-clarity-protocol-imported-template-3"
+    ]
     sales_page = funnel_payload["pages"]["sales-page"]
 
     assert funnel_payload["meta"]["publicationId"] == str(new_publication_id)
@@ -1132,8 +1465,165 @@ def test_build_client_funnel_runtime_artifact_payload_prefers_explicit_publicati
     assert sales_page["publicationId"] == str(new_publication_id)
 
 
-def test_resolve_publish_job_workspace_server_names_prefers_workload_scoped_domains(
+def _add_published_sales_funnel(
+    db_session,
+    *,
+    org_id,
+    client_id,
+    product_id,
+    funnel_id,
+    route_slug,
 ):
+    page_id = uuid4()
+    version_id = uuid4()
+    publication_id = uuid4()
+    funnel = Funnel(
+        id=funnel_id,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        name=route_slug,
+        route_slug=route_slug,
+    )
+    db_session.add(funnel)
+    db_session.add(
+        FunnelPage(
+            id=page_id,
+            funnel_id=funnel_id,
+            name="Sales Page",
+            slug="sales-page",
+            template_id="sales-pdp",
+        )
+    )
+    db_session.add(
+        FunnelPageVersion(
+            id=version_id,
+            page_id=page_id,
+            puck_data={"root": {"props": {"title": "Sales Page"}}, "content": []},
+        )
+    )
+    db_session.add(
+        FunnelPublication(
+            id=publication_id,
+            funnel_id=funnel_id,
+            entry_page_id=page_id,
+            created_by="codex",
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication_id,
+            page_id=page_id,
+            page_version_id=version_id,
+            slug_at_publish="sales-page",
+            title_at_publish="Sales Page",
+        )
+    )
+    db_session.flush()
+    funnel.entry_page_id = page_id
+    funnel.active_publication_id = publication_id
+    return publication_id
+
+
+def test_build_client_funnel_runtime_artifact_payload_scopes_to_included_funnel_ids(
+    db_session, monkeypatch
+):
+    org_id = TEST_ORG_ID
+    client_id = uuid4()
+    product_id = uuid4()
+    product_slug = str(product_id).split("-")[0]
+    target_funnel_id = uuid4()
+    other_funnel_id = uuid4()
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Scoped Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Scoped Product",
+        )
+    )
+    db_session.flush()
+
+    target_publication_id = _add_published_sales_funnel(
+        db_session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        funnel_id=target_funnel_id,
+        route_slug="target-flow",
+    )
+    _add_published_sales_funnel(
+        db_session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        funnel_id=other_funnel_id,
+        route_slug="other-flow",
+    )
+    db_session.commit()
+
+    monkeypatch.setattr(
+        deploy_service,
+        "build_public_page_metadata_for_context",
+        lambda **_: {"title": "Sales Page"},
+    )
+
+    payload = deploy_service.build_client_funnel_runtime_artifact_payload(
+        session=db_session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        updated_from_funnel_id=str(target_funnel_id),
+        updated_from_publication_id=str(target_publication_id),
+        publication_id_overrides={str(target_funnel_id): str(target_publication_id)},
+        included_funnel_ids={str(target_funnel_id)},
+    )
+
+    assert payload["meta"]["includedFunnelIds"] == [str(target_funnel_id)]
+    assert set(payload["products"][product_slug]["funnels"]) == {"target-flow"}
+
+
+def test_build_client_funnel_runtime_artifact_payload_fails_when_funnel_scope_matches_nothing(
+    db_session,
+):
+    org_id = TEST_ORG_ID
+    client_id = uuid4()
+    product_id = uuid4()
+    funnel_id = uuid4()
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Scoped Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Scoped Product",
+        )
+    )
+    db_session.flush()
+    _add_published_sales_funnel(
+        db_session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        funnel_id=funnel_id,
+        route_slug="other-flow",
+    )
+    db_session.commit()
+
+    with pytest.raises(deploy_service.DeployError, match="No published funnels matched"):
+        deploy_service.build_client_funnel_runtime_artifact_payload(
+            session=db_session,
+            org_id=str(org_id),
+            client_id=str(client_id),
+            updated_from_funnel_id=str(uuid4()),
+            updated_from_publication_id=str(uuid4()),
+            included_funnel_ids={str(uuid4())},
+        )
+
+
+def test_resolve_publish_job_workspace_server_names_prefers_workload_scoped_domains():
     result = deploy_service._resolve_publish_job_workspace_server_names(
         session=None,
         org_id=str(uuid4()),
@@ -1305,7 +1795,9 @@ def test_ensure_bunny_pull_zone_creates_when_missing(monkeypatch):
                 "OriginUrl": "http://46.225.124.104",
                 "Hostnames": [{"Value": "brand-funnels-workspace-123-funnel-456.b-cdn.net"}],
             }
-        raise AssertionError(f"Unexpected Bunny API call: method={method}, path={path}, payload={payload}")
+        raise AssertionError(
+            f"Unexpected Bunny API call: method={method}, path={path}, payload={payload}"
+        )
 
     monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
     zone = deploy_service._ensure_bunny_pull_zone(
@@ -1435,7 +1927,9 @@ def test_purge_bunny_pull_zone_cache_calls_expected_endpoint(monkeypatch):
     assert output == {"zoneId": 777, "status": "purged"}
 
 
-def test_ensure_bunny_pull_zone_hostname_skips_create_when_hostname_already_on_same_zone(monkeypatch):
+def test_ensure_bunny_pull_zone_hostname_skips_create_when_hostname_already_on_same_zone(
+    monkeypatch,
+):
     monkeypatch.setattr(
         deploy_service,
         "_get_bunny_pull_zone",
@@ -1444,11 +1938,17 @@ def test_ensure_bunny_pull_zone_hostname_skips_create_when_hostname_already_on_s
     monkeypatch.setattr(
         deploy_service,
         "_find_bunny_pull_zone_by_hostname",
-        lambda *, hostname: {"Id": 777, "Name": "workspace-123", "Hostnames": [{"Value": hostname}]},
+        lambda *, hostname: {
+            "Id": 777,
+            "Name": "workspace-123",
+            "Hostnames": [{"Value": hostname}],
+        },
     )
 
     def _unexpected_request(*, method: str, path: str, payload: dict | None = None):
-        raise AssertionError(f"addHostname should not run when hostname already exists ({method} {path} {payload})")
+        raise AssertionError(
+            f"addHostname should not run when hostname already exists ({method} {path} {payload})"
+        )
 
     monkeypatch.setattr(deploy_service, "_bunny_api_request", _unexpected_request)
 
@@ -1469,7 +1969,11 @@ def test_ensure_bunny_pull_zone_hostname_errors_when_hostname_is_on_other_zone(m
     monkeypatch.setattr(
         deploy_service,
         "_find_bunny_pull_zone_by_hostname",
-        lambda *, hostname: {"Id": 888, "Name": "workspace-other", "Hostnames": [{"Value": hostname}]},
+        lambda *, hostname: {
+            "Id": 888,
+            "Name": "workspace-other",
+            "Hostnames": [{"Value": hostname}],
+        },
     )
 
     with pytest.raises(
@@ -1482,7 +1986,9 @@ def test_ensure_bunny_pull_zone_hostname_errors_when_hostname_is_on_other_zone(m
         )
 
 
-def test_ensure_bunny_pull_zone_hostname_reconciles_already_registered_after_bunny_rejects_create(monkeypatch):
+def test_ensure_bunny_pull_zone_hostname_reconciles_already_registered_after_bunny_rejects_create(
+    monkeypatch,
+):
     zone_fetches = {"count": 0}
 
     def fake_get_bunny_pull_zone(*, zone_id: int):
@@ -1498,7 +2004,9 @@ def test_ensure_bunny_pull_zone_hostname_reconciles_already_registered_after_bun
         }
 
     monkeypatch.setattr(deploy_service, "_get_bunny_pull_zone", fake_get_bunny_pull_zone)
-    monkeypatch.setattr(deploy_service, "_find_bunny_pull_zone_by_hostname", lambda *, hostname: None)
+    monkeypatch.setattr(
+        deploy_service, "_find_bunny_pull_zone_by_hostname", lambda *, hostname: None
+    )
 
     def fake_bunny_api_request(*, method: str, path: str, payload: dict | None = None):
         assert method == "POST"
@@ -1546,7 +2054,11 @@ def test_provision_bunny_custom_domains_upserts_namecheap_and_requests_ssl(monke
     monkeypatch.setattr(
         deploy_service,
         "_ensure_bunny_pull_zone_hostname",
-        lambda *, zone_id, hostname: {"zone_id": zone_id, "hostname": hostname, "status": "created"},
+        lambda *, zone_id, hostname: {
+            "zone_id": zone_id,
+            "hostname": hostname,
+            "status": "created",
+        },
     )
     monkeypatch.setattr(
         deploy_service,
@@ -1629,19 +2141,29 @@ def test_provision_bunny_custom_domains_skips_ssl_request_when_disabled(monkeypa
     )
 
     def _unexpected_auto_ssl(*, zone_id: int):
-        raise AssertionError(f"Auto SSL should not run on deploy-domain save path for zone {zone_id}")
+        raise AssertionError(
+            f"Auto SSL should not run on deploy-domain save path for zone {zone_id}"
+        )
 
     def _unexpected_certificate(*, zone_id: int, hostname: str):
         raise AssertionError(
             f"Free certificate should not be requested on deploy-domain save path ({zone_id}, {hostname})"
         )
 
-    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone_auto_ssl_enabled", _unexpected_auto_ssl)
-    monkeypatch.setattr(deploy_service, "_request_bunny_pull_zone_certificate", _unexpected_certificate)
+    monkeypatch.setattr(
+        deploy_service, "_ensure_bunny_pull_zone_auto_ssl_enabled", _unexpected_auto_ssl
+    )
+    monkeypatch.setattr(
+        deploy_service, "_request_bunny_pull_zone_certificate", _unexpected_certificate
+    )
     monkeypatch.setattr(
         deploy_service,
         "_ensure_bunny_pull_zone_hostname",
-        lambda *, zone_id, hostname: {"zone_id": zone_id, "hostname": hostname, "status": "created"},
+        lambda *, zone_id, hostname: {
+            "zone_id": zone_id,
+            "hostname": hostname,
+            "status": "created",
+        },
     )
     monkeypatch.setattr(
         deploy_service,
@@ -1682,7 +2204,10 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
                                     "source_ref": {"client_id": "workspace-123"},
-                                    "service_config": {"server_names": ["offers.example.com"], "https": True},
+                                    "service_config": {
+                                        "server_names": ["offers.example.com"],
+                                        "https": True,
+                                    },
                                 }
                             ],
                         }
@@ -1741,7 +2266,10 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
     assert output["pull_zone"]["id"] == 999
     assert output["pull_zone"]["name"] == "brand-funnels-brand-abc"
     assert output["pull_zone"]["originUrl"] == "http://46.225.124.104"
-    assert output["pull_zone"]["accessUrls"] == ["https://brand-funnels-brand-abc.b-cdn.net/", "https://offers.example.com/"]
+    assert output["pull_zone"]["accessUrls"] == [
+        "https://brand-funnels-brand-abc.b-cdn.net/",
+        "https://offers.example.com/",
+    ]
     assert output["pull_zone"]["dnsTargetHostname"] == "brand-funnels-brand-abc.b-cdn.net"
     assert isinstance(output["pull_zone"]["domainProvisioning"], list)
     assert captured == {
@@ -1752,7 +2280,9 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
     }
 
 
-def test_configure_bunny_pull_zone_for_workload_uses_workspace_id_for_zone_scope(tmp_path, monkeypatch):
+def test_configure_bunny_pull_zone_for_workload_uses_workspace_id_for_zone_scope(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
 
@@ -1769,7 +2299,10 @@ def test_configure_bunny_pull_zone_for_workload_uses_workspace_id_for_zone_scope
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
                                     "source_ref": {"client_id": "client-456"},
-                                    "service_config": {"server_names": ["offers.example.com"], "https": True},
+                                    "service_config": {
+                                        "server_names": ["offers.example.com"],
+                                        "https": True,
+                                    },
                                 }
                             ],
                         }
@@ -1828,7 +2361,9 @@ def test_configure_bunny_pull_zone_for_workload_uses_workspace_id_for_zone_scope
     }
 
 
-def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domains(tmp_path, monkeypatch):
+def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domains(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
 
@@ -1845,7 +2380,11 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
                                     "source_ref": {"client_id": "workspace-123"},
-                                    "service_config": {"server_names": [], "https": False, "ports": [24123]},
+                                    "service_config": {
+                                        "server_names": [],
+                                        "https": False,
+                                        "ports": [24123],
+                                    },
                                 }
                             ],
                         }
@@ -1915,7 +2454,11 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
                                     "source_ref": {"client_id": "workspace-123"},
-                                    "service_config": {"server_names": [], "https": False, "ports": []},
+                                    "service_config": {
+                                        "server_names": [],
+                                        "https": False,
+                                        "ports": [],
+                                    },
                                 }
                             ],
                         }
@@ -1967,7 +2510,9 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
     }
 
 
-def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_override(tmp_path, monkeypatch):
+def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_override(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
 
@@ -1984,7 +2529,11 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
                                     "source_ref": {"client_id": "workspace-123"},
-                                    "service_config": {"server_names": [], "https": False, "ports": []},
+                                    "service_config": {
+                                        "server_names": [],
+                                        "https": False,
+                                        "ports": [],
+                                    },
                                 }
                             ],
                         }
@@ -2044,7 +2593,9 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
     assert captured["request_ssl"] is False
 
 
-def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_scope_mismatches(tmp_path, monkeypatch):
+def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_scope_mismatches(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
 
@@ -2061,7 +2612,10 @@ def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_scope_mism
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
                                     "source_ref": {"client_id": "workspace-123"},
-                                    "service_config": {"server_names": ["offers.example.com"], "https": True},
+                                    "service_config": {
+                                        "server_names": ["offers.example.com"],
+                                        "https": True,
+                                    },
                                 }
                             ],
                         }
@@ -2098,7 +2652,11 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
                                     "source_ref": {"client_id": "workspace-123"},
-                                    "service_config": {"server_names": [], "https": False, "ports": []},
+                                    "service_config": {
+                                        "server_names": [],
+                                        "https": False,
+                                        "ports": [],
+                                    },
                                 }
                             ],
                         }
@@ -2356,6 +2914,94 @@ def test_validate_standalone_html_image_references_rejects_missing_srcset_asset(
         )
 
 
+def test_html_deploy_rewrites_inline_relative_static_asset_references():
+    png = _tiny_png_bytes()
+    served_assets = {
+        "/assets/flow-images/hero.webp": deployer_adapter._StandaloneServedAsset(
+            content=png,
+            content_type="image/webp",
+        ),
+        "/assets/quiz-icons/yes.svg": deployer_adapter._StandaloneServedAsset(
+            content=b"<svg></svg>",
+            content_type="image/svg+xml",
+        ),
+        "/assets/tenor/aeonik-400.woff2": deployer_adapter._StandaloneServedAsset(
+            content=b"font-bytes",
+            content_type="font/woff2",
+        ),
+    }
+
+    html_document = """
+    <style>@font-face{src:url("./assets/tenor/aeonik-400.woff2")}</style>
+    <script>
+      window.__LOCAL_IMAGE_MAP = {
+        "hero": "./assets/flow-images/hero.webp?width=716#main",
+        "yes": "./assets/quiz-icons/yes.svg"
+      };
+    </script>
+    """
+
+    rewritten = deployer_adapter._rewrite_relative_standalone_static_asset_references(
+        html_document,
+        standalone_served_assets=served_assets,
+        context_label="test quiz",
+    )
+
+    assert "./assets/" not in rewritten
+    assert "/assets/flow-images/hero.webp?width=716#main" in rewritten
+    assert "/assets/quiz-icons/yes.svg" in rewritten
+    assert 'url("/assets/tenor/aeonik-400.woff2")' in rewritten
+    assert (
+        deployer_adapter._rewrite_relative_standalone_static_asset_references(
+            rewritten,
+            standalone_served_assets=served_assets,
+            context_label="test quiz",
+        )
+        == rewritten
+    )
+
+
+def test_html_deploy_rejects_unregistered_inline_relative_static_asset_reference():
+    with pytest.raises(ValueError, match="not present in the html-deploy asset payload"):
+        deployer_adapter._rewrite_relative_standalone_static_asset_references(
+            '<script>window.icon = "./assets/quiz-icons/missing.svg";</script>',
+            standalone_served_assets={},
+            context_label="test quiz",
+        )
+
+
+def test_html_deploy_rewrites_inline_relative_assets_to_route_scoped_payloads():
+    png = _tiny_png_bytes()
+    served_assets = {
+        "/8b89a76d/testosterone-support/quiz/assets/flow-images/hero.webp": (
+            deployer_adapter._StandaloneServedAsset(
+                content=png,
+                content_type="image/webp",
+            )
+        ),
+    }
+
+    rewritten = deployer_adapter._rewrite_relative_standalone_static_asset_references(
+        '<script>window.hero = "./assets/flow-images/hero.webp";</script>',
+        standalone_served_assets=served_assets,
+        context_label="test quiz",
+        asset_route_prefixes=(
+            "/assets/",
+            "/8b89a76d/testosterone-support/quiz/assets/",
+        ),
+    )
+
+    assert "./assets/" not in rewritten
+    assert "/8b89a76d/testosterone-support/quiz/assets/flow-images/hero.webp" in rewritten
+
+
+def test_html_deploy_nginx_redirects_directory_routes_to_trailing_slash():
+    block = deployer_adapter._html_deploy_directory_slash_redirect_nginx_block()
+
+    assert "-d $request_filename" in block
+    assert "return 302 $mos_html_deploy_directory_redirect/$is_args$args;" in block
+
+
 def test_validate_standalone_html_image_references_validates_uploaded_public_asset_bytes():
     site_dir = "/tmp/mos-standalone-preflight"
     public_id = "77777777-7777-4777-8777-777777777777"
@@ -2378,8 +3024,12 @@ def test_validate_standalone_html_image_references_validates_uploaded_public_ass
     )
 
 
-def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatible_artifact(monkeypatch):
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist")
+def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatible_artifact(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist"
+    )
     workload_patch = deploy_service.build_funnel_publication_workload_patch(
         workload_name="auto-standalone-funnel",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
@@ -2415,7 +3065,7 @@ def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatibl
                                             "type": "ImportedHtmlDocument",
                                             "props": {
                                                 "htmlDocument": "<html><body>ok</body></html>",
-                                                    "instrumentationManifest": {
+                                                "instrumentationManifest": {
                                                     "schemaVersion": "html-deploy-v1",
                                                     "htmlArtifactKind": "sales",
                                                     "pageStage": "sales",
@@ -2441,7 +3091,7 @@ def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatibl
                                     ],
                                     "zones": {},
                                 }
-                            }
+                            },
                         },
                     }
                 },
@@ -2462,8 +3112,12 @@ def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatibl
     assert "runtime_dist_path" not in source_ref
 
 
-def test_apply_publish_job_artifact_render_mode_rejects_runtime_bundle_fallback_for_incompatible_artifact(monkeypatch):
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist")
+def test_apply_publish_job_artifact_render_mode_rejects_runtime_bundle_fallback_for_incompatible_artifact(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist"
+    )
     workload_patch = deploy_service.build_funnel_publication_workload_patch(
         workload_name="fallback-runtime-funnel",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
@@ -2510,7 +3164,9 @@ def test_apply_publish_job_artifact_render_mode_rejects_runtime_bundle_fallback_
         },
     }
 
-    with pytest.raises(deploy_service.DeployError, match="Legacy production HTML deployment fallback"):
+    with pytest.raises(
+        deploy_service.DeployError, match="Legacy production HTML deployment fallback"
+    ):
         deploy_service._apply_publish_job_artifact_render_mode(
             workload_patch=workload_patch,
             artifact_payload=artifact_payload,
@@ -2577,8 +3233,7 @@ def test_patch_workload_in_plan_assigns_different_ports_for_different_orgs(tmp_p
     payload = json.loads(plan_path.read_text(encoding="utf-8"))
     workloads = payload["new_spec"]["instances"][0]["workloads"]
     ports_by_workload = {
-        str(item["name"]): int(item["service_config"]["ports"][0])
-        for item in workloads
+        str(item["name"]): int(item["service_config"]["ports"][0]) for item in workloads
     }
     assert ports_by_workload["brand-funnels-a"] != ports_by_workload["brand-funnels-b"]
 
@@ -2718,7 +3373,9 @@ def test_find_latest_plan_ignores_materialized_apply_plans(tmp_path, monkeypatch
     assert latest == canonical_newer
 
 
-def test_find_latest_plan_returns_none_when_only_materialized_apply_plan_exists(tmp_path, monkeypatch):
+def test_find_latest_plan_returns_none_when_only_materialized_apply_plan_exists(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
 
     materialized = tmp_path / "plan-apply-2026-02-19T12-06-00Z-abcd1234.json"
@@ -2763,6 +3420,79 @@ def test_materialize_funnel_artifacts_for_apply_skips_empty_inline_artifacts_wit
     assert materialized == plan_file
 
 
+def test_materialize_funnel_artifacts_for_apply_scopes_selected_workload_before_validation(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "stale-invalid-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "client_id": "client-old",
+                                        "artifact_render_mode": "standalone_imported_html",
+                                        "artifact": {"meta": {"clientId": "client-old"}},
+                                    },
+                                },
+                                {
+                                    "name": "selected-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "client_id": "client-new",
+                                        "artifact_render_mode": "html_deploy",
+                                        "upstream_api_base_root": "https://api.moshq.app",
+                                        "artifact": {
+                                            "meta": {"clientId": "client-new"},
+                                            "products": {},
+                                        },
+                                    },
+                                },
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(
+        plan_file=plan_file,
+        workload_names={"selected-workload"},
+    )
+
+    assert materialized != plan_file
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    workloads = payload["new_spec"]["instances"][0]["workloads"]
+    assert [workload["name"] for workload in workloads] == ["selected-workload"]
+    assert workloads[0]["source_ref"]["artifact_render_mode"] == "html_deploy"
+
+
+def test_materialize_funnel_artifacts_for_apply_rejects_missing_selected_workload(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps({"new_spec": {"instances": [{"name": "mos-ghc-1", "workloads": []}]}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(deploy_service.DeployError, match="Selected deploy workload"):
+        deploy_service._materialize_funnel_artifacts_for_apply(
+            plan_file=plan_file,
+            workload_names={"selected-workload"},
+        )
+
+
 def test_materialize_funnel_artifacts_for_apply_hydrates_from_artifact_id(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
 
@@ -2778,7 +3508,9 @@ def test_materialize_funnel_artifacts_for_apply_hydrates_from_artifact_id(tmp_pa
             },
         }
 
-    monkeypatch.setattr(deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load)
+    monkeypatch.setattr(
+        deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load
+    )
     monkeypatch.setattr(
         deploy_service,
         "_artifact_payload_supports_html_deploy",
@@ -2843,7 +3575,9 @@ def test_materialize_funnel_artifacts_for_apply_replaces_stale_inline_artifact_w
             },
         }
 
-    monkeypatch.setattr(deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load)
+    monkeypatch.setattr(
+        deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load
+    )
     monkeypatch.setattr(
         deploy_service,
         "_artifact_payload_supports_html_deploy",
@@ -2868,7 +3602,10 @@ def test_materialize_funnel_artifacts_for_apply_replaces_stale_inline_artifact_w
                                         "upstream_api_base_root": "https://api.moshq.app",
                                         "runtime_dist_path": "mos/frontend/dist",
                                         "artifact": {
-                                            "meta": {"artifactId": "artifact-old", "publicationId": "pub-old"},
+                                            "meta": {
+                                                "artifactId": "artifact-old",
+                                                "publicationId": "pub-old",
+                                            },
                                             "products": {
                                                 "sample-product": {
                                                     "meta": {"productSlug": "sample-product"},
@@ -2906,7 +3643,9 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_publication_so
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app"
+    )
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -2946,7 +3685,9 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_artifact_sourc
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app"
+    )
     client_id = "f51f25df-e761-4ead-850b-a35a20b35fde"
     product_id = "638d19db-9480-4bbd-91c6-052b07b6537d"
 
@@ -2957,7 +3698,9 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_artifact_sourc
             "legacy-product",
         )
 
-    monkeypatch.setattr(deploy_service, "_load_product_route_context_for_apply", _fake_product_context)
+    monkeypatch.setattr(
+        deploy_service, "_load_product_route_context_for_apply", _fake_product_context
+    )
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -2996,7 +3739,9 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_artifact_sourc
     source_ref = workload["source_ref"]
     assert source_ref["client_id"] == client_id
     assert source_ref["upstream_api_base_root"] == "https://api.moshq.app"
-    assert source_ref["runtime_dist_path"] == deploy_service.settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+    assert (
+        source_ref["runtime_dist_path"] == deploy_service.settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+    )
     assert "legacy-product" in source_ref["artifact"]["products"]
 
 
@@ -3005,7 +3750,9 @@ def test_materialize_funnel_artifacts_for_apply_converts_legacy_artifact_public_
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app"
+    )
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -3049,7 +3796,9 @@ def test_materialize_funnel_artifacts_for_apply_preserves_standalone_render_mode
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app"
+    )
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -3094,7 +3843,9 @@ def test_materialize_funnel_artifacts_for_apply_infers_standalone_render_mode_fr
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app"
+    )
 
     def _fake_load(*, artifact_id: str):
         assert artifact_id == "artifact-123"
@@ -3139,7 +3890,9 @@ def test_materialize_funnel_artifacts_for_apply_infers_standalone_render_mode_fr
             },
         }
 
-    monkeypatch.setattr(deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load)
+    monkeypatch.setattr(
+        deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load
+    )
     monkeypatch.setattr(
         deploy_service,
         "_artifact_payload_supports_html_deploy",
@@ -3201,7 +3954,9 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
                                     "content": [
                                         {
                                             "type": "ImportedHtmlDocument",
-                                            "props": {"htmlDocument": "<html><body>ok</body></html>"},
+                                            "props": {
+                                                "htmlDocument": "<html><body>ok</body></html>"
+                                            },
                                         }
                                     ]
                                 },
@@ -3214,14 +3969,20 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
         "assets": {"items": {"asset-1": {"sizeBytes": 12, "bytesBase64": "YWJj"}}},
     }
 
-    monkeypatch.setattr(
-        deploy_service,
-        "persist_client_funnel_runtime_artifact",
-        lambda **_: {
+    captured_persist_kwargs = {}
+
+    def _persist_runtime_artifact(**kwargs):
+        captured_persist_kwargs.update(kwargs)
+        return {
             "artifact_id": "artifact-123",
             "artifact_version": 7,
             "client_id": "client-1",
-        },
+        }
+
+    monkeypatch.setattr(
+        deploy_service,
+        "persist_client_funnel_runtime_artifact",
+        _persist_runtime_artifact,
     )
 
     import app.db.repositories.artifacts as artifacts_module
@@ -3242,6 +4003,7 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
         "source_type": "funnel_artifact",
         "source_ref": {
             "upstream_api_base_root": "https://api.moshq.app",
+            "artifact_render_mode": "html_deploy",
             "artifact": {"meta": {"clientId": "client-1"}, "products": {}},
         },
     }
@@ -3259,8 +4021,8 @@ def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_p
     assert hydrated["source_ref"]["artifact_id"] == "artifact-123"
     assert hydrated["source_ref"]["artifact_version"] == 7
     assert hydrated["source_ref"]["artifact"] == artifact_payload
-    assert hydrated["source_ref"]["artifact"] is not artifact_payload
     assert hydrated["source_ref"]["artifact"]["meta"]["artifactId"] == "artifact-123"
+    assert captured_persist_kwargs["included_funnel_ids"] == {"funnel-1"}
 
 
 def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens():
@@ -3282,7 +4044,9 @@ def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens(
                                 "slides": [
                                     {"thumbAssetPublicId": "22222222-2222-2222-2222-222222222222"},
                                     {"src": "/public/assets/44444444-4444-4444-4444-444444444444"},
-                                    {"poster": "https://cdn.example.com/api/public/assets/55555555-5555-5555-5555-555555555555.png"},
+                                    {
+                                        "poster": "https://cdn.example.com/api/public/assets/55555555-5555-5555-5555-555555555555.png"
+                                    },
                                 ]
                             }
                         }
@@ -3447,9 +4211,21 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
                         {
                             "type": "SalesPdpHeader",
                             "props": {
-                                "config": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo", "href": "#top"}},
+                                "config": {
+                                    "logo": {
+                                        "assetPublicId": stale_logo_id,
+                                        "alt": "Old Logo",
+                                        "href": "#top",
+                                    }
+                                },
                                 "configJson": json.dumps(
-                                    {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo", "href": "#top"}}
+                                    {
+                                        "logo": {
+                                            "assetPublicId": stale_logo_id,
+                                            "alt": "Old Logo",
+                                            "href": "#top",
+                                        }
+                                    }
                                 ),
                             },
                         },
@@ -3457,7 +4233,13 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
                             "type": "SalesPdpHero",
                             "props": {
                                 "config": {
-                                    "header": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo", "href": "#top"}},
+                                    "header": {
+                                        "logo": {
+                                            "assetPublicId": stale_logo_id,
+                                            "alt": "Old Logo",
+                                            "href": "#top",
+                                        }
+                                    },
                                     "gallery": {"slides": [{"assetPublicId": gallery_asset_id}]},
                                 },
                                 "configJson": json.dumps(
@@ -3469,7 +4251,9 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
                                                 "href": "#top",
                                             }
                                         },
-                                        "gallery": {"slides": [{"assetPublicId": gallery_asset_id}]},
+                                        "gallery": {
+                                            "slides": [{"assetPublicId": gallery_asset_id}]
+                                        },
                                     }
                                 ),
                             },
@@ -3477,8 +4261,12 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
                         {
                             "type": "SalesPdpFooter",
                             "props": {
-                                "config": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}},
-                                "configJson": json.dumps({"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}}),
+                                "config": {
+                                    "logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}
+                                },
+                                "configJson": json.dumps(
+                                    {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}}
+                                ),
                             },
                         },
                     ]
@@ -3495,7 +4283,9 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
                 "type": "PreSalesFooter",
                 "props": {
                     "config": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}},
-                    "configJson": json.dumps({"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}}),
+                    "configJson": json.dumps(
+                        {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}}
+                    ),
                 },
             },
             {
@@ -3511,7 +4301,9 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
 
     materialized = deploy_service._materialize_design_system_brand_logo_in_puck_data(
         puck_data=puck_data,
-        design_system_tokens={"brand": {"logoAssetPublicId": current_logo_id, "logoAlt": brand_alt}},
+        design_system_tokens={
+            "brand": {"logoAssetPublicId": current_logo_id, "logoAlt": brand_alt}
+        },
     )
 
     sales_page_blocks = materialized["content"][0]["props"]["content"]
@@ -3555,7 +4347,9 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
 
     extracted = deploy_service._extract_embedded_asset_public_ids(
         puck_data=materialized,
-        design_system_tokens={"brand": {"logoAssetPublicId": current_logo_id, "logoAlt": brand_alt}},
+        design_system_tokens={
+            "brand": {"logoAssetPublicId": current_logo_id, "logoAlt": brand_alt}
+        },
         context_label="artifact-page",
     )
 
@@ -3673,7 +4467,9 @@ def _build_tracking_validation_artifact_payload(
                             "id": "question-1",
                             "selector": "#question-1",
                             "questionId": "q1",
+                            "questionText": "Question 1",
                             "questionIndex": 1,
+                            "questionType": "single_select",
                             "quizId": "daily-drive-quiz",
                             "quizVersion": "v1",
                         },
@@ -3683,8 +4479,13 @@ def _build_tracking_validation_artifact_payload(
                             "id": "option-1",
                             "selector": "#option-1",
                             "questionId": "q1",
+                            "questionText": "Question 1",
                             "questionIndex": 1,
                             "optionId": "a1",
+                            "optionText": "Answer 1",
+                            "optionIndex": 1,
+                            "selectionOrder": 1,
+                            "submitOnSelect": True,
                             "quizId": "daily-drive-quiz",
                             "quizVersion": "v1",
                         },
@@ -3693,7 +4494,11 @@ def _build_tracking_validation_artifact_payload(
                         {"id": "result-1", "selector": "#result-1", "resultId": "r1"},
                     ],
                     "quizMechanisms": [
-                        {"id": "mechanism-1", "selector": "#mechanism-1", "mechanismName": "metabolic"},
+                        {
+                            "id": "mechanism-1",
+                            "selector": "#mechanism-1",
+                            "mechanismName": "metabolic",
+                        },
                     ],
                     "quizRecommendations": [
                         {
@@ -3712,9 +4517,7 @@ def _build_tracking_validation_artifact_payload(
                 "content": [
                     {
                         "type": "ImportedHtml",
-                        "props": {
-                            "instrumentationManifest": presales_manifest
-                        },
+                        "props": {"instrumentationManifest": presales_manifest},
                     }
                 ]
             },
@@ -3807,6 +4610,20 @@ def _install_publish_job_mocks(monkeypatch):
     )
     monkeypatch.setattr(
         deploy_service,
+        "_snapshot_funnel_publication_state_isolated",
+        lambda **kwargs: {"activePublicationId": "previous-publication", "status": "published"},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_restore_funnel_publication_state_isolated",
+        lambda **kwargs: {
+            "status": "restored",
+            "previousActivePublicationId": "previous-publication",
+            "failedPublicationId": kwargs["failed_publication_id"],
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
         "hydrate_funnel_artifact_workload_patch",
         lambda **kwargs: {
             "name": "brand-funnels-70124684-be65d76e",
@@ -3875,7 +4692,10 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
     assert plan["sales_page"]["slug"] == "sales-page"
     path_plan = plan["path_plans"][0]
     assert path_plan["start_page"]["slug"] == "presales"
-    assert deploy_service._expected_presales_source_page_type(path_plan=path_plan) == "listical_presell"
+    assert (
+        deploy_service._expected_presales_source_page_type(path_plan=path_plan)
+        == "listical_presell"
+    )
     assert path_plan["pre_sales_click_selectors"] == ["#to-sales"]
     assert [target["selector"] for target in path_plan["checkout_targets"]] == ["#checkout-btn"]
     assert path_plan["expected_internal_events"] == [
@@ -3895,7 +4715,6 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "Entered Sales Page",
         "EnteredSales",
         "ViewContent",
-        "AddToCart",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
@@ -3915,7 +4734,7 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "ViewContent",
         "offer_page_view",
         "sales_to_checkout_click",
-        "AddToCart",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
@@ -3931,7 +4750,8 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "cta_view",
         "sales_page_view",
         "EnteredSales",
-        "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
@@ -3956,9 +4776,9 @@ def test_build_funnel_tracking_validation_plan_rejects_legacy_html_manifest():
     artifact_payload = json.loads(
         json.dumps(_build_tracking_validation_artifact_payload(include_presales=True))
     )
-    presales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["presales"][
-        "puckData"
-    ]["content"][0]["props"]["instrumentationManifest"]
+    presales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"][
+        "presales"
+    ]["puckData"]["content"][0]["props"]["instrumentationManifest"]
     presales_manifest["schemaVersion"] = "standalone-imported-html-v0"
 
     with pytest.raises(deploy_service.DeployError, match="html-deploy-v1"):
@@ -3999,20 +4819,150 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
         "QuizLeadViewed",
         "QuizQuestionViewed",
         "QuizOptionPresented",
+        "QuizOptionSelected",
+        "QuizQuestionSubmitted",
         "QuizResultViewed",
         "QuizMechanismViewed",
         "QuizProofViewed",
         "QuizRecommendationViewed",
         "QuizCtaViewed",
-        "QuizOptionSelected",
-        "QuizQuestionSubmitted",
         "QuizCompleted",
         "sales_page_view",
         "EnteredSales",
-        "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
+
+
+def test_quiz_scroll_targets_require_declared_breakpoints():
+    manifest = {
+        "quizScrollTargets": [
+            {
+                "id": "summary_scroll",
+                "screenIndex": 17,
+                "screenName": "ScreenSummaryBrand",
+            }
+        ]
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="requiredBreakpoints"):
+        deploy_service._quiz_scroll_targets_from_manifest(manifest=manifest)
+
+
+def test_quiz_scroll_target_url_preserves_tracking_params():
+    manifest = {
+        "quizScrollTargets": [
+            {
+                "id": "summary_scroll",
+                "screenIndex": 17,
+                "screenName": "ScreenSummaryBrand",
+                "route": "quiz",
+                "requiredBreakpoints": [10, 25, 50, 75, 90],
+            }
+        ]
+    }
+    target = deploy_service._quiz_scroll_targets_from_manifest(manifest=manifest)[0]
+
+    assert (
+        deploy_service._quiz_scroll_target_url(
+            entry_url="https://shop.example/8b89a76d/testosterone-support/quiz?codex_tracking=v1&screen=0#quiz",
+            target=target,
+        )
+        == "https://shop.example/8b89a76d/testosterone-support/quiz?codex_tracking=v1&screen=17#quiz"
+    )
+
+
+def test_readback_quiz_scroll_targets_require_each_declared_breakpoint():
+    path_plan = {
+        "start_page": {
+            "manifest": {
+                "quizScrollTargets": [
+                    {
+                        "id": "protocol_ready_scroll",
+                        "screenIndex": 19,
+                        "screenName": "ScreenGraphLevelBrand",
+                        "requiredBreakpoints": [10, 25, 50],
+                    }
+                ]
+            }
+        }
+    }
+    rows = [
+        {
+            "event": "scroll_depth",
+            "event_source_url": "https://shop.example/8b89a76d/testosterone-support/quiz?codex_tracking=v1&screen=19#protocol-ready",
+            "scrollDepthPct": breakpoint,
+        }
+        for breakpoint in (10, 25)
+    ]
+
+    with pytest.raises(deploy_service.DeployError, match="protocol_ready_scroll.*50"):
+        deploy_service._assert_readback_quiz_scroll_targets(
+            rows=rows,
+            path_plan=path_plan,
+            validation_id="v1",
+        )
+
+
+def test_readback_quiz_scroll_targets_accept_declared_breakpoints():
+    path_plan = {
+        "start_page": {
+            "manifest": {
+                "quizScrollTargets": [
+                    {
+                        "id": "summary_scroll",
+                        "screenIndex": 17,
+                        "screenName": "ScreenSummaryBrand",
+                        "requiredBreakpoints": [10, 25, 50],
+                    }
+                ]
+            }
+        }
+    }
+    rows = [
+        {
+            "event": "scroll_depth",
+            "event_source_url": "https://shop.example/8b89a76d/testosterone-support/quiz?codex_tracking=v1&screen=17#quiz",
+            "scrollDepthPct": breakpoint,
+        }
+        for breakpoint in (10, 25, 50)
+    ]
+
+    deploy_service._assert_readback_quiz_scroll_targets(
+        rows=rows,
+        path_plan=path_plan,
+        validation_id="v1",
+    )
+
+
+def test_browser_scroll_breakpoint_counts_are_screen_scoped():
+    observed_state = {
+        "posthog": {
+            "captures": [
+                [
+                    "scroll_depth",
+                    {
+                        "event_source_url": "https://shop.example/quiz?screen=17#quiz",
+                        "scrollDepthPct": 25,
+                    },
+                ],
+                [
+                    "scroll_depth",
+                    {
+                        "event_source_url": "https://shop.example/quiz?screen=19#protocol-ready",
+                        "scrollDepthPct": 25,
+                    },
+                ],
+            ]
+        }
+    }
+
+    assert deploy_service._recorded_posthog_scroll_depth_counts(
+        observed_state=observed_state,
+        screen_index=17,
+    ) == {25: 1}
 
 
 @pytest.mark.parametrize(
@@ -4039,7 +4989,8 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
                 "cta_view",
                 "sales_page_view",
                 "EnteredSales",
-                "AddToCart",
+                "sales_to_checkout_click",
+                "checkout_click",
                 "SalesToCheckoutClick",
                 "SalesToCheckoutClicked",
             },
@@ -4071,7 +5022,8 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
                 "QuizCompleted",
                 "sales_page_view",
                 "EnteredSales",
-                "AddToCart",
+                "sales_to_checkout_click",
+                "checkout_click",
                 "SalesToCheckoutClick",
                 "SalesToCheckoutClicked",
             },
@@ -4083,7 +5035,8 @@ def test_build_funnel_tracking_validation_plan_requires_quiz_posthog_readback_ev
             {
                 "sales_page_view",
                 "EnteredSales",
-                "AddToCart",
+                "sales_to_checkout_click",
+                "checkout_click",
                 "SalesToCheckoutClick",
                 "SalesToCheckoutClicked",
             },
@@ -4121,7 +5074,10 @@ def test_html_deploy_production_ready_validation_contract_requires_live_posthog_
         assert "EnteredPresales" in path_plan["expected_meta_events"]
         assert "PreSalesToSalesClick" in path_plan["expected_meta_events"]
         assert "EnteredSales" in path_plan["expected_meta_events"]
-        assert deploy_service._expected_presales_source_page_type(path_plan=path_plan) == expected_profile
+        assert (
+            deploy_service._expected_presales_source_page_type(path_plan=path_plan)
+            == expected_profile
+        )
     else:
         assert path_plan["pre_sales_click_selectors"] == []
         assert "EnteredPresales" not in path_plan["expected_meta_events"]
@@ -4153,9 +5109,7 @@ def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatc
         output_path.write_text(
             json.dumps(
                 {
-                    "categories": {
-                        "performance": {"score": 0.91 if profile == "mobile" else 0.93}
-                    },
+                    "categories": {"performance": {"score": 0.91 if profile == "mobile" else 0.93}},
                     "audits": {
                         "largest-contentful-paint": {
                             "score": 0.9,
@@ -4208,8 +5162,7 @@ def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatc
         "desktop",
     ]
     assert all(
-        "mos_deploy_candidate_release=candidate-123" in audit["url"]
-        for audit in result["audits"]
+        "mos_deploy_candidate_release=candidate-123" in audit["url"] for audit in result["audits"]
     )
     assert len(calls) == 4
     assert any("--preset=desktop" in call for call in calls)
@@ -4223,9 +5176,7 @@ def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch
         output_path.write_text(
             json.dumps(
                 {
-                    "categories": {
-                        "performance": {"score": 0.9 if profile == "desktop" else 0.84}
-                    },
+                    "categories": {"performance": {"score": 0.9 if profile == "desktop" else 0.84}},
                     "audits": {},
                 }
             ),
@@ -4383,6 +5334,160 @@ def test_run_html_deploy_optimization_validation_checks_candidate_pages(monkeypa
     assert all("mos_deploy_candidate_release=candidate-123" in url for url in page_requests)
 
 
+def test_html_deploy_validation_targets_include_tracked_presales_sales_handoff_url():
+    pre_sales_page = {
+        "url": "https://shop.example.com/quiz/",
+        "stage": "pre_sales",
+        "html_artifact_kind": "quiz",
+    }
+    sales_page = {
+        "url": "https://shop.example.com/sales-page/",
+        "stage": "sales",
+        "html_artifact_kind": "sales",
+    }
+
+    targets = deploy_service._html_deploy_validation_targets(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [pre_sales_page, sales_page],
+            "path_plans": [
+                {
+                    "start_page": pre_sales_page,
+                    "sales_page": sales_page,
+                    "pre_sales_click_selectors": ["#to-sales"],
+                }
+            ],
+        }
+    )
+
+    urls = [target["url"] for target in targets]
+    assert any("source_page_type=quiz_presell" in url for url in urls)
+    assert any("from_stage=pre_sales" in url for url in urls)
+    assert any("to_stage=sales" in url for url in urls)
+    assert all("mos_deploy_candidate_release=candidate-123" in url for url in urls)
+
+
+def test_html_deploy_no_trailing_slash_entry_preserves_query_and_hash():
+    assert (
+        deploy_service._html_deploy_no_trailing_slash_url(
+            "https://shop.example.com/product/funnel/quiz/?screen=2#quiz"
+        )
+        == "https://shop.example.com/product/funnel/quiz?screen=2#quiz"
+    )
+    assert (
+        deploy_service._html_deploy_no_trailing_slash_url(
+            "https://shop.example.com/product/funnel/quiz?screen=2#quiz"
+        )
+        == "https://shop.example.com/product/funnel/quiz?screen=2#quiz"
+    )
+
+
+def test_html_deploy_browser_resource_validation_detects_route_asset_escape():
+    prefixes = ["/8b89a76d/testosterone-support/quiz/assets/"]
+
+    escaped = deploy_service._html_deploy_browser_resource_failure_message(
+        origin="https://shoptenorco.com",
+        request_url=(
+            "https://shoptenorco.com/8b89a76d/testosterone-support/assets/quiz-icons/concern-energy.svg"
+        ),
+        resource_type="image",
+        route_asset_prefixes=prefixes,
+    )
+    allowed = deploy_service._html_deploy_browser_resource_failure_message(
+        origin="https://shoptenorco.com",
+        request_url=(
+            "https://shoptenorco.com/8b89a76d/testosterone-support/quiz/assets/quiz-icons/concern-energy.svg"
+        ),
+        resource_type="image",
+        route_asset_prefixes=prefixes,
+    )
+    public_asset = deploy_service._html_deploy_browser_resource_failure_message(
+        origin="https://shoptenorco.com",
+        request_url="https://shoptenorco.com/public/assets/pill-caddy",
+        resource_type="image",
+        route_asset_prefixes=prefixes,
+    )
+
+    assert "outside route asset prefix" in escaped
+    assert allowed == ""
+    assert public_asset == ""
+
+
+def test_html_deploy_browser_resource_validation_detects_failed_route_asset():
+    failure = deploy_service._html_deploy_browser_resource_failure_message(
+        origin="https://shoptenorco.com",
+        request_url=(
+            "https://shoptenorco.com/8b89a76d/testosterone-support/quiz/assets/quiz-icons/concern-energy.svg"
+        ),
+        resource_type="image",
+        status=404,
+        route_asset_prefixes=["/8b89a76d/testosterone-support/quiz/assets/"],
+    )
+
+    assert "HTTP 404" in failure
+
+
+def test_run_html_deploy_optimization_validation_checks_tracked_sales_handoff_resources(
+    monkeypatch,
+):
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def get(self, url):
+            raw_url = str(url)
+            if "/assets/broken.css" in raw_url:
+                return _HtmlDeployOptimizationFakeResponse(
+                    status_code=404,
+                    content_type="text/css",
+                )
+            if "/assets/" in raw_url:
+                return _HtmlDeployOptimizationFakeResponse(content_type="image/webp")
+            html = _optimized_html_fixture()
+            if "source_page_type=quiz_presell" in raw_url:
+                html = html.replace(
+                    "</head>",
+                    '<link rel="stylesheet" href="/assets/broken.css"></head>',
+                )
+            return _HtmlDeployOptimizationFakeResponse(text=html)
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    pre_sales_page = {
+        "url": "https://shop.example.com/quiz/",
+        "stage": "pre_sales",
+        "html_artifact_kind": "quiz",
+    }
+    sales_page = {
+        "url": "https://shop.example.com/sales-page/",
+        "stage": "sales",
+        "html_artifact_kind": "sales",
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="source_page_type=quiz_presell"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [pre_sales_page, sales_page],
+                "path_plans": [
+                    {
+                        "start_page": pre_sales_page,
+                        "sales_page": sales_page,
+                        "pre_sales_click_selectors": ["#to-sales"],
+                    }
+                ],
+            }
+        )
+
+
 def test_run_html_deploy_optimization_validation_fails_without_render_marker(monkeypatch):
     class FakeClient:
         def __init__(self, **kwargs):
@@ -4524,7 +5629,6 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
         "Entered Sales Page",
         "EnteredSales",
         "ViewContent",
-        "AddToCart",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
@@ -4536,20 +5640,383 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
         "ViewContent",
         "offer_page_view",
         "sales_to_checkout_click",
-        "AddToCart",
+        "checkout_click",
         "SalesToCheckoutClick",
         "SalesToCheckoutClicked",
     ]
     assert [page["slug"] for page in plan["pages_to_validate"]] == ["sales-page"]
 
 
+def test_build_funnel_tracking_validation_plan_for_sales_cart_drawer_flow():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
+    sales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"][
+        "sales-page"
+    ]["puckData"]["content"][0]["props"]["instrumentationManifest"]
+    sales_manifest["addToCartTargets"] = [
+        {
+            "id": "primary-add-to-cart",
+            "selector": "#add-to-cart",
+            "event": "click",
+            "trackEventType": "add_to_cart",
+        }
+    ]
+    sales_manifest["bindings"][0]["selector"] = ".cart-secure-checkout"
+
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    path_plan = plan["path_plans"][0]
+    assert [target["selector"] for target in path_plan["add_to_cart_targets"]] == ["#add-to-cart"]
+    assert [target["selector"] for target in path_plan["checkout_targets"]] == [
+        ".cart-secure-checkout"
+    ]
+    assert path_plan["expected_internal_events"][-2:] == [
+        "add_to_cart",
+        "sales_to_checkout_click",
+    ]
+    assert path_plan["expected_meta_events"][-3:] == [
+        "AddToCart",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
+    ]
+    assert "add_to_cart" in path_plan["expected_posthog_events"]
+    assert "checkout_click" in path_plan["expected_posthog_events"]
+    assert path_plan["required_posthog_readback_events"][-5:] == [
+        "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
+    ]
+
+
+def test_validate_observed_tracking_events_rejects_checkout_only_add_to_cart():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    with pytest.raises(
+        deploy_service.DeployError,
+        match="AddToCart must only fire from declared add-to-cart targets",
+    ):
+        deploy_service._assert_add_to_cart_events_follow_sales_bundle_contract(
+            path_plan=plan["path_plans"][0],
+            observed_state={
+                "internal": [{"eventType": "sales_to_checkout_click"}],
+                "meta": [["track", "AddToCart", {}]],
+                "posthog": {"captures": [["AddToCart", {}]]},
+            },
+        )
+
+
+def test_validate_observed_tracking_events_rejects_multiple_bundle_add_to_cart_events():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
+    sales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"][
+        "sales-page"
+    ]["puckData"]["content"][0]["props"]["instrumentationManifest"]
+    sales_manifest["addToCartTargets"] = [
+        {
+            "id": "primary-add-to-cart",
+            "selector": "#add-to-cart",
+            "event": "click",
+            "trackEventType": "add_to_cart",
+        }
+    ]
+
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    with pytest.raises(deploy_service.DeployError, match="exactly one Meta AddToCart event"):
+        deploy_service._assert_add_to_cart_events_follow_sales_bundle_contract(
+            path_plan=plan["path_plans"][0],
+            observed_state={
+                "internal": [{"eventType": "add_to_cart"}],
+                "meta": [
+                    ["track", "AddToCart", {}],
+                    ["track", "AddToCart", {}],
+                    ["track", "AddToCart", {}],
+                ],
+                "posthog": {
+                    "captures": [
+                        ["add_to_cart", {}],
+                        ["AddToCart", {}],
+                        ["AddToCart", {}],
+                        ["AddToCart", {}],
+                    ]
+                },
+            },
+        )
+
+
+def test_validate_observed_tracking_events_accepts_public_meta_add_to_cart_mapping():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
+    sales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"][
+        "sales-page"
+    ]["puckData"]["content"][0]["props"]["instrumentationManifest"]
+    sales_manifest["addToCartTargets"] = [
+        {
+            "id": "primary-add-to-cart",
+            "selector": "#add-to-cart",
+            "event": "click",
+            "trackEventType": "add_to_cart",
+        }
+    ]
+
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    deploy_service._assert_add_to_cart_events_follow_sales_bundle_contract(
+        path_plan=plan["path_plans"][0],
+        observed_state={
+            "internal": [
+                {
+                    "eventType": "add_to_cart",
+                    "props": {
+                        "metaEvents": [
+                            {"eventName": "AddToCart", "eventId": "meta-add-to-cart-1"}
+                        ]
+                    },
+                }
+            ],
+            "meta": [["init", "pixel-123"]],
+            "posthog": {"captures": [["add_to_cart", {}], ["AddToCart", {}]]},
+        },
+    )
+
+
+def test_validate_observed_tracking_events_accepts_public_posthog_add_to_cart_mapping():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
+    sales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"][
+        "sales-page"
+    ]["puckData"]["content"][0]["props"]["instrumentationManifest"]
+    sales_manifest["addToCartTargets"] = [
+        {
+            "id": "primary-add-to-cart",
+            "selector": "#add-to-cart",
+            "event": "click",
+            "trackEventType": "add_to_cart",
+        }
+    ]
+
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    deploy_service._assert_add_to_cart_events_follow_sales_bundle_contract(
+        path_plan=plan["path_plans"][0],
+        observed_state={
+            "internal": [{"eventType": "add_to_cart", "props": {}}],
+            "meta": [["track", "AddToCart", {}]],
+            "posthog": {"captures": []},
+        },
+    )
+
+
+def test_validate_observed_tracking_events_dedupes_browser_and_public_meta_mappings():
+    observed_state = {
+        "internal": [
+            {
+                "eventType": "add_to_cart",
+                "props": {
+                    "metaEvents": [
+                        {"eventName": "AddToCart", "eventId": "server-add-to-cart-1"}
+                    ]
+                },
+            }
+        ],
+        "meta": [["init", "pixel-123"], ["track", "AddToCart", {"eventId": "browser-1"}]],
+    }
+
+    names = deploy_service._extract_recorded_meta_event_names_for_validation(
+        observed_state=observed_state
+    )
+
+    assert names.count("AddToCart") == 1
+
+
+def test_validate_observed_tracking_events_rejects_duplicate_public_meta_mappings():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
+    sales_manifest = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"][
+        "sales-page"
+    ]["puckData"]["content"][0]["props"]["instrumentationManifest"]
+    sales_manifest["addToCartTargets"] = [
+        {
+            "id": "primary-add-to-cart",
+            "selector": "#add-to-cart",
+            "event": "click",
+            "trackEventType": "add_to_cart",
+        }
+    ]
+
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    with pytest.raises(deploy_service.DeployError, match="exactly one Meta AddToCart event"):
+        deploy_service._assert_add_to_cart_events_follow_sales_bundle_contract(
+            path_plan=plan["path_plans"][0],
+            observed_state={
+                "internal": [
+                    {
+                        "eventType": "add_to_cart",
+                        "props": {
+                            "metaEvents": [
+                                {"eventName": "AddToCart", "eventId": "server-add-to-cart-1"},
+                                {"eventName": "AddToCart", "eventId": "server-add-to-cart-2"},
+                            ]
+                        },
+                    }
+                ],
+                "meta": [["init", "pixel-123"]],
+                "posthog": {"captures": [["add_to_cart", {}], ["AddToCart", {}]]},
+            },
+        )
+
+
+def test_validate_observed_tracking_events_rejects_initiate_checkout_without_checkout_started():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    with pytest.raises(
+        deploy_service.DeployError,
+        match="InitiateCheckout must only fire from the secure checkout action",
+    ):
+        deploy_service._assert_initiate_checkout_events_follow_sales_contract(
+            path_plan=plan["path_plans"][0],
+            observed_state={
+                "internal": [{"eventType": "add_to_cart"}],
+                "meta": [["track", "InitiateCheckout", {}]],
+                "posthog": {"captures": [["InitiateCheckout", {}]]},
+            },
+        )
+
+
+def test_validate_observed_tracking_events_accepts_one_secure_checkout_initiate_checkout():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=False)
+    binding = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"][
+        "puckData"
+    ]["content"][0]["props"]["instrumentationManifest"]["bindings"][0]
+    binding["trackEventType"] = "checkout_started"
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    deploy_service._assert_initiate_checkout_events_follow_sales_contract(
+        path_plan=plan["path_plans"][0],
+        observed_state={
+            "internal": [{"eventType": "checkout_started"}],
+            "meta": [["track", "InitiateCheckout", {}]],
+            "posthog": {
+                "captures": [
+                    ["checkout_started", {}],
+                    ["InitiateCheckout", {}],
+                ]
+            },
+        },
+    )
+
+
+def test_validate_observed_tracking_events_accepts_public_meta_initiate_checkout_mapping():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=False)
+    binding = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"][
+        "puckData"
+    ]["content"][0]["props"]["instrumentationManifest"]["bindings"][0]
+    binding["trackEventType"] = "checkout_started"
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    deploy_service._assert_initiate_checkout_events_follow_sales_contract(
+        path_plan=plan["path_plans"][0],
+        observed_state={
+            "internal": [
+                {
+                    "eventType": "checkout_started",
+                    "props": {
+                        "metaEvents": [
+                            {
+                                "eventName": "InitiateCheckout",
+                                "eventId": "meta-initiate-checkout-1",
+                            }
+                        ]
+                    },
+                }
+            ],
+            "meta": [["init", "pixel-123"]],
+            "posthog": {"captures": [["checkout_started", {}], ["InitiateCheckout", {}]]},
+        },
+    )
+
+
+def test_validate_observed_tracking_events_accepts_public_posthog_initiate_checkout_mapping():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=False)
+    binding = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"][
+        "puckData"
+    ]["content"][0]["props"]["instrumentationManifest"]["bindings"][0]
+    binding["trackEventType"] = "checkout_started"
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="html_deploy",
+    )
+
+    deploy_service._assert_initiate_checkout_events_follow_sales_contract(
+        path_plan=plan["path_plans"][0],
+        observed_state={
+            "internal": [{"eventType": "checkout_started", "props": {}}],
+            "meta": [["track", "InitiateCheckout", {}]],
+            "posthog": {"captures": []},
+        },
+    )
+
+
 def test_build_funnel_tracking_validation_plan_for_checkout_started_flow():
     artifact_payload = _build_tracking_validation_artifact_payload(include_presales=False)
-    binding = (
-        artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"]["puckData"]["content"][0]["props"][
-            "instrumentationManifest"
-        ]["bindings"][0]
-    )
+    binding = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"][
+        "puckData"
+    ]["content"][0]["props"]["instrumentationManifest"]["bindings"][0]
     binding["trackEventType"] = "checkout_started"
 
     plan = deploy_service._build_funnel_tracking_validation_plan(
@@ -4588,11 +6055,9 @@ def test_build_funnel_tracking_validation_plan_for_checkout_started_flow():
 
 def test_build_funnel_tracking_validation_plan_allows_null_external_checkout_urls():
     artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
-    checkout = (
-        artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"]["puckData"]["content"][0]["props"][
-            "instrumentationManifest"
-        ]["bindings"][0]["checkout"]
-    )
+    checkout = artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"][
+        "puckData"
+    ]["content"][0]["props"]["instrumentationManifest"]["bindings"][0]["checkout"]
     checkout["externalUrlsByVariant"] = None
 
     plan = deploy_service._build_funnel_tracking_validation_plan(
@@ -4634,7 +6099,10 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
             {"eventType": "Entered Funnel"},
             {"eventType": "pre_sales_page_view"},
             {"eventType": "presell_page_view"},
-            {"eventType": "pre_sales_to_sales_click", "props": {"destination_url": sales_url, **handoff_props}},
+            {
+                "eventType": "pre_sales_to_sales_click",
+                "props": {"destination_url": sales_url, **handoff_props},
+            },
             {"eventType": "sales_page_view", "props": handoff_props},
             {"eventType": "offer_page_view"},
             {"eventType": "sales_to_checkout_click"},
@@ -4650,7 +6118,6 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
             ["track", "Entered Sales Page", {}],
             ["track", "EnteredSales", {"event_source_url": sales_url, **handoff_props}],
             ["track", "ViewContent", {}],
-            ["track", "AddToCart", {}],
             ["track", "SalesToCheckoutClick", {}],
             ["track", "SalesToCheckoutClicked", {}],
         ],
@@ -4680,7 +6147,7 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
-                ["AddToCart", {}],
+                ["checkout_click", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
             ],
@@ -4717,7 +6184,6 @@ def test_validate_observed_tracking_events_rejects_extra_sales_entry_meta_events
             ["track", "EnteredSales", {}],
             ["track", "EnteredSales", {}],
             ["track", "ViewContent", {}],
-            ["track", "AddToCart", {}],
             ["track", "SalesToCheckoutClick", {}],
             ["track", "SalesToCheckoutClicked", {}],
         ],
@@ -4739,7 +6205,7 @@ def test_validate_observed_tracking_events_rejects_extra_sales_entry_meta_events
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
-                ["AddToCart", {}],
+                ["checkout_click", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
             ],
@@ -4777,7 +6243,6 @@ def test_validate_observed_tracking_events_rejects_missing_sales_posthog_context
             ["track", "Entered Sales Page", {}],
             ["track", "EnteredSales", {"event_source_url": sales_url}],
             ["track", "ViewContent", {}],
-            ["track", "AddToCart", {}],
             ["track", "SalesToCheckoutClick", {}],
             ["track", "SalesToCheckoutClicked", {}],
         ],
@@ -4799,7 +6264,7 @@ def test_validate_observed_tracking_events_rejects_missing_sales_posthog_context
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
-                ["AddToCart", {}],
+                ["checkout_click", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
             ],
@@ -4882,12 +6347,19 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
                 },
             ],
             ["track", "ViewContent", {}],
-            ["track", "AddToCart", {}],
             ["track", "SalesToCheckoutClick", {}],
             ["track", "SalesToCheckoutClicked", {}],
         ],
         "posthog": {
-            "inits": [["phc_test_123", {"api_host": "https://emb.shopemberco.com", "ui_host": "https://us.posthog.com"}]],
+            "inits": [
+                [
+                    "phc_test_123",
+                    {
+                        "api_host": "https://emb.shopemberco.com",
+                        "ui_host": "https://us.posthog.com",
+                    },
+                ]
+            ],
             "captures": [
                 ["pre_sales_page_view", {}],
                 ["PageView", {}],
@@ -4914,7 +6386,7 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
                 ["sales_to_checkout_click", {}],
-                ["AddToCart", {}],
+                ["checkout_click", {}],
                 ["SalesToCheckoutClick", {}],
                 ["SalesToCheckoutClicked", {}],
             ],
@@ -4935,7 +6407,11 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
         if isinstance(capture[1], dict) and capture[1].get("source_page_type"):
             capture[1]["source_page_type"] = "listicle"
     for meta_call in stale_listical_context_state["meta"]:
-        if len(meta_call) >= 3 and isinstance(meta_call[2], dict) and meta_call[2].get("source_page_type"):
+        if (
+            len(meta_call) >= 3
+            and isinstance(meta_call[2], dict)
+            and meta_call[2].get("source_page_type")
+        ):
             meta_call[2]["source_page_type"] = "listicle"
     with pytest.raises(deploy_service.DeployError, match="source_page_type"):
         deploy_service._validate_observed_tracking_events(
@@ -4970,9 +6446,17 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
         if isinstance(capture[1], dict) and capture[1].get("destination_url"):
             capture[1]["destination_url"] = quiz_destination_url
     for meta_call in quiz_state["meta"]:
-        if len(meta_call) >= 3 and isinstance(meta_call[2], dict) and meta_call[2].get("source_page_type"):
+        if (
+            len(meta_call) >= 3
+            and isinstance(meta_call[2], dict)
+            and meta_call[2].get("source_page_type")
+        ):
             meta_call[2]["source_page_type"] = "quiz_presell"
-        if len(meta_call) >= 3 and isinstance(meta_call[2], dict) and meta_call[2].get("event_source_url"):
+        if (
+            len(meta_call) >= 3
+            and isinstance(meta_call[2], dict)
+            and meta_call[2].get("event_source_url")
+        ):
             meta_call[2]["event_source_url"] = quiz_destination_url
     deploy_service._validate_observed_tracking_events(
         path_plan=quiz_plan["path_plans"][0],
@@ -5033,7 +6517,9 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
         "?src=presale&from=listicle&source_page_type=listical_presell"
         "&session_id=sess-1&visitor_id=anon-1&click_id=click-1"
     )
-    url_missing_stage_context_state["internal"][3]["props"]["destination_url"] = stripped_destination_url
+    url_missing_stage_context_state["internal"][3]["props"][
+        "destination_url"
+    ] = stripped_destination_url
     with pytest.raises(deploy_service.DeployError, match="from_stage"):
         deploy_service._validate_observed_tracking_events(
             path_plan=plan["path_plans"][0],
@@ -5150,7 +6636,11 @@ def test_activate_tracking_validation_target_uses_dom_click():
     deploy_service._activate_tracking_validation_target(page=FakePage(), selector="#checkout-btn")
 
     assert calls[0] == ("locator", "#checkout-btn")
-    assert calls[1] == ("wait_for", "attached", deploy_service._DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS)
+    assert calls[1] == (
+        "wait_for",
+        "attached",
+        deploy_service._DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+    )
     assert calls[2][0] == "evaluate"
     assert "element.click()" in calls[2][1]
 
@@ -5177,12 +6667,16 @@ def test_wait_for_tracking_validation_state_polls_until_events_settle(monkeypatc
 
     class FakePage:
         def evaluate(self, script):
-            return states.pop(0) if states else {
-                "internal": [{"eventType": "sales_page_view"}],
-                "meta": [],
-                "posthog": {"inits": [], "captures": []},
-                "network": {"publicEvents": []},
-            }
+            return (
+                states.pop(0)
+                if states
+                else {
+                    "internal": [{"eventType": "sales_page_view"}],
+                    "meta": [],
+                    "posthog": {"inits": [], "captures": []},
+                    "network": {"publicEvents": []},
+                }
+            )
 
         def wait_for_timeout(self, ms):
             waits.append(ms)
@@ -5202,7 +6696,9 @@ def test_wait_for_tracking_validation_state_polls_until_events_settle(monkeypatc
 
 
 def test_validate_posthog_live_readback_requires_api_key_for_required_events(monkeypatch):
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY", None)
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY", None
+    )
 
     with pytest.raises(deploy_service.DeployError, match="POSTHOG_READBACK_API_KEY"):
         deploy_service._validate_posthog_live_readback(
@@ -5217,9 +6713,12 @@ def test_validate_posthog_live_readback_requires_api_key_for_required_events(mon
 def test_validate_posthog_live_readback_polls_until_sales_aliases_land(monkeypatch):
     calls: list[object] = []
     payloads = [
+        {"results": [_posthog_readback_raw_row("sales_page_view")]},
         {
             "results": [
-                _posthog_readback_raw_row("sales_page_view")
+                _posthog_readback_raw_row("sales_page_view"),
+                _posthog_readback_raw_row("EnteredSales"),
+                _posthog_readback_raw_row("SalesToCheckoutClick"),
             ]
         },
         {
@@ -5252,11 +6751,19 @@ def test_validate_posthog_live_readback_polls_until_sales_aliases_land(monkeypat
             calls.append(("post", url, kwargs["headers"]["Authorization"], kwargs["json"]))
             return FakeResponse()
 
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY", "phx_test")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_TIMEOUT_SECONDS", 2.0)
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_POLL_SECONDS", 0.5)
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY", "phx_test"
+    )
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_TIMEOUT_SECONDS", 2.0
+    )
+    monkeypatch.setattr(
+        deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_POLL_SECONDS", 0.5
+    )
     monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
-    monkeypatch.setattr(deploy_service.time, "sleep", lambda seconds: calls.append(("sleep", seconds)))
+    monkeypatch.setattr(
+        deploy_service.time, "sleep", lambda seconds: calls.append(("sleep", seconds))
+    )
 
     result = deploy_service._validate_posthog_live_readback(
         path_plan={
@@ -5314,8 +6821,18 @@ def test_assert_posthog_readback_rows_validates_canonical_handoff_context():
                 ),
             )
         ),
-        dict(zip(deploy_service._POSTHOG_READBACK_COLUMNS, _posthog_readback_raw_row("sales_page_view", **handoff_props))),
-        dict(zip(deploy_service._POSTHOG_READBACK_COLUMNS, _posthog_readback_raw_row("EnteredSales", **handoff_props))),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row("sales_page_view", **handoff_props),
+            )
+        ),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row("EnteredSales", **handoff_props),
+            )
+        ),
     ]
 
     deploy_service._assert_posthog_readback_rows(
@@ -5351,8 +6868,16 @@ def test_assert_posthog_readback_rows_validates_canonical_handoff_context():
 
 def test_assert_posthog_readback_rows_rejects_duplicate_quiz_completed():
     rows = [
-        dict(zip(deploy_service._POSTHOG_READBACK_COLUMNS, _posthog_readback_raw_row("QuizCompleted"))),
-        dict(zip(deploy_service._POSTHOG_READBACK_COLUMNS, _posthog_readback_raw_row("QuizCompleted"))),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS, _posthog_readback_raw_row("QuizCompleted")
+            )
+        ),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS, _posthog_readback_raw_row("QuizCompleted")
+            )
+        ),
     ]
 
     with pytest.raises(deploy_service.DeployError, match="QuizCompleted must fire once"):
@@ -5373,6 +6898,14 @@ def test_assert_posthog_readback_rows_requires_quiz_to_sales_identity_continuity
                     "QuizCompleted",
                     content_category="pre_sales_page",
                     page_stage="pre_sales",
+                    answers=[
+                        {
+                            "question_id": "q1",
+                            "question_text": "Question one",
+                            "selected_option_ids": ["o1"],
+                            "selected_option_texts": ["Often"],
+                        }
+                    ],
                 ),
             )
         ),
@@ -5408,6 +6941,93 @@ def test_assert_posthog_readback_rows_requires_quiz_to_sales_identity_continuity
         deploy_service._assert_posthog_readback_rows(
             rows=missing_session_rows,
             required_events=["QuizCompleted", "EnteredSales"],
+            validation_id="deploy-validation-123",
+            path_plan=path_plan,
+        )
+
+
+def test_assert_posthog_readback_rows_requires_quiz_answer_payloads():
+    path_plan = {"tracking_validation_profile": "quiz_presell"}
+    rows = [
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row(
+                    "QuizQuestionViewed",
+                    content_category="pre_sales_page",
+                    page_stage="pre_sales",
+                    question_id="q1",
+                    question_text="Question one",
+                ),
+            )
+        ),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row(
+                    "QuizOptionSelected",
+                    content_category="pre_sales_page",
+                    page_stage="pre_sales",
+                    question_id="q1",
+                    question_text="Question one",
+                    option_id="o1",
+                    option_text="Often",
+                    selected_option_ids=["o1"],
+                    selected_option_texts=["Often"],
+                ),
+            )
+        ),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row(
+                    "QuizQuestionSubmitted",
+                    content_category="pre_sales_page",
+                    page_stage="pre_sales",
+                    question_id="q1",
+                    question_text="Question one",
+                    selected_option_ids=["o1"],
+                    selected_option_texts=["Often"],
+                ),
+            )
+        ),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row(
+                    "QuizCompleted",
+                    content_category="pre_sales_page",
+                    page_stage="pre_sales",
+                    answers=[
+                        {
+                            "question_id": "q1",
+                            "question_text": "Question one",
+                            "selected_option_ids": ["o1"],
+                            "selected_option_texts": ["Often"],
+                        }
+                    ],
+                ),
+            )
+        ),
+    ]
+
+    deploy_service._assert_posthog_readback_rows(
+        rows=rows,
+        required_events=[
+            "QuizQuestionViewed",
+            "QuizOptionSelected",
+            "QuizQuestionSubmitted",
+            "QuizCompleted",
+        ],
+        validation_id="deploy-validation-123",
+        path_plan=path_plan,
+    )
+
+    rows[1]["option_text"] = ""
+    with pytest.raises(deploy_service.DeployError, match="option_text"):
+        deploy_service._assert_posthog_readback_rows(
+            rows=rows,
+            required_events=["QuizOptionSelected"],
             validation_id="deploy-validation-123",
             path_plan=path_plan,
         )
@@ -5672,27 +7292,29 @@ def test_validate_deployed_tracking_html_rejects_legacy_mars_references(monkeypa
 
 
 def test_find_html_deploy_forbidden_references_detects_split_legacy_tokens():
-    matches = deploy_service._find_html_deploy_forbidden_references(
-        text="""
+    matches = deploy_service._find_html_deploy_forbidden_references(text="""
         <script>
           const legacyHost = ["men", "go", "to", "mars"].join("");
           const oldStore = ["shop", "mars"].join("");
         </script>
-        """
-    )
+        """)
 
     assert "MenGoToMars compact tracking host" in matches
     assert "legacy shopmars storefront token" in matches
 
 
-def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_for_public_checkout(monkeypatch):
+def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_for_public_checkout(
+    monkeypatch,
+):
     calls: list[object] = []
     validated: dict[str, object] = {}
 
     monkeypatch.setattr(
         deploy_service,
         "_validate_deployed_tracking_html",
-        lambda **kwargs: calls.append(("validate_html", kwargs["validation_plan"]["checkout_validated"])),
+        lambda **kwargs: calls.append(
+            ("validate_html", kwargs["validation_plan"]["checkout_validated"])
+        ),
     )
     monkeypatch.setattr(
         deploy_service,
@@ -5739,7 +7361,9 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
             calls.append(("wait_for_timeout", ms))
 
         def wait_for_url(self, pattern, **kwargs):
-            calls.append(("wait_for_url", getattr(pattern, "pattern", str(pattern)), kwargs.get("timeout")))
+            calls.append(
+                ("wait_for_url", getattr(pattern, "pattern", str(pattern)), kwargs.get("timeout"))
+            )
 
         def expect_request(self, pattern):
             calls.append(("expect_request", getattr(pattern, "pattern", str(pattern))))
@@ -5780,7 +7404,7 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
     class FakePlaywrightManager:
         def __enter__(self):
             calls.append(("playwright_enter",))
-            return SimpleNamespace(chromium=SimpleNamespace(launch=lambda: FakeBrowser()))
+            return SimpleNamespace(chromium=SimpleNamespace(launch=lambda **kwargs: FakeBrowser()))
 
         def __exit__(self, exc_type, exc, tb):
             calls.append(("playwright_exit", exc_type.__name__ if exc_type else None))
@@ -5820,6 +7444,9 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
         "expect_request",
         r".*/(?:api/)?public/checkout(?:/prepare(?:/[^/?]+(?:/consume)?)?)?(?:\?.*)?$",
     ) in calls
+    goto_urls = [str(call[1]) for call in calls if isinstance(call, tuple) and call[0] == "goto"]
+    assert any("/sales-page?" in url for url in goto_urls)
+    assert not any("/sales-page/?" in url for url in goto_urls)
     assert not any(call[0] == "wait_for_url" for call in calls if isinstance(call, tuple))
     assert validated["observed_state"]["posthog"]["captures"] == []
 
@@ -6108,6 +7735,124 @@ async def test_run_funnel_publish_job_validates_candidate_before_activation(tmp_
 
 
 @pytest.mark.asyncio
+async def test_run_funnel_publish_job_restores_publication_when_candidate_gate_fails(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+    monkeypatch.setattr(
+        deploy_service,
+        "_load_funnel_runtime_artifact_payload_for_apply",
+        lambda *, artifact_id: _build_tracking_validation_artifact_payload(include_presales=True),
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_build_html_deploy_candidate_release_id",
+        lambda *, job_id: "candidate-123",
+    )
+
+    restore_calls: list[dict[str, object]] = []
+
+    async def _apply_plan(**kwargs):
+        return {
+            "returncode": 0,
+            "plan_path": "/tmp/plan.json",
+            "materialized_plan_path": "/tmp/plan.json",
+            "server_ips": {"ubuntu-4gb-hel1-2": "135.181.93.244"},
+            "live_url": "http://135.181.93.244",
+            "logs": "",
+        }
+
+    async def _tracking_validation(**kwargs):
+        raise deploy_service.DeployError("candidate gate failed")
+
+    def _restore_publication(**kwargs):
+        restore_calls.append(kwargs)
+        return {
+            "status": "restored",
+            "previousActivePublicationId": kwargs["previous_state"]["activePublicationId"],
+            "failedPublicationId": kwargs["failed_publication_id"],
+        }
+
+    monkeypatch.setattr(deploy_service, "apply_plan", _apply_plan)
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_funnel_tracking_post_deploy_validation",
+        _tracking_validation,
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_restore_funnel_publication_state_isolated",
+        _restore_publication,
+    )
+
+    job_id = "publish-job-candidate-gate-failure"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": True,
+            "access_urls": ["https://shop.shopemberco.com/"],
+            "instance_name": "ubuntu-4gb-hel1-2",
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "failed"
+    assert job["phase"] == "validating_html_deploy_candidate"
+    assert job["error"] == "candidate gate failed"
+    assert restore_calls == [
+        {
+            "org_id": str(TEST_ORG_ID),
+            "funnel_id": "funnel-123",
+            "failed_publication_id": "00000000-0000-0000-0000-000000000999",
+            "previous_state": {
+                "activePublicationId": "previous-publication",
+                "status": "published",
+            },
+        }
+    ]
+    assert job["result"]["publicationRollback"] == {
+        "status": "restored",
+        "previousActivePublicationId": "previous-publication",
+        "failedPublicationId": "00000000-0000-0000-0000-000000000999",
+    }
+    assert "candidatePromotion" not in job["result"].get("deploy", {})
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_reports_artifact_hydration_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+    monkeypatch.setattr(
+        deploy_service,
+        "_hydrate_funnel_artifact_workload_patch_isolated",
+        lambda **kwargs: (_ for _ in ()).throw(deploy_service.DeployError("hydration failed")),
+    )
+
+    job_id = "publish-job-artifact-hydration-failure"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": True,
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "failed"
+    assert job["phase"] == "artifact_hydrating"
+    assert job["error"] == "hydration failed"
+
+
+@pytest.mark.asyncio
 async def test_run_funnel_publish_job_fails_when_standalone_preflight_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     _install_publish_job_mocks(monkeypatch)
@@ -6115,7 +7860,9 @@ async def test_run_funnel_publish_job_fails_when_standalone_preflight_fails(tmp_
     monkeypatch.setattr(
         deploy_service,
         "_validate_standalone_funnel_artifact_preflight",
-        lambda *, workload_patch: (_ for _ in ()).throw(deploy_service.DeployError("parity mismatch")),
+        lambda *, workload_patch: (_ for _ in ()).throw(
+            deploy_service.DeployError("parity mismatch")
+        ),
     )
 
     job_id = "publish-job-standalone-preflight-failure"

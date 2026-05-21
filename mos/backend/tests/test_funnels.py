@@ -6,7 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 
 from app.config import settings
-from app.db.enums import FunnelDomainStatusEnum, FunnelEventTypeEnum
+from app.db.enums import (
+    FunnelDomainStatusEnum,
+    FunnelEventTypeEnum,
+    FunnelPageVersionStatusEnum,
+)
 from app.db.models import (
     AgentRun,
     AgentToolCall,
@@ -16,6 +20,7 @@ from app.db.models import (
     FunnelDomain,
     FunnelEvent,
     FunnelPage,
+    FunnelPageVersion,
     PaidAdsPlatformProfile,
     Site,
 )
@@ -241,6 +246,121 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     assert disabled_meta.status_code == 410
 
 
+def test_funnel_page_detail_omits_inline_html_deploy_payloads_but_save_preserves_them(
+    api_client: TestClient,
+    db_session,
+):
+    client_resp = api_client.post(
+        "/clients", json={"name": "Inline Payload Client", "industry": "SaaS"}
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": "Inline Payload Product"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    funnel_resp = api_client.post(
+        "/funnels",
+        json={
+            "clientId": client_id,
+            "productId": product_id,
+            "name": "Inline Payload Funnel",
+        },
+    )
+    assert funnel_resp.status_code == 201
+    funnel = funnel_resp.json()
+    funnel_id = funnel["id"]
+    route_slug = funnel["route_slug"]
+    page_resp = api_client.post(f"/funnels/{funnel_id}/pages", json={"name": "Sales"})
+    assert page_resp.status_code == 201
+    page = page_resp.json()["page"]
+    page_id = page["id"]
+    set_entry = api_client.patch(f"/funnels/{funnel_id}", json={"entryPageId": page_id})
+    assert set_entry.status_code == 200
+
+    full_puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "id": "imported-doc",
+                "type": "ImportedHtmlDocument",
+                "props": {
+                    "htmlDocument": "<html><body><img src='/assets/hero.png'></body></html>",
+                    "instrumentationManifest": {"schemaVersion": "html-deploy-v1"},
+                    "htmlDeployAssetPayloads": {
+                        "asset-public-id": {
+                            "contentType": "image/png",
+                            "dataBase64": "aGVyby1pbWFnZQ==",
+                            "sizeBytes": 10,
+                            "sha256": "sha256-inline",
+                        }
+                    },
+                    "htmlDeployStaticAssetPayloads": {
+                        "/assets/hero.png": {
+                            "contentType": "image/png",
+                            "dataBase64": "c3RhdGljLWhlcm8=",
+                            "sizeBytes": 11,
+                            "sha256": "sha256-static",
+                        }
+                    },
+                },
+            }
+        ],
+        "zones": {},
+    }
+    save_full = api_client.put(
+        f"/funnels/{funnel_id}/pages/{page_id}",
+        json={"puckData": full_puck_data},
+    )
+    assert save_full.status_code == 200
+
+    detail = api_client.get(f"/funnels/{funnel_id}/pages/{page_id}")
+    assert detail.status_code == 200
+    returned_props = detail.json()["latestDraft"]["puck_data"]["content"][0]["props"]
+    assert "htmlDeployAssetPayloads" not in returned_props
+    assert "htmlDeployStaticAssetPayloads" not in returned_props
+    assert returned_props["htmlDocument"].startswith("<html>")
+
+    public_preview = api_client.get(
+        f"/public/funnels/{_short_uuid_slug(product_id)}/{route_slug}/pages/{page['slug']}"
+    )
+    assert public_preview.status_code == 200
+    public_props = public_preview.json()["puckData"]["content"][0]["props"]
+    assert "htmlDeployAssetPayloads" not in public_props
+    assert "htmlDeployStaticAssetPayloads" not in public_props
+
+    save = api_client.put(
+        f"/funnels/{funnel_id}/pages/{page_id}",
+        json={"puckData": detail.json()["latestDraft"]["puck_data"]},
+    )
+    assert save.status_code == 200
+    save_props = save.json()["puck_data"]["content"][0]["props"]
+    assert "htmlDeployAssetPayloads" not in save_props
+    assert "htmlDeployStaticAssetPayloads" not in save_props
+
+    stored_latest = db_session.scalars(
+        select(FunnelPageVersion)
+        .where(
+            FunnelPageVersion.page_id == UUID(page_id),
+            FunnelPageVersion.status == FunnelPageVersionStatusEnum.draft,
+        )
+        .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
+    ).first()
+    assert stored_latest is not None
+    stored_props = stored_latest.puck_data["content"][0]["props"]
+    assert (
+        stored_props["htmlDeployAssetPayloads"]
+        == full_puck_data["content"][0]["props"]["htmlDeployAssetPayloads"]
+    )
+    assert (
+        stored_props["htmlDeployStaticAssetPayloads"]
+        == full_puck_data["content"][0]["props"]["htmlDeployStaticAssetPayloads"]
+    )
+
+
 def test_public_events_noop_for_site_preview(api_client: TestClient, db_session, auth_context):
     client = Client(
         org_id=UUID(auth_context.org_id),
@@ -359,7 +479,7 @@ def test_public_events_accept_quiz_event_types(api_client: TestClient, db_sessio
                 },
                 {
                     "eventId": "quiz-completed-1",
-                    "eventType": "quiz_completed",
+                    "eventType": "QuizCompleted",
                     "publicationId": publication_id,
                     "pageId": page_id,
                     "visitorId": "visitor_123",
@@ -1228,6 +1348,60 @@ def test_published_public_funnel_page_defaults_posthog_person_profiles_to_always
     public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{entry_slug}")
     assert public_page.status_code == 200
     assert public_page.json()["tracking"]["posthogPersonProfiles"] == "always"
+
+
+def test_published_public_funnel_page_prefers_client_posthog_settings(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_ENABLED", True)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PROJECT_API_KEY", "global_project_key")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_API_HOST", "https://us.i.posthog.com")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_UI_HOST", None)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_DEFAULTS", "2026-01-30")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PERSON_PROFILES", "always")
+
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Client PostHog Settings Funnel",
+    )
+
+    funnel = db_session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
+    assert funnel is not None
+
+    settings_resp = api_client.put(
+        f"/clients/{funnel.client_id}/analytics/posthog",
+        json={
+            "enabled": True,
+            "projectApiKey": "client_project_key",
+            "apiHost": "https://beacon.example-brand.com",
+            "uiHost": "https://app.posthog.com",
+            "defaults": "2026-02-01",
+            "personProfiles": "identified_only",
+            "sourceMode": "structured",
+        },
+    )
+    assert settings_resp.status_code == 200
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    entry_slug = meta.json()["entrySlug"]
+
+    public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{entry_slug}")
+    assert public_page.status_code == 200
+    assert public_page.json()["tracking"] == {
+        "provider": "posthog",
+        "mode": "public_funnel_runtime",
+        "posthogProjectApiKey": "client_project_key",
+        "posthogApiHost": "https://beacon.example-brand.com",
+        "posthogUiHost": "https://app.posthog.com",
+        "posthogDefaults": "2026-02-01",
+        "posthogPersonProfiles": "identified_only",
+    }
 
 
 def test_published_public_funnel_page_prefers_posthog_managed_proxy_override(

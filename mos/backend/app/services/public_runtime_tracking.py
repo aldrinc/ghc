@@ -9,6 +9,7 @@ from app.config import settings
 from app.db.models import Funnel
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
+from app.services.posthog_workspace_settings import resolve_client_posthog_tracking
 
 _MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
 _MOS_POSTHOG_TRACKING_METADATA_KEY = "mosPosthogTracking"
@@ -132,12 +133,24 @@ def resolve_public_posthog_tracking(*, session: Session, funnel: Funnel) -> dict
         return None
 
     override = _resolve_posthog_metadata_override(session=session, funnel=funnel) or {}
+    client_tracking = resolve_client_posthog_tracking(
+        session=session,
+        org_id=str(funnel.org_id),
+        client_id=str(funnel.client_id),
+    ) or {}
     api_key = override.get("posthogProjectApiKey") or clean_optional_text(
+        client_tracking.get("posthogProjectApiKey")
+    ) or clean_optional_text(
         settings.POSTHOG_FUNNELS_PROJECT_API_KEY
     )
-    defaults = override.get("posthogDefaults") or clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
+    defaults = (
+        override.get("posthogDefaults")
+        or clean_optional_text(client_tracking.get("posthogDefaults"))
+        or clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
+    )
     person_profiles = (
         override.get("posthogPersonProfiles")
+        or clean_optional_text(client_tracking.get("posthogPersonProfiles"))
         or clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES)
         or "always"
     )
@@ -156,8 +169,16 @@ def resolve_public_posthog_tracking(*, session: Session, funnel: Funnel) -> dict
             "POSTHOG_FUNNELS_ENABLED is true."
         )
 
-    api_host = override.get("posthogApiHost") or clean_optional_text(settings.POSTHOG_FUNNELS_API_HOST)
-    ui_host = override.get("posthogUiHost") or clean_optional_text(settings.POSTHOG_FUNNELS_UI_HOST)
+    api_host = (
+        override.get("posthogApiHost")
+        or clean_optional_text(client_tracking.get("posthogApiHost"))
+        or clean_optional_text(settings.POSTHOG_FUNNELS_API_HOST)
+    )
+    ui_host = (
+        override.get("posthogUiHost")
+        or clean_optional_text(client_tracking.get("posthogUiHost"))
+        or clean_optional_text(settings.POSTHOG_FUNNELS_UI_HOST)
+    )
 
     if not api_host:
         raise RuntimeError(

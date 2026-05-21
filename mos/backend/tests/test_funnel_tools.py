@@ -343,6 +343,7 @@ def test_draft_generate_page_imported_html_mode_preserves_copy_but_keeps_runtime
     assert saved_component["props"]["htmlDocument"] == reference_html
     assert saved_component["props"]["instrumentationManifest"] == {
         **instrumentation_manifest,
+        "addToCartTargets": [],
         "sections": [],
         "proofs": [],
         "ctas": [],
@@ -354,6 +355,7 @@ def test_draft_generate_page_imported_html_mode_preserves_copy_but_keeps_runtime
         "quizLeads": [],
         "quizQuestions": [],
         "quizOptions": [],
+        "quizSubmissions": [],
         "quizResults": [],
         "quizMechanisms": [],
         "quizRecommendations": [],

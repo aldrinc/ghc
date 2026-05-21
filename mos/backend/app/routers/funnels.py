@@ -63,6 +63,10 @@ from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError
 from app.services.html_funnel_reference import HtmlReferenceError
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
+from app.services.html_deploy_payloads import (
+    preserve_inline_html_deploy_asset_payloads,
+    strip_inline_html_deploy_asset_payloads,
+)
 from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services.funnel_templates import (
     apply_template_assets,
@@ -231,6 +235,16 @@ def _create_initial_page_draft(
     )
     session.add(version)
     return version
+
+
+def _editor_page_version_payload(version: FunnelPageVersion | None) -> dict[str, object] | None:
+    if version is None:
+        return None
+    payload = jsonable_encoder(version)
+    puck_data = payload.get("puck_data")
+    if isinstance(puck_data, dict):
+        payload["puck_data"] = strip_inline_html_deploy_asset_payloads(puck_data)
+    return payload
 
 
 def _normalize_server_names(values: list[str]) -> list[str]:
@@ -1021,8 +1035,8 @@ def get_page(
 
     return {
         "page": jsonable_encoder(page),
-        "latestDraft": jsonable_encoder(draft) if draft else None,
-        "latestApproved": jsonable_encoder(approved) if approved else None,
+        "latestDraft": _editor_page_version_payload(draft),
+        "latestApproved": _editor_page_version_payload(approved),
         "designSystemTokens": design_system_tokens,
     }
 
@@ -1045,7 +1059,16 @@ def save_draft(
     if not page:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
 
-    puck_data = payload.puckData
+    versions_repo = FunnelPageVersionsRepository(session)
+    latest_version = versions_repo.latest_for_page(
+        page_id=str(page.id), status=FunnelPageVersionStatusEnum.draft
+    ) or versions_repo.latest_for_page(
+        page_id=str(page.id), status=FunnelPageVersionStatusEnum.approved
+    )
+    puck_data = preserve_inline_html_deploy_asset_payloads(
+        incoming_puck_data=payload.puckData,
+        source_puck_data=latest_version.puck_data if latest_version else None,
+    )
     normalize_public_page_metadata_for_context(
         session=session,
         org_id=auth.org_id,
@@ -1064,7 +1087,7 @@ def save_draft(
     session.add(version)
     session.commit()
     session.refresh(version)
-    return jsonable_encoder(version)
+    return _editor_page_version_payload(version)
 
 
 @router.patch("/{funnel_id}/pages/{page_id}")
@@ -1216,6 +1239,7 @@ async def publish_funnel_route(
             ),
             default_route_policy=deploy.defaultRoutePolicy,
             default_page_slug=deploy.defaultPageSlug,
+            release_metadata=deploy.releaseMetadata,
         )
         if edge_backed_artifact:
             workload_patch["workspace_server_names"] = server_names

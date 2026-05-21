@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import copy
 from contextlib import ExitStack, contextmanager
 import hashlib
@@ -30,6 +31,11 @@ from sqlalchemy import select
 from app.config import settings
 from app.services.deploy_locks import DeployLockConflict, acquire_deploy_lock
 from app.services.funnel_metadata import build_public_page_metadata_for_context
+from app.services.html_deploy_payloads import (
+    HTML_DEPLOY_INLINE_ASSET_PAYLOAD_KEYS as _HTML_DEPLOY_INLINE_ASSET_PAYLOAD_KEYS,
+    HTML_DEPLOY_STATIC_ASSET_PAYLOAD_KEYS as _HTML_DEPLOY_STATIC_ASSET_PAYLOAD_KEYS,
+    strip_inline_html_deploy_asset_payloads,
+)
 from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services import namecheap_dns as namecheap_dns_service
 from app.services.public_runtime_tracking import resolve_public_runtime_tracking
@@ -84,6 +90,21 @@ _HTML_DEPLOY_SCHEMA_VERSION = "html-deploy-v1"
 _PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
     r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/[^\s\"'<>?#]+"
 )
+_HTML_DEPLOY_STATIC_ASSET_PREFIXES = (
+    "/_standalone-assets/",
+    "/assets/",
+    "/cdn/shop/files/",
+    "/favicon",
+)
+_HTML_DEPLOY_ROUTE_SCOPED_STATIC_ASSET_RE = re.compile(
+    r"^/[A-Za-z0-9][A-Za-z0-9_-]*"
+    r"/[A-Za-z0-9][A-Za-z0-9_-]*"
+    r"/[A-Za-z0-9][A-Za-z0-9_-]*/assets/"
+)
+_HTML_DEPLOY_PRODUCT_SCOPED_STATIC_ASSET_RE = re.compile(r"^/[A-Za-z0-9][A-Za-z0-9_-]*/assets/")
+_FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS = int(
+    os.getenv("FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS", "300")
+)
 _DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS = int(
     os.getenv("DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS", "30000")
 )
@@ -99,6 +120,8 @@ _DEPLOY_TRACKING_VALIDATION_ASSERTION_POLL_MS = int(
 _DEPLOY_TRACKING_VALIDATION_STORAGE_KEY = "__mos_deploy_tracking_validation__"
 _DEPLOY_TRACKING_SCROLL_BREAKPOINTS = (10, 25, 50, 75, 90)
 _HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM = "mos_deploy_candidate_release"
+_HTML_DEPLOY_VALIDATION_CACHE_BUST_QUERY_PARAM = "mos_deploy_validation_cache_bust"
+_HTML_DEPLOY_CDN_CACHE_BUST_QUERY_PARAM = "cachebust"
 _HTML_DEPLOY_CANDIDATE_ACTIVATION_MODE = "candidate_only"
 _HTML_DEPLOY_CANDIDATE_RELEASE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _HTML_DEPLOY_FORBIDDEN_REFERENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -107,6 +130,7 @@ _HTML_DEPLOY_FORBIDDEN_REFERENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ..
     ("Mars Health brand reference", re.compile(r"\bmars\s+health\b", flags=re.IGNORECASE)),
     ("legacy Mars storefront host", re.compile(r"\b(?:shopmars|mymars)\b", flags=re.IGNORECASE)),
     ("legacy Mars funnel token", re.compile(r"\bc9095d\b", flags=re.IGNORECASE)),
+    ("legacy MOS Meta proxy path", re.compile(r"/__mos/meta/", flags=re.IGNORECASE)),
 )
 _HTML_DEPLOY_FORBIDDEN_COMPACT_REFERENCES: tuple[tuple[str, str], ...] = (
     ("MenGoToMars compact tracking host", "mengotomars"),
@@ -147,6 +171,12 @@ _POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
     ("anonymousId", "properties['anonymousId']"),
     ("click_id", "properties['click_id']"),
     ("clickId", "properties['clickId']"),
+    ("campaign_id", "properties['campaign_id']"),
+    ("campaignId", "properties['campaignId']"),
+    ("ad_id", "properties['ad_id']"),
+    ("adId", "properties['adId']"),
+    ("adset_id", "properties['adset_id']"),
+    ("adsetId", "properties['adsetId']"),
     ("source_page_type", "properties['source_page_type']"),
     ("sourcePageType", "properties['sourcePageType']"),
     ("from_stage", "properties['from_stage']"),
@@ -184,24 +214,70 @@ _POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
     ("proofType", "properties['proofType']"),
     ("cta_id", "properties['cta_id']"),
     ("ctaId", "properties['ctaId']"),
+    ("binding_id", "properties['binding_id']"),
+    ("bindingId", "properties['bindingId']"),
     ("cta_position", "properties['cta_position']"),
     ("ctaPosition", "properties['ctaPosition']"),
+    ("button_text", "properties['button_text']"),
+    ("buttonText", "properties['buttonText']"),
+    ("variant_id", "properties['variant_id']"),
+    ("variantId", "properties['variantId']"),
+    ("content_id", "properties['content_id']"),
+    ("contentId", "properties['contentId']"),
+    ("content_ids", "properties['content_ids']"),
+    ("value", "properties['value']"),
+    ("currency", "properties['currency']"),
+    ("checkout_url", "properties['checkout_url']"),
+    ("checkoutUrl", "properties['checkoutUrl']"),
+    ("transition_id", "properties['transition_id']"),
+    ("transitionId", "properties['transitionId']"),
     ("quiz_id", "properties['quiz_id']"),
     ("quizId", "properties['quizId']"),
     ("quiz_version", "properties['quiz_version']"),
     ("quizVersion", "properties['quizVersion']"),
     ("quiz_variant", "properties['quiz_variant']"),
     ("quizVariant", "properties['quizVariant']"),
+    ("lead_id", "properties['lead_id']"),
+    ("leadId", "properties['leadId']"),
+    ("lead_type", "properties['lead_type']"),
+    ("leadType", "properties['leadType']"),
     ("question_id", "properties['question_id']"),
     ("questionId", "properties['questionId']"),
+    ("question_text", "properties['question_text']"),
+    ("questionText", "properties['questionText']"),
     ("question_index", "properties['question_index']"),
     ("questionIndex", "properties['questionIndex']"),
+    ("question_type", "properties['question_type']"),
+    ("questionType", "properties['questionType']"),
+    ("question_role", "properties['question_role']"),
+    ("questionRole", "properties['questionRole']"),
+    ("is_required", "properties['is_required']"),
+    ("isRequired", "properties['isRequired']"),
     ("option_id", "properties['option_id']"),
     ("optionId", "properties['optionId']"),
+    ("option_text", "properties['option_text']"),
+    ("optionText", "properties['optionText']"),
+    ("option_index", "properties['option_index']"),
+    ("optionIndex", "properties['optionIndex']"),
+    ("option_position", "properties['option_position']"),
+    ("optionPosition", "properties['optionPosition']"),
+    ("option_role", "properties['option_role']"),
+    ("optionRole", "properties['optionRole']"),
+    ("selection_order", "properties['selection_order']"),
+    ("selectionOrder", "properties['selectionOrder']"),
+    ("selected_option_ids", "properties['selected_option_ids']"),
+    ("selectedOptionIds", "properties['selectedOptionIds']"),
+    ("selected_option_texts", "properties['selected_option_texts']"),
+    ("selectedOptionTexts", "properties['selectedOptionTexts']"),
+    ("answers", "properties['answers']"),
+    ("answers_by_question", "properties['answers_by_question']"),
+    ("answersByQuestion", "properties['answersByQuestion']"),
     ("result_id", "properties['result_id']"),
     ("resultId", "properties['resultId']"),
     ("segment_id", "properties['segment_id']"),
     ("segmentId", "properties['segmentId']"),
+    ("question_count_answered", "properties['question_count_answered']"),
+    ("questionCountAnswered", "properties['questionCountAnswered']"),
     ("recommendation_id", "properties['recommendation_id']"),
     ("recommendationId", "properties['recommendationId']"),
     ("answer_path_id", "properties['answer_path_id']"),
@@ -218,8 +294,17 @@ _POSTHOG_READBACK_COLUMNS: tuple[str, ...] = (
     "timestamp",
     *(column for column, _select in _POSTHOG_READBACK_COLUMN_SELECTS),
 )
+_POSTHOG_READBACK_STABILIZATION_SECONDS = 3.0
 _DEPLOY_TRACKING_VALIDATION_INIT_SCRIPT = """
 (() => {
+  try {
+    Object.defineProperty(window.navigator, "webdriver", {
+      configurable: true,
+      get: () => undefined,
+    });
+  } catch (_error) {
+    // Some browser contexts lock navigator properties; continue with the rest of validation.
+  }
   const STORAGE_KEY = "__mos_deploy_tracking_validation__";
   const defaultState = () => ({
     meta: [],
@@ -271,6 +356,22 @@ _DEPLOY_TRACKING_VALIDATION_INIT_SCRIPT = """
           ? input.url
           : "";
     const isPublicEventsRequest = url.includes("/public/events");
+    const isPostHogCaptureRequest = url.includes("/capture/");
+    if (isPostHogCaptureRequest) {
+      try {
+        const body = typeof init?.body === "string" ? init.body : null;
+        if (body) {
+          const parsed = JSON.parse(body);
+          const eventName = typeof parsed?.event === "string" ? parsed.event : null;
+          if (eventName) {
+            state.posthog.captures.push([eventName, parsed?.properties || {}]);
+            persist();
+          }
+        }
+      } catch (_error) {
+        // Ignore malformed validation payloads and let the final assertion explain the miss.
+      }
+    }
     if (url.includes("/public/events")) {
       try {
         const body = typeof init?.body === "string" ? init.body : null;
@@ -461,6 +562,10 @@ def _find_repo_root(start: Path) -> Path:
     )
 
 
+def _backend_source_dir() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _cloudhand_dir() -> Path:
     """
     Runtime directory for plans + Terraform state.
@@ -521,6 +626,52 @@ def _normalize_deploy_lock_workload_names(workload_names: list[str] | set[str] |
         seen.add(workload_name)
         normalized.append(workload_name)
     return sorted(normalized) if normalized else ["*"]
+
+
+def _scope_apply_plan_to_workloads(
+    *,
+    plan: dict[str, Any],
+    workload_names: set[str] | None,
+) -> bool:
+    if not workload_names:
+        return False
+
+    new_spec = plan.get("new_spec")
+    if not isinstance(new_spec, dict):
+        raise DeployError("Plan new_spec must be an object.")
+    instances = new_spec.get("instances")
+    if not isinstance(instances, list):
+        raise DeployError("Plan new_spec.instances must be a list.")
+
+    found_workload_names: set[str] = set()
+    has_changes = False
+    for inst in instances:
+        if not isinstance(inst, dict):
+            continue
+        workloads = inst.get("workloads")
+        if not isinstance(workloads, list):
+            continue
+
+        scoped_workloads: list[Any] = []
+        for workload in workloads:
+            if not isinstance(workload, dict):
+                scoped_workloads.append(workload)
+                continue
+            workload_name = str(workload.get("name") or "").strip()
+            if workload_name in workload_names:
+                found_workload_names.add(workload_name)
+                scoped_workloads.append(workload)
+                continue
+            has_changes = True
+        if scoped_workloads != workloads:
+            inst["workloads"] = scoped_workloads
+
+    missing_workload_names = sorted(workload_names - found_workload_names)
+    if missing_workload_names:
+        raise DeployError(
+            "Selected deploy workload(s) not found in plan: " + ", ".join(missing_workload_names)
+        )
+    return has_changes
 
 
 @contextmanager
@@ -981,6 +1132,7 @@ def build_funnel_publication_workload_patch(
     artifact_render_mode: str = _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
     default_route_policy: str = "entry_page",
     default_page_slug: str | None = None,
+    release_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     name = workload_name.strip()
     if not name:
@@ -1025,13 +1177,20 @@ def build_funnel_publication_workload_patch(
     if normalized_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
         api_base_root = _require_standalone_upstream_api_origin(upstream_api_base_url=api_base_root)
     normalized_default_route_policy = (default_route_policy or "entry_page").strip().lower()
-    if normalized_default_route_policy not in {"entry_page", "prefer_sales", "explicit_slug", "none"}:
+    if normalized_default_route_policy not in {
+        "entry_page",
+        "prefer_sales",
+        "explicit_slug",
+        "none",
+    }:
         raise DeployError(
             "Deploy defaultRoutePolicy must be one of: entry_page, prefer_sales, explicit_slug, none."
         )
     normalized_default_page_slug = str(default_page_slug or "").strip()
     if normalized_default_route_policy == "explicit_slug" and not normalized_default_page_slug:
-        raise DeployError("Deploy defaultPageSlug is required when defaultRoutePolicy is explicit_slug.")
+        raise DeployError(
+            "Deploy defaultPageSlug is required when defaultRoutePolicy is explicit_slug."
+        )
 
     https_enabled = https and bool(normalized_server_names)
 
@@ -1048,6 +1207,8 @@ def build_funnel_publication_workload_patch(
             "products": {},
         },
     }
+    if release_metadata:
+        source_ref["release_metadata"] = copy.deepcopy(release_metadata)
     if normalized_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE:
         source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
 
@@ -1085,6 +1246,7 @@ def build_funnel_artifact_workload_patch(
     artifact_render_mode: str = _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
     default_route_policy: str = "entry_page",
     default_page_slug: str | None = None,
+    release_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return build_funnel_publication_workload_patch(
         workload_name=workload_name,
@@ -1097,6 +1259,7 @@ def build_funnel_artifact_workload_patch(
         artifact_render_mode=artifact_render_mode,
         default_route_policy=default_route_policy,
         default_page_slug=default_page_slug,
+        release_metadata=release_metadata,
     )
 
 
@@ -1376,6 +1539,318 @@ def _extract_public_asset_refs_from_text(raw_value: str) -> tuple[set[str], list
     return matches, invalid_urls
 
 
+def _normalize_inline_html_deploy_asset_payload(
+    *,
+    public_id: str,
+    raw_payload: Any,
+    context_label: str,
+) -> dict[str, Any]:
+    if not isinstance(raw_payload, dict):
+        raise DeployError(
+            f"{context_label} inline asset payload for '{public_id}' must be an object."
+        )
+    raw_content_type = raw_payload.get("contentType")
+    if raw_content_type is None:
+        raw_content_type = raw_payload.get("content_type")
+    content_type = str(raw_content_type or "").split(";", 1)[0].strip().lower()
+    if not content_type.startswith("image/"):
+        raise DeployError(
+            f"{context_label} inline asset '{public_id}' has unsupported contentType "
+            f"'{content_type or 'unknown'}'. Expected image/*."
+        )
+
+    raw_bytes_base64 = raw_payload.get("bytesBase64")
+    if raw_bytes_base64 is None:
+        raw_bytes_base64 = raw_payload.get("bytes_base64")
+    if not isinstance(raw_bytes_base64, str) or not raw_bytes_base64.strip():
+        raise DeployError(
+            f"{context_label} inline asset '{public_id}' must include non-empty bytesBase64."
+        )
+    try:
+        decoded_bytes = base64.b64decode(raw_bytes_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise DeployError(
+            f"{context_label} inline asset '{public_id}' has invalid bytesBase64."
+        ) from exc
+    if not decoded_bytes:
+        raise DeployError(f"{context_label} inline asset '{public_id}' decoded to empty bytes.")
+
+    declared_size = raw_payload.get("sizeBytes")
+    if declared_size is None:
+        declared_size = raw_payload.get("size_bytes")
+    if declared_size is not None:
+        try:
+            declared_size_int = int(declared_size)
+        except (TypeError, ValueError) as exc:
+            raise DeployError(
+                f"{context_label} inline asset '{public_id}' sizeBytes must be a non-negative integer."
+            ) from exc
+        if declared_size_int < 0:
+            raise DeployError(
+                f"{context_label} inline asset '{public_id}' sizeBytes must be a non-negative integer."
+            )
+        if declared_size_int != len(decoded_bytes):
+            raise DeployError(
+                f"{context_label} inline asset '{public_id}' sizeBytes ({declared_size_int}) "
+                f"does not match decoded byte length ({len(decoded_bytes)})."
+            )
+
+    return {
+        "contentType": content_type,
+        "sizeBytes": len(decoded_bytes),
+        "serveMode": "embedded",
+        "bytesBase64": base64.b64encode(decoded_bytes).decode("ascii"),
+    }
+
+
+def _normalize_html_deploy_static_asset_path(
+    raw_path: Any,
+    *,
+    context_label: str,
+) -> str:
+    path = str(raw_path or "").strip()
+    if not path:
+        raise DeployError(f"{context_label} static asset path must be non-empty.")
+    if "://" in path or path.startswith("//"):
+        raise DeployError(f"{context_label} static asset path '{path}' must be a same-origin path.")
+    if "?" in path or "#" in path:
+        raise DeployError(
+            f"{context_label} static asset path '{path}' must not include query strings or fragments."
+        )
+    if not path.startswith("/"):
+        raise DeployError(f"{context_label} static asset path '{path}' must start with '/'.")
+    normalized = posixpath.normpath(path)
+    if path.endswith("/") and not normalized.endswith("/"):
+        normalized += "/"
+    if normalized != path:
+        raise DeployError(
+            f"{context_label} static asset path '{path}' must be normalized; expected '{normalized}'."
+        )
+    lowered = path.lower()
+    route_scoped_static_asset = _HTML_DEPLOY_ROUTE_SCOPED_STATIC_ASSET_RE.match(path) is not None
+    product_scoped_static_asset = (
+        _HTML_DEPLOY_PRODUCT_SCOPED_STATIC_ASSET_RE.match(path) is not None
+    )
+    if (
+        not any(lowered.startswith(prefix) for prefix in _HTML_DEPLOY_STATIC_ASSET_PREFIXES)
+        and not route_scoped_static_asset
+        and not product_scoped_static_asset
+    ):
+        raise DeployError(
+            f"{context_label} static asset path '{path}' must start with one of: "
+            + ", ".join(_HTML_DEPLOY_STATIC_ASSET_PREFIXES)
+            + ", a product-scoped /<product>/assets/ path, or a route-scoped "
+            "/<product>/<funnel>/<page>/assets/ path"
+        )
+    return path
+
+
+def _normalize_html_deploy_static_asset_payload(
+    *,
+    asset_path: str,
+    raw_payload: Any,
+    context_label: str,
+) -> dict[str, Any]:
+    if not isinstance(raw_payload, dict):
+        raise DeployError(
+            f"{context_label} static asset payload for '{asset_path}' must be an object."
+        )
+    raw_content_type = raw_payload.get("contentType")
+    if raw_content_type is None:
+        raw_content_type = raw_payload.get("content_type")
+    content_type = str(raw_content_type or "").split(";", 1)[0].strip().lower()
+    if not content_type:
+        raise DeployError(
+            f"{context_label} static asset '{asset_path}' must include non-empty contentType."
+        )
+    allowed = (
+        content_type.startswith("image/")
+        or content_type.startswith("video/")
+        or content_type.startswith("font/")
+        or content_type
+        in {
+            "application/font-woff",
+            "application/font-woff2",
+            "application/javascript",
+            "application/json",
+            "application/octet-stream",
+            "application/vnd.ms-fontobject",
+            "application/x-font-otf",
+            "application/x-font-ttf",
+            "application/x-font-woff",
+            "application/x-font-woff2",
+            "image/svg+xml",
+            "text/css",
+            "text/javascript",
+        }
+    )
+    if not allowed:
+        raise DeployError(
+            f"{context_label} static asset '{asset_path}' has unsupported contentType "
+            f"'{content_type}'. Expected image, video, font, CSS, JavaScript, JSON, SVG, or binary font bytes."
+        )
+
+    raw_bytes_base64 = raw_payload.get("bytesBase64")
+    if raw_bytes_base64 is None:
+        raw_bytes_base64 = raw_payload.get("bytes_base64")
+    if not isinstance(raw_bytes_base64, str) or not raw_bytes_base64.strip():
+        raise DeployError(
+            f"{context_label} static asset '{asset_path}' must include non-empty bytesBase64."
+        )
+    try:
+        decoded_bytes = base64.b64decode(raw_bytes_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise DeployError(
+            f"{context_label} static asset '{asset_path}' has invalid bytesBase64."
+        ) from exc
+    if not decoded_bytes:
+        raise DeployError(f"{context_label} static asset '{asset_path}' decoded to empty bytes.")
+
+    declared_size = raw_payload.get("sizeBytes")
+    if declared_size is None:
+        declared_size = raw_payload.get("size_bytes")
+    if declared_size is not None:
+        try:
+            declared_size_int = int(declared_size)
+        except (TypeError, ValueError) as exc:
+            raise DeployError(
+                f"{context_label} static asset '{asset_path}' sizeBytes must be a non-negative integer."
+            ) from exc
+        if declared_size_int < 0:
+            raise DeployError(
+                f"{context_label} static asset '{asset_path}' sizeBytes must be a non-negative integer."
+            )
+        if declared_size_int != len(decoded_bytes):
+            raise DeployError(
+                f"{context_label} static asset '{asset_path}' sizeBytes ({declared_size_int}) "
+                f"does not match decoded byte length ({len(decoded_bytes)})."
+            )
+
+    raw_sha256 = raw_payload.get("sha256")
+    if raw_sha256 is not None:
+        expected_sha256 = str(raw_sha256 or "").strip().lower()
+        actual_sha256 = hashlib.sha256(decoded_bytes).hexdigest()
+        if expected_sha256 != actual_sha256:
+            raise DeployError(
+                f"{context_label} static asset '{asset_path}' sha256 does not match decoded bytes."
+            )
+
+    return {
+        "contentType": content_type,
+        "sizeBytes": len(decoded_bytes),
+        "serveMode": "embedded",
+        "sha256": hashlib.sha256(decoded_bytes).hexdigest(),
+        "bytesBase64": base64.b64encode(decoded_bytes).decode("ascii"),
+    }
+
+
+def _normalize_release_metadata_string_set(
+    *,
+    release_metadata: dict[str, Any],
+    key: str,
+) -> set[str] | None:
+    raw_values = release_metadata.get(key)
+    if raw_values is None:
+        return None
+    if not isinstance(raw_values, list):
+        raise DeployError(f"release_metadata.{key} must be a list when provided.")
+    return {str(value or "").strip() for value in raw_values if str(value or "").strip()}
+
+
+def _extract_inline_html_deploy_asset_payloads(
+    *,
+    puck_data: dict[str, Any],
+    context_label: str,
+) -> dict[str, dict[str, Any]]:
+    output: dict[str, dict[str, Any]] = {}
+    for obj in _walk_json_dicts(puck_data):
+        for payload_key in _HTML_DEPLOY_INLINE_ASSET_PAYLOAD_KEYS:
+            raw_payloads = obj.get(payload_key)
+            if raw_payloads is None:
+                continue
+            if not isinstance(raw_payloads, dict):
+                raise DeployError(f"{context_label}.{payload_key} must be an object.")
+            for raw_public_id, raw_payload in raw_payloads.items():
+                cleaned_public_id = str(raw_public_id or "").strip()
+                try:
+                    normalized_public_id = str(UUID(cleaned_public_id))
+                except ValueError as exc:
+                    raise DeployError(
+                        f"{context_label}.{payload_key} includes invalid public asset id "
+                        f"'{cleaned_public_id}'. Expected a UUID."
+                    ) from exc
+                normalized_payload = _normalize_inline_html_deploy_asset_payload(
+                    public_id=normalized_public_id,
+                    raw_payload=raw_payload,
+                    context_label=f"{context_label}.{payload_key}",
+                )
+                existing = output.get(normalized_public_id)
+                if existing is not None and existing != normalized_payload:
+                    raise DeployError(
+                        f"{context_label}.{payload_key} includes conflicting inline payloads "
+                        f"for public asset '{normalized_public_id}'."
+                    )
+                output[normalized_public_id] = normalized_payload
+    return output
+
+
+def _extract_inline_html_deploy_static_asset_payloads(
+    *,
+    puck_data: dict[str, Any],
+    context_label: str,
+) -> dict[str, dict[str, Any]]:
+    output: dict[str, dict[str, Any]] = {}
+    for obj in _walk_json_dicts(puck_data):
+        for payload_key in _HTML_DEPLOY_STATIC_ASSET_PAYLOAD_KEYS:
+            raw_payloads = obj.get(payload_key)
+            if raw_payloads is None:
+                continue
+            if not isinstance(raw_payloads, dict):
+                raise DeployError(f"{context_label}.{payload_key} must be an object.")
+            for raw_path, raw_payload in raw_payloads.items():
+                normalized_path = _normalize_html_deploy_static_asset_path(
+                    raw_path,
+                    context_label=f"{context_label}.{payload_key}",
+                )
+                normalized_payload = _normalize_html_deploy_static_asset_payload(
+                    asset_path=normalized_path,
+                    raw_payload=raw_payload,
+                    context_label=f"{context_label}.{payload_key}",
+                )
+                existing = output.get(normalized_path)
+                if existing is not None and existing != normalized_payload:
+                    raise DeployError(
+                        f"{context_label}.{payload_key} includes conflicting payloads "
+                        f"for static asset '{normalized_path}'."
+                    )
+                output[normalized_path] = normalized_payload
+    return output
+
+
+def _strip_inline_html_deploy_asset_payloads(value: Any) -> Any:
+    return strip_inline_html_deploy_asset_payloads(value)
+
+
+def _extract_imported_html_document_public_asset_ids(
+    *,
+    puck_data: dict[str, Any],
+    context_label: str,
+) -> set[str]:
+    public_ids: set[str] = set()
+    for obj in _walk_json_dicts(puck_data):
+        raw_html_document = obj.get("htmlDocument")
+        if not isinstance(raw_html_document, str) or not raw_html_document.strip():
+            continue
+        matched_public_ids, invalid_urls = _extract_public_asset_refs_from_text(raw_html_document)
+        if invalid_urls:
+            raise DeployError(
+                f"{context_label} htmlDocument includes invalid public asset URL "
+                f"'{invalid_urls[0]}'. Expected /public/assets/<uuid>."
+            )
+        public_ids.update(matched_public_ids)
+    return public_ids
+
+
 def _extract_embedded_asset_public_ids(
     *,
     puck_data: dict[str, Any],
@@ -1454,13 +1929,36 @@ def _build_embedded_asset_payload(
     client_id: str,
     public_ids: list[str],
 ) -> tuple[dict[str, dict[str, Any]], int]:
+    asset_items, total_embedded_bytes, _total_referenced_bytes = (
+        _build_funnel_artifact_asset_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            public_ids=public_ids,
+            embed_bytes=True,
+            inline_asset_payloads=None,
+            required_inline_public_ids=None,
+        )
+    )
+    return asset_items, total_embedded_bytes
+
+
+def _build_funnel_artifact_asset_payload(
+    *,
+    session: Any,
+    org_id: str,
+    client_id: str,
+    public_ids: list[str],
+    embed_bytes: bool,
+    inline_asset_payloads: dict[str, dict[str, Any]] | None = None,
+    required_inline_public_ids: set[str] | None = None,
+) -> tuple[dict[str, dict[str, Any]], int, int]:
     if not public_ids:
-        return {}, 0
+        return {}, 0, 0
 
     from sqlalchemy import select
 
     from app.db.models import Asset
-    from app.services.media_storage import MediaStorage
 
     asset_public_ids = [UUID(value) for value in public_ids]
     assets = list(
@@ -1482,9 +1980,12 @@ def _build_embedded_asset_payload(
             + ", ".join(missing_public_ids)
         )
 
-    storage = MediaStorage()
+    storage: Any | None = None
     output: dict[str, dict[str, Any]] = {}
-    total_bytes = 0
+    total_embedded_bytes = 0
+    total_referenced_bytes = 0
+    normalized_inline_asset_payloads = inline_asset_payloads or {}
+    normalized_required_inline_public_ids = required_inline_public_ids or set()
 
     for public_id in public_ids:
         asset = assets_by_public_id[public_id]
@@ -1499,6 +2000,68 @@ def _build_embedded_asset_payload(
         if not asset.storage_key:
             raise DeployError(f"Asset {public_id} is missing storage_key.")
 
+        declared_size = int(asset.size_bytes) if asset.size_bytes is not None else None
+        content_type = (asset.content_type or "").split(";")[0].strip().lower()
+        inline_payload = normalized_inline_asset_payloads.get(public_id)
+        if inline_payload is not None:
+            inline_content_type = str(inline_payload.get("contentType") or "").strip().lower()
+            if not inline_content_type.startswith("image/"):
+                raise DeployError(
+                    f"Inline asset {public_id} has unsupported content type "
+                    f"'{inline_content_type or 'unknown'}'. Expected image/*."
+                )
+            raw_inline_bytes = inline_payload.get("bytesBase64")
+            if not isinstance(raw_inline_bytes, str) or not raw_inline_bytes.strip():
+                raise DeployError(f"Inline asset {public_id} is missing bytesBase64.")
+            try:
+                inline_bytes = base64.b64decode(raw_inline_bytes, validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise DeployError(f"Inline asset {public_id} has invalid bytesBase64.") from exc
+            if not inline_bytes:
+                raise DeployError(f"Inline asset {public_id} decoded to empty bytes.")
+            inline_payload = {
+                "contentType": inline_content_type,
+                "sizeBytes": len(inline_bytes),
+                "serveMode": "embedded",
+                "bytesBase64": base64.b64encode(inline_bytes).decode("ascii"),
+            }
+            total_embedded_bytes += len(inline_bytes)
+            if total_embedded_bytes > _DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES:
+                raise DeployError(
+                    "Embedded funnel artifact assets exceed DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES "
+                    f"(current={total_embedded_bytes} bytes, limit={_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES} bytes)."
+                )
+            output[public_id] = inline_payload
+            continue
+
+        if public_id in normalized_required_inline_public_ids:
+            raise DeployError(
+                "HTML deploy artifact asset generation requires inline image bytes for "
+                f"public asset '{public_id}'. Re-run the html-deploy-v1 import flow so the "
+                "artifact can be validated without object-store re-downloads."
+            )
+
+        if not embed_bytes:
+            if not content_type.startswith("image/"):
+                raise DeployError(
+                    f"Asset {public_id} has unsupported content type '{content_type or 'unknown'}'. Expected image/*."
+                )
+            total_referenced_bytes += declared_size or 0
+            output[public_id] = {
+                "contentType": content_type,
+                "sizeBytes": declared_size,
+                "serveMode": "public_asset_reference",
+                "publicPath": f"/public/assets/{public_id}",
+                "apiPath": f"/api/public/assets/{public_id}",
+                **({"width": int(asset.width)} if asset.width else {}),
+                **({"height": int(asset.height)} if asset.height else {}),
+            }
+            continue
+
+        if storage is None:
+            from app.services.media_storage import MediaStorage
+
+            storage = MediaStorage()
         data, downloaded_content_type = storage.download_bytes(key=asset.storage_key)
         if not data:
             raise DeployError(f"Asset {public_id} downloaded empty bytes from object storage.")
@@ -1517,20 +2080,21 @@ def _build_embedded_asset_payload(
             public_id=public_id,
         )
 
-        total_bytes += len(data)
-        if total_bytes > _DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES:
+        total_embedded_bytes += len(data)
+        if total_embedded_bytes > _DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES:
             raise DeployError(
                 "Embedded funnel artifact assets exceed DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES "
-                f"(current={total_bytes} bytes, limit={_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES} bytes)."
+                f"(current={total_embedded_bytes} bytes, limit={_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES} bytes)."
             )
 
         output[public_id] = {
             "contentType": content_type,
             "sizeBytes": len(data),
+            "serveMode": "embedded",
             "bytesBase64": base64.b64encode(data).decode("ascii"),
         }
 
-    return output, total_bytes
+    return output, total_embedded_bytes, total_referenced_bytes
 
 
 def _optimize_embedded_artifact_image_bytes(
@@ -1611,6 +2175,10 @@ def build_client_funnel_runtime_artifact_payload(
     updated_from_funnel_id: str,
     updated_from_publication_id: str,
     publication_id_overrides: dict[str, str] | None = None,
+    asset_reference_mode: bool = False,
+    included_funnel_ids: set[str] | None = None,
+    included_page_slugs: set[str] | None = None,
+    included_page_stages: set[str] | None = None,
 ) -> dict[str, Any]:
     from fastapi.encoders import jsonable_encoder
     from sqlalchemy import select
@@ -1630,6 +2198,7 @@ def build_client_funnel_runtime_artifact_payload(
         "sales-pdp": "sales",
         "sales_pdp": "sales",
     }
+
     def _artifact_page_slug(*, publication_slug: Any, template_id: str) -> str:
         artifact_slug = resolve_funnel_template_artifact_slug(template_id)
         normalized_publication_slug = str(publication_slug or "").strip().lower()
@@ -1652,7 +2221,6 @@ def build_client_funnel_runtime_artifact_payload(
             f"Unsupported template '{template_id or 'unknown'}' for deploy artifact page slug."
         )
 
-
     client_funnels = list(
         session.scalars(
             select(Funnel)
@@ -1668,6 +2236,23 @@ def build_client_funnel_runtime_artifact_payload(
     if not client_funnels:
         raise DeployError("No published funnels found for client deploy artifact.")
 
+    normalized_included_funnel_ids = {
+        str(value or "").strip()
+        for value in (included_funnel_ids or set())
+        if str(value or "").strip()
+    }
+    if normalized_included_funnel_ids:
+        client_funnels = [
+            client_funnel
+            for client_funnel in client_funnels
+            if str(client_funnel.id) in normalized_included_funnel_ids
+        ]
+        if not client_funnels:
+            raise DeployError(
+                "No published funnels matched deploy artifact funnel filter: "
+                + ", ".join(sorted(normalized_included_funnel_ids))
+            )
+
     product_ids: set[str] = set()
     normalized_publication_overrides = {
         str(raw_funnel_id or "").strip(): str(raw_publication_id or "").strip()
@@ -1678,6 +2263,16 @@ def build_client_funnel_runtime_artifact_payload(
         {"funnelId": funnel_id, "publicationId": publication_id}
         for funnel_id, publication_id in sorted(normalized_publication_overrides.items())
     ]
+    normalized_included_page_slugs = {
+        str(value or "").strip().lower()
+        for value in (included_page_slugs or set())
+        if str(value or "").strip()
+    }
+    normalized_included_page_stages = {
+        str(value or "").strip().lower()
+        for value in (included_page_stages or set())
+        if str(value or "").strip()
+    }
 
     for client_funnel in client_funnels:
         if not client_funnel.product_id:
@@ -1704,6 +2299,10 @@ def build_client_funnel_runtime_artifact_payload(
     products_payload: dict[str, dict[str, Any]] = {}
     product_slug_to_product_id: dict[str, str] = {}
     embedded_asset_public_ids: set[str] = set()
+    inline_asset_payloads: dict[str, dict[str, Any]] = {}
+    inline_static_asset_payloads: dict[str, dict[str, Any]] = {}
+    inline_required_public_ids: set[str] = set()
+    included_publication_page_ids: set[str] = set()
 
     for client_funnel in client_funnels:
         route_slug = (client_funnel.route_slug or "").strip()
@@ -1744,7 +2343,7 @@ def build_client_funnel_runtime_artifact_payload(
         if not publication_pages:
             raise DeployError(f"Publication '{active_publication_id}' contains no pages.")
 
-        page_details: list[tuple[str, str, Any, FunnelPage | None]] = []
+        page_details: list[tuple[str, str, Any, FunnelPage | None, str]] = []
         entry_slug: str | None = None
         seen_artifacts: set[str] = set()
 
@@ -1758,12 +2357,28 @@ def build_client_funnel_runtime_artifact_payload(
                 publication_slug=getattr(item, "slug_at_publish", None),
                 template_id=template_id,
             )
+            page_stage = resolve_funnel_page_stage(
+                slug=artifact_slug,
+                template_id=page.template_id if page else None,
+                page_name=page.name if page else None,
+            )
+            include_page = True
+            if normalized_included_page_slugs:
+                raw_page_slug = str(getattr(item, "slug_at_publish", "") or "").strip().lower()
+                include_page = (
+                    artifact_slug.lower() in normalized_included_page_slugs
+                    or raw_page_slug in normalized_included_page_slugs
+                )
+            if include_page and normalized_included_page_stages:
+                include_page = page_stage.lower() in normalized_included_page_stages
+            if not include_page:
+                continue
             if artifact_slug in seen_artifacts:
                 raise DeployError(
                     f"Funnel '{client_funnel.id}' has multiple pages mapped to artifact '{artifact_slug}'."
                 )
             seen_artifacts.add(artifact_slug)
-            page_details.append((artifact_slug, str(item.page_id), version, page))
+            page_details.append((artifact_slug, str(item.page_id), version, page, page_stage))
             if str(item.page_id) == str(active_publication.entry_page_id):
                 entry_slug = artifact_slug
 
@@ -1771,19 +2386,16 @@ def build_client_funnel_runtime_artifact_payload(
             raise DeployError(
                 f"Entry page artifact slug not found for funnel '{client_funnel.id}'."
             )
+        included_publication_page_ids.update(page_id for _, page_id, _, _, _ in page_details)
 
-        page_map = {page_id: artifact_slug for artifact_slug, page_id, _, _ in page_details}
+        page_map = {page_id: artifact_slug for artifact_slug, page_id, _, _, _ in page_details}
         page_stage_map = {
-            page_id: resolve_funnel_page_stage(
-                slug=artifact_slug,
-                template_id=page.template_id if page else None,
-                page_name=page.name if page else None,
-            )
-            for artifact_slug, page_id, _, page in page_details
+            page_id: page_stage
+            for _artifact_slug, page_id, _version, _page, page_stage in page_details
         }
         page_type_map = {
             page_id: page_type
-            for _, page_id, _, page in page_details
+            for _, page_id, _, page, _page_stage in page_details
             for page_type in [
                 (clean_optional_text(page.page_type) if page else None)
                 or resolve_funnel_template_page_type(page.template_id if page else None)
@@ -1791,14 +2403,19 @@ def build_client_funnel_runtime_artifact_payload(
             if page_type
         }
         try:
-            tracking = resolve_public_runtime_tracking(
-                session=session,
-                funnel=client_funnel,
-                include_posthog=True,
-            ) or {}
+            tracking = (
+                resolve_public_runtime_tracking(
+                    session=session,
+                    funnel=client_funnel,
+                    include_posthog=True,
+                )
+                or {}
+            )
         except RuntimeError as exc:
             raise DeployError(str(exc)) from exc
-        from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
+        from app.db.repositories.client_compliance_profiles import (
+            ClientComplianceProfilesRepository,
+        )
 
         compliance_profile = ClientComplianceProfilesRepository(session).get(
             org_id=str(client_funnel.org_id),
@@ -1810,7 +2427,7 @@ def build_client_funnel_runtime_artifact_payload(
             else ""
         )
         pages_payload: dict[str, dict[str, Any]] = {}
-        for artifact_slug, page_id, version, page in page_details:
+        for artifact_slug, page_id, version, page, _page_stage in page_details:
             tokens = resolve_design_system_tokens(
                 session=session,
                 org_id=str(client_funnel.org_id),
@@ -1834,6 +2451,37 @@ def build_client_funnel_runtime_artifact_payload(
                 puck_data=version.puck_data,
             )
             page_context_label = f"Funnel '{client_funnel.id}' page '{page_id}' ({product_slug}/{route_slug}/{artifact_slug})"
+            page_inline_asset_payloads = _extract_inline_html_deploy_asset_payloads(
+                puck_data=materialized_puck_data,
+                context_label=page_context_label,
+            )
+            page_static_asset_payloads = _extract_inline_html_deploy_static_asset_payloads(
+                puck_data=materialized_puck_data,
+                context_label=page_context_label,
+            )
+            for public_id, payload in page_inline_asset_payloads.items():
+                existing_payload = inline_asset_payloads.get(public_id)
+                if existing_payload is not None and existing_payload != payload:
+                    raise DeployError(
+                        f"Funnel artifact includes conflicting inline asset payloads for public asset '{public_id}'."
+                    )
+                inline_asset_payloads[public_id] = payload
+            for asset_path, payload in page_static_asset_payloads.items():
+                existing_payload = inline_static_asset_payloads.get(asset_path)
+                if existing_payload is not None and existing_payload != payload:
+                    raise DeployError(
+                        f"Funnel artifact includes conflicting inline static asset payloads for '{asset_path}'."
+                    )
+                inline_static_asset_payloads[asset_path] = payload
+            materialized_puck_data = _strip_inline_html_deploy_asset_payloads(
+                materialized_puck_data
+            )
+            page_html_document_public_ids = _extract_imported_html_document_public_asset_ids(
+                puck_data=materialized_puck_data,
+                context_label=page_context_label,
+            )
+            if page_inline_asset_payloads:
+                inline_required_public_ids.update(page_html_document_public_ids)
             page_asset_public_ids = _extract_embedded_asset_public_ids(
                 puck_data=materialized_puck_data,
                 design_system_tokens=tokens if isinstance(tokens, dict) else None,
@@ -1910,33 +2558,82 @@ def build_client_funnel_runtime_artifact_payload(
                 "entrySlug": entry_slug,
                 "pages": [
                     {"pageId": page_id, "slug": artifact_slug}
-                    for artifact_slug, page_id, _, _ in page_details
+                    for artifact_slug, page_id, _, _, _ in page_details
                 ],
             },
             "pages": pages_payload,
             "commerce": commerce_payload,
         }
 
-    embedded_assets, total_embedded_asset_bytes = _build_embedded_asset_payload(
+    asset_items, total_embedded_asset_bytes, total_referenced_asset_bytes = (
+        _build_funnel_artifact_asset_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            public_ids=sorted(embedded_asset_public_ids),
+            embed_bytes=not asset_reference_mode,
+            inline_asset_payloads=inline_asset_payloads,
+            required_inline_public_ids=inline_required_public_ids,
+        )
+    )
+
+    assets_payload: dict[str, Any] = {
+        "totalBytes": total_embedded_asset_bytes,
+        "items": asset_items,
+    }
+    if inline_static_asset_payloads:
+        assets_payload["staticItems"] = inline_static_asset_payloads
+        assets_payload["totalStaticBytes"] = sum(
+            int(payload.get("sizeBytes") or 0) for payload in inline_static_asset_payloads.values()
+        )
+    if asset_reference_mode:
+        assets_payload["serveMode"] = "public_asset_reference"
+        assets_payload["totalReferencedBytes"] = total_referenced_asset_bytes
+
+    meta_payload: dict[str, Any] = {
+        "clientId": str(client_id),
+        "updatedFromFunnelId": updated_from_funnel_id,
+        "updatedFromPublicationId": updated_from_publication_id,
+        "publicationOverrides": publication_override_manifest,
+    }
+    if normalized_included_page_slugs or normalized_included_page_stages:
+        meta_payload["includedPublicationPageIds"] = sorted(included_publication_page_ids)
+        meta_payload["includedPageSlugs"] = sorted(normalized_included_page_slugs)
+        meta_payload["includedPageStages"] = sorted(normalized_included_page_stages)
+    if normalized_included_funnel_ids:
+        meta_payload["includedFunnelIds"] = sorted(normalized_included_funnel_ids)
+
+    return {
+        "meta": meta_payload,
+        "products": products_payload,
+        "assets": assets_payload,
+    }
+
+
+def _build_embedded_client_funnel_runtime_artifact_payload(
+    *,
+    session: Any,
+    org_id: str,
+    client_id: str,
+    updated_from_funnel_id: str,
+    updated_from_publication_id: str,
+    publication_id_overrides: dict[str, str] | None = None,
+    included_funnel_ids: set[str] | None = None,
+    included_page_slugs: set[str] | None = None,
+    included_page_stages: set[str] | None = None,
+) -> dict[str, Any]:
+    return build_client_funnel_runtime_artifact_payload(
         session=session,
         org_id=org_id,
         client_id=client_id,
-        public_ids=sorted(embedded_asset_public_ids),
+        updated_from_funnel_id=updated_from_funnel_id,
+        updated_from_publication_id=updated_from_publication_id,
+        publication_id_overrides=publication_id_overrides,
+        asset_reference_mode=False,
+        included_funnel_ids=included_funnel_ids,
+        included_page_slugs=included_page_slugs,
+        included_page_stages=included_page_stages,
     )
-
-    return {
-        "meta": {
-            "clientId": str(client_id),
-            "updatedFromFunnelId": updated_from_funnel_id,
-            "updatedFromPublicationId": updated_from_publication_id,
-            "publicationOverrides": publication_override_manifest,
-        },
-        "products": products_payload,
-        "assets": {
-            "totalBytes": total_embedded_asset_bytes,
-            "items": embedded_assets,
-        },
-    }
 
 
 def _parse_artifact_uuid(value: Any, *, label: str) -> UUID:
@@ -1957,6 +2654,9 @@ def validate_funnel_artifact_identity(
     products = artifact_payload.get("products")
     if not isinstance(products, dict) or not products:
         raise DeployError("Artifact identity audit requires a non-empty products object.")
+    artifact_meta = (
+        artifact_payload.get("meta") if isinstance(artifact_payload.get("meta"), dict) else {}
+    )
 
     audited_funnels: list[dict[str, Any]] = []
     for product_slug, product_payload in products.items():
@@ -1979,7 +2679,9 @@ def validate_funnel_artifact_identity(
                 raise DeployError(
                     f"Artifact identity audit funnel '{product_slug}/{funnel_token}' is missing meta."
                 )
-            funnel_id = str(funnel_meta.get("funnelId") or funnel_payload.get("funnelId") or "").strip()
+            funnel_id = str(
+                funnel_meta.get("funnelId") or funnel_payload.get("funnelId") or ""
+            ).strip()
             publication_id = str(
                 funnel_meta.get("publicationId") or funnel_payload.get("publicationId") or ""
             ).strip()
@@ -2008,9 +2710,9 @@ def validate_funnel_artifact_identity(
 
             publication_page_rows = list(
                 session.execute(
-                    select(FunnelPublicationPage.page_id, FunnelPublicationPage.slug_at_publish).where(
-                        FunnelPublicationPage.publication_id == publication_uuid
-                    )
+                    select(
+                        FunnelPublicationPage.page_id, FunnelPublicationPage.slug_at_publish
+                    ).where(FunnelPublicationPage.publication_id == publication_uuid)
                 ).all()
             )
             publication_page_ids = {str(row[0]) for row in publication_page_rows}
@@ -2018,15 +2720,42 @@ def validate_funnel_artifact_identity(
                 raise DeployError(
                     f"Artifact identity audit failed: publication '{publication_id}' contains no pages."
                 )
+            included_page_ids_raw = (
+                artifact_meta.get("includedPublicationPageIds")
+                if isinstance(artifact_meta.get("includedPublicationPageIds"), list)
+                else None
+            )
+            expected_page_ids = {
+                str(page_id or "").strip()
+                for page_id in (included_page_ids_raw or publication_page_ids)
+                if str(page_id or "").strip()
+            }
+            if not expected_page_ids:
+                raise DeployError(
+                    f"Artifact identity audit failed: artifact page filter for publication '{publication_id}' selected no pages."
+                )
+            unknown_included_page_ids = sorted(expected_page_ids - publication_page_ids)
+            if unknown_included_page_ids:
+                raise DeployError(
+                    "Artifact identity audit failed: includedPublicationPageIds contains pages "
+                    f"outside publication '{publication_id}': {unknown_included_page_ids}."
+                )
 
             page_funnel_rows = list(
                 session.execute(
                     select(FunnelPage.id, FunnelPage.funnel_id).where(
-                        FunnelPage.id.in_([_parse_artifact_uuid(page_id, label="pageId") for page_id in publication_page_ids])
+                        FunnelPage.id.in_(
+                            [
+                                _parse_artifact_uuid(page_id, label="pageId")
+                                for page_id in publication_page_ids
+                            ]
+                        )
                     )
                 ).all()
             )
-            page_funnel_ids = {str(page_id): str(page_funnel_id) for page_id, page_funnel_id in page_funnel_rows}
+            page_funnel_ids = {
+                str(page_id): str(page_funnel_id) for page_id, page_funnel_id in page_funnel_rows
+            }
             for page_id in sorted(publication_page_ids):
                 if page_funnel_ids.get(page_id) != str(funnel.id):
                     raise DeployError(
@@ -2050,6 +2779,10 @@ def validate_funnel_artifact_identity(
                     raise DeployError(
                         f"Artifact identity audit failed: page '{page_id}' is not in publication '{publication_id}'."
                     )
+                if page_id not in expected_page_ids:
+                    raise DeployError(
+                        f"Artifact identity audit failed: page '{page_id}' is not included in the artifact page filter."
+                    )
                 if str(page_payload.get("publicationId") or "").strip() != publication_id:
                     raise DeployError(
                         f"Artifact identity audit failed: page '{page_id}' has publicationId that does not match funnel publication '{publication_id}'."
@@ -2068,13 +2801,15 @@ def validate_funnel_artifact_identity(
                     raise DeployError(
                         f"Artifact identity audit failed: page '{page_id}' is missing pageStageMap."
                     )
-                page_map_ids = {str(key or "").strip() for key in page_map if str(key or "").strip()}
+                page_map_ids = {
+                    str(key or "").strip() for key in page_map if str(key or "").strip()
+                }
                 page_stage_map_ids = {
                     str(key or "").strip() for key in page_stage_map if str(key or "").strip()
                 }
-                if page_map_ids != publication_page_ids:
-                    missing = sorted(publication_page_ids - page_map_ids)
-                    extra = sorted(page_map_ids - publication_page_ids)
+                if page_map_ids != expected_page_ids:
+                    missing = sorted(expected_page_ids - page_map_ids)
+                    extra = sorted(page_map_ids - expected_page_ids)
                     raise DeployError(
                         "Artifact identity audit failed: pageMap does not match publication pages "
                         f"for publication '{publication_id}' (missing={missing}, extra={extra})."
@@ -2095,7 +2830,9 @@ def validate_funnel_artifact_identity(
                     {
                         "pageId": page_id,
                         "slug": str(page_slug),
-                        "stage": str(page_payload.get("stage") or page_stage_map.get(page_id) or "custom"),
+                        "stage": str(
+                            page_payload.get("stage") or page_stage_map.get(page_id) or "custom"
+                        ),
                     }
                 )
 
@@ -2123,11 +2860,14 @@ def persist_client_funnel_runtime_artifact(
     funnel_id: str,
     publication_id: str,
     created_by_user_id: str | None = None,
+    included_funnel_ids: set[str] | None = None,
+    included_page_slugs: set[str] | None = None,
+    included_page_stages: set[str] | None = None,
 ) -> dict[str, Any]:
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from app.db.enums import ArtifactTypeEnum
-    from app.db.models import Funnel
+    from app.db.models import Artifact, Funnel
     from app.db.repositories.artifacts import ArtifactsRepository
 
     funnel = session.scalars(
@@ -2144,6 +2884,9 @@ def persist_client_funnel_runtime_artifact(
         updated_from_funnel_id=str(funnel.id),
         updated_from_publication_id=publication_id,
         publication_id_overrides={str(funnel.id): publication_id},
+        included_funnel_ids=included_funnel_ids,
+        included_page_slugs=included_page_slugs,
+        included_page_stages=included_page_stages,
     )
     payload.setdefault("meta", {})["identityAudit"] = validate_funnel_artifact_identity(
         session=session,
@@ -2151,25 +2894,36 @@ def persist_client_funnel_runtime_artifact(
         artifact_payload=payload,
     )
 
-    artifacts_repo = ArtifactsRepository(session)
-    latest = artifacts_repo.get_latest_by_type(
-        org_id=org_id,
-        client_id=client_id,
-        artifact_type=ArtifactTypeEnum.funnel_runtime_bundle,
+    latest_version = session.scalar(
+        select(func.max(Artifact.version)).where(
+            Artifact.org_id == org_id,
+            Artifact.client_id == client_id,
+            Artifact.type == ArtifactTypeEnum.funnel_runtime_bundle,
+        )
     )
-    next_version = int(latest.version) + 1 if latest and latest.version else 1
-    artifact = artifacts_repo.insert(
+    next_version = int(latest_version or 0) + 1
+    resolved_created_by_user = ArtifactsRepository(session)._resolve_created_by_user_id(
+        org_id=org_id,
+        created_by_user=created_by_user_id,
+    )
+    artifact = Artifact(
         org_id=org_id,
         client_id=client_id,
-        artifact_type=ArtifactTypeEnum.funnel_runtime_bundle,
+        type=ArtifactTypeEnum.funnel_runtime_bundle,
         data=payload,
-        created_by_user=created_by_user_id,
+        created_by_user=resolved_created_by_user,
         version=next_version,
     )
+    session.add(artifact)
+    session.flush()
+    artifact_id = str(artifact.id)
+    artifact_version = int(artifact.version or next_version)
+    session.commit()
     return {
-        "artifact_id": str(artifact.id),
-        "artifact_version": int(artifact.version),
+        "artifact_id": artifact_id,
+        "artifact_version": artifact_version,
         "client_id": client_id,
+        "artifact_payload": payload,
     }
 
 
@@ -2207,7 +2961,10 @@ def _page_payload_supports_standalone_imported_html(*, page_payload: dict[str, A
         return False
 
     block = content[0]
-    if not isinstance(block, dict) or str(block.get("type") or "").strip() != "ImportedHtmlDocument":
+    if (
+        not isinstance(block, dict)
+        or str(block.get("type") or "").strip() != "ImportedHtmlDocument"
+    ):
         return False
 
     props = block.get("props")
@@ -2238,7 +2995,10 @@ def _page_payload_supports_standalone_compliance(*, page_payload: dict[str, Any]
         return False
 
     block = content[0]
-    if not isinstance(block, dict) or str(block.get("type") or "").strip() != "FunnelCompliancePage":
+    if (
+        not isinstance(block, dict)
+        or str(block.get("type") or "").strip() != "FunnelCompliancePage"
+    ):
         return False
 
     props = block.get("props")
@@ -2249,7 +3009,9 @@ def _page_payload_supports_standalone_compliance(*, page_payload: dict[str, Any]
     return bool(page_key)
 
 
-def _artifact_payload_supports_standalone_imported_html(*, artifact_payload: dict[str, Any]) -> bool:
+def _artifact_payload_supports_standalone_imported_html(
+    *, artifact_payload: dict[str, Any]
+) -> bool:
     products = artifact_payload.get("products")
     if not isinstance(products, dict) or not products:
         return False
@@ -2269,19 +3031,16 @@ def _artifact_payload_supports_standalone_imported_html(*, artifact_payload: dic
             for page_payload in pages.values():
                 if not isinstance(page_payload, dict):
                     return False
-                if (
-                    not _page_payload_supports_standalone_imported_html(page_payload=page_payload)
-                    and not _page_payload_supports_standalone_compliance(page_payload=page_payload)
-                ):
+                if not _page_payload_supports_standalone_imported_html(
+                    page_payload=page_payload
+                ) and not _page_payload_supports_standalone_compliance(page_payload=page_payload):
                     return False
 
     return True
 
 
 def _artifact_payload_supports_html_deploy(*, artifact_payload: dict[str, Any]) -> bool:
-    return _artifact_payload_supports_standalone_imported_html(
-        artifact_payload=artifact_payload
-    )
+    return _artifact_payload_supports_standalone_imported_html(artifact_payload=artifact_payload)
 
 
 def _resolve_publish_job_artifact_render_mode(
@@ -2351,11 +3110,17 @@ def _build_funnel_page_route_path(*, product_slug: str, funnel_slug: str, page_s
 def _resolve_funnel_page_manifest(*, page_payload: dict[str, Any]) -> dict[str, Any]:
     puck_data = page_payload.get("puckData")
     content = puck_data.get("content") if isinstance(puck_data, dict) else None
-    block = content[0] if isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict) else None
+    block = (
+        content[0]
+        if isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict)
+        else None
+    )
     props = block.get("props") if isinstance(block, dict) else None
     manifest = props.get("instrumentationManifest") if isinstance(props, dict) else None
     if not isinstance(manifest, dict):
-        raise DeployError("Imported HTML page is missing instrumentationManifest for tracking validation.")
+        raise DeployError(
+            "Imported HTML page is missing instrumentationManifest for tracking validation."
+        )
     return manifest
 
 
@@ -2528,10 +3293,10 @@ def _extract_checkout_targets(*, sales_manifest: dict[str, Any]) -> list[dict[st
             {
                 "selector": selector,
                 "mode": mode,
-                "track_event_type": str(binding.get("trackEventType") or "sales_to_checkout_click").strip(),
-                "external_urls": _extract_external_checkout_urls(
-                    checkout_config=checkout_config
-                ),
+                "track_event_type": str(
+                    binding.get("trackEventType") or "sales_to_checkout_click"
+                ).strip(),
+                "external_urls": _extract_external_checkout_urls(checkout_config=checkout_config),
             }
         )
     if not targets:
@@ -2541,6 +3306,33 @@ def _extract_checkout_targets(*, sales_manifest: dict[str, Any]) -> list[dict[st
     if missing_selector_count:
         raise DeployError(
             "Sales-page checkout bindings must all include selectors for post-deploy validation."
+        )
+    return sorted(targets, key=lambda item: _tracking_selector_sort_key(str(item["selector"])))
+
+
+def _extract_add_to_cart_targets(*, sales_manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_targets = sales_manifest.get("addToCartTargets")
+    if raw_targets is None:
+        raw_targets = sales_manifest.get("add_to_cart_targets")
+    targets_source = raw_targets if isinstance(raw_targets, list) else []
+    targets: list[dict[str, Any]] = []
+    missing_selector_count = 0
+    for target in targets_source:
+        if not isinstance(target, dict):
+            continue
+        selector = str(target.get("selector") or "").strip()
+        if not selector:
+            missing_selector_count += 1
+            continue
+        targets.append(
+            {
+                "selector": selector,
+                "track_event_type": str(target.get("trackEventType") or "add_to_cart").strip(),
+            }
+        )
+    if missing_selector_count:
+        raise DeployError(
+            "Sales-page add-to-cart targets must all include selectors for post-deploy validation."
         )
     return sorted(targets, key=lambda item: _tracking_selector_sort_key(str(item["selector"])))
 
@@ -2574,7 +3366,9 @@ def _extract_funnel_tracking_page_entries(
 ) -> dict[str, Any]:
     products = artifact_payload.get("products")
     if not isinstance(products, dict):
-        raise DeployError("Funnel artifact payload is missing products for post-deploy tracking validation.")
+        raise DeployError(
+            "Funnel artifact payload is missing products for post-deploy tracking validation."
+        )
 
     matched_product_slug = ""
     matched_funnel_slug = ""
@@ -2610,7 +3404,9 @@ def _extract_funnel_tracking_page_entries(
     pages = matched_funnel_payload.get("pages")
     funnel_meta = matched_funnel_payload.get("meta")
     if not isinstance(pages, dict) or not isinstance(funnel_meta, dict):
-        raise DeployError("Matched funnel artifact payload is missing pages or meta for tracking validation.")
+        raise DeployError(
+            "Matched funnel artifact payload is missing pages or meta for tracking validation."
+        )
 
     page_ids_by_slug: dict[str, str] = {}
     raw_meta_pages = funnel_meta.get("pages")
@@ -2683,7 +3479,8 @@ def _extract_funnel_tracking_page_entries(
                 "payload": page_payload,
                 "manifest": manifest,
                 "tracking": _normalize_tracking_config(page_payload.get("tracking")),
-                "url": origin + _build_funnel_page_route_path(
+                "url": origin
+                + _build_funnel_page_route_path(
                     product_slug=matched_product_slug,
                     funnel_slug=matched_funnel_slug,
                     page_slug=page_slug,
@@ -2692,7 +3489,9 @@ def _extract_funnel_tracking_page_entries(
         )
 
     if not page_entries:
-        raise DeployError("Matched funnel artifact payload contains no pages for tracking validation.")
+        raise DeployError(
+            "Matched funnel artifact payload contains no pages for tracking validation."
+        )
 
     return {
         "product_slug": matched_product_slug,
@@ -2705,6 +3504,7 @@ def _extract_funnel_tracking_page_entries(
 def _build_expected_tracking_events(
     *,
     has_pre_sales: bool,
+    add_to_cart_event_types: list[str],
     checkout_event_types: list[str],
 ) -> dict[str, list[str]]:
     internal_events: list[str] = []
@@ -2762,17 +3562,25 @@ def _build_expected_tracking_events(
             "offer_page_view",
         ]
 
+    add_to_cart_event_type_set = {
+        str(event_type or "").strip() or "add_to_cart" for event_type in add_to_cart_event_types
+    }
+    if "add_to_cart" in add_to_cart_event_type_set:
+        internal_events.append("add_to_cart")
+        meta_events.append("AddToCart")
+        posthog_events.append("add_to_cart")
+        posthog_events.append("AddToCart")
+
     checkout_event_type_set = {
         str(event_type or "").strip() or "sales_to_checkout_click"
         for event_type in checkout_event_types
     }
     if "sales_to_checkout_click" in checkout_event_type_set:
         internal_events.append("sales_to_checkout_click")
-        meta_events.append("AddToCart")
         meta_events.append("SalesToCheckoutClick")
         meta_events.append("SalesToCheckoutClicked")
         posthog_events.append("sales_to_checkout_click")
-        posthog_events.append("AddToCart")
+        posthog_events.append("checkout_click")
         posthog_events.append("SalesToCheckoutClick")
         posthog_events.append("SalesToCheckoutClicked")
     if "checkout_started" in checkout_event_type_set:
@@ -2818,7 +3626,7 @@ def _manifest_target_event_requirements(
         value = manifest.get(key) if isinstance(manifest, dict) else None
         return isinstance(value, list) and len(value) > 0
 
-    if profile in {"listical_presell", "quiz_presell"}:
+    if profile == "quiz_presell":
         events.extend(["scroll_depth", "qualified_session"])
         if _has_targets("sections"):
             events.append("section_view")
@@ -2826,28 +3634,35 @@ def _manifest_target_event_requirements(
             events.append("proof_view")
         if _has_targets("ctas") or _has_targets("bindings"):
             events.append("cta_view")
+        if _has_targets("quizLeads"):
+            events.append("QuizLeadViewed")
+        if _has_targets("quizQuestions"):
+            events.append("QuizQuestionViewed")
+        if _has_targets("quizOptions"):
+            events.append("QuizOptionPresented")
+            events.append("QuizOptionSelected")
+            events.append("QuizQuestionSubmitted")
+        if _has_targets("quizResults"):
+            events.append("QuizResultViewed")
+        if _has_targets("quizMechanisms"):
+            events.append("QuizMechanismViewed")
+        if _has_targets("proofs"):
+            events.append("QuizProofViewed")
+        if _has_targets("quizRecommendations"):
+            events.append("QuizRecommendationViewed")
+        if _has_targets("ctas") or _has_targets("bindings"):
+            events.append("QuizCtaViewed")
+            events.append("QuizCompleted")
+        return events
 
-    if profile == "quiz_presell":
-        quiz_target_events = [
-            ("quizLeads", "QuizLeadViewed"),
-            ("quizQuestions", "QuizQuestionViewed"),
-            ("quizOptions", "QuizOptionPresented"),
-            ("quizResults", "QuizResultViewed"),
-            ("quizMechanisms", "QuizMechanismViewed"),
-            ("proofs", "QuizProofViewed"),
-            ("quizRecommendations", "QuizRecommendationViewed"),
-            ("ctas", "QuizCtaViewed"),
-        ]
-        for manifest_key, event_name in quiz_target_events:
-            if _has_targets(manifest_key):
-                events.append(event_name)
-        events.extend(
-            [
-                "QuizOptionSelected",
-                "QuizQuestionSubmitted",
-                "QuizCompleted",
-            ]
-        )
+    if profile == "listical_presell":
+        events.extend(["scroll_depth", "qualified_session"])
+        if _has_targets("sections"):
+            events.append("section_view")
+        if _has_targets("proofs"):
+            events.append("proof_view")
+        if _has_targets("ctas") or _has_targets("bindings"):
+            events.append("cta_view")
 
     return events
 
@@ -2963,6 +3778,7 @@ def _build_required_posthog_readback_events(
     expected_posthog_events: list[str],
     start_page: dict[str, Any],
     sales_page: dict[str, Any],
+    add_to_cart_targets: list[dict[str, Any]],
     checkout_targets: list[dict[str, Any]],
     has_pre_sales: bool,
 ) -> list[str]:
@@ -2995,9 +3811,16 @@ def _build_required_posthog_readback_events(
                 )
             )
     required.extend(["sales_page_view", "EnteredSales"])
-    if checkout_targets:
+    if add_to_cart_targets:
+        if "add_to_cart" in expected_event_set:
+            required.append("add_to_cart")
         if "AddToCart" in expected_event_set:
             required.append("AddToCart")
+    if checkout_targets:
+        if "sales_to_checkout_click" in expected_event_set:
+            required.append("sales_to_checkout_click")
+        if "checkout_click" in expected_event_set:
+            required.append("checkout_click")
         if "SalesToCheckoutClick" in expected_event_set:
             required.append("SalesToCheckoutClick")
         if "SalesToCheckoutClicked" in expected_event_set:
@@ -3014,6 +3837,7 @@ def _build_tracking_path_plan(
     start_page: dict[str, Any],
     sales_page: dict[str, Any],
     pre_sales_click_selectors: list[str],
+    add_to_cart_targets: list[dict[str, Any]],
     checkout_targets: list[dict[str, Any]],
 ) -> dict[str, Any]:
     has_pre_sales = bool(pre_sales_click_selectors)
@@ -3030,6 +3854,11 @@ def _build_tracking_path_plan(
     )
     expected = _build_expected_tracking_events(
         has_pre_sales=has_pre_sales,
+        add_to_cart_event_types=[
+            str(target.get("track_event_type") or "add_to_cart")
+            for target in add_to_cart_targets
+            if isinstance(target, dict)
+        ],
         checkout_event_types=[
             str(target.get("track_event_type") or "sales_to_checkout_click")
             for target in checkout_targets
@@ -3040,6 +3869,7 @@ def _build_tracking_path_plan(
         "start_page": start_page,
         "sales_page": sales_page,
         "pre_sales_click_selectors": pre_sales_click_selectors,
+        "add_to_cart_targets": add_to_cart_targets,
         "checkout_targets": checkout_targets,
         "tracking": tracking,
         "tracking_validation_profile": tracking_profile,
@@ -3053,6 +3883,7 @@ def _build_tracking_path_plan(
                 expected_posthog_events=expected["posthog"],
                 start_page=start_page,
                 sales_page=sales_page,
+                add_to_cart_targets=add_to_cart_targets,
                 checkout_targets=checkout_targets,
                 has_pre_sales=has_pre_sales,
             )
@@ -3079,12 +3910,16 @@ def _build_funnel_tracking_validation_plan(
         )
     normalized_access_urls = _normalize_access_urls(access_urls)
     if not normalized_access_urls:
-        raise DeployError("Post-deploy tracking validation requires at least one public access URL.")
+        raise DeployError(
+            "Post-deploy tracking validation requires at least one public access URL."
+        )
 
     origin_url = normalized_access_urls[0]
     parsed_origin = urlsplit(origin_url)
     if not parsed_origin.scheme or not parsed_origin.netloc:
-        raise DeployError(f"Invalid public access URL '{origin_url}' for post-deploy tracking validation.")
+        raise DeployError(
+            f"Invalid public access URL '{origin_url}' for post-deploy tracking validation."
+        )
     origin = f"{parsed_origin.scheme}://{parsed_origin.netloc}"
 
     extraction = _extract_funnel_tracking_page_entries(
@@ -3097,7 +3932,9 @@ def _build_funnel_tracking_validation_plan(
     page_entries: list[dict[str, Any]] = extraction["page_entries"]
     sales_pages = [entry for entry in page_entries if entry["stage"] == "sales"]
     if not sales_pages:
-        raise DeployError("Post-deploy tracking validation requires a sales page in the published funnel.")
+        raise DeployError(
+            "Post-deploy tracking validation requires a sales page in the published funnel."
+        )
     if len(sales_pages) > 1:
         sales_urls = ", ".join(entry["url"] for entry in sales_pages)
         raise DeployError(
@@ -3108,6 +3945,7 @@ def _build_funnel_tracking_validation_plan(
     if not isinstance(sales_manifest, dict):
         raise DeployError("Sales page is missing instrumentationManifest for tracking validation.")
 
+    add_to_cart_targets = _extract_add_to_cart_targets(sales_manifest=sales_manifest)
     checkout_targets = _extract_checkout_targets(sales_manifest=sales_manifest)
     pre_sales_pages = sorted(
         [entry for entry in page_entries if entry["stage"] == "pre_sales"],
@@ -3135,6 +3973,7 @@ def _build_funnel_tracking_validation_plan(
                     start_page=pre_sales_page,
                     sales_page=sales_page,
                     pre_sales_click_selectors=pre_sales_click_selectors,
+                    add_to_cart_targets=add_to_cart_targets,
                     checkout_targets=checkout_targets,
                 )
             )
@@ -3144,6 +3983,7 @@ def _build_funnel_tracking_validation_plan(
                 start_page=sales_page,
                 sales_page=sales_page,
                 pre_sales_click_selectors=[],
+                add_to_cart_targets=add_to_cart_targets,
                 checkout_targets=checkout_targets,
             )
         )
@@ -3182,37 +4022,11 @@ def _validate_posthog_asset_endpoint(*, api_host: str) -> None:
     if not parsed.scheme or not parsed.netloc:
         raise DeployError(f"PostHog api_host '{api_host}' must be an absolute URL.")
     asset_url = (
-        normalized_api_host.replace(".i.posthog.com", "-assets.i.posthog.com")
-        + "/static/array.js"
+        normalized_api_host.replace(".i.posthog.com", "-assets.i.posthog.com") + "/static/array.js"
     )
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         response = client.get(asset_url)
         response.raise_for_status()
-
-
-def _validate_meta_proxy_endpoint(
-    *,
-    client: httpx.Client,
-    origin: str,
-    path: str,
-    pixel_id: str,
-    page_url: str,
-) -> None:
-    endpoint = f"{origin.rstrip('/')}{path}"
-    params = {
-        "id": pixel_id,
-        "ev": "PageView",
-        "dl": page_url,
-        "_mos_validation": "1",
-    }
-    try:
-        response = client.get(endpoint, params=params)
-        response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        raise DeployError(
-            "Post-deploy tracking validation failed: Meta proxy endpoint "
-            f"'{endpoint}' returned HTTP {exc.response.status_code}."
-        ) from exc
 
 
 def _find_html_deploy_forbidden_references(*, text: str) -> list[str]:
@@ -3250,6 +4064,8 @@ def _assert_no_html_deploy_forbidden_browser_references(
     *,
     page: Any,
     forbidden_request_urls: list[str],
+    failed_resource_urls: list[str] | None = None,
+    route_asset_escape_urls: list[str] | None = None,
     context_label: str,
 ) -> None:
     if forbidden_request_urls:
@@ -3257,9 +4073,18 @@ def _assert_no_html_deploy_forbidden_browser_references(
             f"Post-deploy browser validation failed for {context_label}: loaded forbidden legacy request URLs "
             f"{sorted(set(forbidden_request_urls))!r}."
         )
+    if failed_resource_urls:
+        raise DeployError(
+            f"Post-deploy browser validation failed for {context_label}: linked browser resources failed to load "
+            f"{sorted(set(failed_resource_urls))!r}."
+        )
+    if route_asset_escape_urls:
+        raise DeployError(
+            f"Post-deploy browser validation failed for {context_label}: route-scoped asset requests escaped the page asset prefix "
+            f"{sorted(set(route_asset_escape_urls))!r}."
+        )
     try:
-        rendered_reference_text = page.evaluate(
-            """
+        rendered_reference_text = page.evaluate("""
 () => {
   const chunks = [];
   const push = (value) => {
@@ -3279,8 +4104,7 @@ def _assert_no_html_deploy_forbidden_browser_references(
   scanRoot(document.documentElement);
   return chunks.join("\\n").slice(0, 2000000);
 }
-"""
-        )
+""")
     except Exception as exc:
         raise DeployError(
             f"Post-deploy browser validation failed for {context_label}: could not scan rendered page references."
@@ -3289,6 +4113,88 @@ def _assert_no_html_deploy_forbidden_browser_references(
         text=str(rendered_reference_text or ""),
         context_label=f"{context_label} rendered DOM",
     )
+
+
+_HTML_DEPLOY_BROWSER_RESOURCE_TYPES = {
+    "font",
+    "image",
+    "imageset",
+    "manifest",
+    "media",
+    "script",
+    "stylesheet",
+}
+
+
+def _html_deploy_no_trailing_slash_url(raw_url: str) -> str:
+    parsed = urlsplit(str(raw_url or "").strip())
+    path = parsed.path
+    if path and path != "/" and path.endswith("/"):
+        return parsed._replace(path=path.rstrip("/")).geturl()
+    return parsed.geturl()
+
+
+def _html_deploy_route_asset_prefix_for_page_url(page_url: str) -> str:
+    parsed = urlsplit(str(page_url or "").strip())
+    route_path = parsed.path.rstrip("/")
+    if not route_path:
+        return ""
+    return f"{route_path}/assets/"
+
+
+def _html_deploy_route_asset_prefixes_for_path_plan(*, path_plan: dict[str, Any]) -> list[str]:
+    prefixes: list[str] = ["/assets/", "/_standalone-assets/"]
+    for page_key in ("start_page", "sales_page"):
+        page = path_plan.get(page_key)
+        if not isinstance(page, dict):
+            continue
+        parsed = urlsplit(str(page.get("url") or "").strip())
+        product_slug = next((part for part in parsed.path.split("/") if part), "")
+        if product_slug:
+            product_prefix = f"/{product_slug}/assets/"
+            if product_prefix not in prefixes:
+                prefixes.append(product_prefix)
+        prefix = _html_deploy_route_asset_prefix_for_page_url(str(page.get("url") or ""))
+        if prefix and prefix not in prefixes:
+            prefixes.append(prefix)
+    return prefixes
+
+
+def _html_deploy_browser_resource_failure_message(
+    *,
+    origin: str,
+    request_url: str,
+    resource_type: str,
+    status: int | None = None,
+    failure: str = "",
+    route_asset_prefixes: list[str],
+) -> str:
+    normalized_type = str(resource_type or "").strip().lower()
+    if normalized_type not in _HTML_DEPLOY_BROWSER_RESOURCE_TYPES:
+        return ""
+    parsed_origin = urlsplit(str(origin or "").strip())
+    parsed_url = urlsplit(str(request_url or "").strip())
+    if (
+        parsed_url.scheme not in {"http", "https"}
+        or not parsed_url.netloc
+        or parsed_url.netloc != parsed_origin.netloc
+    ):
+        return ""
+
+    path = parsed_url.path
+    if (
+        "/assets/" in path
+        and not path.startswith("/public/assets/")
+        and not path.startswith("/api/public/assets/")
+        and not any(path.startswith(prefix) for prefix in route_asset_prefixes)
+    ):
+        return f"{request_url} ({normalized_type}: outside route asset prefix)"
+
+    if status is not None and status >= 400:
+        return f"{request_url} ({normalized_type}: HTTP {status})"
+    if failure:
+        return f"{request_url} ({normalized_type}: {failure})"
+    return ""
 
 
 def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None:
@@ -3330,7 +4236,7 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
                 if (
                     expected_meta_pixel_id not in html_document
                     or "https://connect.facebook.net/en_US/fbevents.js" not in html_document
-                    or "window.fbq(\"init\"" not in html_document
+                    or 'window.fbq("init"' not in html_document
                 ):
                     raise DeployError(
                         f"Post-deploy tracking validation failed for '{fetch_url}': direct Meta Pixel bootstrap was not embedded."
@@ -3340,7 +4246,9 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
                         f"Post-deploy tracking validation failed for '{fetch_url}': Meta Pixel bootstrap used the legacy MOS proxy path."
                     )
 
-            expected_posthog_api_key = str(tracking_config.get("posthogProjectApiKey") or "").strip()
+            expected_posthog_api_key = str(
+                tracking_config.get("posthogProjectApiKey") or ""
+            ).strip()
             if expected_posthog_api_key:
                 required_fragments = [
                     "window.posthog.init(",
@@ -3356,7 +4264,11 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
                     if value:
                         required_fragments.append(value)
                 missing_fragment = next(
-                    (fragment for fragment in required_fragments if fragment and fragment not in html_document),
+                    (
+                        fragment
+                        for fragment in required_fragments
+                        if fragment and fragment not in html_document
+                    ),
                     None,
                 )
                 if missing_fragment is not None:
@@ -3406,8 +4318,7 @@ class _HtmlDeployOptimizationParser(HTMLParser):
             return
         if (
             tag_name == "style"
-            and str(attr_lookup.get("data-mos-render-optimization") or "").strip().lower()
-            == "true"
+            and str(attr_lookup.get("data-mos-render-optimization") or "").strip().lower() == "true"
         ):
             self.render_optimization_style_count += 1
 
@@ -3420,7 +4331,9 @@ def _html_deploy_page_fetch_url(*, page_url: str, candidate_release_id: str) -> 
         {
             _HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM: _validate_html_deploy_candidate_release_id(
                 candidate_release_id
-            )
+            ),
+            _HTML_DEPLOY_VALIDATION_CACHE_BUST_QUERY_PARAM: uuid4().hex,
+            _HTML_DEPLOY_CDN_CACHE_BUST_QUERY_PARAM: uuid4().hex,
         },
     )
 
@@ -3462,7 +4375,7 @@ def _html_deploy_image_reference_urls(*, parser: _HtmlDeployOptimizationParser) 
     for link in parser.links:
         rel = str(link.get("rel") or "").lower()
         as_value = str(link.get("as") or "").lower()
-        if as_value == "image" or "preload" in rel:
+        if as_value == "image":
             href = str(link.get("href") or "").strip()
             if href:
                 urls.append(href)
@@ -3479,11 +4392,126 @@ def _html_deploy_image_reference_urls(*, parser: _HtmlDeployOptimizationParser) 
     return deduped
 
 
+def _html_deploy_resource_reference_urls(
+    *, parser: _HtmlDeployOptimizationParser
+) -> list[dict[str, str]]:
+    resources: list[dict[str, str]] = []
+
+    for raw_url in _html_deploy_image_reference_urls(parser=parser):
+        resources.append({"url": raw_url, "kind": "image"})
+
+    for link in parser.links:
+        rel_tokens = {
+            token.strip().lower()
+            for token in str(link.get("rel") or "").replace(",", " ").split()
+            if token.strip()
+        }
+        as_value = str(link.get("as") or "").strip().lower()
+        href = str(link.get("href") or "").strip()
+        if not href:
+            continue
+        kind = ""
+        if "stylesheet" in rel_tokens:
+            kind = "stylesheet"
+        elif "modulepreload" in rel_tokens:
+            kind = "script"
+        elif "preload" in rel_tokens:
+            kind = as_value or "preload"
+        elif {"icon", "shortcut", "apple-touch-icon"} & rel_tokens:
+            kind = "image"
+        elif "manifest" in rel_tokens:
+            kind = "manifest"
+        if kind:
+            resources.append({"url": href, "kind": kind})
+
+    for src in parser.script_srcs:
+        resources.append({"url": src, "kind": "script"})
+
+    seen: set[tuple[str, str]] = set()
+    deduped: list[dict[str, str]] = []
+    for resource in resources:
+        raw_url = str(resource.get("url") or "").strip()
+        kind = str(resource.get("kind") or "resource").strip().lower() or "resource"
+        key = (raw_url, kind)
+        if not raw_url or key in seen:
+            continue
+        seen.add(key)
+        deduped.append({"url": raw_url, "kind": kind})
+    return deduped
+
+
+def _html_deploy_should_validate_resource_url(*, page_url: str, raw_url: str) -> bool:
+    normalized = str(raw_url or "").strip()
+    if not normalized:
+        return False
+    lowered = normalized.lower()
+    if (
+        lowered.startswith("data:")
+        or lowered.startswith("blob:")
+        or lowered.startswith("mailto:")
+        or lowered.startswith("tel:")
+        or lowered.startswith("javascript:")
+        or lowered.startswith("#")
+    ):
+        return False
+
+    page = urlsplit(page_url)
+    resource = urlsplit(urljoin(page_url, normalized))
+    if resource.scheme not in {"http", "https"} or not resource.netloc:
+        return False
+    if resource.netloc == page.netloc:
+        return True
+    # Shopify-hosted page media should have been localized by html-deploy-v1.
+    return "/cdn/shop/files/" in resource.path.lower()
+
+
+def _assert_html_deploy_resource_urls_resolve(
+    *,
+    client: httpx.Client,
+    page_url: str,
+    parser: _HtmlDeployOptimizationParser,
+    candidate_release_id: str = "",
+) -> int:
+    checked = 0
+    failures: list[str] = []
+    for resource in _html_deploy_resource_reference_urls(parser=parser):
+        raw_url = str(resource.get("url") or "").strip()
+        kind = str(resource.get("kind") or "resource").strip().lower() or "resource"
+        if not _html_deploy_should_validate_resource_url(page_url=page_url, raw_url=raw_url):
+            continue
+        asset_url = urljoin(page_url, raw_url)
+        if candidate_release_id and urlsplit(asset_url).netloc == urlsplit(page_url).netloc:
+            asset_url = _html_deploy_page_fetch_url(
+                page_url=asset_url,
+                candidate_release_id=candidate_release_id,
+            )
+        try:
+            response = client.get(asset_url)
+            response.raise_for_status()
+            content_type = str(response.headers.get("content-type") or "").split(";", 1)[0]
+            if kind == "image" and content_type and not content_type.lower().startswith("image/"):
+                raise DeployError(
+                    f"expected image/* content-type, got '{content_type or 'unknown'}'"
+                )
+            checked += 1
+        except Exception as exc:
+            failures.append(f"{asset_url} ({kind}): {exc}")
+    if failures:
+        preview = "; ".join(failures[:8])
+        extra = "" if len(failures) <= 8 else f"; +{len(failures) - 8} more"
+        raise DeployError(
+            "HTML deploy optimization validation failed: linked resources or image assets did not resolve "
+            f"for '{page_url}'. {preview}{extra}"
+        )
+    return checked
+
+
 def _assert_html_deploy_image_urls_resolve(
     *,
     client: httpx.Client,
     page_url: str,
     parser: _HtmlDeployOptimizationParser,
+    candidate_release_id: str = "",
 ) -> int:
     checked = 0
     failures: list[str] = []
@@ -3491,6 +4519,11 @@ def _assert_html_deploy_image_urls_resolve(
         if _html_deploy_is_data_or_empty_url(raw_url):
             continue
         asset_url = urljoin(page_url, raw_url)
+        if candidate_release_id:
+            asset_url = _html_deploy_page_fetch_url(
+                page_url=asset_url,
+                candidate_release_id=candidate_release_id,
+            )
         try:
             response = client.get(asset_url)
             response.raise_for_status()
@@ -3602,8 +4635,7 @@ def _assert_html_deploy_optimization_markers(
             failures.append("missing responsive image srcset/source candidates")
     if failures:
         raise DeployError(
-            f"HTML deploy optimization validation failed for '{page_url}': "
-            + "; ".join(failures)
+            f"HTML deploy optimization validation failed for '{page_url}': " + "; ".join(failures)
         )
 
     return {
@@ -3625,6 +4657,72 @@ def _assert_html_deploy_optimization_markers(
     }
 
 
+def _html_deploy_validation_targets(*, validation_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    candidate_release_id = str(validation_plan.get("candidate_release_id") or "").strip()
+    targets: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_target(*, page: dict[str, Any], url: str, context: str) -> None:
+        if not isinstance(page, dict):
+            return
+        normalized_url = str(url or "").strip()
+        if not normalized_url or normalized_url in seen:
+            return
+        seen.add(normalized_url)
+        targets.append({"page": page, "url": normalized_url, "context": context})
+
+    for page in validation_plan.get("pages_to_validate", []):
+        if not isinstance(page, dict):
+            continue
+        page_url = str(page.get("url") or "").strip()
+        if not page_url:
+            continue
+        add_target(
+            page=page,
+            url=_html_deploy_page_fetch_url(
+                page_url=page_url,
+                candidate_release_id=candidate_release_id,
+            ),
+            context="canonical_page",
+        )
+
+    for index, path_plan in enumerate(validation_plan.get("path_plans", []) or []):
+        if not isinstance(path_plan, dict) or not path_plan.get("pre_sales_click_selectors"):
+            continue
+        sales_page = path_plan.get("sales_page")
+        if not isinstance(sales_page, dict):
+            continue
+        sales_url = str(sales_page.get("url") or "").strip()
+        if not sales_url:
+            continue
+        source_page_type = _expected_presales_source_page_type(path_plan=path_plan)
+        handoff_url = _append_url_query_params(
+            sales_url,
+            {
+                "src": "presale",
+                "from": "quiz" if source_page_type == "quiz_presell" else "listicle",
+                "source_page_type": source_page_type or "pre_sales",
+                "from_stage": "pre_sales",
+                "to_stage": "sales",
+                "session_id": f"deploy-validation-session-{index + 1}",
+                "visitor_id": f"deploy-validation-visitor-{index + 1}",
+                "click_id": f"deploy-validation-click-{index + 1}",
+                "campaign_id": f"deploy-validation-campaign-{index + 1}",
+                "ad_id": f"deploy-validation-ad-{index + 1}",
+            },
+        )
+        add_target(
+            page=sales_page,
+            url=_html_deploy_page_fetch_url(
+                page_url=handoff_url,
+                candidate_release_id=candidate_release_id,
+            ),
+            context="tracked_sales_handoff",
+        )
+
+    return targets
+
+
 def _run_html_deploy_optimization_validation_sync(
     *,
     validation_plan: dict[str, Any],
@@ -3633,27 +4731,38 @@ def _run_html_deploy_optimization_validation_sync(
         return None
 
     candidate_release_id = str(validation_plan.get("candidate_release_id") or "").strip()
+    return {
+        "status": "disabled",
+        "candidateReleaseId": candidate_release_id or None,
+        "reason": (
+            "HTML deploy optimization and optimization validation are disabled. "
+            "Release readiness is gated by artifact asset closure, browser resource validation, "
+            "tracking validation, Meta delivery, and PostHog live readback."
+        ),
+        "pages": [],
+    }
+
     pages: list[dict[str, Any]] = []
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-        for page in validation_plan.get("pages_to_validate", []):
-            if not isinstance(page, dict):
-                continue
-            page_url = str(page.get("url") or "").strip()
-            if not page_url:
-                continue
-            fetch_url = _html_deploy_page_fetch_url(
-                page_url=page_url,
-                candidate_release_id=candidate_release_id,
-            )
+        for target in _html_deploy_validation_targets(validation_plan=validation_plan):
+            page = target["page"]
+            fetch_url = str(target["url"])
             response = client.get(fetch_url)
             response.raise_for_status()
             html_document = response.text
             parser = _HtmlDeployOptimizationParser()
             parser.feed(html_document)
+            resolved_resource_count = _assert_html_deploy_resource_urls_resolve(
+                client=client,
+                page_url=fetch_url,
+                parser=parser,
+                candidate_release_id=candidate_release_id,
+            )
             resolved_image_count = _assert_html_deploy_image_urls_resolve(
                 client=client,
                 page_url=fetch_url,
                 parser=parser,
+                candidate_release_id=candidate_release_id,
             )
             pages.append(
                 _assert_html_deploy_optimization_markers(
@@ -3664,6 +4773,8 @@ def _run_html_deploy_optimization_validation_sync(
                     resolved_image_count=resolved_image_count,
                 )
             )
+            pages[-1]["validationContext"] = target.get("context")
+            pages[-1]["resolvedResourceReferences"] = resolved_resource_count
 
     return {
         "status": "passed",
@@ -3693,7 +4804,9 @@ def _normalize_lighthouse_score(score: Any) -> float:
     try:
         value = float(score)
     except (TypeError, ValueError) as exc:
-        raise DeployError("HTML deploy Lighthouse validation failed: missing performance score.") from exc
+        raise DeployError(
+            "HTML deploy Lighthouse validation failed: missing performance score."
+        ) from exc
     if value <= 1.0:
         return value * 100.0
     return value
@@ -3839,28 +4952,23 @@ def _run_html_deploy_lighthouse_validation_sync(
     *,
     validation_plan: dict[str, Any],
 ) -> dict[str, Any] | None:
-    if not _html_deploy_lighthouse_enabled(validation_plan=validation_plan):
+    if validation_plan.get("render_mode") != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
         return None
-    urls = _html_deploy_lighthouse_urls(validation_plan=validation_plan)
-    if not urls:
-        raise DeployError("HTML deploy Lighthouse validation requires at least one page URL.")
-
-    audits: list[dict[str, Any]] = []
-    for url in urls:
-        for profile in ("mobile", "desktop"):
-            audits.append(_run_single_html_deploy_lighthouse_audit(url=url, profile=profile))
     return {
-        "status": "passed",
+        "status": "disabled",
         "candidateReleaseId": validation_plan.get("candidate_release_id"),
-        "thresholds": {
-            "mobile": _html_deploy_lighthouse_threshold(profile="mobile"),
-            "desktop": _html_deploy_lighthouse_threshold(profile="desktop"),
-        },
-        "audits": audits,
+        "reason": (
+            "HTML deploy Lighthouse validation is disabled with the optimization validator. "
+            "Performance validation will be rebuilt separately so missing local Lighthouse tooling "
+            "cannot block production-ready analytics and artifact validation."
+        ),
+        "audits": [],
     }
 
 
-def _assert_event_multiset_contains(*, observed: list[str], expected: list[str], label: str) -> None:
+def _assert_event_multiset_contains(
+    *, observed: list[str], expected: list[str], label: str
+) -> None:
     expected_counts: dict[str, int] = {}
     observed_counts: dict[str, int] = {}
     for event_name in expected:
@@ -3895,6 +5003,58 @@ def _extract_recorded_event_names(*, observed_events: list[Any]) -> list[str]:
     return names
 
 
+def _extract_recorded_public_meta_event_names(*, observed_state: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    for entry in (observed_state.get("internal") if isinstance(observed_state, dict) else []) or []:
+        if not isinstance(entry, dict):
+            continue
+        props = entry.get("props")
+        if not isinstance(props, dict):
+            continue
+        meta_events = props.get("metaEvents")
+        if not isinstance(meta_events, list):
+            continue
+        for meta_event in meta_events:
+            if not isinstance(meta_event, dict):
+                continue
+            event_name = str(
+                meta_event.get("eventName")
+                or meta_event.get("event_name")
+                or meta_event.get("event")
+                or ""
+            ).strip()
+            if event_name:
+                names.append(event_name)
+    return names
+
+
+def _event_name_counts(names: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for name in names:
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def _extract_recorded_meta_event_names_for_validation(
+    *, observed_state: dict[str, Any]
+) -> list[str]:
+    meta_calls = observed_state.get("meta") if isinstance(observed_state, dict) else None
+    browser_names = _extract_recorded_event_names(observed_events=meta_calls or [])
+    public_names = _extract_recorded_public_meta_event_names(observed_state=observed_state)
+    if not public_names:
+        return browser_names
+    if not browser_names:
+        return public_names
+
+    browser_counts = _event_name_counts(browser_names)
+    public_counts = _event_name_counts(public_names)
+    merged: list[str] = []
+    for event_name in sorted(set(browser_counts) | set(public_counts)):
+        merged.extend([event_name] * max(browser_counts.get(event_name, 0), public_counts.get(event_name, 0)))
+    return merged
+
+
 def _extract_recorded_posthog_event_names(*, observed_events: list[Any]) -> list[str]:
     names: list[str] = []
     for entry in observed_events:
@@ -3904,6 +5064,71 @@ def _extract_recorded_posthog_event_names(*, observed_events: list[Any]) -> list
         if event_name:
             names.append(event_name)
     return names
+
+
+def _posthog_event_names_for_public_event(event_type: str) -> list[str]:
+    normalized_event_type = str(event_type or "").strip()
+    if normalized_event_type == "pre_sales_page_view":
+        return [
+            "pre_sales_page_view",
+            "PageView",
+            "presell_page_view",
+            "EnteredPresales",
+            "Entered Presales Page",
+        ]
+    if normalized_event_type == "pre_sales_to_sales_click":
+        return ["pre_sales_to_sales_click", "cta_click", "PreSalesToSalesClick"]
+    if normalized_event_type == "sales_page_view":
+        return [
+            "sales_page_view",
+            "PageView",
+            "Entered Sales Page",
+            "EnteredSales",
+            "ViewContent",
+        ]
+    if normalized_event_type == "offer_page_view":
+        return ["offer_page_view"]
+    if normalized_event_type == "add_to_cart":
+        return ["add_to_cart", "AddToCart"]
+    if normalized_event_type == "sales_to_checkout_click":
+        return [
+            "sales_to_checkout_click",
+            "checkout_click",
+            "SalesToCheckoutClick",
+            "SalesToCheckoutClicked",
+        ]
+    if normalized_event_type == "checkout_started":
+        return ["checkout_started", "InitiateCheckout"]
+    return [normalized_event_type] if normalized_event_type else []
+
+
+def _extract_recorded_public_posthog_event_names(*, observed_state: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    for event_type in _extract_recorded_internal_event_names(observed_state=observed_state):
+        names.extend(_posthog_event_names_for_public_event(event_type))
+    return names
+
+
+def _extract_recorded_posthog_event_names_for_validation(
+    *, observed_state: dict[str, Any]
+) -> list[str]:
+    posthog_state = observed_state.get("posthog") if isinstance(observed_state, dict) else None
+    browser_names = _extract_recorded_posthog_event_names(
+        observed_events=(posthog_state.get("captures") if isinstance(posthog_state, dict) else [])
+        or []
+    )
+    public_names = _extract_recorded_public_posthog_event_names(observed_state=observed_state)
+    if not public_names:
+        return browser_names
+    if not browser_names:
+        return public_names
+
+    browser_counts = _event_name_counts(browser_names)
+    public_counts = _event_name_counts(public_names)
+    merged: list[str] = []
+    for event_name in sorted(set(browser_counts) | set(public_counts)):
+        merged.extend([event_name] * max(browser_counts.get(event_name, 0), public_counts.get(event_name, 0)))
+    return merged
 
 
 def _extract_recorded_internal_event_names(*, observed_state: dict[str, Any]) -> list[str]:
@@ -3956,7 +5181,8 @@ def _extract_recorded_meta_event_params(
     event_name: str,
 ) -> list[dict[str, Any]]:
     params_list: list[dict[str, Any]] = []
-    for entry in (observed_state.get("meta") if isinstance(observed_state, dict) else []) or []:
+    meta_calls = observed_state.get("meta") if isinstance(observed_state, dict) else []
+    for entry in meta_calls or []:
         if not isinstance(entry, list) or len(entry) < 3:
             continue
         if str(entry[1] or "").strip() != event_name:
@@ -3964,6 +5190,42 @@ def _extract_recorded_meta_event_params(
         params = entry[2]
         if isinstance(params, dict):
             params_list.append(params)
+    if params_list:
+        return params_list
+
+    for entry in (observed_state.get("internal") if isinstance(observed_state, dict) else []) or []:
+        if not isinstance(entry, dict):
+            continue
+        props = entry.get("props")
+        if not isinstance(props, dict):
+            continue
+        meta_events = props.get("metaEvents")
+        if not isinstance(meta_events, list):
+            continue
+        for meta_event in meta_events:
+            if not isinstance(meta_event, dict):
+                continue
+            public_event_name = str(
+                meta_event.get("eventName")
+                or meta_event.get("event_name")
+                or meta_event.get("event")
+                or ""
+            ).strip()
+            if public_event_name != event_name:
+                continue
+            public_params = dict(props)
+            event_id = str(
+                meta_event.get("eventId")
+                or meta_event.get("event_id")
+                or public_params.get("eventId")
+                or public_params.get("event_id")
+                or ""
+            ).strip()
+            if event_id:
+                public_params["eventId"] = event_id
+                public_params["event_id"] = event_id
+            public_params["eventName"] = public_event_name
+            params_list.append(public_params)
     return params_list
 
 
@@ -4081,6 +5343,148 @@ def _recorded_posthog_scroll_depth_counts(
     return counts
 
 
+def _assert_tracking_any_prop_present(
+    *,
+    props: dict[str, Any],
+    key_groups: tuple[tuple[str, ...], ...],
+    field_label: str,
+    label: str,
+) -> None:
+    if any(_first_tracking_prop(props, *keys) for keys in key_groups):
+        return
+    expected_keys = ["/".join(keys) for keys in key_groups]
+    raise DeployError(
+        f"Post-deploy tracking validation failed for {label}: expected tracking attribute "
+        f"'{field_label}' to be present in one of {expected_keys!r}."
+    )
+
+
+def _assert_tracking_prop_matches(
+    *,
+    props: dict[str, Any],
+    keys: tuple[str, ...],
+    field_label: str,
+    expected_value: str,
+    label: str,
+) -> None:
+    expected = _clean_tracking_value(expected_value)
+    if not expected:
+        return
+    observed = _first_tracking_prop(props, *keys)
+    if observed != expected:
+        raise DeployError(
+            f"Post-deploy tracking validation failed for {label}: tracking attribute "
+            f"'{field_label}' expected {expected!r}, observed {observed!r}."
+        )
+
+
+def _assert_sales_action_event_core_attributes(
+    *,
+    props: dict[str, Any],
+    label: str,
+    expected_session_id: str = "",
+    expected_visitor_id: str = "",
+    expected_click_id: str = "",
+    expected_source_page_type: str = "",
+    expected_from_stage: str = "",
+    expected_to_stage: str = "",
+    require_product_context: bool = True,
+) -> None:
+    if expected_session_id or expected_visitor_id or expected_click_id:
+        _assert_props_include_canonical_handoff_values(
+            props=props,
+            expected_session_id=expected_session_id,
+            expected_visitor_id=expected_visitor_id,
+            expected_click_id=expected_click_id,
+            label=label,
+        )
+    else:
+        _assert_tracking_any_prop_present(
+            props=props,
+            key_groups=(("session_id", "sessionId"),),
+            field_label="session_id",
+            label=label,
+        )
+        _assert_tracking_any_prop_present(
+            props=props,
+            key_groups=(("visitor_id", "visitorId"),),
+            field_label="visitor_id",
+            label=label,
+        )
+
+    _assert_tracking_any_prop_present(
+        props=props,
+        key_groups=(
+            ("cta_id", "ctaId"),
+            ("binding_id", "bindingId"),
+            ("target_id", "targetId"),
+        ),
+        field_label="cta/binding/target id",
+        label=label,
+    )
+    if expected_source_page_type:
+        _assert_tracking_prop_matches(
+            props=props,
+            keys=("source_page_type", "sourcePageType"),
+            field_label="source_page_type",
+            expected_value=expected_source_page_type,
+            label=label,
+        )
+    if expected_from_stage:
+        _assert_tracking_prop_matches(
+            props=props,
+            keys=("from_stage", "fromStage"),
+            field_label="from_stage",
+            expected_value=expected_from_stage,
+            label=label,
+        )
+    if expected_to_stage:
+        _assert_tracking_prop_matches(
+            props=props,
+            keys=("to_stage", "toStage"),
+            field_label="to_stage",
+            expected_value=expected_to_stage,
+            label=label,
+        )
+    if not require_product_context:
+        return
+    _assert_tracking_any_prop_present(
+        props=props,
+        key_groups=(
+            ("variant_id", "variantId"),
+            ("content_id", "contentId"),
+            ("content_ids",),
+        ),
+        field_label="variant/content id",
+        label=label,
+    )
+    _assert_tracking_any_prop_present(
+        props=props,
+        key_groups=(("value",),),
+        field_label="value",
+        label=label,
+    )
+    _assert_tracking_any_prop_present(
+        props=props,
+        key_groups=(("currency",),),
+        field_label="currency",
+        label=label,
+    )
+    if expected_to_stage == "checkout":
+        _assert_tracking_any_prop_present(
+            props=props,
+            key_groups=(("transition_id", "transitionId"),),
+            field_label="transition_id",
+            label=label,
+        )
+        _assert_tracking_any_prop_present(
+            props=props,
+            key_groups=(("checkout_url", "checkoutUrl"), ("destination_url", "destinationUrl")),
+            field_label="checkout_url",
+            label=label,
+        )
+
+
 def _params_from_url(value: Any) -> dict[str, str]:
     raw_url = _clean_tracking_value(value)
     if not raw_url:
@@ -4092,9 +5496,7 @@ def _params_from_url(value: Any) -> dict[str, str]:
 def _assert_public_events_requests_succeeded(*, observed_state: dict[str, Any]) -> None:
     network_state = observed_state.get("network") if isinstance(observed_state, dict) else None
     public_event_requests = (
-        network_state.get("publicEvents")
-        if isinstance(network_state, dict)
-        else []
+        network_state.get("publicEvents") if isinstance(network_state, dict) else []
     )
     failures = [
         request
@@ -4141,8 +5543,37 @@ def _assert_props_include_canonical_handoff_values(
     if mismatches:
         raise DeployError(
             f"Post-deploy tracking validation failed for {label}: event did not use one canonical "
-            "funnel session across the presales-to-sales handoff; "
-            + "; ".join(mismatches)
+            "funnel session across the presales-to-sales handoff; " + "; ".join(mismatches)
+        )
+
+
+def _assert_props_include_expected_attribution_values(
+    *,
+    props: dict[str, Any],
+    expected_campaign_id: str = "",
+    expected_ad_id: str = "",
+    expected_fbclid: str = "",
+    label: str,
+) -> None:
+    expected = {
+        "campaign_id": _clean_tracking_value(expected_campaign_id),
+        "ad_id": _clean_tracking_value(expected_ad_id),
+        "fbclid": _clean_tracking_value(expected_fbclid),
+    }
+    observed = {
+        "campaign_id": _first_tracking_prop(props, "campaign_id", "campaignId"),
+        "ad_id": _first_tracking_prop(props, "ad_id", "adId"),
+        "fbclid": _first_tracking_prop(props, "fbclid"),
+    }
+    mismatches = [
+        f"{field} expected {expected_value!r}, observed {observed[field]!r}"
+        for field, expected_value in expected.items()
+        if expected_value and observed[field] != expected_value
+    ]
+    if mismatches:
+        raise DeployError(
+            f"Post-deploy tracking validation failed for {label}: event did not preserve first-class "
+            "attribution fields across the presales-to-sales handoff; " + "; ".join(mismatches)
         )
 
 
@@ -4251,6 +5682,9 @@ def _assert_presales_to_sales_bridge_stitched(
         "click_id",
         "clickId",
     )
+    expected_campaign_id = _first_tracking_prop(click_props, "campaign_id", "campaignId")
+    expected_ad_id = _first_tracking_prop(click_props, "ad_id", "adId")
+    expected_fbclid = _first_tracking_prop(click_props, "fbclid")
     missing_click_bridge_values = []
     if not expected_session_id:
         missing_click_bridge_values.append("session_id")
@@ -4268,6 +5702,13 @@ def _assert_presales_to_sales_bridge_stitched(
     _assert_sales_event_presales_source_context(
         props=click_props,
         expected_source_page_type=expected_source_page_type,
+        label="pre_sales_to_sales_click internal event",
+    )
+    _assert_props_include_expected_attribution_values(
+        props=click_props,
+        expected_campaign_id=expected_campaign_id,
+        expected_ad_id=expected_ad_id,
+        expected_fbclid=expected_fbclid,
         label="pre_sales_to_sales_click internal event",
     )
     _assert_url_includes_handoff_values(
@@ -4291,6 +5732,13 @@ def _assert_presales_to_sales_bridge_stitched(
         expected_source_page_type=expected_source_page_type,
         label="sales_page_view internal event",
     )
+    _assert_props_include_expected_attribution_values(
+        props=sales_props_items[-1],
+        expected_campaign_id=expected_campaign_id,
+        expected_ad_id=expected_ad_id,
+        expected_fbclid=expected_fbclid,
+        label="sales_page_view internal event",
+    )
 
     for posthog_event_name in ("pre_sales_to_sales_click", "cta_click", "PreSalesToSalesClick"):
         posthog_props_items = _extract_recorded_posthog_event_props(
@@ -4309,6 +5757,13 @@ def _assert_presales_to_sales_bridge_stitched(
         _assert_sales_event_presales_source_context(
             props=posthog_props_items[-1],
             expected_source_page_type=expected_source_page_type,
+            label=f"{posthog_event_name} PostHog capture",
+        )
+        _assert_props_include_expected_attribution_values(
+            props=posthog_props_items[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
             label=f"{posthog_event_name} PostHog capture",
         )
 
@@ -4331,6 +5786,13 @@ def _assert_presales_to_sales_bridge_stitched(
             expected_source_page_type=expected_source_page_type,
             label=f"{posthog_event_name} PostHog capture",
         )
+        _assert_props_include_expected_attribution_values(
+            props=posthog_props_items[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
+            label=f"{posthog_event_name} PostHog capture",
+        )
 
     presales_click_meta_params = _extract_recorded_meta_event_params(
         observed_state=observed_state,
@@ -4347,6 +5809,13 @@ def _assert_presales_to_sales_bridge_stitched(
         _assert_sales_event_presales_source_context(
             props=presales_click_meta_params[-1],
             expected_source_page_type=expected_source_page_type,
+            label="PreSalesToSalesClick Meta event",
+        )
+        _assert_props_include_expected_attribution_values(
+            props=presales_click_meta_params[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
             label="PreSalesToSalesClick Meta event",
         )
 
@@ -4377,6 +5846,13 @@ def _assert_presales_to_sales_bridge_stitched(
         _assert_sales_event_presales_source_context(
             props=entered_sales_meta_params[-1],
             expected_source_page_type=expected_source_page_type,
+            label="EnteredSales Meta event",
+        )
+        _assert_props_include_expected_attribution_values(
+            props=entered_sales_meta_params[-1],
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
             label="EnteredSales Meta event",
         )
 
@@ -4413,9 +5889,17 @@ def _assert_sales_posthog_events_include_funnel_context(
     if not isinstance(sales_page, dict):
         return
     expected_context = [
-        (("product_slug", "productSlug"), "product_slug", str(sales_page.get("product_slug") or "")),
+        (
+            ("product_slug", "productSlug"),
+            "product_slug",
+            str(sales_page.get("product_slug") or ""),
+        ),
         (("funnel_slug", "funnelSlug"), "funnel_slug", str(sales_page.get("funnel_slug") or "")),
-        (("publication_id", "publicationId"), "publication_id", str(sales_page.get("publication_id") or "")),
+        (
+            ("publication_id", "publicationId"),
+            "publication_id",
+            str(sales_page.get("publication_id") or ""),
+        ),
         (("page_id", "pageId"), "page_id", str(sales_page.get("page_id") or "")),
         (("page_slug", "pageSlug"), "page_slug", str(sales_page.get("slug") or "")),
         (("page_stage", "pageStage"), "page_stage", "sales"),
@@ -4453,6 +5937,83 @@ def _assert_sales_posthog_events_include_funnel_context(
             )
 
 
+def _assert_sales_action_events_include_required_attributes(
+    *,
+    path_plan: dict[str, Any],
+    observed_state: dict[str, Any],
+) -> None:
+    has_add_to_cart_targets = bool(path_plan.get("add_to_cart_targets"))
+    has_checkout_targets = bool(path_plan.get("checkout_targets"))
+    if not has_add_to_cart_targets and not has_checkout_targets:
+        return
+
+    expected_source_page_type = _expected_presales_source_page_type(path_plan=path_plan)
+    click_props_items = _extract_recorded_internal_event_props(
+        observed_state=observed_state,
+        event_type="pre_sales_to_sales_click",
+    )
+    handoff_props = click_props_items[-1] if click_props_items else {}
+    expected_session_id = _first_tracking_prop(handoff_props, "session_id", "sessionId")
+    expected_visitor_id = _first_tracking_prop(handoff_props, "visitor_id", "visitorId")
+    expected_click_id = _first_tracking_prop(handoff_props, "click_id", "clickId")
+
+    def assert_runtime_event(event_type: str, *, to_stage: str) -> None:
+        for props in _extract_recorded_internal_event_props(
+            observed_state=observed_state,
+            event_type=event_type,
+        ):
+            _assert_sales_action_event_core_attributes(
+                props=props,
+                label=f"{event_type} internal event",
+                expected_session_id=expected_session_id,
+                expected_visitor_id=expected_visitor_id,
+                expected_click_id=expected_click_id,
+                expected_from_stage="sales",
+                expected_to_stage=to_stage,
+            )
+
+    def assert_platform_event(event_name: str, *, platform: str, to_stage: str) -> None:
+        if platform == "posthog":
+            props_items = _extract_recorded_posthog_event_props(
+                observed_state=observed_state,
+                event_name=event_name,
+            )
+        else:
+            props_items = _extract_recorded_meta_event_params(
+                observed_state=observed_state,
+                event_name=event_name,
+            )
+        for props in props_items:
+            _assert_sales_action_event_core_attributes(
+                props=props,
+                label=f"{event_name} {platform} event",
+                expected_session_id=expected_session_id,
+                expected_visitor_id=expected_visitor_id,
+                expected_click_id=expected_click_id,
+                expected_source_page_type=expected_source_page_type,
+                expected_from_stage="sales",
+                expected_to_stage=to_stage,
+            )
+
+    if has_add_to_cart_targets:
+        assert_runtime_event("add_to_cart", to_stage="cart")
+        for event_name in ("add_to_cart", "AddToCart"):
+            assert_platform_event(event_name, platform="posthog", to_stage="cart")
+        assert_platform_event("AddToCart", platform="meta", to_stage="cart")
+
+    if has_checkout_targets:
+        assert_runtime_event("sales_to_checkout_click", to_stage="checkout")
+        for event_name in (
+            "sales_to_checkout_click",
+            "checkout_click",
+            "SalesToCheckoutClick",
+            "SalesToCheckoutClicked",
+        ):
+            assert_platform_event(event_name, platform="posthog", to_stage="checkout")
+        for event_name in ("SalesToCheckoutClick", "SalesToCheckoutClicked"):
+            assert_platform_event(event_name, platform="meta", to_stage="checkout")
+
+
 def _assert_entered_sales_meta_event_has_sales_source_url(
     *,
     path_plan: dict[str, Any],
@@ -4482,6 +6043,111 @@ def _assert_entered_sales_meta_event_has_sales_source_url(
             )
 
 
+def _assert_observed_posthog_quiz_answer_attributes(
+    *,
+    path_plan: dict[str, Any],
+    observed_state: dict[str, Any],
+) -> None:
+    if str(path_plan.get("tracking_validation_profile") or "").strip() != "quiz_presell":
+        return
+
+    def assert_text(
+        props: dict[str, Any], *, keys: tuple[str, ...], field_label: str, label: str
+    ) -> None:
+        if _first_tracking_prop(props, *keys):
+            return
+        raise DeployError(
+            f"Post-deploy tracking validation failed for browser-captured PostHog {label}: "
+            f"'{field_label}' is missing."
+        )
+
+    def assert_array(
+        props: dict[str, Any], *, keys: tuple[str, ...], field_label: str, label: str
+    ) -> list[Any]:
+        values = _readback_array_prop(props, *keys)
+        if values:
+            return values
+        raise DeployError(
+            f"Post-deploy tracking validation failed for browser-captured PostHog {label}: "
+            f"'{field_label}' is missing or empty."
+        )
+
+    for event_name in ("QuizQuestionViewed",):
+        for props in _extract_recorded_posthog_event_props(
+            observed_state=observed_state, event_name=event_name
+        ):
+            label = event_name
+            assert_text(
+                props, keys=("question_id", "questionId"), field_label="question_id", label=label
+            )
+            assert_text(
+                props,
+                keys=("question_text", "questionText"),
+                field_label="question_text",
+                label=label,
+            )
+
+    for event_name in ("QuizOptionPresented", "QuizOptionSelected"):
+        for props in _extract_recorded_posthog_event_props(
+            observed_state=observed_state, event_name=event_name
+        ):
+            label = event_name
+            assert_text(
+                props, keys=("question_id", "questionId"), field_label="question_id", label=label
+            )
+            assert_text(
+                props,
+                keys=("question_text", "questionText"),
+                field_label="question_text",
+                label=label,
+            )
+            assert_text(props, keys=("option_id", "optionId"), field_label="option_id", label=label)
+            assert_text(
+                props, keys=("option_text", "optionText"), field_label="option_text", label=label
+            )
+            if event_name == "QuizOptionSelected":
+                assert_array(
+                    props,
+                    keys=("selected_option_ids", "selectedOptionIds"),
+                    field_label="selected_option_ids",
+                    label=label,
+                )
+                assert_array(
+                    props,
+                    keys=("selected_option_texts", "selectedOptionTexts"),
+                    field_label="selected_option_texts",
+                    label=label,
+                )
+
+    for event_name in ("QuizQuestionSubmitted",):
+        for props in _extract_recorded_posthog_event_props(
+            observed_state=observed_state, event_name=event_name
+        ):
+            label = event_name
+            assert_array(
+                props,
+                keys=("selected_option_ids", "selectedOptionIds"),
+                field_label="selected_option_ids",
+                label=label,
+            )
+            assert_array(
+                props,
+                keys=("selected_option_texts", "selectedOptionTexts"),
+                field_label="selected_option_texts",
+                label=label,
+            )
+
+    for props in _extract_recorded_posthog_event_props(
+        observed_state=observed_state, event_name="QuizCompleted"
+    ):
+        answers = assert_array(
+            props, keys=("answers",), field_label="answers", label="QuizCompleted"
+        )
+        _assert_quiz_answer_items_complete(
+            answers=answers, label="browser-captured PostHog QuizCompleted"
+        )
+
+
 def _assert_sales_entry_meta_events_match_sales_loads(
     *,
     internal_events: list[str],
@@ -4500,7 +6166,138 @@ def _assert_sales_entry_meta_events_match_sales_loads(
             )
 
 
-def _validate_observed_tracking_events(*, path_plan: dict[str, Any], observed_state: dict[str, Any]) -> None:
+def _assert_add_to_cart_events_follow_sales_bundle_contract(
+    *, path_plan: dict[str, Any], observed_state: dict[str, Any]
+) -> None:
+    tracking = path_plan.get("tracking") or {}
+    has_add_to_cart_targets = bool(path_plan.get("add_to_cart_targets"))
+    internal_events = _extract_recorded_internal_event_names(observed_state=observed_state)
+    internal_add_to_cart_count = internal_events.count("add_to_cart")
+
+    meta_event_names = _extract_recorded_meta_event_names_for_validation(
+        observed_state=observed_state
+    )
+    meta_add_to_cart_count = meta_event_names.count("AddToCart")
+
+    posthog_event_names = _extract_recorded_posthog_event_names_for_validation(
+        observed_state=observed_state
+    )
+    posthog_add_to_cart_count = posthog_event_names.count("add_to_cart")
+    posthog_add_to_cart_alias_count = posthog_event_names.count("AddToCart")
+
+    expected_meta_pixel_id = str(tracking.get("metaPixelId") or "").strip()
+    has_posthog = bool(
+        str(tracking.get("posthogProjectApiKey") or "").strip()
+        and str(tracking.get("posthogApiHost") or "").strip()
+    )
+
+    if not has_add_to_cart_targets:
+        unexpected_counts = {
+            "internal_add_to_cart": internal_add_to_cart_count,
+            "meta_AddToCart": meta_add_to_cart_count if expected_meta_pixel_id else 0,
+            "posthog_add_to_cart": posthog_add_to_cart_count if has_posthog else 0,
+            "posthog_AddToCart": posthog_add_to_cart_alias_count if has_posthog else 0,
+        }
+        unexpected_counts = {key: value for key, value in unexpected_counts.items() if value}
+        if unexpected_counts:
+            raise DeployError(
+                "Post-deploy tracking validation failed for AddToCart contract: "
+                "AddToCart must only fire from declared add-to-cart targets, observed "
+                f"{unexpected_counts!r} without any add-to-cart target."
+            )
+        return
+
+    if internal_add_to_cart_count != 1:
+        raise DeployError(
+            "Post-deploy tracking validation failed for AddToCart contract: "
+            "expected exactly one internal add_to_cart event for the activated bundled offer, "
+            f"observed {internal_add_to_cart_count}."
+        )
+    if expected_meta_pixel_id and meta_add_to_cart_count != 1:
+        raise DeployError(
+            "Post-deploy tracking validation failed for AddToCart contract: "
+            "expected exactly one Meta AddToCart event for the bundled offer, "
+            f"observed {meta_add_to_cart_count}."
+        )
+    if has_posthog and (posthog_add_to_cart_count != 1 or posthog_add_to_cart_alias_count != 1):
+        raise DeployError(
+            "Post-deploy tracking validation failed for AddToCart contract: "
+            "expected exactly one PostHog add_to_cart event and one AddToCart alias for the bundled offer, "
+            f"observed add_to_cart={posthog_add_to_cart_count}, "
+            f"AddToCart={posthog_add_to_cart_alias_count}."
+        )
+
+
+def _assert_initiate_checkout_events_follow_sales_contract(
+    *, path_plan: dict[str, Any], observed_state: dict[str, Any]
+) -> None:
+    tracking = path_plan.get("tracking") or {}
+    expected_checkout_started = "checkout_started" in set(
+        str(event_name or "").strip()
+        for event_name in path_plan.get("expected_internal_events") or []
+    )
+    internal_events = _extract_recorded_internal_event_names(observed_state=observed_state)
+    internal_checkout_started_count = internal_events.count("checkout_started")
+
+    meta_event_names = _extract_recorded_meta_event_names_for_validation(
+        observed_state=observed_state
+    )
+    meta_initiate_checkout_count = meta_event_names.count("InitiateCheckout")
+
+    posthog_event_names = _extract_recorded_posthog_event_names_for_validation(
+        observed_state=observed_state
+    )
+    posthog_checkout_started_count = posthog_event_names.count("checkout_started")
+    posthog_initiate_checkout_count = posthog_event_names.count("InitiateCheckout")
+
+    expected_meta_pixel_id = str(tracking.get("metaPixelId") or "").strip()
+    has_posthog = bool(
+        str(tracking.get("posthogProjectApiKey") or "").strip()
+        and str(tracking.get("posthogApiHost") or "").strip()
+    )
+
+    if not expected_checkout_started:
+        unexpected_counts = {
+            "internal_checkout_started": internal_checkout_started_count,
+            "meta_InitiateCheckout": meta_initiate_checkout_count if expected_meta_pixel_id else 0,
+            "posthog_checkout_started": posthog_checkout_started_count if has_posthog else 0,
+            "posthog_InitiateCheckout": posthog_initiate_checkout_count if has_posthog else 0,
+        }
+        unexpected_counts = {key: value for key, value in unexpected_counts.items() if value}
+        if unexpected_counts:
+            raise DeployError(
+                "Post-deploy tracking validation failed for InitiateCheckout contract: "
+                "InitiateCheckout must only fire from the secure checkout action, observed "
+                f"{unexpected_counts!r} without an expected checkout_started event."
+            )
+        return
+
+    if internal_checkout_started_count != 1:
+        raise DeployError(
+            "Post-deploy tracking validation failed for InitiateCheckout contract: "
+            "expected exactly one internal checkout_started event from the secure checkout action, "
+            f"observed {internal_checkout_started_count}."
+        )
+    if expected_meta_pixel_id and meta_initiate_checkout_count != 1:
+        raise DeployError(
+            "Post-deploy tracking validation failed for InitiateCheckout contract: "
+            "expected exactly one Meta InitiateCheckout event from the secure checkout action, "
+            f"observed {meta_initiate_checkout_count}."
+        )
+    if has_posthog and (
+        posthog_checkout_started_count != 1 or posthog_initiate_checkout_count != 1
+    ):
+        raise DeployError(
+            "Post-deploy tracking validation failed for InitiateCheckout contract: "
+            "expected exactly one PostHog checkout_started event and one InitiateCheckout alias, "
+            f"observed checkout_started={posthog_checkout_started_count}, "
+            f"InitiateCheckout={posthog_initiate_checkout_count}."
+        )
+
+
+def _validate_observed_tracking_events(
+    *, path_plan: dict[str, Any], observed_state: dict[str, Any]
+) -> None:
     _assert_public_events_requests_succeeded(observed_state=observed_state)
     internal_events = _extract_recorded_internal_event_names(observed_state=observed_state)
     _assert_event_multiset_contains(
@@ -4523,7 +6320,9 @@ def _validate_observed_tracking_events(*, path_plan: dict[str, Any], observed_st
                 f"Post-deploy tracking validation failed for Meta Pixel: expected init for pixel '{expected_meta_pixel_id}', "
                 f"observed {meta_init_ids!r}."
             )
-        meta_event_names = _extract_recorded_event_names(observed_events=meta_calls or [])
+        meta_event_names = _extract_recorded_meta_event_names_for_validation(
+            observed_state=observed_state
+        )
         _assert_event_multiset_contains(
             observed=meta_event_names,
             expected=list(path_plan.get("expected_meta_events") or []),
@@ -4568,8 +6367,8 @@ def _validate_observed_tracking_events(*, path_plan: dict[str, Any], observed_st
             raise DeployError(
                 "Post-deploy tracking validation failed for PostHog: expected an init call matching the deployed tracking config."
             )
-        posthog_event_names = _extract_recorded_posthog_event_names(
-            observed_events=(posthog_state.get("captures") if isinstance(posthog_state, dict) else []) or []
+        posthog_event_names = _extract_recorded_posthog_event_names_for_validation(
+            observed_state=observed_state
         )
         _assert_quiz_completed_not_duplicated(
             event_names=posthog_event_names,
@@ -4580,27 +6379,128 @@ def _validate_observed_tracking_events(*, path_plan: dict[str, Any], observed_st
             expected=list(path_plan.get("expected_posthog_events") or []),
             label="PostHog events",
         )
+        _assert_observed_posthog_quiz_answer_attributes(
+            path_plan=path_plan,
+            observed_state=observed_state,
+        )
         _assert_sales_posthog_events_include_funnel_context(
             path_plan=path_plan,
             observed_state=observed_state,
         )
+        _assert_sales_action_events_include_required_attributes(
+            path_plan=path_plan,
+            observed_state=observed_state,
+        )
+    _assert_add_to_cart_events_follow_sales_bundle_contract(
+        path_plan=path_plan,
+        observed_state=observed_state,
+    )
+    _assert_initiate_checkout_events_follow_sales_contract(
+        path_plan=path_plan,
+        observed_state=observed_state,
+    )
 
 
 def _activate_tracking_validation_target(*, page: Any, selector: str) -> None:
-    locator = page.locator(selector).first
-    locator.wait_for(state="attached", timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS)
-    locator.evaluate(
-        """
-(element) => {
-  try {
-    element.scrollIntoView({ block: "center", inline: "center" });
-  } catch (_error) {
-    // Ignore scroll errors and still attempt click.
-  }
-  element.click();
-}
-"""
+    normalized_selector = str(selector or "").strip()
+    if not normalized_selector:
+        raise DeployError("Post-deploy tracking validation target selector is empty.")
+    selected_attr = f"mosTrackingValidationTarget{uuid4().hex}"
+    page.wait_for_function(
+        f"""
+() => {{
+  try {{
+    return document.querySelectorAll({json.dumps(normalized_selector)}).length > 0;
+  }} catch (_error) {{
+    return false;
+  }}
+}}
+""",
+        timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
     )
+    selected = page.evaluate(
+        f"""
+(args) => {{
+  const selector = args.selector;
+  const selectedAttr = args.selectedAttr;
+  const isVisibleCandidate = (element) => {{
+    if (!(element instanceof HTMLElement)) return false;
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      style.visibility !== "hidden" &&
+      style.display !== "none" &&
+      element.getAttribute("aria-hidden") !== "true"
+    );
+  }};
+  const candidates = Array.from(document.querySelectorAll(selector));
+  const boundCandidate = candidates.find((element) => (
+    element instanceof HTMLElement &&
+    element.dataset &&
+    (
+      element.dataset.mosAddToCartTargetBound ||
+      element.dataset.mosStandaloneBridgeBound ||
+      element.dataset.mosDirectControlTracking ||
+      element.dataset.mosDirectQuizHandoff
+    ) &&
+    isVisibleCandidate(element)
+  ));
+  const boundAnyCandidate = candidates.find((element) => (
+    element instanceof HTMLElement &&
+    element.dataset &&
+    (
+      element.dataset.mosAddToCartTargetBound ||
+      element.dataset.mosStandaloneBridgeBound ||
+      element.dataset.mosDirectControlTracking ||
+      element.dataset.mosDirectQuizHandoff
+    )
+  ));
+  const visibleCandidate = candidates.find(isVisibleCandidate);
+  const element = boundCandidate || visibleCandidate || boundAnyCandidate || candidates[0];
+  if (!element) return false;
+  try {{
+    element.dataset[selectedAttr] = "true";
+    element.scrollIntoView({{ block: "center", inline: "center" }});
+  }} catch (_error) {{
+    // Ignore scroll errors and still select the element.
+  }}
+  return true;
+}}
+""",
+        {"selector": normalized_selector, "selectedAttr": selected_attr},
+    )
+    if selected is not True:
+        raise DeployError(
+            f"Post-deploy tracking validation target selector {normalized_selector!r} matched no clickable element."
+        )
+    page.wait_for_timeout(250)
+    clicked = page.evaluate(
+        f"""
+(selectedAttr) => {{
+  const element = document.querySelector("[data-" + selectedAttr.replace(/[A-Z]/g, (letter) => "-" + letter.toLowerCase()) + "='true']");
+  if (!element) return false;
+  try {{
+    const rect = element.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {{
+      const targetY = Math.max(0, window.scrollY + rect.top - Math.max(0, (window.innerHeight - rect.height) / 2));
+      window.scrollTo(window.scrollX, targetY);
+    }}
+    element.scrollIntoView({{ block: "center", inline: "center" }});
+  }} catch (_error) {{
+    // Ignore scroll errors and still attempt click.
+  }}
+  element.click();
+  return true;
+}}
+""",
+        selected_attr,
+    )
+    if clicked is not True:
+        raise DeployError(
+            f"Post-deploy tracking validation target selector {normalized_selector!r} could not be clicked."
+        )
 
 
 def _tracking_path_requires_live_posthog_readback(*, path_plan: dict[str, Any]) -> bool:
@@ -4625,6 +6525,21 @@ def _meta_event_name_from_request_url(url: str) -> str:
     params = parse_qs(parsed.query)
     values = params.get("ev") or []
     return str(values[-1] or "").strip() if values else ""
+
+
+def _meta_event_name_from_request_payload(payload: str) -> str:
+    text = str(payload or "")
+    if not text:
+        return ""
+    values = parse_qs(text).get("ev") or []
+    if values:
+        return str(values[-1] or "").strip()
+    match = re.search(
+        r'name=["\']ev["\']\s*\r?\n\r?\n([^\r\n]+)',
+        text,
+        flags=re.IGNORECASE,
+    )
+    return str(match.group(1) or "").strip() if match else ""
 
 
 def _assert_meta_pixel_network_requests_succeeded(
@@ -4658,9 +6573,7 @@ def _assert_meta_pixel_network_requests_succeeded(
         if isinstance(response, dict) and str(response.get("event") or "").strip()
     ]
     missing_events = [
-        event_name
-        for event_name in expected_events
-        if event_name not in observed_events
+        event_name for event_name in expected_events if event_name not in observed_events
     ]
     if missing_events:
         raise DeployError(
@@ -4904,6 +6817,7 @@ def _exercise_quiz_scroll_targets(
             timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
         )
         page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+        _wait_for_tracking_runtime_ready(page=page)
         _assert_quiz_scroll_target_active(page=page, target=target)
         baseline_counts = _recorded_posthog_scroll_depth_counts(
             observed_state=_collect_tracking_validation_state(page=page),
@@ -4921,6 +6835,7 @@ def _exercise_quiz_scroll_targets(
             target=target,
             baseline_counts=baseline_counts,
         )
+        _wait_for_artifact_navigation_tracking_flush(page=page)
     return True
 
 
@@ -4930,38 +6845,70 @@ def _exercise_quiz_manifest_interactions(*, page: Any, manifest: dict[str, Any])
     quiz_options = manifest.get("quizOptions")
     if not isinstance(quiz_options, list) or not quiz_options:
         return
+    selected_options = [
+        option
+        for option in quiz_options
+        if isinstance(option, dict)
+        and str(option.get("selector") or "").strip()
+        and option.get("selectionOrder") is not None
+    ]
+    if not selected_options:
+        raise DeployError(
+            "Post-deploy tracking validation could not execute the quiz path: "
+            "quizOptions must declare selectionOrder for the answer choices to click."
+        )
     sorted_options = sorted(
-        [
-            option
-            for option in quiz_options
-            if isinstance(option, dict) and str(option.get("selector") or "").strip()
-        ],
-        key=lambda option: (
-            int(option.get("questionIndex") or 0),
-            str(option.get("id") or ""),
-        ),
+        selected_options, key=lambda option: int(option.get("selectionOrder") or 0)
     )
-    seen_questions: set[str] = set()
+    quiz_submissions = [
+        submission
+        for submission in (manifest.get("quizSubmissions") or [])
+        if isinstance(submission, dict) and str(submission.get("selector") or "").strip()
+    ]
+    ordered_question_keys: list[str] = []
+    options_by_question: dict[str, list[dict[str, Any]]] = {}
     for option in sorted_options:
         question_key = (
             str(option.get("questionId") or "").strip()
             or str(option.get("questionIndex") or "").strip()
             or str(option.get("id") or "").strip()
         )
-        if question_key in seen_questions:
-            continue
-        seen_questions.add(question_key)
-        selector = str(option.get("selector") or "").strip()
-        try:
-            _activate_tracking_validation_target(page=page, selector=selector)
-            page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
-        except Exception:
-            continue
+        if question_key not in options_by_question:
+            ordered_question_keys.append(question_key)
+            options_by_question[question_key] = []
+        options_by_question[question_key].append(option)
+    for question_key in ordered_question_keys:
+        for option in options_by_question.get(question_key, []):
+            selector = str(option.get("selector") or "").strip()
+            try:
+                _activate_tracking_validation_target(page=page, selector=selector)
+                page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+            except Exception as exc:
+                raise DeployError(
+                    "Post-deploy tracking validation could not click declared quiz option "
+                    f"{str(option.get('id') or option.get('optionId') or selector)!r} "
+                    f"for question {question_key!r}."
+                ) from exc
+        matching_submissions = [
+            submission
+            for submission in quiz_submissions
+            if str(submission.get("questionId") or "").strip() == question_key
+        ]
+        for submission in matching_submissions:
+            submission_selector = str(submission.get("selector") or "").strip()
+            try:
+                _activate_tracking_validation_target(page=page, selector=submission_selector)
+                page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+            except Exception as exc:
+                raise DeployError(
+                    "Post-deploy tracking validation could not click declared quiz submission "
+                    f"{str(submission.get('id') or submission_selector)!r} "
+                    f"for question {question_key!r}."
+                ) from exc
 
 
 def _collect_tracking_validation_state(*, page: Any) -> dict[str, Any]:
-    observed_state = page.evaluate(
-        f"""
+    observed_state = page.evaluate(f"""
 () => {{
   try {{
     return JSON.parse(window.sessionStorage.getItem({json.dumps(_DEPLOY_TRACKING_VALIDATION_STORAGE_KEY)}) || "{{}}");
@@ -4969,8 +6916,7 @@ def _collect_tracking_validation_state(*, page: Any) -> dict[str, Any]:
     return {{}};
   }}
 }}
-"""
-    )
+""")
     if not isinstance(observed_state, dict):
         raise DeployError("Post-deploy tracking validation did not capture any tracking state.")
     return observed_state
@@ -5004,6 +6950,108 @@ def _wait_for_tracking_validation_state(
             page.wait_for_timeout(poll_ms)
 
 
+def _wait_for_tracking_runtime_ready(*, page: Any) -> None:
+    try:
+        page.wait_for_function(
+            """
+() => Boolean(
+  window.MOSStandaloneAnalytics &&
+  typeof window.MOSStandaloneAnalytics.trackEvent === "function"
+)
+""",
+            timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+        )
+    except Exception:
+        # The final event assertions produce the actionable failure if the runtime never emits.
+        return
+
+
+def _wait_for_artifact_navigation_tracking_flush(*, page: Any) -> None:
+    try:
+        page.evaluate("""
+async () => {
+  if (
+    window.MOSStandaloneAnalytics &&
+    typeof window.MOSStandaloneAnalytics.waitForNavigationFlush === "function"
+  ) {
+    await window.MOSStandaloneAnalytics.waitForNavigationFlush();
+  }
+}
+""")
+    except Exception:
+        # Event/readback assertions remain the source of truth.
+        return
+
+
+def _wait_for_internal_tracking_event(
+    *,
+    page: Any,
+    event_type: str,
+    timeout_ms: int | None = None,
+    required: bool = False,
+) -> None:
+    normalized_event_type = str(event_type or "").strip()
+    if not normalized_event_type:
+        return
+    effective_timeout_ms = (
+        timeout_ms if timeout_ms is not None else _DEPLOY_TRACKING_VALIDATION_ASSERTION_TIMEOUT_MS
+    )
+    try:
+        page.wait_for_function(
+            f"""
+() => {{
+  try {{
+    const raw = window.sessionStorage.getItem({json.dumps(_DEPLOY_TRACKING_VALIDATION_STORAGE_KEY)});
+    const parsed = raw ? JSON.parse(raw) : {{}};
+    const events = Array.isArray(parsed.internal) ? parsed.internal : [];
+    return events.some((entry) => entry && entry.eventType === {json.dumps(normalized_event_type)});
+  }} catch (_error) {{
+    return false;
+  }}
+}}
+""",
+            timeout=max(100, effective_timeout_ms),
+        )
+    except Exception as exc:
+        if required:
+            raise DeployError(
+                "Post-deploy tracking validation did not observe required internal event "
+                f"{normalized_event_type!r} within {effective_timeout_ms}ms."
+            ) from exc
+        # Keep the consolidated validator error as the source of truth.
+        return
+
+
+def _wait_for_tracking_target_bound(*, page: Any, selector: str) -> None:
+    normalized_selector = str(selector or "").strip()
+    if not normalized_selector:
+        return
+    try:
+        page.wait_for_function(
+            f"""
+() => {{
+  try {{
+    return Array.from(document.querySelectorAll({json.dumps(normalized_selector)})).some((element) => (
+      element &&
+      element.dataset &&
+      (
+        element.dataset.mosAddToCartTargetBound ||
+        element.dataset.mosStandaloneBridgeBound ||
+        element.dataset.mosDirectControlTracking ||
+        element.dataset.mosDirectQuizHandoff
+      )
+    ));
+  }} catch (_error) {{
+    return false;
+  }}
+}}
+""",
+            timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+        )
+    except Exception:
+        return
+
+
 def _resolve_posthog_readback_ui_host(*, tracking: dict[str, Any]) -> str:
     configured_ui_host = str(tracking.get("posthogUiHost") or "").strip().rstrip("/")
     if configured_ui_host:
@@ -5019,7 +7067,9 @@ def _resolve_posthog_readback_ui_host(*, tracking: dict[str, Any]) -> str:
             "Post-deploy tracking validation requires posthogUiHost for live PostHog readback "
             f"when posthogApiHost is '{configured_api_host}'."
         )
-    raise DeployError("Post-deploy tracking validation requires posthogUiHost for live PostHog readback.")
+    raise DeployError(
+        "Post-deploy tracking validation requires posthogUiHost for live PostHog readback."
+    )
 
 
 def _query_posthog_readback_events(
@@ -5028,19 +7078,35 @@ def _query_posthog_readback_events(
     ui_host: str,
     api_key: str,
     validation_id: str,
+    required_events: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     escaped_validation_id = str(validation_id or "").replace("'", "\\'")
+    event_names = _dedupe_preserving_order(
+        [
+            str(event_name or "").strip()
+            for event_name in (required_events or [])
+            if str(event_name or "").strip()
+        ]
+    )
+    event_filter = ""
+    if event_names:
+        escaped_event_names = ", ".join(
+            "'" + event_name.replace("'", "\\'") + "'" for event_name in event_names
+        )
+        event_filter = f"\n  and event in ({escaped_event_names})"
     selected_property_columns = "\n".join(
         f"  {select_expression} as {column_name},"
         for column_name, select_expression in _POSTHOG_READBACK_COLUMN_SELECTS
     ).rstrip(",")
     query = f"""
+-- html-deploy-v1 readback poll {time.time_ns()}
 select
   event,
   timestamp,
 {selected_property_columns}
 from events
 where timestamp > now() - interval 2 hour
+{event_filter}
   and (
     position(toString(properties['$current_url']), '{escaped_validation_id}') > 0
     or position(toString(properties.event_source_url), '{escaped_validation_id}') > 0
@@ -5087,7 +7153,9 @@ def _readback_prop(row: dict[str, Any], *keys: str) -> str:
     return _first_tracking_prop(row, *keys)
 
 
-def _readback_rows_for_event(*, rows: list[dict[str, Any]], event_name: str) -> list[dict[str, Any]]:
+def _readback_rows_for_event(
+    *, rows: list[dict[str, Any]], event_name: str
+) -> list[dict[str, Any]]:
     return [
         row
         for row in rows
@@ -5106,6 +7174,10 @@ def _readback_row_contains_validation_id(*, row: dict[str, Any], validation_id: 
         row.get("path"),
         row.get("utm_content"),
         row.get("utm_campaign"),
+        row.get("campaign_id"),
+        row.get("campaignId"),
+        row.get("ad_id"),
+        row.get("adId"),
         row.get("fbclid"),
         row.get("mos_deploy_validation_id"),
         row.get("mosDeployValidationId"),
@@ -5153,9 +7225,17 @@ def _assert_readback_sales_context(
     if not isinstance(sales_page, dict):
         return
     expected_context = [
-        (("product_slug", "productSlug"), "product_slug", str(sales_page.get("product_slug") or "")),
+        (
+            ("product_slug", "productSlug"),
+            "product_slug",
+            str(sales_page.get("product_slug") or ""),
+        ),
         (("funnel_slug", "funnelSlug"), "funnel_slug", str(sales_page.get("funnel_slug") or "")),
-        (("publication_id", "publicationId"), "publication_id", str(sales_page.get("publication_id") or "")),
+        (
+            ("publication_id", "publicationId"),
+            "publication_id",
+            str(sales_page.get("publication_id") or ""),
+        ),
         (("page_id", "pageId"), "page_id", str(sales_page.get("page_id") or "")),
         (("page_slug", "pageSlug"), "page_slug", str(sales_page.get("slug") or "")),
         (("page_stage", "pageStage"), "page_stage", "sales"),
@@ -5209,6 +7289,9 @@ def _assert_readback_presales_handoff(
     expected_session_id = _readback_prop(click_row, "session_id", "sessionId")
     expected_visitor_id = _readback_prop(click_row, "visitor_id", "visitorId")
     expected_click_id = _readback_prop(click_row, "click_id", "clickId")
+    expected_campaign_id = _readback_prop(click_row, "campaign_id", "campaignId")
+    expected_ad_id = _readback_prop(click_row, "ad_id", "adId")
+    expected_fbclid = _readback_prop(click_row, "fbclid")
     missing = []
     if not expected_session_id:
         missing.append("session_id")
@@ -5244,6 +7327,13 @@ def _assert_readback_presales_handoff(
             expected_source_page_type=expected_source_page_type,
             label=f"live PostHog readback {str(row.get('event') or '').strip()}",
         )
+        _assert_props_include_expected_attribution_values(
+            props=row,
+            expected_campaign_id=expected_campaign_id,
+            expected_ad_id=expected_ad_id,
+            expected_fbclid=expected_fbclid,
+            label=f"live PostHog readback {str(row.get('event') or '').strip()}",
+        )
 
     for event_name in ("sales_page_view", "EnteredSales"):
         for row in _readback_rows_for_event(rows=rows, event_name=event_name):
@@ -5259,6 +7349,307 @@ def _assert_readback_presales_handoff(
                 expected_source_page_type=expected_source_page_type,
                 label=f"live PostHog readback {event_name}",
             )
+            _assert_props_include_expected_attribution_values(
+                props=row,
+                expected_campaign_id=expected_campaign_id,
+                expected_ad_id=expected_ad_id,
+                expected_fbclid=expected_fbclid,
+                label=f"live PostHog readback {event_name}",
+            )
+
+
+def _assert_readback_sales_action_attributes(
+    *,
+    rows: list[dict[str, Any]],
+    path_plan: dict[str, Any],
+    validation_id: str,
+) -> None:
+    if not path_plan.get("add_to_cart_targets") and not path_plan.get("checkout_targets"):
+        return
+    expected_source_page_type = _expected_presales_source_page_type(path_plan=path_plan)
+    click_rows = [
+        row
+        for event_name in ("PreSalesToSalesClick", "cta_click", "pre_sales_to_sales_click")
+        for row in _readback_rows_for_event(rows=rows, event_name=event_name)
+    ]
+    handoff_row = click_rows[-1] if click_rows else {}
+    expected_session_id = _readback_prop(handoff_row, "session_id", "sessionId")
+    expected_visitor_id = _readback_prop(handoff_row, "visitor_id", "visitorId")
+    expected_click_id = _readback_prop(handoff_row, "click_id", "clickId")
+    expected_campaign_id = _readback_prop(handoff_row, "campaign_id", "campaignId")
+    expected_ad_id = _readback_prop(handoff_row, "ad_id", "adId")
+    expected_fbclid = _readback_prop(handoff_row, "fbclid")
+
+    add_to_cart_rows = _readback_rows_for_event(rows=rows, event_name="add_to_cart")
+    add_to_cart_alias_rows = _readback_rows_for_event(rows=rows, event_name="AddToCart")
+    if path_plan.get("add_to_cart_targets"):
+        if len(add_to_cart_rows) != 1 or len(add_to_cart_alias_rows) != 1:
+            raise DeployError(
+                "Post-deploy tracking validation failed for live PostHog AddToCart contract: "
+                "expected exactly one add_to_cart event and one AddToCart alias for the bundled offer, "
+                f"observed add_to_cart={len(add_to_cart_rows)}, AddToCart={len(add_to_cart_alias_rows)}."
+            )
+    elif add_to_cart_rows or add_to_cart_alias_rows:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog AddToCart contract: "
+            "AddToCart must only fire from declared add-to-cart targets, observed "
+            f"add_to_cart={len(add_to_cart_rows)}, AddToCart={len(add_to_cart_alias_rows)} "
+            "without any add-to-cart target."
+        )
+
+    checkout_started_rows = _readback_rows_for_event(rows=rows, event_name="checkout_started")
+    initiate_checkout_rows = _readback_rows_for_event(rows=rows, event_name="InitiateCheckout")
+    expected_checkout_started = "checkout_started" in set(
+        str(event_name or "").strip()
+        for event_name in path_plan.get("expected_internal_events") or []
+    )
+    if expected_checkout_started:
+        if len(checkout_started_rows) != 1 or len(initiate_checkout_rows) != 1:
+            raise DeployError(
+                "Post-deploy tracking validation failed for live PostHog InitiateCheckout contract: "
+                "expected exactly one checkout_started event and one InitiateCheckout alias, "
+                f"observed checkout_started={len(checkout_started_rows)}, "
+                f"InitiateCheckout={len(initiate_checkout_rows)}."
+            )
+    elif checkout_started_rows or initiate_checkout_rows:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog InitiateCheckout contract: "
+            "InitiateCheckout must only fire from the secure checkout action, observed "
+            f"checkout_started={len(checkout_started_rows)}, "
+            f"InitiateCheckout={len(initiate_checkout_rows)} without an expected checkout_started event."
+        )
+
+    event_names: list[str] = []
+    if path_plan.get("add_to_cart_targets"):
+        event_names.extend(["add_to_cart", "AddToCart"])
+    if path_plan.get("checkout_targets"):
+        expected_internal_events = {
+            str(event_name or "").strip()
+            for event_name in path_plan.get("expected_internal_events") or []
+        }
+        if "sales_to_checkout_click" in expected_internal_events:
+            event_names.extend(
+                [
+                    "sales_to_checkout_click",
+                    "checkout_click",
+                    "SalesToCheckoutClick",
+                    "SalesToCheckoutClicked",
+                ]
+            )
+        if "checkout_started" in expected_internal_events:
+            event_names.extend(["checkout_started", "InitiateCheckout"])
+
+    for event_name in event_names:
+        expected_to_stage = "cart" if event_name in {"add_to_cart", "AddToCart"} else "checkout"
+        for row in _readback_rows_for_event(rows=rows, event_name=event_name):
+            _assert_sales_action_event_core_attributes(
+                props=row,
+                label=f"live PostHog readback '{validation_id}' {event_name}",
+                expected_session_id=expected_session_id,
+                expected_visitor_id=expected_visitor_id,
+                expected_click_id=expected_click_id,
+                expected_source_page_type=expected_source_page_type,
+                expected_from_stage="sales",
+                expected_to_stage=expected_to_stage,
+            )
+            _assert_props_include_expected_attribution_values(
+                props=row,
+                expected_campaign_id=expected_campaign_id,
+                expected_ad_id=expected_ad_id,
+                expected_fbclid=expected_fbclid,
+                label=f"live PostHog readback '{validation_id}' {event_name}",
+            )
+
+
+def _readback_array_prop(row: dict[str, Any], *keys: str) -> list[Any]:
+    for key in keys:
+        value = row.get(key)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, tuple):
+            return list(value)
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                continue
+            if cleaned.startswith("[") or cleaned.startswith("{"):
+                try:
+                    parsed = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    parsed = None
+                if isinstance(parsed, list):
+                    return parsed
+                if isinstance(parsed, dict):
+                    return [parsed]
+            return [cleaned]
+    return []
+
+
+def _assert_readback_non_empty_text(
+    *,
+    row: dict[str, Any],
+    keys: tuple[str, ...],
+    field_label: str,
+    label: str,
+) -> None:
+    if _readback_prop(row, *keys):
+        return
+    raise DeployError(
+        f"Post-deploy tracking validation failed for live PostHog readback {label}: "
+        f"'{field_label}' is missing."
+    )
+
+
+def _assert_readback_non_empty_array(
+    *,
+    row: dict[str, Any],
+    keys: tuple[str, ...],
+    field_label: str,
+    label: str,
+) -> list[Any]:
+    values = _readback_array_prop(row, *keys)
+    if values:
+        return values
+    raise DeployError(
+        f"Post-deploy tracking validation failed for live PostHog readback {label}: "
+        f"'{field_label}' is missing or empty."
+    )
+
+
+def _assert_quiz_answer_items_complete(*, answers: list[Any], label: str) -> None:
+    if not answers:
+        raise DeployError(
+            f"Post-deploy tracking validation failed for tracking payload {label}: "
+            "'answers' is missing or empty."
+        )
+    missing: list[str] = []
+    for index, answer in enumerate(answers):
+        if not isinstance(answer, dict):
+            missing.append(f"answers[{index}] must be an object")
+            continue
+        question_id = _first_tracking_prop(answer, "question_id", "questionId")
+        question_text = _first_tracking_prop(answer, "question_text", "questionText")
+        option_ids = _readback_array_prop(answer, "selected_option_ids", "selectedOptionIds")
+        option_texts = _readback_array_prop(answer, "selected_option_texts", "selectedOptionTexts")
+        if not question_id:
+            missing.append(f"answers[{index}].question_id")
+        if not question_text:
+            missing.append(f"answers[{index}].question_text")
+        if not option_ids:
+            missing.append(f"answers[{index}].selected_option_ids")
+        if not option_texts:
+            missing.append(f"answers[{index}].selected_option_texts")
+    if missing:
+        raise DeployError(
+            f"Post-deploy tracking validation failed for tracking payload {label}: "
+            "quiz answer payload is incomplete; missing " + ", ".join(missing) + "."
+        )
+
+
+def _assert_readback_quiz_attributes(
+    *,
+    rows: list[dict[str, Any]],
+    path_plan: dict[str, Any],
+    validation_id: str,
+) -> None:
+    if str(path_plan.get("tracking_validation_profile") or "").strip() != "quiz_presell":
+        return
+    for row in rows:
+        event_name = str(row.get("event") or "").strip()
+        if event_name not in {"presell_page_view", "EnteredPresales"}:
+            continue
+        label = f"'{validation_id}' {event_name}"
+        _assert_tracking_any_prop_present(
+            props=row,
+            key_groups=(("session_id", "sessionId"),),
+            field_label="session_id",
+            label=label,
+        )
+        _assert_tracking_any_prop_present(
+            props=row,
+            key_groups=(("visitor_id", "visitorId"), ("anonymous_id", "anonymousId")),
+            field_label="visitor_id/anonymous_id",
+            label=label,
+        )
+        _assert_tracking_prop_matches(
+            props=row,
+            keys=("source_page_type", "sourcePageType"),
+            field_label="source_page_type",
+            expected_value="quiz_presell",
+            label=label,
+        )
+
+    question_events = {"quiz_question_viewed", "QuizQuestionViewed"}
+    option_events = {
+        "quiz_option_presented",
+        "QuizOptionPresented",
+        "quiz_option_selected",
+        "QuizOptionSelected",
+    }
+    submitted_events = {"quiz_question_submitted", "QuizQuestionSubmitted"}
+    completed_events = {"quiz_completed", "QuizCompleted"}
+    for row in rows:
+        event_name = str(row.get("event") or "").strip()
+        label = f"'{validation_id}' {event_name}"
+        if event_name in question_events:
+            _assert_readback_non_empty_text(
+                row=row,
+                keys=("question_id", "questionId"),
+                field_label="question_id",
+                label=label,
+            )
+            _assert_readback_non_empty_text(
+                row=row,
+                keys=("question_text", "questionText"),
+                field_label="question_text",
+                label=label,
+            )
+        if event_name in option_events:
+            _assert_readback_non_empty_text(
+                row=row,
+                keys=("question_id", "questionId"),
+                field_label="question_id",
+                label=label,
+            )
+            _assert_readback_non_empty_text(
+                row=row,
+                keys=("question_text", "questionText"),
+                field_label="question_text",
+                label=label,
+            )
+            _assert_readback_non_empty_text(
+                row=row,
+                keys=("option_id", "optionId"),
+                field_label="option_id",
+                label=label,
+            )
+            _assert_readback_non_empty_text(
+                row=row,
+                keys=("option_text", "optionText"),
+                field_label="option_text",
+                label=label,
+            )
+        if event_name in {"quiz_option_selected", "QuizOptionSelected", *submitted_events}:
+            _assert_readback_non_empty_array(
+                row=row,
+                keys=("selected_option_ids", "selectedOptionIds"),
+                field_label="selected_option_ids",
+                label=label,
+            )
+            _assert_readback_non_empty_array(
+                row=row,
+                keys=("selected_option_texts", "selectedOptionTexts"),
+                field_label="selected_option_texts",
+                label=label,
+            )
+        if event_name in completed_events:
+            answers = _assert_readback_non_empty_array(
+                row=row,
+                keys=("answers",),
+                field_label="answers",
+                label=label,
+            )
+            _assert_quiz_answer_items_complete(answers=answers, label=label)
 
 
 def _readback_value_contains_screen_index(*, value: Any, screen_index: int) -> bool:
@@ -5458,9 +7849,7 @@ def _assert_posthog_readback_rows(
         if isinstance(row, dict) and str(row.get("event") or "").strip()
     ]
     missing_events = [
-        event_name
-        for event_name in required_events
-        if event_name and event_name not in event_names
+        event_name for event_name in required_events if event_name and event_name not in event_names
     ]
     if missing_events:
         raise DeployError(
@@ -5514,9 +7903,19 @@ def _assert_posthog_readback_rows(
             path_plan=path_plan,
             validation_id=validation_id,
         )
+        _assert_readback_sales_action_attributes(
+            rows=rows,
+            path_plan=path_plan,
+            validation_id=validation_id,
+        )
         _assert_readback_posthog_identity_continuity(
             rows=rows,
             required_events=required_events,
+            path_plan=path_plan,
+            validation_id=validation_id,
+        )
+        _assert_readback_quiz_attributes(
+            rows=rows,
             path_plan=path_plan,
             validation_id=validation_id,
         )
@@ -5550,11 +7949,16 @@ def _validate_posthog_live_readback(
     tracking = path_plan.get("tracking") if isinstance(path_plan, dict) else {}
     tracking_config = tracking if isinstance(tracking, dict) else {}
     ui_host = _resolve_posthog_readback_ui_host(tracking=tracking_config)
-    timeout_seconds = max(1.0, float(settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_TIMEOUT_SECONDS))
-    poll_seconds = max(0.5, float(settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_POLL_SECONDS))
+    timeout_seconds = max(
+        1.0, float(settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_TIMEOUT_SECONDS)
+    )
+    poll_seconds = max(
+        0.5, float(settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_POLL_SECONDS)
+    )
     deadline = time.monotonic() + timeout_seconds
     last_error: DeployError | None = None
     last_rows: list[dict[str, Any]] = []
+    passed_once = False
 
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         while True:
@@ -5563,6 +7967,7 @@ def _validate_posthog_live_readback(
                 ui_host=ui_host,
                 api_key=api_key,
                 validation_id=validation_id,
+                required_events=required_events,
             )
             last_rows = rows
             try:
@@ -5572,6 +7977,10 @@ def _validate_posthog_live_readback(
                     validation_id=validation_id,
                     path_plan=path_plan,
                 )
+                if not passed_once:
+                    passed_once = True
+                    time.sleep(_POSTHOG_READBACK_STABILIZATION_SECONDS)
+                    continue
                 return {
                     "validationId": validation_id,
                     "uiHost": ui_host,
@@ -5586,6 +7995,7 @@ def _validate_posthog_live_readback(
                 }
             except DeployError as exc:
                 last_error = exc
+                passed_once = False
                 if time.monotonic() >= deadline:
                     raise DeployError(
                         "Post-deploy tracking validation did not observe required live PostHog "
@@ -5615,22 +8025,56 @@ def _run_single_tracking_path_validation(
         "utm_campaign": validation_id,
         "utm_content": validation_id,
         "mos_deploy_validation_id": validation_id,
+        "campaign_id": validation_id,
+        "ad_id": validation_id,
         "fbclid": validation_id,
+        _HTML_DEPLOY_VALIDATION_CACHE_BUST_QUERY_PARAM: validation_id,
+        _HTML_DEPLOY_CDN_CACHE_BUST_QUERY_PARAM: validation_id,
     }
     candidate_release_id = str(path_plan.get("candidate_release_id") or "").strip()
     if candidate_release_id:
         validation_query_params[_HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM] = (
             _validate_html_deploy_candidate_release_id(candidate_release_id)
         )
-    paid_entry_url = _append_url_query_params(start_url, validation_query_params)
-    sales_entry_url = _append_url_query_params(sales_url, validation_query_params)
+    paid_entry_url = _append_url_query_params(
+        _html_deploy_no_trailing_slash_url(start_url),
+        validation_query_params,
+    )
+    sales_entry_url = _append_url_query_params(
+        _html_deploy_no_trailing_slash_url(sales_url),
+        validation_query_params,
+    )
+
+    def _candidate_scoped_current_url(current_url: str) -> str:
+        if not candidate_release_id:
+            return current_url
+        parsed = urlsplit(str(current_url or "").strip())
+        current_values = parse_qs(parsed.query, keep_blank_values=True).get(
+            _HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM
+        )
+        if current_values and current_values[-1] == candidate_release_id:
+            return current_url
+        return _append_url_query_params(
+            current_url,
+            {
+                _HTML_DEPLOY_CANDIDATE_RELEASE_QUERY_PARAM: candidate_release_id,
+                _HTML_DEPLOY_VALIDATION_CACHE_BUST_QUERY_PARAM: uuid4().hex,
+                _HTML_DEPLOY_CDN_CACHE_BUST_QUERY_PARAM: uuid4().hex,
+            },
+        )
+
     mock_checkout_url = f"{origin.rstrip('/')}/__mos_mock_checkout__/"
     checkout_request_re = re.compile(
         r".*/(?:api/)?public/checkout(?:/prepare(?:/[^/?]+(?:/consume)?)?)?(?:\?.*)?$"
     )
     forbidden_request_urls: list[str] = []
+    failed_resource_urls: list[str] = []
+    route_asset_escape_urls: list[str] = []
+    route_asset_prefixes = _html_deploy_route_asset_prefixes_for_path_plan(path_plan=path_plan)
     meta_pixel_responses: list[dict[str, Any]] = []
-    requires_live_posthog_readback = _tracking_path_requires_live_posthog_readback(path_plan=path_plan)
+    requires_live_posthog_readback = _tracking_path_requires_live_posthog_readback(
+        path_plan=path_plan
+    )
     expected_meta_events = [
         str(event_name or "").strip()
         for event_name in path_plan.get("expected_meta_events", [])
@@ -5639,15 +8083,24 @@ def _run_single_tracking_path_validation(
     require_meta_pixel_network_validation = bool(expected_meta_events) and (
         path_plan.get("require_meta_pixel_network_validation") is not False
     )
-    if requires_live_posthog_readback and not str(
-        settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY or ""
-    ).strip():
+    if (
+        requires_live_posthog_readback
+        and not str(settings.DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY or "").strip()
+    ):
         raise DeployError(
             "Post-deploy tracking validation requires live PostHog readback for html-deploy-v1, but "
             "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_API_KEY is not configured."
         )
 
-    context = browser.new_context(ignore_https_errors=True)
+    context = browser.new_context(
+        ignore_https_errors=True,
+        user_agent=(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        viewport={"width": 1280, "height": 720},
+    )
     try:
         if not requires_live_posthog_readback:
             context.route(
@@ -5693,6 +8146,7 @@ window.__mosPosthogArrayLoaded = true;
                 body="<html><body>mock checkout</body></html>",
             ),
         )
+
         def _fulfill_checkout_route(route: Any) -> None:
             request_url = str(getattr(getattr(route, "request", None), "url", "") or "")
             parsed_checkout_url = urlsplit(request_url)
@@ -5729,32 +8183,121 @@ window.__mosPosthogArrayLoaded = true;
                 body=json.dumps(payload),
             )
 
-        context.route("**/public/checkout*", _fulfill_checkout_route)
+        context.route("**/public/checkout**", _fulfill_checkout_route)
         context.add_init_script(_DEPLOY_TRACKING_VALIDATION_INIT_SCRIPT)
         page = context.new_page()
         if hasattr(page, "on"):
-            page.on(
-                "request",
-                lambda request: (
-                    forbidden_request_urls.append(str(request.url))
-                    if _find_html_deploy_forbidden_references(text=str(request.url))
-                    else None
-                ),
-            )
-            page.on(
-                "response",
-                lambda response: (
-                    meta_pixel_responses.append(
-                        {
-                            "url": str(response.url),
-                            "event": _meta_event_name_from_request_url(str(response.url)),
-                            "status": response.status,
-                        }
+
+            def _handle_tracking_validation_request(request: Any) -> None:
+                request_url = str(request.url)
+                if _find_html_deploy_forbidden_references(text=request_url):
+                    forbidden_request_urls.append(request_url)
+                resource_type = ""
+                try:
+                    resource_type_value = getattr(request, "resource_type", "")
+                    resource_type = (
+                        resource_type_value()
+                        if callable(resource_type_value)
+                        else resource_type_value
                     )
-                    if _is_meta_pixel_request_url(str(response.url))
-                    else None
-                ),
-            )
+                except Exception:
+                    resource_type = ""
+                resource_failure = _html_deploy_browser_resource_failure_message(
+                    origin=origin,
+                    request_url=request_url,
+                    resource_type=str(resource_type or ""),
+                    route_asset_prefixes=route_asset_prefixes,
+                )
+                if "outside route asset prefix" in resource_failure:
+                    route_asset_escape_urls.append(resource_failure)
+                if not _is_meta_pixel_request_url(request_url):
+                    return
+                post_data = ""
+                try:
+                    raw_post_data = getattr(request, "post_data", "")
+                    post_data = raw_post_data() if callable(raw_post_data) else raw_post_data
+                except Exception:
+                    post_data = ""
+                meta_pixel_responses.append(
+                    {
+                        "url": request_url,
+                        "event": _meta_event_name_from_request_url(request_url)
+                        or _meta_event_name_from_request_payload(str(post_data or "")),
+                        "status": None,
+                        "phase": "request",
+                    }
+                )
+
+            def _handle_tracking_validation_response(response: Any) -> None:
+                response_url = str(response.url)
+                resource_type = ""
+                try:
+                    request = response.request
+                    resource_type_value = getattr(request, "resource_type", "")
+                    resource_type = (
+                        resource_type_value()
+                        if callable(resource_type_value)
+                        else resource_type_value
+                    )
+                except Exception:
+                    resource_type = ""
+                resource_failure = _html_deploy_browser_resource_failure_message(
+                    origin=origin,
+                    request_url=response_url,
+                    resource_type=str(resource_type or ""),
+                    status=int(getattr(response, "status", 0) or 0),
+                    route_asset_prefixes=route_asset_prefixes,
+                )
+                if resource_failure:
+                    if "outside route asset prefix" in resource_failure:
+                        route_asset_escape_urls.append(resource_failure)
+                    else:
+                        failed_resource_urls.append(resource_failure)
+                if not _is_meta_pixel_request_url(response_url):
+                    return
+                meta_pixel_responses.append(
+                    {
+                        "url": response_url,
+                        "event": _meta_event_name_from_request_url(response_url),
+                        "status": response.status,
+                        "phase": "response",
+                    }
+                )
+
+            def _handle_tracking_validation_request_failed(request: Any) -> None:
+                resource_type = ""
+                try:
+                    resource_type_value = getattr(request, "resource_type", "")
+                    resource_type = (
+                        resource_type_value()
+                        if callable(resource_type_value)
+                        else resource_type_value
+                    )
+                except Exception:
+                    resource_type = ""
+                failure_text = ""
+                try:
+                    failure_value = getattr(request, "failure", "")
+                    failure_details = failure_value() if callable(failure_value) else failure_value
+                    if isinstance(failure_details, dict):
+                        failure_text = str(failure_details.get("errorText") or "")
+                    else:
+                        failure_text = str(failure_details or "")
+                except Exception:
+                    failure_text = ""
+                resource_failure = _html_deploy_browser_resource_failure_message(
+                    origin=origin,
+                    request_url=str(request.url),
+                    resource_type=str(resource_type or ""),
+                    failure=failure_text,
+                    route_asset_prefixes=route_asset_prefixes,
+                )
+                if resource_failure:
+                    failed_resource_urls.append(resource_failure)
+
+            page.on("request", _handle_tracking_validation_request)
+            page.on("response", _handle_tracking_validation_response)
+            page.on("requestfailed", _handle_tracking_validation_request_failed)
         page.goto(
             paid_entry_url,
             wait_until="domcontentloaded",
@@ -5762,24 +8305,29 @@ window.__mosPosthogArrayLoaded = true;
         )
         page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
         _exercise_tracking_page_view_targets(page=page)
+        quiz_interactions_exercised = False
         start_manifest = start_page.get("manifest")
         if str(start_page.get("html_artifact_kind") or "").strip().lower() == "quiz":
             if isinstance(start_manifest, dict):
                 _exercise_quiz_manifest_interactions(page=page, manifest=start_manifest)
-        if isinstance(start_manifest, dict):
-            _exercise_quiz_scroll_targets(
-                page=page,
-                manifest=start_manifest,
-                entry_url=paid_entry_url,
-            )
+                quiz_interactions_exercised = True
+        if isinstance(start_manifest, dict) and _exercise_quiz_scroll_targets(
+            page=page,
+            manifest=start_manifest,
+            entry_url=paid_entry_url,
+        ):
+            quiz_interactions_exercised = False
+        _wait_for_artifact_navigation_tracking_flush(page=page)
 
         if str(start_page.get("stage") or "").strip() != "sales":
             initial_state = _collect_tracking_validation_state(page=page)
-            initial_meta_event_names = _extract_recorded_event_names(
-                observed_events=(initial_state.get("meta") if isinstance(initial_state, dict) else []) or []
+            initial_meta_event_names = _extract_recorded_meta_event_names_for_validation(
+                observed_state=initial_state
             )
             _assert_sales_entry_meta_events_match_sales_loads(
-                internal_events=_extract_recorded_internal_event_names(observed_state=initial_state),
+                internal_events=_extract_recorded_internal_event_names(
+                    observed_state=initial_state
+                ),
                 meta_event_names=initial_meta_event_names,
                 context_label=start_url,
             )
@@ -5793,24 +8341,58 @@ window.__mosPosthogArrayLoaded = true;
         if pre_sales_selectors:
             target_path = urlsplit(sales_url).path
             errors: list[str] = []
-            for selector in pre_sales_selectors:
+            start_artifact_kind = str(start_page.get("html_artifact_kind") or "").strip().lower()
+            reuse_completed_quiz_state = (
+                quiz_interactions_exercised and start_artifact_kind == "quiz"
+            )
+            for selector_index, selector in enumerate(pre_sales_selectors):
                 try:
-                    page.goto(
-                        paid_entry_url,
-                        wait_until="domcontentloaded",
-                        timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
-                    )
-                    page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
-                    _exercise_tracking_page_view_targets(page=page)
-                    if str(start_page.get("html_artifact_kind") or "").strip().lower() == "quiz":
-                        start_manifest = start_page.get("manifest")
-                        if isinstance(start_manifest, dict):
-                            _exercise_quiz_manifest_interactions(page=page, manifest=start_manifest)
+                    if not (reuse_completed_quiz_state and selector_index == 0):
+                        page.goto(
+                            paid_entry_url,
+                            wait_until="domcontentloaded",
+                            timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+                        )
+                        page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+                        _exercise_tracking_page_view_targets(page=page)
+                        if start_artifact_kind == "quiz":
+                            start_manifest = start_page.get("manifest")
+                            if isinstance(start_manifest, dict):
+                                _exercise_quiz_manifest_interactions(
+                                    page=page, manifest=start_manifest
+                                )
+                    _wait_for_artifact_navigation_tracking_flush(page=page)
                     _activate_tracking_validation_target(page=page, selector=selector)
+                    _wait_for_internal_tracking_event(
+                        page=page,
+                        event_type="pre_sales_to_sales_click",
+                        timeout_ms=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+                        required=True,
+                    )
                     page.wait_for_url(
                         re.compile(re.escape(target_path)),
                         timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
                     )
+                    candidate_scoped_url = _candidate_scoped_current_url(page.url)
+                    if candidate_scoped_url != page.url:
+                        page.goto(
+                            candidate_scoped_url,
+                            wait_until="domcontentloaded",
+                            timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+                        )
+                    try:
+                        page.wait_for_load_state(
+                            "domcontentloaded",
+                            timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+                        )
+                    except Exception:
+                        pass
+                    _wait_for_tracking_runtime_ready(page=page)
+                    if "sales_page_view" in (path_plan.get("expected_internal_events") or []):
+                        _wait_for_internal_tracking_event(
+                            page=page,
+                            event_type="sales_page_view",
+                        )
                     _exercise_tracking_page_view_targets(page=page)
                     activated_pre_sales_selector = selector
                     break
@@ -5823,6 +8405,49 @@ window.__mosPosthogArrayLoaded = true;
                 )
 
         activated_checkout_selector = ""
+        activated_add_to_cart_selector = ""
+        add_to_cart_targets = [
+            target
+            for target in path_plan.get("add_to_cart_targets", [])
+            if isinstance(target, dict) and str(target.get("selector") or "").strip()
+        ]
+        if add_to_cart_targets:
+            add_to_cart_errors: list[str] = []
+            for target in add_to_cart_targets:
+                selector = str(target.get("selector") or "").strip()
+                try:
+                    if urlsplit(page.url).path != urlsplit(sales_url).path:
+                        page.goto(
+                            sales_entry_url,
+                            wait_until="domcontentloaded",
+                            timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+                        )
+                        page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+                    _wait_for_tracking_runtime_ready(page=page)
+                    if "sales_page_view" in (path_plan.get("expected_internal_events") or []):
+                        _wait_for_internal_tracking_event(
+                            page=page,
+                            event_type="sales_page_view",
+                        )
+                    _exercise_tracking_page_view_targets(page=page)
+                    _wait_for_tracking_target_bound(page=page, selector=selector)
+                    _activate_tracking_validation_target(page=page, selector=selector)
+                    _wait_for_internal_tracking_event(
+                        page=page,
+                        event_type=str(target.get("track_event_type") or "add_to_cart"),
+                        required=True,
+                    )
+                    page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+                    activated_add_to_cart_selector = selector
+                    break
+                except Exception as exc:
+                    add_to_cart_errors.append(f"{selector}: {exc}")
+            if not activated_add_to_cart_selector:
+                raise DeployError(
+                    "Post-deploy tracking validation could not activate add-to-cart with any declared selector: "
+                    + "; ".join(add_to_cart_errors)
+                )
+
         checkout_targets = [
             target
             for target in path_plan.get("checkout_targets", [])
@@ -5841,7 +8466,14 @@ window.__mosPosthogArrayLoaded = true;
                             timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
                         )
                         page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
+                    _wait_for_tracking_runtime_ready(page=page)
+                    if "sales_page_view" in (path_plan.get("expected_internal_events") or []):
+                        _wait_for_internal_tracking_event(
+                            page=page,
+                            event_type="sales_page_view",
+                        )
                     _exercise_tracking_page_view_targets(page=page)
+                    _wait_for_tracking_target_bound(page=page, selector=selector)
                     if mode == "external_checkout_url":
                         external_urls = [
                             str(url or "").strip()
@@ -5852,18 +8484,28 @@ window.__mosPosthogArrayLoaded = true;
                             raise DeployError(
                                 "External checkout binding has no configured external checkout URLs."
                             )
-                        for external_url in external_urls:
-                            context.route(
-                                external_url,
-                                lambda route: route.fulfill(
-                                    status=200,
-                                    content_type="text/html; charset=utf-8",
-                                    body="<html><body>mock external checkout</body></html>",
-                                ),
-                            )
+                        external_url_pattern = re.compile(
+                            "|".join(f"{re.escape(url)}(?:[&#].*)?" for url in external_urls)
+                        )
+                        context.route(
+                            external_url_pattern,
+                            lambda route: route.fulfill(
+                                status=200,
+                                content_type="text/html; charset=utf-8",
+                                body="<html><body>mock external checkout</body></html>",
+                            ),
+                        )
                         _activate_tracking_validation_target(page=page, selector=selector)
+                        _wait_for_internal_tracking_event(
+                            page=page,
+                            event_type=str(
+                                target.get("track_event_type") or "sales_to_checkout_click"
+                            ),
+                            timeout_ms=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
+                            required=True,
+                        )
                         page.wait_for_url(
-                            re.compile("|".join(re.escape(url) for url in external_urls)),
+                            external_url_pattern,
                             timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
                         )
                         page.goto(
@@ -5874,6 +8516,13 @@ window.__mosPosthogArrayLoaded = true;
                     else:
                         with page.expect_request(checkout_request_re):
                             _activate_tracking_validation_target(page=page, selector=selector)
+                        _wait_for_internal_tracking_event(
+                            page=page,
+                            event_type=str(
+                                target.get("track_event_type") or "sales_to_checkout_click"
+                            ),
+                            required=True,
+                        )
                     activated_checkout_selector = selector
                     break
                 except Exception as exc:
@@ -5888,13 +8537,17 @@ window.__mosPosthogArrayLoaded = true;
         _assert_no_html_deploy_forbidden_browser_references(
             page=page,
             forbidden_request_urls=forbidden_request_urls,
+            failed_resource_urls=failed_resource_urls,
+            route_asset_escape_urls=route_asset_escape_urls,
             context_label=start_url,
         )
         _wait_for_tracking_validation_state(page=page, path_plan=path_plan)
         page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
         _assert_meta_pixel_network_requests_succeeded(
             meta_pixel_responses=meta_pixel_responses,
-            expected_meta_events=expected_meta_events if require_meta_pixel_network_validation else [],
+            expected_meta_events=(
+                expected_meta_events if require_meta_pixel_network_validation else []
+            ),
             context_label=start_url,
         )
         posthog_readback = _validate_posthog_live_readback(
@@ -5906,6 +8559,7 @@ window.__mosPosthogArrayLoaded = true;
             "salesUrl": sales_url,
             "validationId": validation_id,
             "preSalesSelector": activated_pre_sales_selector or None,
+            "addToCartSelector": activated_add_to_cart_selector or None,
             "checkoutSelector": activated_checkout_selector or None,
             "posthogReadback": posthog_readback,
         }
@@ -5913,7 +8567,9 @@ window.__mosPosthogArrayLoaded = true;
         context.close()
 
 
-def _run_funnel_tracking_post_deploy_validation_sync(*, validation_plan: dict[str, Any]) -> list[dict[str, Any]]:
+def _run_funnel_tracking_post_deploy_validation_sync(
+    *, validation_plan: dict[str, Any]
+) -> list[dict[str, Any]]:
     from playwright.sync_api import sync_playwright
 
     _validate_deployed_tracking_html(validation_plan=validation_plan)
@@ -5924,7 +8580,9 @@ def _run_funnel_tracking_post_deploy_validation_sync(*, validation_plan: dict[st
 
     path_results: list[dict[str, Any]] = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
+        browser = playwright.chromium.launch(
+            args=["--disable-blink-features=AutomationControlled"],
+        )
         try:
             for path_plan in validation_plan.get("path_plans", []):
                 if not isinstance(path_plan, dict):
@@ -6018,6 +8676,36 @@ def hydrate_funnel_artifact_workload_patch(
     source_ref = workload_patch.get("source_ref")
     if not isinstance(source_ref, dict):
         raise DeployError("funnel_artifact workload patch is missing source_ref.")
+    release_metadata = (
+        source_ref.get("release_metadata")
+        if isinstance(source_ref.get("release_metadata"), dict)
+        else {}
+    )
+    raw_render_mode = str(source_ref.get("artifact_render_mode") or "").strip().lower()
+    included_funnel_ids = _normalize_release_metadata_string_set(
+        release_metadata=release_metadata,
+        key="htmlDeployIncludedFunnelIds",
+    )
+    if raw_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_HTML_DEPLOY and included_funnel_ids is None:
+        included_funnel_ids = {str(funnel_id)}
+    included_page_slugs_raw = _normalize_release_metadata_string_set(
+        release_metadata=release_metadata,
+        key="htmlDeployIncludedPageSlugs",
+    )
+    included_page_slugs = (
+        {value.lower() for value in included_page_slugs_raw}
+        if included_page_slugs_raw is not None
+        else None
+    )
+    included_page_stages_raw = _normalize_release_metadata_string_set(
+        release_metadata=release_metadata,
+        key="htmlDeployIncludedPageStages",
+    )
+    included_page_stages = (
+        {value.lower() for value in included_page_stages_raw}
+        if included_page_stages_raw is not None
+        else None
+    )
 
     artifact_ref = persist_client_funnel_runtime_artifact(
         session=session,
@@ -6025,15 +8713,22 @@ def hydrate_funnel_artifact_workload_patch(
         funnel_id=funnel_id,
         publication_id=publication_id,
         created_by_user_id=created_by_user_id,
+        included_funnel_ids=included_funnel_ids,
+        included_page_slugs=included_page_slugs,
+        included_page_stages=included_page_stages,
     )
-    from app.db.repositories.artifacts import ArtifactsRepository
+    artifact_payload = artifact_ref.get("artifact_payload")
+    if artifact_payload is None:
+        from app.db.repositories.artifacts import ArtifactsRepository
 
-    artifact_record = ArtifactsRepository(session).get(org_id=org_id, artifact_id=str(artifact_ref["artifact_id"]))
-    if artifact_record is None:
-        raise DeployError(
-            f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' could not be reloaded for deploy hydration."
+        artifact_record = ArtifactsRepository(session).get(
+            org_id=org_id, artifact_id=str(artifact_ref["artifact_id"])
         )
-    artifact_payload = artifact_record.data
+        if artifact_record is None:
+            raise DeployError(
+                f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' could not be reloaded for deploy hydration."
+            )
+        artifact_payload = artifact_record.data
     if not isinstance(artifact_payload, dict):
         raise DeployError(
             f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' has an invalid payload."
@@ -6042,7 +8737,7 @@ def hydrate_funnel_artifact_workload_patch(
     source_ref["client_id"] = str(artifact_ref["client_id"])
     source_ref["artifact_id"] = str(artifact_ref["artifact_id"])
     source_ref["artifact_version"] = int(artifact_ref["artifact_version"])
-    source_ref["artifact"] = copy.deepcopy(artifact_payload)
+    source_ref["artifact"] = artifact_payload
     workload_patch["source_ref"] = source_ref
     return workload_patch
 
@@ -6682,9 +9377,9 @@ def _normalize_legacy_artifact_source_ref_for_apply(*, workload: dict[str, Any])
         )
 
     explicit_render_mode = source_ref.get("artifact_render_mode")
-    raw_render_mode = str(
-        explicit_render_mode or _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
-    ).strip().lower()
+    raw_render_mode = (
+        str(explicit_render_mode or _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE).strip().lower()
+    )
     if raw_render_mode not in {
         _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
         _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML,
@@ -6772,7 +9467,10 @@ def _materialize_funnel_artifacts_for_apply(
     if not isinstance(instances, list):
         raise DeployError("Plan new_spec.instances must be a list.")
 
-    has_changes = False
+    has_changes = _scope_apply_plan_to_workloads(
+        plan=plan,
+        workload_names=workload_names,
+    )
     for inst in instances:
         if not isinstance(inst, dict):
             continue
@@ -6811,9 +9509,7 @@ def _materialize_funnel_artifacts_for_apply(
             if not raw_render_mode:
                 inferred_render_mode = (
                     _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
-                    if _artifact_payload_supports_html_deploy(
-                        artifact_payload=artifact_payload
-                    )
+                    if _artifact_payload_supports_html_deploy(artifact_payload=artifact_payload)
                     else _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
                 )
                 source_ref["artifact_render_mode"] = inferred_render_mode
@@ -6921,6 +9617,13 @@ async def _apply_plan_unlocked(
 
     # Run Cloudhand apply in a subprocess so we can stream/capture Terraform output.
     env = os.environ.copy()
+    backend_source_dir = str(_backend_source_dir())
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        f"{backend_source_dir}{os.pathsep}{existing_pythonpath}"
+        if existing_pythonpath
+        else backend_source_dir
+    )
     project_id = settings.DEPLOY_PROJECT_ID
     terraform_bin = _resolve_terraform_bin()
 
@@ -8148,7 +10851,9 @@ def _validate_html_deploy_data_image(*, raw_url: str) -> None:
     try:
         base64.b64decode(payload, validate=True)
     except Exception as exc:
-        raise DeployError("HTML deploy image preflight found an invalid base64 data image URL.") from exc
+        raise DeployError(
+            "HTML deploy image preflight found an invalid base64 data image URL."
+        ) from exc
 
 
 def _infer_html_deploy_image_content_type(*, route_path: str, hinted_content_type: str) -> str:
@@ -8166,7 +10871,9 @@ def _validate_html_deploy_image_payload(
     content_type: str,
 ) -> None:
     if not payload:
-        raise DeployError(f"HTML deploy image preflight found empty image bytes for '{route_path}'.")
+        raise DeployError(
+            f"HTML deploy image preflight found empty image bytes for '{route_path}'."
+        )
     normalized_content_type = _infer_html_deploy_image_content_type(
         route_path=route_path,
         hinted_content_type=content_type,
@@ -8179,9 +10886,13 @@ def _validate_html_deploy_image_payload(
         try:
             decoded = payload[:4096].decode("utf-8", errors="ignore").lower()
         except Exception as exc:
-            raise DeployError(f"HTML deploy image preflight could not decode SVG '{route_path}'.") from exc
+            raise DeployError(
+                f"HTML deploy image preflight could not decode SVG '{route_path}'."
+            ) from exc
         if "<svg" not in decoded:
-            raise DeployError(f"HTML deploy image preflight could not validate SVG bytes for '{route_path}'.")
+            raise DeployError(
+                f"HTML deploy image preflight could not validate SVG bytes for '{route_path}'."
+            )
         return
 
     from PIL import Image
@@ -8192,7 +10903,9 @@ def _validate_html_deploy_image_payload(
         with Image.open(io.BytesIO(payload)) as image:
             width, height = image.size
     except Exception as exc:
-        raise DeployError(f"HTML deploy image preflight could not decode image '{route_path}': {exc}") from exc
+        raise DeployError(
+            f"HTML deploy image preflight could not decode image '{route_path}': {exc}"
+        ) from exc
     if width <= 0 or height <= 0:
         raise DeployError(
             f"HTML deploy image preflight found invalid image dimensions for '{route_path}': {width}x{height}."
@@ -8233,7 +10946,9 @@ def _validate_standalone_html_image_references(
     upstream_api_base_root: str,
 ) -> None:
     if not uploaded_html_files:
-        raise DeployError("HTML deploy image preflight did not generate any HTML routes to validate.")
+        raise DeployError(
+            "HTML deploy image preflight did not generate any HTML routes to validate."
+        )
 
     expected_hosts = _html_deploy_expected_image_hosts(
         public_server_names=public_server_names,
@@ -8311,7 +11026,9 @@ def _validate_standalone_funnel_artifact_preflight(*, workload_patch: dict[str, 
     try:
         app = ApplicationSpec.model_validate(workload_patch)
     except Exception as exc:  # pragma: no cover
-        raise DeployError(f"Standalone preflight could not parse the workload patch: {exc}") from exc
+        raise DeployError(
+            f"Standalone preflight could not parse the workload patch: {exc}"
+        ) from exc
 
     if app.source_type != ApplicationSourceType.FUNNEL_ARTIFACT:
         return
@@ -8344,10 +11061,9 @@ def _validate_standalone_funnel_artifact_preflight(*, workload_patch: dict[str, 
     standalone_served_assets: dict[str, Any] = {}
     standalone_image_sources: dict[str, Any] = {}
     site_dir = "/tmp/mos-standalone-preflight"
-    public_server_names = (
-        deployer._normalize_server_names(app.workspace_server_names)
-        or deployer._normalize_server_names(app.service_config.server_names)
-    )
+    public_server_names = deployer._normalize_server_names(
+        app.workspace_server_names
+    ) or deployer._normalize_server_names(app.service_config.server_names)
 
     try:
         deployer._write_funnel_artifact_assets(
@@ -8453,6 +11169,103 @@ def _activate_html_deploy_candidate_release(
     }
 
 
+def _hydrate_funnel_artifact_workload_patch_isolated(
+    *,
+    org_id: str,
+    funnel_id: str,
+    publication_id: str,
+    workload_patch: dict[str, Any],
+    created_by_user_id: str | None,
+) -> dict[str, Any]:
+    from app.db.base import SessionLocal
+
+    session = SessionLocal()
+    try:
+        return hydrate_funnel_artifact_workload_patch(
+            session=session,
+            org_id=org_id,
+            funnel_id=funnel_id,
+            publication_id=publication_id,
+            workload_patch=workload_patch,
+            created_by_user_id=created_by_user_id,
+        )
+    finally:
+        session.close()
+
+
+def _snapshot_funnel_publication_state_isolated(
+    *,
+    org_id: str,
+    funnel_id: str,
+) -> dict[str, Any]:
+    from app.db.base import SessionLocal
+    from app.db.models import Funnel
+
+    session = SessionLocal()
+    try:
+        funnel = session.scalars(
+            select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)
+        ).first()
+        if funnel is None:
+            return {}
+        status_value = getattr(funnel.status, "value", None)
+        return {
+            "activePublicationId": str(funnel.active_publication_id or "").strip(),
+            "status": str(status_value or funnel.status or "").strip(),
+        }
+    finally:
+        session.close()
+
+
+def _restore_funnel_publication_state_isolated(
+    *,
+    org_id: str,
+    funnel_id: str,
+    failed_publication_id: str,
+    previous_state: dict[str, Any],
+) -> dict[str, Any]:
+    from app.db.base import SessionLocal
+    from app.db.enums import FunnelStatusEnum
+    from app.db.models import Funnel
+
+    normalized_failed_publication_id = str(failed_publication_id or "").strip()
+    previous_active_publication_id = str(
+        (previous_state or {}).get("activePublicationId") or ""
+    ).strip()
+    previous_status = str((previous_state or {}).get("status") or "").strip()
+    if not normalized_failed_publication_id:
+        return {"status": "skipped", "reason": "missing_failed_publication_id"}
+
+    session = SessionLocal()
+    try:
+        funnel = session.scalars(
+            select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)
+        ).first()
+        if funnel is None:
+            return {"status": "skipped", "reason": "funnel_not_found"}
+
+        current_active_publication_id = str(funnel.active_publication_id or "").strip()
+        if current_active_publication_id != normalized_failed_publication_id:
+            return {
+                "status": "skipped",
+                "reason": "active_publication_changed",
+                "currentActivePublicationId": current_active_publication_id or None,
+                "failedPublicationId": normalized_failed_publication_id,
+            }
+
+        funnel.active_publication_id = previous_active_publication_id or None
+        if previous_status:
+            funnel.status = FunnelStatusEnum(previous_status)
+        session.commit()
+        return {
+            "status": "restored",
+            "previousActivePublicationId": previous_active_publication_id or None,
+            "failedPublicationId": normalized_failed_publication_id,
+        }
+    finally:
+        session.close()
+
+
 async def _run_apply_plan_job(job_id: str) -> None:
     job = _read_job(job_id)
     path = _job_path(job_id)
@@ -8523,7 +11336,31 @@ async def _run_funnel_publish_job(job_id: str) -> None:
     hydrated_artifact_render_mode = ""
     publication_id = ""
     html_deploy_candidate_release_id = ""
+    html_deploy_candidate_activated = False
+    previous_publication_state: dict[str, Any] = {}
     deploy_lock_stack: ExitStack | None = None
+
+    async def _restore_failed_candidate_publication() -> dict[str, Any] | None:
+        if (
+            not publication_id
+            or not html_deploy_candidate_release_id
+            or html_deploy_candidate_activated
+        ):
+            return None
+        try:
+            return await asyncio.to_thread(
+                _restore_funnel_publication_state_isolated,
+                org_id=org_id,
+                funnel_id=funnel_id,
+                failed_publication_id=publication_id,
+                previous_state=previous_publication_state,
+            )
+        except Exception as exc:  # pragma: no cover - defensive rollback reporting
+            return {
+                "status": "failed",
+                "failedPublicationId": publication_id,
+                "error": str(exc),
+            }
 
     if not org_id or not user_id or not funnel_id:
         job["status"] = "failed"
@@ -8535,6 +11372,12 @@ async def _run_funnel_publish_job(job_id: str) -> None:
     try:
         session = SessionLocal()
         try:
+            if deploy_request is not None:
+                previous_publication_state = await asyncio.to_thread(
+                    _snapshot_funnel_publication_state_isolated,
+                    org_id=org_id,
+                    funnel_id=funnel_id,
+                )
             publication = publish_funnel(
                 session=session, org_id=org_id, user_id=user_id, funnel_id=funnel_id
             )
@@ -8552,14 +11395,25 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                 if not isinstance(workload_patch, dict):
                     raise DeployError("Publish deploy request is missing workload_patch.")
 
-                workload_patch = hydrate_funnel_artifact_workload_patch(
-                    session=session,
-                    org_id=org_id,
-                    funnel_id=funnel_id,
-                    publication_id=str(publication.id),
-                    workload_patch=workload_patch,
-                    created_by_user_id=user_id,
-                )
+                job["phase"] = "artifact_hydrating"
+                _write_json_atomic(path, job)
+                try:
+                    workload_patch = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            _hydrate_funnel_artifact_workload_patch_isolated,
+                            org_id=org_id,
+                            funnel_id=funnel_id,
+                            publication_id=str(publication.id),
+                            workload_patch=workload_patch,
+                            created_by_user_id=user_id,
+                        ),
+                        timeout=_FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS,
+                    )
+                except asyncio.TimeoutError as exc:
+                    raise DeployError(
+                        "Funnel artifact hydration timed out after "
+                        f"{_FUNNEL_PUBLISH_ARTIFACT_HYDRATION_TIMEOUT_SECONDS} seconds."
+                    ) from exc
 
                 hydrated_source_ref = workload_patch.get("source_ref")
                 if isinstance(hydrated_source_ref, dict):
@@ -8570,9 +11424,13 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         raise DeployError(
                             "Hydrated funnel deploy workload is missing source_ref.artifact_id."
                         )
-                    artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
-                        artifact_id=artifact_id
-                    )
+                    inline_artifact_payload = hydrated_source_ref.get("artifact")
+                    if isinstance(inline_artifact_payload, dict):
+                        artifact_payload = inline_artifact_payload
+                    else:
+                        artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
+                            artifact_id=artifact_id
+                        )
                     hydrated_artifact_payload = artifact_payload
                     workload_patch = _apply_publish_job_artifact_render_mode(
                         workload_patch=workload_patch,
@@ -8630,7 +11488,10 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     job["result"] = result_payload
                     job["phase"] = "artifact_hydrated"
                     _write_json_atomic(path, job)
-                    if resolved_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+                    if (
+                        resolved_render_mode
+                        == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
+                    ):
                         job["phase"] = "preflighting_standalone"
                         _write_json_atomic(path, job)
                         await asyncio.to_thread(
@@ -8683,9 +11544,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                 if apply_plan_enabled:
                     workload_name = str(workload_patch.get("name") or "").strip()
                     if not workload_name:
-                        raise DeployError(
-                            "Publish deploy workload patch is missing workload name."
-                        )
+                        raise DeployError("Publish deploy workload patch is missing workload name.")
                     job["phase"] = "applying_plan"
                     _write_json_atomic(path, job)
                     apply_result = await apply_plan(
@@ -8696,6 +11555,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     deploy_response["apply"] = summary
                     if return_code != 0:
                         result_payload["deploy"] = deploy_response
+                        rollback_result = await _restore_failed_candidate_publication()
+                        if rollback_result is not None:
+                            result_payload["publicationRollback"] = rollback_result
                         job["result"] = result_payload
                         job["access_urls"] = access_urls
                         job["status"] = "failed"
@@ -8730,13 +11592,15 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         job["phase"] = "validating_html_deploy_candidate"
                         job["result"] = result_payload
                         _write_json_atomic(path, job)
-                        html_deploy_validation_report = await _run_funnel_tracking_post_deploy_validation(
-                            artifact_payload=hydrated_artifact_payload,
-                            funnel_id=funnel_id,
-                            publication_id=publication_id,
-                            access_urls=access_urls,
-                            render_mode=hydrated_artifact_render_mode,
-                            candidate_release_id=html_deploy_candidate_release_id,
+                        html_deploy_validation_report = (
+                            await _run_funnel_tracking_post_deploy_validation(
+                                artifact_payload=hydrated_artifact_payload,
+                                funnel_id=funnel_id,
+                                publication_id=publication_id,
+                                access_urls=access_urls,
+                                render_mode=hydrated_artifact_render_mode,
+                                candidate_release_id=html_deploy_candidate_release_id,
+                            )
                         )
                         deploy_response["candidateTrackingValidation"] = (
                             html_deploy_validation_report
@@ -8755,6 +11619,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                             server_ips=summary.get("server_ips") or {},
                             instance_name=deploy_request.get("instance_name"),
                         )
+                        html_deploy_candidate_activated = True
 
                 if bool(deploy_request.get("bunny_pull_zone", False)):
                     job["phase"] = "reconciling_bunny"
@@ -8790,7 +11655,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     else:
                         bunny_access_urls = []
                     if not isinstance(bunny_pull_zone_payload, dict):
-                        raise DeployError("Publish deploy Bunny pull zone payload must be an object.")
+                        raise DeployError(
+                            "Publish deploy Bunny pull zone payload must be an object."
+                        )
                     try:
                         bunny_zone_id = int(bunny_pull_zone_payload.get("id"))
                     except (TypeError, ValueError) as exc:
@@ -8836,12 +11703,14 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     job["phase"] = "validating_tracking"
                     job["result"] = result_payload
                     _write_json_atomic(path, job)
-                    html_deploy_validation_report = await _run_funnel_tracking_post_deploy_validation(
-                        artifact_payload=hydrated_artifact_payload,
-                        funnel_id=funnel_id,
-                        publication_id=publication_id,
-                        access_urls=access_urls,
-                        render_mode=hydrated_artifact_render_mode,
+                    html_deploy_validation_report = (
+                        await _run_funnel_tracking_post_deploy_validation(
+                            artifact_payload=hydrated_artifact_payload,
+                            funnel_id=funnel_id,
+                            publication_id=publication_id,
+                            access_urls=access_urls,
+                            render_mode=hydrated_artifact_render_mode,
+                        )
                     )
                     deploy_response["trackingValidation"] = html_deploy_validation_report
                     deploy_response["htmlDeployValidationReport"] = html_deploy_validation_report
@@ -8860,18 +11729,27 @@ async def _run_funnel_publish_job(job_id: str) -> None:
     except ValueError as exc:
         job["status"] = "failed"
         job["error"] = str(exc)
+        rollback_result = await _restore_failed_candidate_publication()
+        if rollback_result is not None:
+            result_payload["publicationRollback"] = rollback_result
         if result_payload:
             job["result"] = result_payload
         job["access_urls"] = access_urls
     except DeployError as exc:
         job["status"] = "failed"
         job["error"] = str(exc)
+        rollback_result = await _restore_failed_candidate_publication()
+        if rollback_result is not None:
+            result_payload["publicationRollback"] = rollback_result
         if result_payload:
             job["result"] = result_payload
         job["access_urls"] = access_urls
     except Exception as exc:  # pragma: no cover - defensive
         job["status"] = "failed"
         job["error"] = f"Unexpected publish/deploy failure: {exc}"
+        rollback_result = await _restore_failed_candidate_publication()
+        if rollback_result is not None:
+            result_payload["publicationRollback"] = rollback_result
         if result_payload:
             job["result"] = result_payload
         job["access_urls"] = access_urls

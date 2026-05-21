@@ -106,21 +106,34 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
     ]);
   });
 
-  it("maps sales checkout clicks with a variant to AddToCart and a checkout click", () => {
+  it("maps bundled add-to-cart purchase intent to one Meta AddToCart event", () => {
+    expect(
+      mapRuntimeEventToMetaPixelEvents({
+        eventType: "add_to_cart",
+        props: {
+          content_ids: ["supplement-subscription", "book", "caddy"],
+          num_items: 3,
+        },
+      }),
+    ).toEqual([
+      {
+        eventName: "AddToCart",
+        params: {
+          content_ids: ["supplement-subscription", "book", "caddy"],
+          content_type: "product",
+          num_items: 3,
+        },
+      },
+    ]);
+  });
+
+  it("maps sales checkout clicks to checkout events without AddToCart", () => {
     expect(
       mapRuntimeEventToMetaPixelEvents({
         eventType: "sales_to_checkout_click",
         props: { variantId: "variant_123" },
       }),
     ).toEqual([
-      {
-        eventName: "AddToCart",
-        params: {
-          content_ids: ["variant_123"],
-          content_type: "product",
-          num_items: 1,
-        },
-      },
       {
         eventName: "SalesToCheckoutClick",
         method: "trackCustom",

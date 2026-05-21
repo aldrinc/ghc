@@ -241,6 +241,8 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
             "fbc": "fb.1.1710000001.fb-click-123",
             "eventSourceUrl": "https://funnel.example/sales?utm_source=meta&fbclid=fb-click-123",
             "transitionId": "checkout-transition-123",
+            "mosMetaAddToCartEventId": "mos-meta-atc-123",
+            "mosMetaInitiateCheckoutEventId": "checkout_started:checkout-transition-123",
         },
     )
 
@@ -264,6 +266,8 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     assert metadata["fbc"] == "fb.1.1710000001.fb-click-123"
     assert metadata["event_source_url"] == "https://funnel.example/sales?utm_source=meta&fbclid=fb-click-123"
     assert metadata["transition_id"] == "checkout-transition-123"
+    assert metadata["mos_meta_add_to_cart_event_id"] == "mos-meta-atc-123"
+    assert metadata["mos_meta_initiate_checkout_event_id"] == "checkout_started:checkout-transition-123"
     assert "url_params" not in metadata
 
 
@@ -443,6 +447,9 @@ def test_public_checkout_persists_checkout_started_event(
             "visitorId": "visitor_123",
             "sessionId": "session_123",
             "utm": {"source": "test"},
+            "transitionId": "checkout-transition-123",
+            "mosMetaAddToCartEventId": "mos-meta-atc-123",
+            "mosMetaInitiateCheckoutEventId": "checkout_started:checkout-transition-123",
         },
     )
 
@@ -463,6 +470,9 @@ def test_public_checkout_persists_checkout_started_event(
     assert event.props["provider"] == "shopify"
     assert event.props["checkout_session_id"] == "gid://shopify/Cart/example"
     assert event.props["variant_id"] == str(seeded["variant"].id)
+    assert event.props["transition_id"] == "checkout-transition-123"
+    assert event.props["mos_meta_add_to_cart_event_id"] == "mos-meta-atc-123"
+    assert event.props["mos_meta_initiate_checkout_event_id"] == "checkout_started:checkout-transition-123"
 
 
 def test_prepared_public_checkout_reuses_prepared_cart_and_tracks_on_consume(
@@ -497,6 +507,9 @@ def test_prepared_public_checkout_reuses_prepared_cart_and_tracks_on_consume(
         "visitorId": "visitor_123",
         "sessionId": "session_123",
         "utm": {"source": "test"},
+        "transitionId": "checkout-transition-prepared-123",
+        "mosMetaAddToCartEventId": "mos-meta-atc-prepared-123",
+        "mosMetaInitiateCheckoutEventId": "checkout_started:checkout-transition-prepared-123",
     }
 
     prepare_response = api_client.post("/public/checkout/prepare", json=payload)
@@ -515,6 +528,11 @@ def test_prepared_public_checkout_reuses_prepared_cart_and_tracks_on_consume(
     assert prepared_record.checkout_session_id == "gid://shopify/Cart/prepared"
     assert prepared_record.consumed_at is None
     assert len(observed) == 1
+    assert observed[0]["metadata"]["mos_meta_add_to_cart_event_id"] == "mos-meta-atc-prepared-123"
+    assert (
+        observed[0]["metadata"]["mos_meta_initiate_checkout_event_id"]
+        == "checkout_started:checkout-transition-prepared-123"
+    )
 
     existing_event = db_session.scalars(
         select(FunnelEvent).where(
@@ -555,6 +573,12 @@ def test_prepared_public_checkout_reuses_prepared_cart_and_tracks_on_consume(
     assert event.props["provider"] == "shopify"
     assert event.props["checkout_session_id"] == "gid://shopify/Cart/prepared"
     assert event.props["variant_id"] == str(seeded["variant"].id)
+    assert event.props["transition_id"] == "checkout-transition-prepared-123"
+    assert event.props["mos_meta_add_to_cart_event_id"] == "mos-meta-atc-prepared-123"
+    assert (
+        event.props["mos_meta_initiate_checkout_event_id"]
+        == "checkout_started:checkout-transition-prepared-123"
+    )
 
 
 def test_prepared_public_checkout_routes_shopify_subscription_by_purchase_mode(

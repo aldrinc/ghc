@@ -20,6 +20,11 @@ function cleanText(value: unknown): string | null {
   return trimmed || null;
 }
 
+function cleanStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => cleanText(item)).filter(Boolean) as string[];
+}
+
 function randomEventIdSegment(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -81,14 +86,22 @@ function pageViewParams(event: RuntimeTrackingEventLike) {
 }
 
 function checkoutParams(event: RuntimeTrackingEvent) {
+  const explicitContentIds = cleanStringArray(event.props?.content_ids || event.props?.contentIds);
+  const variantId =
+    cleanText(event.props?.variantId) ||
+    cleanText(event.props?.variant_id) ||
+    cleanText(event.props?.contentId) ||
+    cleanText(event.props?.content_id);
+  const contentIds = explicitContentIds.length ? explicitContentIds : (variantId ? [variantId] : []);
+  const explicitNumItems = Number(event.props?.num_items || event.props?.numItems);
   const params: Record<string, unknown> = {
     content_type: "product",
-    num_items: 1,
+    num_items: Number.isFinite(explicitNumItems) && explicitNumItems > 0
+      ? explicitNumItems
+      : Math.max(1, contentIds.length || 1),
   };
-  const variantId =
-    typeof event.props?.variantId === "string" ? event.props.variantId.trim() : "";
-  if (variantId) {
-    params.content_ids = [variantId];
+  if (contentIds.length) {
+    params.content_ids = contentIds;
   }
   return params;
 }
@@ -138,21 +151,7 @@ export function mapRuntimeEventToMetaPixelEvents(
     return [{ eventName: "AddToCart", params: checkoutParams(event as RuntimeTrackingEvent) }];
   }
   if (event.eventType === "sales_to_checkout_click") {
-    const variantId =
-      typeof event.props?.variantId === "string" ? event.props.variantId.trim() : "";
     return [
-      ...(variantId
-        ? [
-            {
-              eventName: "AddToCart",
-              params: {
-                content_ids: [variantId],
-                content_type: "product",
-                num_items: 1,
-              },
-            },
-          ]
-        : []),
       {
         eventName: "SalesToCheckoutClick",
         method: "trackCustom",

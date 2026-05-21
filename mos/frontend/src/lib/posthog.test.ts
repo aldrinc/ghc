@@ -131,7 +131,7 @@ describe("capturePostHogEvent", () => {
     );
   });
 
-  it("maps checkout clicks to AddToCart and the checkout transition event", () => {
+  it("maps checkout clicks to checkout transition events without AddToCart", () => {
     capturePostHogEvent({
       tracking,
       distinctId: "visitor-1",
@@ -157,17 +157,6 @@ describe("capturePostHogEvent", () => {
       expect.arrayContaining([
         [
           "capture",
-          "AddToCart",
-          expect.objectContaining({
-            internal_event_type: "sales_to_checkout_click",
-            content_ids: ["variant-123"],
-            content_type: "product",
-            num_items: 1,
-            $event_id: expect.any(String),
-          }),
-        ],
-        [
-          "capture",
           "SalesToCheckoutClick",
           expect.objectContaining({
             internal_event_type: "sales_to_checkout_click",
@@ -184,6 +173,17 @@ describe("capturePostHogEvent", () => {
             from_stage: "sales",
             to_stage: "checkout",
             $event_id: expect.any(String),
+          }),
+        ],
+      ]),
+    );
+    expect(posthogRoot.mosFunnel).not.toEqual(
+      expect.arrayContaining([
+        [
+          "capture",
+          "AddToCart",
+          expect.objectContaining({
+            internal_event_type: "sales_to_checkout_click",
           }),
         ],
       ]),
