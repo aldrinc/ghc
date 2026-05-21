@@ -27,6 +27,28 @@ from cloudhand.models import ApplicationSpec
 from cloudhand.models import FunnelArtifactRenderMode
 
 
+def _enable_html_deploy_optimization(monkeypatch):
+    monkeypatch.setattr(deployer_module, "_STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION", True)
+
+
+def _set_imported_html_page_stage(
+    app: ApplicationSpec,
+    *,
+    stage: str,
+    artifact_kind: str | None = None,
+) -> None:
+    page_payload = app.source_ref.artifact["products"]["example-product"]["funnels"][
+        "example-funnel"
+    ]["pages"]["presales"]
+    page_payload["stage"] = stage
+    page_payload["pageStageMap"] = {"page-1": stage}
+    imported_block = page_payload["puckData"]["content"][0]
+    manifest = imported_block["props"]["instrumentationManifest"]
+    manifest["pageStage"] = stage
+    if artifact_kind:
+        manifest["htmlArtifactKind"] = artifact_kind
+
+
 def _make_png_bytes(*, width: int, height: int, color: tuple[int, int, int, int]) -> bytes:
     buffer = io.BytesIO()
     Image.new("RGBA", (width, height), color).save(buffer, format="PNG")
@@ -838,7 +860,8 @@ def test_funnel_artifact_site_proxies_live_api_and_keeps_bundle_routes():
     assert "systemctl reload nginx" in commands
 
 
-def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle():
+def test_funnel_artifact_site_exports_html_deploy_without_runtime_bundle(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <head>
@@ -1024,6 +1047,7 @@ def test_html_deploy_bridge_preserves_checkout_loading_visual_contract():
 </html>
 """
     app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    _set_imported_html_page_stage(app, stage="pre_sales", artifact_kind="listicle")
     deployer, uploaded, _commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -1558,6 +1582,7 @@ def test_activate_funnel_artifact_candidate_release_promotes_named_release():
 
 
 def test_html_deploy_rewrites_upstream_public_asset_urls_to_artifact_assets(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
@@ -1784,6 +1809,7 @@ def test_html_deploy_bridge_augments_checkout_selection_with_purchase_mode():
 </html>
 """
     app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    _set_imported_html_page_stage(app, stage="pre_sales", artifact_kind="listicle")
     deployer, uploaded, _commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -1799,15 +1825,16 @@ def test_html_deploy_bridge_augments_checkout_selection_with_purchase_mode():
 
 
 def test_html_deploy_local_relative_image_assets_are_written(monkeypatch, tmp_path):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <body>
-    <img src="public/assets/generated/chart.jpg" alt="Chart">
+    <img src="assets/generated/chart.jpg" alt="Chart">
     <a id="main-cta" href="#shop">Start my protocol</a>
   </body>
 </html>
 """
-    asset_root = tmp_path / "public" / "assets" / "generated"
+    asset_root = tmp_path / "assets" / "generated"
     asset_root.mkdir(parents=True, exist_ok=True)
     asset_path = asset_root / "chart.jpg"
     asset_path.write_bytes(_make_jpeg_bytes(width=1200, height=800, color=(201, 20, 35)))
@@ -1819,6 +1846,7 @@ def test_html_deploy_local_relative_image_assets_are_written(monkeypatch, tmp_pa
     )
 
     app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    _set_imported_html_page_stage(app, stage="pre_sales", artifact_kind="listicle")
     deployer, uploaded, _commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
@@ -2333,6 +2361,7 @@ def test_funnel_artifact_site_mirrors_non_canonical_public_asset_urls_locally(mo
 
 
 def test_funnel_artifact_site_mirrors_extensionless_absolute_img_urls(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -2370,6 +2399,7 @@ def test_funnel_artifact_site_mirrors_extensionless_absolute_img_urls(monkeypatc
 
 
 def test_funnel_artifact_site_prioritizes_large_hero_image_over_decorative_icons(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <head>
@@ -2497,6 +2527,7 @@ def test_standalone_image_source_uses_actual_image_format_for_mismatched_content
 
 
 def test_funnel_artifact_site_rewrites_tiny_reused_image_routes_when_safe(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -2507,6 +2538,7 @@ def test_funnel_artifact_site_rewrites_tiny_reused_image_routes_when_safe(monkey
 </html>
 """
     app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    _set_imported_html_page_stage(app, stage="pre_sales", artifact_kind="listicle")
     deployer, uploaded, _commands = _stub_deployer()
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 1)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
@@ -2527,12 +2559,13 @@ def test_funnel_artifact_site_rewrites_tiny_reused_image_routes_when_safe(monkey
     entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
     entry_html = uploaded[entry_route_path]
 
-    assert "tiny-w96.png" in entry_html
-    assert entry_html.count("tiny-w96.png") == 2
+    assert "tiny-w96.webp" in entry_html
+    assert entry_html.count("tiny-w96.webp") == 2
     assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
 
 
 def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_safe(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -2542,6 +2575,7 @@ def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_sa
 </html>
 """
     app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    _set_imported_html_page_stage(app, stage="pre_sales", artifact_kind="listicle")
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
     app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
         "contentType": "image/jpeg",
@@ -2600,6 +2634,7 @@ def test_normalize_remote_standalone_fetch_url_downgrades_legacy_public_asset_ho
 
 
 def test_presales_responsive_rewrites_emit_webp_variants(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -2649,6 +2684,7 @@ def test_presales_responsive_rewrites_emit_webp_variants(monkeypatch):
 
 
 def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -2658,6 +2694,7 @@ def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
 </html>
 """
     app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    _set_imported_html_page_stage(app, stage="pre_sales", artifact_kind="listicle")
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
     app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
         "contentType": "image/jpeg",
@@ -2668,6 +2705,7 @@ def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 1)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
+    monkeypatch.setattr(deployer_module, "_is_presales_stage", lambda _page_stage: False)
     monkeypatch.setattr(
         deployer,
         "_measure_html_deploy_image_layouts",
@@ -2697,6 +2735,7 @@ def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
 
 
 def test_image_rewrites_revert_to_baseline_when_visual_parity_fails(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -2825,6 +2864,7 @@ def test_build_standalone_render_optimization_css_targets_sales_and_presales():
 
 
 def test_funnel_artifact_site_injects_render_optimization_styles(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
     html_document = """<!DOCTYPE html>
 <html>
   <head>
@@ -3466,7 +3506,7 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
     assert any(cmd.startswith("python3 /tmp/cloudhand-runtime-config-") for cmd in commands)
     assert any(cmd.startswith("rm -f /tmp/cloudhand-runtime-config-") for cmd in commands)
     assert '"defaultProductSlug":"example-product"' in runtime_block
-    assert '"defaultFunnelSlug":"f85405a4"' in runtime_block
+    assert '"defaultFunnelSlug":"example-funnel"' in runtime_block
     assert '"defaultEntrySlug":"presales"' in runtime_block
     assert "raw = raw.replace" in runtime_inject_script
     assert '<script type="module"' in runtime_inject_script
@@ -3476,11 +3516,7 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
         in runtime_block
     )
     assert (
-        '"example-product/f85405a4/presales":"11111111-1111-1111-1111-111111111111"'
-        in runtime_block
-    )
-    assert (
-        '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"f85405a4"'
+        '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"example-funnel"'
         in runtime_block
     )
 
@@ -3556,10 +3592,10 @@ def test_funnel_artifact_site_prefers_updated_from_funnel_for_runtime_config():
     assert isinstance(runtime_inject_script, str)
     runtime_block = _extract_runtime_block(runtime_inject_script)
     assert '"defaultProductSlug":"example-product"' in runtime_block
-    assert '"defaultFunnelSlug":"18ac0fe1"' in runtime_block
+    assert '"defaultFunnelSlug":"imported-funnel"' in runtime_block
     assert '"defaultEntrySlug":"presales"' in runtime_block
     assert (
-        '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"18ac0fe1"'
+        '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"imported-funnel"'
         in runtime_block
     )
     assert '"commerce":' not in runtime_block

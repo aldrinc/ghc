@@ -12632,8 +12632,8 @@ print(json.dumps(report, sort_keys=True))
         if ($http_referer ~ "[?&]{_FUNNEL_ARTIFACT_CANDIDATE_QUERY_PARAM}=(?<mos_referer_candidate_release>{candidate_release_nginx_pattern})(?:[&#]|$)") {{
             rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_referer_candidate_release/$1 last;
         }}
-        if ($http_referer ~ "{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/(?<mos_ref_path_rel>{candidate_release_nginx_pattern})/") {{
-            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_ref_path_rel/$1 last;
+        if ($http_referer ~ "{_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/(?<mos_referer_path_candidate_release>{candidate_release_nginx_pattern})/") {{
+            rewrite ^/(.*)$ {_FUNNEL_ARTIFACT_CANDIDATE_ROUTE_PREFIX}/$mos_referer_path_candidate_release/$1 last;
         }}
 """
             standalone_asset_location = f"""    location ^~ {_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/ {{

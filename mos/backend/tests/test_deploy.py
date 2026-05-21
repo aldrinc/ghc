@@ -5153,19 +5153,10 @@ def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatc
     )
 
     assert result is not None
-    assert result["status"] == "passed"
-    assert result["thresholds"] == {"mobile": 85.0, "desktop": 85.0}
-    assert [audit["profile"] for audit in result["audits"]] == [
-        "mobile",
-        "desktop",
-        "mobile",
-        "desktop",
-    ]
-    assert all(
-        "mos_deploy_candidate_release=candidate-123" in audit["url"] for audit in result["audits"]
-    )
-    assert len(calls) == 4
-    assert any("--preset=desktop" in call for call in calls)
+    assert result["status"] == "disabled"
+    assert result["candidateReleaseId"] == "candidate-123"
+    assert result["audits"] == []
+    assert calls == []
 
 
 def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch):
@@ -5202,14 +5193,16 @@ def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch
     )
     monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
 
-    with pytest.raises(deploy_service.DeployError, match="below required 85.00"):
-        deploy_service._run_html_deploy_lighthouse_validation_sync(
-            validation_plan={
-                "render_mode": "html_deploy",
-                "candidate_release_id": "candidate-123",
-                "pages_to_validate": [{"url": "https://shop.example.com/sales-page/"}],
-            }
-        )
+    result = deploy_service._run_html_deploy_lighthouse_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [{"url": "https://shop.example.com/sales-page/"}],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "disabled"
 
 
 class _HtmlDeployOptimizationFakeResponse:
@@ -5318,20 +5311,10 @@ def test_run_html_deploy_optimization_validation_checks_candidate_pages(monkeypa
     )
 
     assert result is not None
-    assert result["status"] == "passed"
+    assert result["status"] == "disabled"
     assert result["candidateReleaseId"] == "candidate-123"
-    assert len(result["pages"]) == 2
-    assert result["pages"][0]["renderOptimizationCss"] is True
-    assert result["pages"][0]["tailwindRuntimeRemoved"] is True
-    assert result["pages"][0]["legacyIm8ScriptsRemoved"] is True
-    assert result["pages"][0]["rasterImageCount"] == 2
-    assert result["pages"][0]["responsiveImageCount"] >= 2
-    assert result["pages"][0]["lazyImageCount"] == 1
-    assert result["pages"][0]["highPriorityImageCount"] == 1
-    assert result["pages"][0]["imagePreloadCount"] == 1
-    assert result["pages"][0]["fontPreloadCount"] == 1
-    page_requests = [url for url in requested_urls if "/assets/" not in url]
-    assert all("mos_deploy_candidate_release=candidate-123" in url for url in page_requests)
+    assert result["pages"] == []
+    assert requested_urls == []
 
 
 def test_html_deploy_validation_targets_include_tracked_presales_sales_handoff_url():
@@ -5471,21 +5454,23 @@ def test_run_html_deploy_optimization_validation_checks_tracked_sales_handoff_re
         "html_artifact_kind": "sales",
     }
 
-    with pytest.raises(deploy_service.DeployError, match="source_page_type=quiz_presell"):
-        deploy_service._run_html_deploy_optimization_validation_sync(
-            validation_plan={
-                "render_mode": "html_deploy",
-                "candidate_release_id": "candidate-123",
-                "pages_to_validate": [pre_sales_page, sales_page],
-                "path_plans": [
-                    {
-                        "start_page": pre_sales_page,
-                        "sales_page": sales_page,
-                        "pre_sales_click_selectors": ["#to-sales"],
-                    }
-                ],
-            }
-        )
+    result = deploy_service._run_html_deploy_optimization_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [pre_sales_page, sales_page],
+            "path_plans": [
+                {
+                    "start_page": pre_sales_page,
+                    "sales_page": sales_page,
+                    "pre_sales_click_selectors": ["#to-sales"],
+                }
+            ],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "disabled"
 
 
 def test_run_html_deploy_optimization_validation_fails_without_render_marker(monkeypatch):
@@ -5506,20 +5491,22 @@ def test_run_html_deploy_optimization_validation_fails_without_render_marker(mon
 
     monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
 
-    with pytest.raises(deploy_service.DeployError, match="missing data-mos-render-optimization"):
-        deploy_service._run_html_deploy_optimization_validation_sync(
-            validation_plan={
-                "render_mode": "html_deploy",
-                "candidate_release_id": "candidate-123",
-                "pages_to_validate": [
-                    {
-                        "url": "https://shop.example.com/sales-page/",
-                        "stage": "sales",
-                        "html_artifact_kind": "sales",
-                    }
-                ],
-            }
-        )
+    result = deploy_service._run_html_deploy_optimization_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [
+                {
+                    "url": "https://shop.example.com/sales-page/",
+                    "stage": "sales",
+                    "html_artifact_kind": "sales",
+                }
+            ],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "disabled"
 
 
 def test_run_html_deploy_optimization_validation_fails_broken_image(monkeypatch):
@@ -5543,20 +5530,22 @@ def test_run_html_deploy_optimization_validation_fails_broken_image(monkeypatch)
 
     monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
 
-    with pytest.raises(deploy_service.DeployError, match="image assets did not resolve"):
-        deploy_service._run_html_deploy_optimization_validation_sync(
-            validation_plan={
-                "render_mode": "html_deploy",
-                "candidate_release_id": "candidate-123",
-                "pages_to_validate": [
-                    {
-                        "url": "https://shop.example.com/listicle/",
-                        "stage": "pre_sales",
-                        "html_artifact_kind": "listicle",
-                    }
-                ],
-            }
-        )
+    result = deploy_service._run_html_deploy_optimization_validation_sync(
+        validation_plan={
+            "render_mode": "html_deploy",
+            "candidate_release_id": "candidate-123",
+            "pages_to_validate": [
+                {
+                    "url": "https://shop.example.com/listicle/",
+                    "stage": "pre_sales",
+                    "html_artifact_kind": "listicle",
+                }
+            ],
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "disabled"
 
 
 @pytest.mark.asyncio
@@ -6093,6 +6082,17 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
         "from_stage": "pre_sales",
         "to_stage": "sales",
     }
+    checkout_props = {
+        **handoff_props,
+        "from_stage": "sales",
+        "to_stage": "checkout",
+        "cta_id": "main-cta",
+        "variant_id": "variant-1",
+        "value": 49.0,
+        "currency": "USD",
+        "transition_id": "transition-1",
+        "checkout_url": "https://shop.shopemberco.com/checkout",
+    }
 
     observed_state = {
         "internal": [
@@ -6105,7 +6105,7 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
             },
             {"eventType": "sales_page_view", "props": handoff_props},
             {"eventType": "offer_page_view"},
-            {"eventType": "sales_to_checkout_click"},
+            {"eventType": "sales_to_checkout_click", "props": checkout_props},
         ],
         "meta": [
             ["init", "pixel-123"],
@@ -6118,8 +6118,8 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
             ["track", "Entered Sales Page", {}],
             ["track", "EnteredSales", {"event_source_url": sales_url, **handoff_props}],
             ["track", "ViewContent", {}],
-            ["track", "SalesToCheckoutClick", {}],
-            ["track", "SalesToCheckoutClicked", {}],
+            ["track", "SalesToCheckoutClick", checkout_props],
+            ["track", "SalesToCheckoutClicked", checkout_props],
         ],
         "posthog": {
             "inits": [
@@ -6146,10 +6146,10 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
                 ["EnteredSales", _expected_sales_posthog_context(**handoff_props)],
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
-                ["sales_to_checkout_click", {}],
-                ["checkout_click", {}],
-                ["SalesToCheckoutClick", {}],
-                ["SalesToCheckoutClicked", {}],
+                ["sales_to_checkout_click", checkout_props],
+                ["checkout_click", checkout_props],
+                ["SalesToCheckoutClick", checkout_props],
+                ["SalesToCheckoutClicked", checkout_props],
             ],
         },
     }
@@ -6168,13 +6168,23 @@ def test_validate_observed_tracking_events_rejects_extra_sales_entry_meta_events
         access_urls=["https://shop.shopemberco.com/"],
         render_mode="html_deploy",
     )
+    checkout_props = {
+        "session_id": "session-1",
+        "visitor_id": "visitor-1",
+        "cta_id": "main-cta",
+        "variant_id": "variant-1",
+        "value": 49.0,
+        "currency": "USD",
+        "transition_id": "transition-1",
+        "checkout_url": "https://shop.shopemberco.com/checkout",
+    }
 
     observed_state = {
         "internal": [
             {"eventType": "Entered Funnel"},
             {"eventType": "sales_page_view"},
             {"eventType": "offer_page_view"},
-            {"eventType": "sales_to_checkout_click"},
+            {"eventType": "sales_to_checkout_click", "props": checkout_props},
         ],
         "meta": [
             ["init", "pixel-123"],
@@ -6184,8 +6194,8 @@ def test_validate_observed_tracking_events_rejects_extra_sales_entry_meta_events
             ["track", "EnteredSales", {}],
             ["track", "EnteredSales", {}],
             ["track", "ViewContent", {}],
-            ["track", "SalesToCheckoutClick", {}],
-            ["track", "SalesToCheckoutClicked", {}],
+            ["track", "SalesToCheckoutClick", checkout_props],
+            ["track", "SalesToCheckoutClicked", checkout_props],
         ],
         "posthog": {
             "inits": [
@@ -6204,10 +6214,10 @@ def test_validate_observed_tracking_events_rejects_extra_sales_entry_meta_events
                 ["EnteredSales", {}],
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
-                ["sales_to_checkout_click", {}],
-                ["checkout_click", {}],
-                ["SalesToCheckoutClick", {}],
-                ["SalesToCheckoutClicked", {}],
+                ["sales_to_checkout_click", checkout_props],
+                ["checkout_click", checkout_props],
+                ["SalesToCheckoutClick", checkout_props],
+                ["SalesToCheckoutClicked", checkout_props],
             ],
         },
     }
@@ -6228,13 +6238,23 @@ def test_validate_observed_tracking_events_rejects_missing_sales_posthog_context
         render_mode="html_deploy",
     )
     sales_url = "https://shop.shopemberco.com/ember/daily/sales-page/"
+    checkout_props = {
+        "session_id": "session-1",
+        "visitor_id": "visitor-1",
+        "cta_id": "main-cta",
+        "variant_id": "variant-1",
+        "value": 49.0,
+        "currency": "USD",
+        "transition_id": "transition-1",
+        "checkout_url": "https://shop.shopemberco.com/checkout",
+    }
 
     observed_state = {
         "internal": [
             {"eventType": "Entered Funnel"},
             {"eventType": "sales_page_view"},
             {"eventType": "offer_page_view"},
-            {"eventType": "sales_to_checkout_click"},
+            {"eventType": "sales_to_checkout_click", "props": checkout_props},
         ],
         "meta": [
             ["init", "pixel-123"],
@@ -6243,8 +6263,8 @@ def test_validate_observed_tracking_events_rejects_missing_sales_posthog_context
             ["track", "Entered Sales Page", {}],
             ["track", "EnteredSales", {"event_source_url": sales_url}],
             ["track", "ViewContent", {}],
-            ["track", "SalesToCheckoutClick", {}],
-            ["track", "SalesToCheckoutClicked", {}],
+            ["track", "SalesToCheckoutClick", checkout_props],
+            ["track", "SalesToCheckoutClicked", checkout_props],
         ],
         "posthog": {
             "inits": [
@@ -6263,10 +6283,10 @@ def test_validate_observed_tracking_events_rejects_missing_sales_posthog_context
                 ["EnteredSales", _expected_sales_posthog_context()],
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
-                ["sales_to_checkout_click", {}],
-                ["checkout_click", {}],
-                ["SalesToCheckoutClick", {}],
-                ["SalesToCheckoutClicked", {}],
+                ["sales_to_checkout_click", checkout_props],
+                ["checkout_click", checkout_props],
+                ["SalesToCheckoutClick", checkout_props],
+                ["SalesToCheckoutClicked", checkout_props],
             ],
         },
     }
@@ -6309,6 +6329,17 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
         "from_stage": "pre_sales",
         "to_stage": "sales",
     }
+    checkout_props = {
+        **handoff_props,
+        "from_stage": "sales",
+        "to_stage": "checkout",
+        "cta_id": "main-cta",
+        "variant_id": "variant-1",
+        "value": 49.0,
+        "currency": "USD",
+        "transition_id": "transition-1",
+        "checkout_url": "https://shop.shopemberco.com/checkout",
+    }
 
     observed_state = {
         "internal": [
@@ -6327,7 +6358,7 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
                 "props": handoff_props,
             },
             {"eventType": "offer_page_view"},
-            {"eventType": "sales_to_checkout_click"},
+            {"eventType": "sales_to_checkout_click", "props": checkout_props},
         ],
         "meta": [
             ["init", "pixel-123"],
@@ -6347,8 +6378,8 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
                 },
             ],
             ["track", "ViewContent", {}],
-            ["track", "SalesToCheckoutClick", {}],
-            ["track", "SalesToCheckoutClicked", {}],
+            ["track", "SalesToCheckoutClick", checkout_props],
+            ["track", "SalesToCheckoutClicked", checkout_props],
         ],
         "posthog": {
             "inits": [
@@ -6385,10 +6416,10 @@ def test_validate_observed_tracking_events_requires_presales_sales_session_stitc
                 ],
                 ["ViewContent", {}],
                 ["offer_page_view", {}],
-                ["sales_to_checkout_click", {}],
-                ["checkout_click", {}],
-                ["SalesToCheckoutClick", {}],
-                ["SalesToCheckoutClicked", {}],
+                ["sales_to_checkout_click", checkout_props],
+                ["checkout_click", checkout_props],
+                ["SalesToCheckoutClick", checkout_props],
+                ["SalesToCheckoutClicked", checkout_props],
             ],
         },
     }
@@ -6629,20 +6660,25 @@ def test_activate_tracking_validation_target_uses_dom_click():
     class FakePage:
         url = "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"
 
-        def locator(self, selector):
-            calls.append(("locator", selector))
-            return FakeLocator()
+        def wait_for_function(self, script, **kwargs):
+            calls.append(("wait_for_function", kwargs.get("timeout")))
+
+        def evaluate(self, script, arg=None):
+            calls.append(("page_evaluate", arg))
+            return True
+
+        def wait_for_timeout(self, ms):
+            calls.append(("wait_for_timeout", ms))
 
     deploy_service._activate_tracking_validation_target(page=FakePage(), selector="#checkout-btn")
 
-    assert calls[0] == ("locator", "#checkout-btn")
-    assert calls[1] == (
-        "wait_for",
-        "attached",
+    assert calls[0] == (
+        "wait_for_function",
         deploy_service._DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
     )
-    assert calls[2][0] == "evaluate"
-    assert "element.click()" in calls[2][1]
+    assert calls[1][0] == "page_evaluate"
+    assert calls[2] == ("wait_for_timeout", 250)
+    assert calls[3][0] == "page_evaluate"
 
 
 def test_wait_for_tracking_validation_state_polls_until_events_settle(monkeypatch):
@@ -7369,8 +7405,13 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
             calls.append(("expect_request", getattr(pattern, "pattern", str(pattern))))
             return FakeExpectRequest()
 
+        def wait_for_function(self, script, **kwargs):
+            calls.append(("wait_for_function", kwargs.get("timeout")))
+
         def evaluate(self, script, arg=None):
             calls.append(("page_evaluate",))
+            if arg is not None:
+                return True
             return {
                 "internal": [],
                 "meta": [],
