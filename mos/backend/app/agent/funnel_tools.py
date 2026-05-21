@@ -2041,6 +2041,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- For multi-select quiz pages, declare each selected validation option with selectionOrder and add quizSubmissions[] for next/submit controls when the question does not submit on option click.\n"
                 "- For quiz pages with scrollable result/protocol screens, declare quizScrollTargets[] with screenIndex, screenName, selector, and requiredBreakpoints so PostHog scroll_depth breakpoints are validated.\n"
                 "- For sales pages, bind the primary buy CTA with a checkout binding.\n"
+                "- For quiz pages with scrollable result/protocol screens, declare quizScrollTargets[] with screenIndex, screenName, selector, and requiredBreakpoints so PostHog scroll_depth breakpoints are validated.\n"
                 "- If a sales page has an add-to-cart/cart-opening CTA and a separate final secure checkout CTA, use trackEventType='sales_to_checkout_click' for the add-to-cart CTA and trackEventType='checkout_started' for the final secure checkout CTA.\n"
                 "- Prefer checkout.mode='public_checkout'. Use checkout.mode='external_checkout_url' only when an explicit per-variant external URL map is required.\n"
                 "- If the page has variant/pack selectors, use an option_values resolver with selectors that read the live chosen values from the existing HTML controls.\n"

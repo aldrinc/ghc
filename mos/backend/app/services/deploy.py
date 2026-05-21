@@ -5239,7 +5239,11 @@ def _tracking_value_contains_screen_index(*, value: Any, screen_index: int) -> b
     expected = str(screen_index)
     if isinstance(value, dict):
         for key in ("screen", "screenIndex", "screen_index"):
-            if str(value.get(key) or "").strip() == expected:
+            raw_screen_value = value.get(key)
+            if isinstance(raw_screen_value, list):
+                if expected in {str(item or "").strip() for item in raw_screen_value}:
+                    return True
+            if str(raw_screen_value or "").strip() == expected:
                 return True
         return any(
             _tracking_value_contains_screen_index(value=item, screen_index=screen_index)
@@ -5280,7 +5284,14 @@ def _tracking_value_contains_screen_index(*, value: Any, screen_index: int) -> b
 
 
 def _tracking_scroll_breakpoint_from_props(props: dict[str, Any]) -> int | None:
-    for key in ("scrollDepthPct", "scroll_depth_pct", "depthPct", "depth_pct"):
+    for key in (
+        "scrollDepthPct",
+        "scroll_depth_pct",
+        "depthPct",
+        "depth_pct",
+        "maxScrollDepthPct",
+        "max_scroll_depth_pct",
+    ):
         raw_value = props.get(key)
         if raw_value is None:
             continue

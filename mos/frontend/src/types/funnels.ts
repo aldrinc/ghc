@@ -161,6 +161,12 @@ export type ImportedHtmlViewTarget = {
   submitOnSelect?: boolean | null;
   resultId?: string | null;
   segmentId?: string | null;
+  screenIndex?: number | null;
+  screenName?: string | null;
+  route?: string | null;
+  hash?: string | null;
+  titleContains?: string | null;
+  requiredBreakpoints?: number[];
   recommendationId?: string | null;
   screenIndex?: number | null;
   screenName?: string | null;
@@ -224,6 +230,7 @@ export type ImportedHtmlInstrumentationManifest = {
   quizResults?: ImportedHtmlViewTarget[];
   quizMechanisms?: ImportedHtmlViewTarget[];
   quizRecommendations?: ImportedHtmlViewTarget[];
+  quizScrollTargets?: ImportedHtmlViewTarget[];
   productDetails?: ImportedHtmlViewTarget[];
   selectors?: ImportedHtmlViewTarget[];
 };
