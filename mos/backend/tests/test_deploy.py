@@ -3764,6 +3764,8 @@ def _posthog_readback_raw_row(event_name: str, **overrides) -> list:
     row = {
         "event": event_name,
         "timestamp": "2026-05-12T17:00:00Z",
+        "person_id": "person-1",
+        "distinct_id": "session-1",
         "current_url": validation_url,
         "event_source_url": validation_url,
         "destination_url": "",
@@ -3776,6 +3778,7 @@ def _posthog_readback_raw_row(event_name: str, **overrides) -> list:
         "content_category": "sales_page",
         "page_stage": "sales",
         "session_id": "session-1",
+        "funnel_session_id": "session-1",
         "visitor_id": "visitor-1",
         "click_id": "click-1",
         "product_slug": "ember",
@@ -5357,6 +5360,56 @@ def test_assert_posthog_readback_rows_rejects_duplicate_quiz_completed():
             rows=rows,
             required_events=["QuizCompleted"],
             validation_id="deploy-validation-123",
+        )
+
+
+def test_assert_posthog_readback_rows_requires_quiz_to_sales_identity_continuity():
+    path_plan = {"tracking_validation_profile": "quiz_presell"}
+    rows = [
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row(
+                    "QuizCompleted",
+                    content_category="pre_sales_page",
+                    page_stage="pre_sales",
+                ),
+            )
+        ),
+        dict(
+            zip(
+                deploy_service._POSTHOG_READBACK_COLUMNS,
+                _posthog_readback_raw_row("EnteredSales"),
+            )
+        ),
+    ]
+
+    deploy_service._assert_posthog_readback_rows(
+        rows=rows,
+        required_events=["QuizCompleted", "EnteredSales"],
+        validation_id="deploy-validation-123",
+        path_plan=path_plan,
+    )
+
+    split_person_rows = [dict(row) for row in rows]
+    split_person_rows[1]["person_id"] = "person-2"
+    with pytest.raises(deploy_service.DeployError, match="different PostHog people"):
+        deploy_service._assert_posthog_readback_rows(
+            rows=split_person_rows,
+            required_events=["QuizCompleted", "EnteredSales"],
+            validation_id="deploy-validation-123",
+            path_plan=path_plan,
+        )
+
+    missing_session_rows = [dict(row) for row in rows]
+    missing_session_rows[1]["funnel_session_id"] = ""
+    missing_session_rows[1]["funnelSessionId"] = ""
+    with pytest.raises(deploy_service.DeployError, match="funnel_session_id"):
+        deploy_service._assert_posthog_readback_rows(
+            rows=missing_session_rows,
+            required_events=["QuizCompleted", "EnteredSales"],
+            validation_id="deploy-validation-123",
+            path_plan=path_plan,
         )
 
 

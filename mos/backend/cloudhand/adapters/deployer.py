@@ -4682,6 +4682,16 @@ WantedBy=multi-user.target
                     "HTML deploy artifact export declared PostHog tracking but disabled capture_pageleave. "
                     "The site was not activated."
                 )
+            for token in (
+                "getCanonicalPostHogDistinctId",
+                "funnel_session_id",
+                "restorePostHogIdentity(instance);",
+            ):
+                if not self._remote_tree_contains_text(root_path=site_dir, text=token):
+                    raise ValueError(
+                        "HTML deploy artifact export declared PostHog tracking but did not emit "
+                        f"the required identity continuity token {token!r}. The site was not activated."
+                    )
         if self._funnel_artifact_declares_meta_tracking(source=source):
             if not self._remote_tree_contains_text(
                 root_path=site_dir,
@@ -6020,6 +6030,8 @@ WantedBy=multi-user.target
 		    const clickId = readFirstSearchParam(currentUrl.searchParams, CLICK_PARAM_NAMES);
 		    assignCleanProp(props, "session_id", sessionIdValue);
 		    assignCleanProp(props, "sessionId", sessionIdValue);
+		    assignCleanProp(props, "funnel_session_id", sessionIdValue);
+		    assignCleanProp(props, "funnelSessionId", sessionIdValue);
 		    assignCleanProp(props, "visitor_id", visitorIdValue);
 		    assignCleanProp(props, "visitorId", visitorIdValue);
 		    assignCleanProp(props, "click_id", clickId);
@@ -6194,6 +6206,7 @@ WantedBy=multi-user.target
     const pageVariant = cleanText(config.pageSlug);
     const resolvedVisitorId = cleanText(visitorId);
 	    const resolvedSessionId = cleanText(sessionId);
+	    const resolvedFunnelSessionId = cleanText(sessionId);
 	    const deviceType = resolveDeviceType();
 	    const clickAttribution = resolveClickAttribution();
 		    const inboundPresaleBridgeContext = resolvePresaleBridgeContext(window.location.href, pageStage);
@@ -6218,10 +6231,13 @@ WantedBy=multi-user.target
       html_deploy_schema_version: cleanText(config.htmlDeploySchemaVersion),
       pageVariant,
       page_variant: pageVariant,
+      distinct_id: getCanonicalPostHogDistinctId(),
       visitorId: resolvedVisitorId,
       visitor_id: resolvedVisitorId,
       sessionId: resolvedSessionId,
       session_id: resolvedSessionId,
+      funnelSessionId: resolvedFunnelSessionId,
+      funnel_session_id: resolvedFunnelSessionId,
       path: window.location.pathname + window.location.search,
       referrer: document.referrer || undefined,
       deviceType,
@@ -6279,6 +6295,73 @@ WantedBy=multi-user.target
     "funnel-session",
 	    getFirstSearchParam(SESSION_PARAM_NAMES),
   );
+  const POSTHOG_IDENTIFIED_EMAIL_STORAGE_KEY = "mos_funnel_identified_email";
+  const POSTHOG_IDENTIFIED_SESSION_STORAGE_KEY = "mos_funnel_identified_session_id";
+  const POSTHOG_IDENTIFIED_EMAIL_HASH_STORAGE_KEY = "mos_funnel_identified_email_sha256";
+  const getCanonicalPostHogDistinctId = () =>
+    cleanText(sessionId) || cleanText(visitorId) || "anonymous-funnel-visitor";
+  const readStoredPostHogIdentity = () => {
+    try {
+      const email = cleanText(window.localStorage.getItem(POSTHOG_IDENTIFIED_EMAIL_STORAGE_KEY));
+      if (!email) return null;
+      const storedSessionId = cleanText(window.localStorage.getItem(POSTHOG_IDENTIFIED_SESSION_STORAGE_KEY));
+      if (storedSessionId && storedSessionId !== cleanText(sessionId)) return null;
+      return {
+        email,
+        emailHash: cleanText(window.localStorage.getItem(POSTHOG_IDENTIFIED_EMAIL_HASH_STORAGE_KEY)),
+      };
+    } catch (_) {
+      return null;
+    }
+  };
+  const persistPostHogIdentity = (email, emailHash) => {
+    const normalizedEmail = cleanText(email) ? String(email).trim().toLowerCase() : null;
+    if (!normalizedEmail) return;
+    try {
+      window.localStorage.setItem(POSTHOG_IDENTIFIED_EMAIL_STORAGE_KEY, normalizedEmail);
+      window.localStorage.setItem(POSTHOG_IDENTIFIED_SESSION_STORAGE_KEY, cleanText(sessionId));
+      const cleanedEmailHash = cleanText(emailHash);
+      if (cleanedEmailHash) {
+        window.localStorage.setItem(POSTHOG_IDENTIFIED_EMAIL_HASH_STORAGE_KEY, cleanedEmailHash);
+      }
+    } catch (_) {
+      // Ignore storage write failures; the active page still identifies immediately below.
+    }
+  };
+  const resolvePostHogPersonProps = (email, emailHash, extraProps) => {
+    const props = {
+      email: cleanText(email),
+      product_slug: cleanText(config.productSlug),
+      funnel_slug: cleanText(config.funnelSlug),
+      page_slug: cleanText(config.pageSlug),
+      page_stage: cleanText(config.pageStage),
+      page_id: cleanText(config.pageId),
+      publication_id: cleanText(config.publicationId),
+      visitor_id: cleanText(visitorId),
+      visitorId: cleanText(visitorId),
+      session_id: cleanText(sessionId),
+      sessionId: cleanText(sessionId),
+      funnel_session_id: cleanText(sessionId),
+      funnelSessionId: cleanText(sessionId),
+      external_id: resolveMetaExternalId(),
+      ...(extraProps || {}),
+    };
+    assignCleanProp(props, "em", emailHash);
+    assignCleanProp(props, "email_sha256", emailHash);
+    return props;
+  };
+  const restorePostHogIdentity = (instance) => {
+    if (!instance || typeof instance.identify !== "function") return;
+    const storedIdentity = readStoredPostHogIdentity();
+    if (!storedIdentity) return;
+    const restoreKey = storedIdentity.email + ":" + cleanText(sessionId);
+    if (instance.__mosFunnelRestoredIdentityFor === restoreKey) return;
+    instance.__mosFunnelRestoredIdentityFor = restoreKey;
+    instance.identify(
+      storedIdentity.email,
+      resolvePostHogPersonProps(storedIdentity.email, storedIdentity.emailHash),
+    );
+  };
 
   const getUtmParams = () => {
     const params = new URLSearchParams(window.location.search);
@@ -6561,7 +6644,7 @@ WantedBy=multi-user.target
     const defaults = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogDefaults) || "2026-01-30";
     const personProfiles =
       cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogPersonProfiles) || "identified_only";
-    const distinctId = cleanText(visitorId) || "anonymous-funnel-visitor";
+    const distinctId = getCanonicalPostHogDistinctId();
     !function(t,e){var o,n,p,r,d;e.__SV||(window.posthog&&window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0])&&r.parentNode?r.parentNode.insertBefore(p,r):(d=t.head||t.body||t.documentElement)&&d.appendChild(p);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Ir Sr init jr $r Ci qr Hr Dr capture calculateEventProperties Wr register register_once register_for_session unregister unregister_for_session Qr getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync tn identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty Jr Yr createPersonProfile setInternalOrTestUser Kr Pr nn opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing zr debug ki Xr getPageViewId captureTraceFeedback captureTraceMetric Mr".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
     const existingInstance = window.posthog && window.posthog[POSTHOG_INSTANCE_NAME];
     if (
@@ -6569,6 +6652,7 @@ WantedBy=multi-user.target
       (existingInstance.__mosFunnelConfigured === "true" || window.__mosFunnelPostHogConfigured === "true")
     ) {
       window.__mosFunnelPostHogConfigured = "true";
+      restorePostHogIdentity(existingInstance);
       return existingInstance;
     }
     window.posthog.init(
@@ -6595,8 +6679,11 @@ WantedBy=multi-user.target
         productSlug: cleanText(config.productSlug),
         funnelSlug: cleanText(config.funnelSlug),
         publicationId: cleanText(config.publicationId),
+        funnel_session_id: cleanText(sessionId),
+        funnelSessionId: cleanText(sessionId),
       });
     }
+    restorePostHogIdentity(instance);
     instance.__mosFunnelConfigured = "true";
     window.__mosFunnelPostHogConfigured = "true";
     return instance;
@@ -8538,22 +8625,11 @@ WantedBy=multi-user.target
     if (!posthog || typeof posthog.identify !== "function") return;
     const bindingId = String(binding && binding.id ? binding.id : "unknown");
     const source = cleanText(binding && binding.emailCapture && binding.emailCapture.source);
-    const personProps = {
-      email: normalizedEmail,
+    const personProps = resolvePostHogPersonProps(normalizedEmail, emailHash, {
       capture_source: source,
-      product_slug: cleanText(config.productSlug),
-      funnel_slug: cleanText(config.funnelSlug),
-      page_slug: cleanText(config.pageSlug),
-      page_stage: cleanText(config.pageStage),
-      page_id: cleanText(config.pageId),
-      publication_id: cleanText(config.publicationId),
-      visitor_id: cleanText(visitorId),
-      session_id: cleanText(sessionId),
       binding_id: bindingId,
-      external_id: resolveMetaExternalId(),
-    };
-    assignCleanProp(personProps, "em", emailHash);
-    assignCleanProp(personProps, "email_sha256", emailHash);
+    });
+    persistPostHogIdentity(normalizedEmail, emailHash);
     posthog.identify(normalizedEmail, personProps);
   };
   const completeEmailCaptureSuccess = (binding, element) => {

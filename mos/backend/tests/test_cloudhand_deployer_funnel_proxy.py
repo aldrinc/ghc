@@ -2787,6 +2787,30 @@ def test_validate_funnel_artifact_site_output_requires_posthog_web_analytics_cap
         )
 
 
+def test_validate_funnel_artifact_site_output_requires_posthog_identity_continuity_tokens():
+    app = _artifact_app(render_mode="html_deploy", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
+    deployer = object.__new__(ServerDeployer)
+    deployer._path_exists = lambda path: True
+    deployer._funnel_artifact_declares_posthog_tracking = lambda *, source: True
+    deployer._funnel_artifact_declares_meta_tracking = lambda *, source: False
+    deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
+    deployer._remote_tree_contains_text = lambda *, root_path, text: text in {
+        "MOS_HTML_DEPLOY_BRIDGE_START",
+        "window.posthog.init(",
+        "capture_pageview: true",
+        "capture_pageleave: true",
+        "getCanonicalPostHogDistinctId",
+        "funnel_session_id",
+    }
+
+    with pytest.raises(ValueError, match="identity continuity token"):
+        deployer._validate_funnel_artifact_site_output(
+            site_dir="/opt/apps/landing-artifact/site-releases/20260422T000000Z",
+            source=app.source_ref,
+            render_mode=FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML,
+        )
+
+
 def test_validate_funnel_artifact_site_output_requires_meta_pixel_bootstrap_when_tracking_is_declared():
     app = _artifact_app(render_mode="html_deploy", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
     deployer = object.__new__(ServerDeployer)

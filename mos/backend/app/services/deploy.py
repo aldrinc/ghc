@@ -117,6 +117,8 @@ _HTML_DEPLOY_FORBIDDEN_COMPACT_REFERENCES: tuple[tuple[str, str], ...] = (
     ("legacy Mars funnel token", "c9095d"),
 )
 _POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
+    ("person_id", "person_id"),
+    ("distinct_id", "distinct_id"),
     ("current_url", "properties['$current_url']"),
     ("event_source_url", "properties['event_source_url']"),
     ("destination_url", "properties['destination_url']"),
@@ -137,6 +139,8 @@ _POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
     ("pageStage", "properties['pageStage']"),
     ("session_id", "properties['session_id']"),
     ("sessionId", "properties['sessionId']"),
+    ("funnel_session_id", "properties['funnel_session_id']"),
+    ("funnelSessionId", "properties['funnelSessionId']"),
     ("visitor_id", "properties['visitor_id']"),
     ("visitorId", "properties['visitorId']"),
     ("anonymous_id", "properties['anonymous_id']"),
@@ -162,6 +166,8 @@ _POSTHOG_READBACK_COLUMN_SELECTS: tuple[tuple[str, str], ...] = (
     ("fbclid", "properties['fbclid']"),
     ("fbc", "properties['fbc']"),
     ("fbp", "properties['fbp']"),
+    ("em", "properties['em']"),
+    ("email_sha256", "properties['email_sha256']"),
     ("mos_deploy_validation_id", "properties['mos_deploy_validation_id']"),
     ("mosDeployValidationId", "properties['mosDeployValidationId']"),
     ("internal_event_type", "properties['internal_event_type']"),
@@ -5328,6 +5334,117 @@ def _assert_quiz_completed_not_duplicated(
         )
 
 
+def _assert_readback_posthog_identity_continuity(
+    *,
+    rows: list[dict[str, Any]],
+    required_events: list[str],
+    path_plan: dict[str, Any],
+    validation_id: str,
+) -> None:
+    profile = str(path_plan.get("tracking_validation_profile") or "").strip()
+    if profile != "quiz_presell":
+        return
+    quiz_events = {
+        "presell_page_view",
+        "EnteredPresales",
+        "quiz_question_viewed",
+        "QuizQuestionViewed",
+        "quiz_option_presented",
+        "QuizOptionPresented",
+        "quiz_option_selected",
+        "QuizOptionSelected",
+        "quiz_question_submitted",
+        "QuizQuestionSubmitted",
+        "quiz_completed",
+        "QuizCompleted",
+    }
+    handoff_events = {"PreSalesToSalesClick", "pre_sales_to_sales_click", "cta_click"}
+    sales_events = {
+        "sales_page_view",
+        "EnteredSales",
+        "add_to_cart",
+        "AddToCart",
+        "sales_to_checkout_click",
+        "checkout_click",
+        "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
+        "checkout_started",
+        "InitiateCheckout",
+    }
+    relevant_event_names = quiz_events | handoff_events | sales_events
+    required_event_names = {str(event_name or "").strip() for event_name in required_events}
+    relevant_rows = [
+        row
+        for row in rows
+        if isinstance(row, dict)
+        and str(row.get("event") or "").strip() in relevant_event_names
+        and (
+            not required_event_names
+            or str(row.get("event") or "").strip() in required_event_names
+            or str(row.get("event") or "").strip() in handoff_events
+        )
+    ]
+    if not relevant_rows:
+        return
+
+    missing_funnel_session_rows = [
+        str(row.get("event") or "").strip()
+        for row in relevant_rows
+        if not _readback_prop(row, "funnel_session_id", "funnelSessionId")
+    ]
+    if missing_funnel_session_rows:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog readback "
+            f"'{validation_id}': expected quiz-to-sales events to include top-level "
+            f"funnel_session_id; missing on {missing_funnel_session_rows!r}."
+        )
+
+    funnel_session_ids = {
+        _readback_prop(row, "funnel_session_id", "funnelSessionId")
+        for row in relevant_rows
+        if _readback_prop(row, "funnel_session_id", "funnelSessionId")
+    }
+    if len(funnel_session_ids) != 1:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog readback "
+            f"'{validation_id}': quiz-to-sales events split across funnel_session_id "
+            f"values {sorted(funnel_session_ids)!r}."
+        )
+
+    quiz_rows = [
+        row for row in relevant_rows if str(row.get("event") or "").strip() in quiz_events
+    ]
+    sales_rows = [
+        row for row in relevant_rows if str(row.get("event") or "").strip() in sales_events
+    ]
+    if not quiz_rows or not sales_rows:
+        return
+
+    missing_person_rows = [
+        str(row.get("event") or "").strip()
+        for row in [*quiz_rows, *sales_rows]
+        if not _readback_prop(row, "person_id")
+    ]
+    if missing_person_rows:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog readback "
+            f"'{validation_id}': expected PostHog person_id on quiz and sales rows; "
+            f"missing on {missing_person_rows!r}."
+        )
+
+    person_ids = {
+        _readback_prop(row, "person_id")
+        for row in [*quiz_rows, *sales_rows]
+        if _readback_prop(row, "person_id")
+    }
+    if len(person_ids) != 1:
+        raise DeployError(
+            "Post-deploy tracking validation failed for live PostHog readback "
+            f"'{validation_id}': quiz and sales events resolved to different PostHog "
+            f"people {sorted(person_ids)!r} for the same funnel_session_id."
+        )
+
+
 def _assert_posthog_readback_rows(
     *,
     rows: list[dict[str, Any]],
@@ -5394,6 +5511,12 @@ def _assert_posthog_readback_rows(
         )
         _assert_readback_presales_handoff(
             rows=rows,
+            path_plan=path_plan,
+            validation_id=validation_id,
+        )
+        _assert_readback_posthog_identity_continuity(
+            rows=rows,
+            required_events=required_events,
             path_plan=path_plan,
             validation_id=validation_id,
         )
