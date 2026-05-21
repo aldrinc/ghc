@@ -160,7 +160,7 @@ class EventRequirement(BaseModel):
     required_meta_event: str | None = None
     required_props: list[PropRequirement]
     allowed_after: EventOrderingRequirement | None = None
-    destination_receipt: list[Literal["posthog", "meta_proxy", "meta_test_events"]]
+    destination_receipt: list[Literal["posthog", "meta_pixel", "meta_test_events"]]
 ```
 
 Example for sales entry:
@@ -177,7 +177,7 @@ required_props:
   - visitor_id exists
 destination_receipt:
   - posthog
-  - meta_proxy
+  - meta_pixel
 ```
 
 ## Validation Phases
@@ -213,7 +213,8 @@ Checks:
 - HTML contains the correct instrumentation manifest.
 - HTML contains no forbidden legacy references.
 - PostHog and Meta bootstrap snippets match the configured tracking payload.
-- Meta Pixel loads through MOS proxy.
+- Meta Pixel loads directly from `https://connect.facebook.net/en_US/fbevents.js`.
+- MOS Meta proxy paths such as `/__mos/meta/*` are rejected.
 - Image references in `src` and `srcset` resolve to deployed assets.
 - The artifact render mode is `html_deploy`.
 
@@ -275,8 +276,7 @@ The browser runner captures outbound calls before they leave the page:
 
 - `/api/public/events`
 - PostHog capture endpoint
-- MOS Meta proxy endpoint
-- direct Meta endpoint if proxying is intentionally disabled for a non-production test
+- direct Meta Pixel endpoint
 
 For each captured event, the validator parses the request payload into a normalized event envelope:
 
@@ -335,8 +335,7 @@ Meta browser pixel does not provide the same simple query surface as PostHog. Th
 
 Level 1, required:
 
-- Browser sends Meta event through MOS proxy.
-- MOS proxy forwards to Meta.
+- Browser sends Meta event directly to Meta Pixel endpoints.
 - Meta endpoint returns a successful response.
 - Validator records event name, event id, pixel id, payload fields, response status, and response body hash.
 
@@ -349,11 +348,11 @@ Level 2, recommended when credentials are configured:
 The validator report must distinguish:
 
 ```text
-meta_delivery_proof=proxy_forwarded
+meta_delivery_proof=direct_pixel_network
 meta_delivery_proof=meta_test_event_confirmed
 ```
 
-Production deploys should require at least `proxy_forwarded`. Environments with Meta validation credentials can require `meta_test_event_confirmed`.
+Production deploys should require at least `direct_pixel_network`. Environments with Meta validation credentials can require `meta_test_event_confirmed`.
 
 ## Page Type Contracts
 
@@ -512,7 +511,7 @@ The validator should write one JSON report per run.
     "static": {"status": "passed"},
     "browserSend": {"status": "passed"},
     "posthogReadback": {"status": "passed"},
-    "metaDelivery": {"status": "passed", "proof": "proxy_forwarded"}
+    "metaDelivery": {"status": "passed", "proof": "direct_pixel_network"}
   },
   "observedEvents": [],
   "assertions": [],
@@ -526,7 +525,7 @@ The deploy job should persist this report and include a compact summary:
 html-deploy-v1 validation passed
 artifactKind=quiz
 posthogReadback=confirmed
-metaDelivery=proxy_forwarded
+metaDelivery=direct_pixel_network
 bridgeStitching=confirmed
 ```
 
@@ -591,8 +590,8 @@ Implement event normalization for:
 - MOS internal events
 - PostHog browser capture
 - PostHog readback rows
-- Meta proxy requests
-- Meta proxy delivery responses
+- direct Meta Pixel requests
+- direct Meta Pixel responses
 
 Acceptance:
 
@@ -663,7 +662,7 @@ Acceptance:
 
 - A page missing PostHog `EnteredSales` fails.
 - A page missing RMBC bridge fields fails.
-- A page with Meta proxy delivery failure fails.
+- A page with direct Meta Pixel delivery failure fails.
 
 ## Configuration
 
@@ -696,7 +695,7 @@ Unit tests:
 - sales contract requires `EnteredSales`
 - bridge relationship assertions fail on missing params
 - PostHog adapter polls until events land
-- Meta adapter fails on non-2xx proxy delivery
+- Meta adapter fails on non-2xx direct Pixel delivery
 
 Integration tests:
 
@@ -708,7 +707,7 @@ Integration tests:
 Production smoke:
 
 - run validator against a staging route with real PostHog readback
-- run validator against Meta proxy in delivery-proof mode
+- run validator against direct Meta Pixel network delivery in delivery-proof mode
 - store validation report as deploy artifact evidence
 
 ## Migration Strategy
@@ -722,7 +721,7 @@ Production smoke:
 
 ## Open Decisions
 
-1. Should production require Meta proxy delivery only, or Meta test-event confirmation when credentials are available?
+1. Should production require direct Meta Pixel network delivery only, or Meta test-event confirmation when credentials are available?
 2. Should quiz artifacts without declared `validationFlow` fail immediately, or warn during a short migration window?
 3. Should validation reports be stored as deploy-job JSON only, or also persisted as first-class artifact records?
 4. Should CI run destination adapters against mocked services only, with live destination validation reserved for post-deploy?

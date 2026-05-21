@@ -162,6 +162,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (typeof value === "boolean") target[key] = value;
   };
 
+  const assignStringListProp = (target, key, value) => {
+    if (!Array.isArray(value)) return;
+    const cleaned = value.map((item) => cleanText(item)).filter(Boolean);
+    if (cleaned.length) target[key] = cleaned;
+  };
+
   const getSearchParam = (name) => {
     try {
       return cleanText(new URLSearchParams(window.location.search).get(name));
@@ -199,14 +205,30 @@ function buildStandaloneImportedHtmlRuntimeScript({
     assignCleanProp(props, "quiz_variant", target.quizVariant);
     assignCleanProp(props, "questionId", target.questionId);
     assignCleanProp(props, "question_id", target.questionId);
+    assignCleanProp(props, "questionText", target.questionText);
+    assignCleanProp(props, "question_text", target.questionText);
     assignNumberProp(props, "questionIndex", target.questionIndex);
     assignNumberProp(props, "question_index", target.questionIndex);
+    assignCleanProp(props, "questionType", target.questionType);
+    assignCleanProp(props, "question_type", target.questionType);
     assignCleanProp(props, "questionRole", target.questionRole);
     assignCleanProp(props, "question_role", target.questionRole);
+    assignBooleanProp(props, "isRequired", target.isRequired);
+    assignBooleanProp(props, "is_required", target.isRequired);
     assignCleanProp(props, "optionId", target.optionId);
     assignCleanProp(props, "option_id", target.optionId);
+    assignCleanProp(props, "optionText", target.optionText);
+    assignCleanProp(props, "option_text", target.optionText);
+    assignNumberProp(props, "optionIndex", target.optionIndex);
+    assignNumberProp(props, "option_index", target.optionIndex);
+    assignNumberProp(props, "optionPosition", target.optionPosition || target.optionIndex);
+    assignNumberProp(props, "option_position", target.optionPosition || target.optionIndex);
     assignCleanProp(props, "optionRole", target.optionRole);
     assignCleanProp(props, "option_role", target.optionRole);
+    assignNumberProp(props, "selectionOrder", target.selectionOrder);
+    assignNumberProp(props, "selection_order", target.selectionOrder);
+    assignBooleanProp(props, "submitOnSelect", target.submitOnSelect);
+    assignBooleanProp(props, "submit_on_select", target.submitOnSelect);
     assignCleanProp(props, "resultId", target.resultId);
     assignCleanProp(props, "result_id", target.resultId);
     assignCleanProp(props, "segmentId", target.segmentId);
@@ -233,6 +255,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
     assignCleanProp(props, "sku", target.sku);
     assignCleanProp(props, "bundleId", target.bundleId);
     assignCleanProp(props, "bundle_id", target.bundleId);
+    assignStringListProp(props, "contentIds", target.contentIds);
+    assignStringListProp(props, "content_ids", target.content_ids || target.contentIds);
+    assignNumberProp(props, "numItems", target.numItems);
+    assignNumberProp(props, "num_items", target.num_items || target.numItems);
     assignCleanProp(props, "pricePoint", target.pricePoint);
     assignCleanProp(props, "price_point", target.pricePoint);
     assignCleanProp(props, "guaranteeId", target.guaranteeId);
@@ -262,6 +288,158 @@ function buildStandaloneImportedHtmlRuntimeScript({
     assignBooleanProp(props, "subscriptionFlag", target.subscriptionFlag);
     assignBooleanProp(props, "subscription_flag", target.subscriptionFlag);
     return props;
+  };
+
+  const quizAnswerStateByQuestionId = {};
+  const manifestTargets = (key) => {
+    const manifest = config.manifest && typeof config.manifest === "object" ? config.manifest : {};
+    const targets = manifest[key];
+    return Array.isArray(targets) ? targets.filter((target) => target && typeof target === "object") : [];
+  };
+  const firstCleanProp = (source, names) => {
+    if (!source || typeof source !== "object" || !Array.isArray(names)) return null;
+    for (const name of names) {
+      const value = cleanText(source[name]);
+      if (value) return value;
+    }
+    return null;
+  };
+  const targetQuestionId = (target) => firstCleanProp(target, ["questionId", "question_id", "id"]);
+  const targetOptionId = (target) => firstCleanProp(target, ["optionId", "option_id", "id"]);
+  const findQuizQuestionTarget = (questionId) => {
+    const normalizedQuestionId = cleanText(questionId);
+    if (!normalizedQuestionId) return null;
+    return manifestTargets("quizQuestions").find((target) => targetQuestionId(target) === normalizedQuestionId) || null;
+  };
+  const normalizeQuestionType = (value) => {
+    const normalized = cleanText(value);
+    return normalized ? normalized.toLowerCase().replace(/[\\s-]+/g, "_") : "single_select";
+  };
+  const isMultiSelectQuestion = (questionTarget, props) => {
+    const explicitType = firstCleanProp(props, ["questionType", "question_type"]) ||
+      firstCleanProp(questionTarget, ["questionType", "question_type"]);
+    const normalizedType = normalizeQuestionType(explicitType);
+    return (
+      normalizedType === "multi_select" ||
+      normalizedType === "multiple_select" ||
+      normalizedType === "checkbox" ||
+      normalizedType === "checkbox_group"
+    );
+  };
+  const cleanStringArray = (value) => {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => cleanText(item)).filter(Boolean);
+  };
+  const quizOptionTextForId = (questionId, optionId) => {
+    const normalizedQuestionId = cleanText(questionId);
+    const normalizedOptionId = cleanText(optionId);
+    if (!normalizedOptionId) return null;
+    const match = manifestTargets("quizOptions").find((target) => (
+      targetOptionId(target) === normalizedOptionId &&
+      (!normalizedQuestionId || targetQuestionId(target) === normalizedQuestionId)
+    ));
+    return firstCleanProp(match, ["optionText", "option_text"]);
+  };
+  const buildQuizAnswerSnapshot = (questionId, state) => {
+    if (!questionId || !state) return null;
+    const selectedOptionIds = cleanStringArray(state.selected_option_ids);
+    const selectedOptionTexts = cleanStringArray(state.selected_option_texts);
+    return {
+      question_id: questionId,
+      questionId,
+      question_text: cleanText(state.question_text),
+      questionText: cleanText(state.question_text),
+      question_index: state.question_index,
+      questionIndex: state.question_index,
+      question_type: cleanText(state.question_type),
+      questionType: cleanText(state.question_type),
+      selected_option_ids: selectedOptionIds,
+      selectedOptionIds: selectedOptionIds,
+      selected_option_texts: selectedOptionTexts,
+      selectedOptionTexts: selectedOptionTexts,
+    };
+  };
+  const allQuizAnswers = () => Object.keys(quizAnswerStateByQuestionId)
+    .map((questionId) => buildQuizAnswerSnapshot(questionId, quizAnswerStateByQuestionId[questionId]))
+    .filter(Boolean);
+  const answerStateProps = (questionId) => {
+    const state = questionId ? quizAnswerStateByQuestionId[questionId] : null;
+    const answers = allQuizAnswers();
+    const snapshot = buildQuizAnswerSnapshot(questionId, state);
+    return {
+      ...(snapshot || {}),
+      ...(answers.length ? {
+        answers,
+        answersByQuestion: quizAnswerStateByQuestionId,
+        answers_by_question: quizAnswerStateByQuestionId,
+        questionCountAnswered: answers.length,
+        question_count_answered: answers.length,
+      } : {}),
+    };
+  };
+  const updateQuizAnswerState = (eventType, props) => {
+    const normalizedEventType = cleanText(eventType);
+    const questionId = firstCleanProp(props, ["question_id", "questionId"]);
+    if (!questionId) return {};
+    const questionTarget = findQuizQuestionTarget(questionId);
+    const questionProps = buildDeclaredTargetProps(questionTarget);
+    const questionText = firstCleanProp(props, ["question_text", "questionText"]) ||
+      firstCleanProp(questionProps, ["question_text", "questionText"]);
+    const questionIndex = Number(
+      (props && (props.question_index || props.questionIndex)) ||
+      questionProps.question_index ||
+      questionProps.questionIndex ||
+      0
+    ) || undefined;
+    const questionType = normalizeQuestionType(
+      firstCleanProp(props, ["question_type", "questionType"]) ||
+      firstCleanProp(questionProps, ["question_type", "questionType"])
+    );
+    const selectedOptionIds = cleanStringArray(props && (props.selected_option_ids || props.selectedOptionIds));
+    const optionId = firstCleanProp(props, ["option_id", "optionId"]);
+    const nextSelectedIds = selectedOptionIds.length ? selectedOptionIds : (optionId ? [optionId] : []);
+    const selectedOptionTexts = cleanStringArray(props && (props.selected_option_texts || props.selectedOptionTexts));
+    const optionText = firstCleanProp(props, ["option_text", "optionText"]);
+    const nextSelectedTexts = selectedOptionTexts.length
+      ? selectedOptionTexts
+      : nextSelectedIds.map((selectedOptionId) => (
+          optionText && selectedOptionId === optionId
+            ? optionText
+            : (quizOptionTextForId(questionId, selectedOptionId) || selectedOptionId)
+        ));
+    const current = quizAnswerStateByQuestionId[questionId] || {
+      question_id: questionId,
+      question_text: questionText,
+      question_index: questionIndex,
+      question_type: questionType,
+      selected_option_ids: [],
+      selected_option_texts: [],
+    };
+    current.question_text = current.question_text || questionText;
+    current.question_index = current.question_index || questionIndex;
+    current.question_type = current.question_type || questionType;
+    if (normalizedEventType === "quiz_option_selected" || normalizedEventType === "QuizOptionSelected") {
+      if (isMultiSelectQuestion(questionTarget, props)) {
+        nextSelectedIds.forEach((selectedOptionId, index) => {
+          if (!current.selected_option_ids.includes(selectedOptionId)) {
+            current.selected_option_ids.push(selectedOptionId);
+            current.selected_option_texts.push(nextSelectedTexts[index] || selectedOptionId);
+          }
+        });
+      } else {
+        current.selected_option_ids = nextSelectedIds;
+        current.selected_option_texts = nextSelectedTexts;
+      }
+      quizAnswerStateByQuestionId[questionId] = current;
+    }
+    if (normalizedEventType === "quiz_question_submitted" || normalizedEventType === "QuizQuestionSubmitted") {
+      if (nextSelectedIds.length) {
+        current.selected_option_ids = nextSelectedIds;
+        current.selected_option_texts = nextSelectedTexts;
+      }
+      quizAnswerStateByQuestionId[questionId] = current;
+    }
+    return answerStateProps(questionId);
   };
 
   const readStoredMetaEmailHash = () => {
@@ -348,6 +526,37 @@ function buildStandaloneImportedHtmlRuntimeScript({
       String(index),
       randomEventIdSegment(),
     ].join(":");
+  };
+
+  const buildMetaAddToCartHandoffEventId = (variantId) => {
+    return [
+      "mos",
+      "meta",
+      "AddToCart",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      resolveCanonicalSessionId() || "session",
+      cleanText(variantId) || "variant",
+      randomEventIdSegment(),
+    ].join(":");
+  };
+
+  const buildMetaInitiateCheckoutHandoffEventId = (transitionId) => {
+    const cleanedTransitionId = cleanText(transitionId);
+    return cleanedTransitionId ? "checkout_started:" + cleanedTransitionId : "";
+  };
+
+  const metaAddToCartCheckoutEventIds = {};
+  const metaAddToCartNextEventIds = {};
+  const metaAddToCartVariantKey = (variantId) => cleanText(variantId) || "default";
+  const resolveMetaAddToCartCheckoutEventId = (variantId) => {
+    const key = metaAddToCartVariantKey(variantId);
+    if (!metaAddToCartCheckoutEventIds[key]) {
+      metaAddToCartCheckoutEventIds[key] =
+        metaAddToCartNextEventIds[key] || buildMetaAddToCartHandoffEventId(variantId);
+      metaAddToCartNextEventIds[key] = metaAddToCartCheckoutEventIds[key];
+    }
+    return metaAddToCartCheckoutEventIds[key];
   };
 
   const CLICK_ID_KEYS = ["fbclid", "gclid", "ttclid", "msclkid", "twclid", "li_fat_id"];
@@ -864,13 +1073,26 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   const resolveProductMetaParams = (props) => {
+    const explicitContentIds = cleanStringArray(props && (props.content_ids || props.contentIds));
+    const variantId = cleanText(
+      props &&
+        (
+          props.variantId ||
+          props.variant_id ||
+          props.contentId ||
+          props.content_id
+        ),
+    );
+    const contentIds = explicitContentIds.length ? explicitContentIds : (variantId ? [variantId] : []);
+    const explicitNumItems = Number(props && (props.num_items || props.numItems));
     const params = {
       content_type: "product",
-      num_items: 1,
+      num_items: Number.isFinite(explicitNumItems) && explicitNumItems > 0
+        ? explicitNumItems
+        : Math.max(1, contentIds.length || 1),
     };
-    const variantId = cleanText(props && props.variantId);
-    if (variantId) {
-      params.content_ids = [variantId];
+    if (contentIds.length) {
+      params.content_ids = contentIds;
     }
     return params;
   };
@@ -903,26 +1125,19 @@ function buildStandaloneImportedHtmlRuntimeScript({
       }];
     }
     if (eventType === "add_to_cart") {
+      const variantId = cleanText(props && (props.variantId || props.variant_id || props.contentId || props.content_id));
+      const metaAddToCartEventId =
+        cleanText(props && (props.metaAddToCartEventId || props.meta_add_to_cart_event_id)) ||
+        resolveMetaAddToCartCheckoutEventId(variantId);
       return [{
         method: "track",
         eventName: "AddToCart",
         params: resolveProductMetaParams(props),
+        ...(metaAddToCartEventId ? { eventId: metaAddToCartEventId } : {}),
       }];
     }
     if (eventType === "sales_to_checkout_click") {
-      const variantId = cleanText(props && props.variantId);
       return [
-        ...(variantId
-          ? [{
-              method: "track",
-              eventName: "AddToCart",
-              params: {
-                content_ids: [variantId],
-                content_type: "product",
-                num_items: 1,
-              },
-            }]
-          : []),
         {
           method: "trackCustom",
           eventName: "SalesToCheckoutClick",
@@ -942,10 +1157,15 @@ function buildStandaloneImportedHtmlRuntimeScript({
       ];
     }
     if (eventType === "checkout_started") {
+      const transitionId = cleanText(props && (props.transitionId || props.transition_id));
+      const metaInitiateCheckoutEventId =
+        cleanText(props && (props.metaInitiateCheckoutEventId || props.meta_initiate_checkout_event_id)) ||
+        buildMetaInitiateCheckoutHandoffEventId(transitionId);
       return [{
         method: "track",
         eventName: "InitiateCheckout",
         params: resolveProductMetaParams(props),
+        ...(metaInitiateCheckoutEventId ? { eventId: metaInitiateCheckoutEventId } : {}),
       }];
     }
     if (eventType === "presell_page_view") {
@@ -1226,6 +1446,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
   let cachedCommercePromise = null;
   const preparedCheckoutCache = {};
   const preparedCheckoutInFlight = {};
+  const preparedCheckoutTransitionIds = {};
   const checkoutOriginPreconnects = {};
   const checkoutUrlPrefetches = {};
   const checkoutBindingElements = {};
@@ -1294,7 +1515,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const SCROLL_DEPTH_MILESTONES = [10, 25, 50, 75, 90, 100];
   const QUALIFIED_ACTIVE_TIME_MS = 3000;
   const QUALIFIED_SCROLL_DEPTH_PCT = 25;
-  const trackedScrollDepthMilestones = {};
+  const scrollDepthStateByKey = {};
   const observedViewTargetKeys = {};
   const interactionListenerKeys = {};
   let interactionSequence = 0;
@@ -1341,7 +1562,37 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
   };
 
-  const calculateScrollDepthPct = () => {
+  let lastScrollDepthElement = null;
+  const resolveScrollDepthStateKey = () => {
+    return [
+      cleanText(config.pageId) || "page",
+      window.location.pathname || "",
+      window.location.search || "",
+      window.location.hash || "",
+    ].join("|");
+  };
+  const resolveScrollDepthState = () => {
+    const key = resolveScrollDepthStateKey();
+    if (!scrollDepthStateByKey[key]) {
+      scrollDepthStateByKey[key] = {
+        maxScrollDepthPct: 0,
+        trackedMilestones: {},
+      };
+    }
+    return scrollDepthStateByKey[key];
+  };
+  const calculateElementScrollDepthPct = (element) => {
+    if (!(element instanceof HTMLElement)) return null;
+    if (element.isConnected === false) return null;
+    const scrollHeight = element.scrollHeight || 0;
+    const viewportHeight = element.clientHeight || 0;
+    if (!scrollHeight || !viewportHeight) return null;
+    if (viewportHeight >= scrollHeight) return null;
+    const scrollTop = element.scrollTop || 0;
+    return Math.max(0, Math.min(100, Math.round(((scrollTop + viewportHeight) / scrollHeight) * 100)));
+  };
+
+  const calculateWindowScrollDepthPct = () => {
     const doc = document.documentElement;
     const body = document.body;
     const scrollTop = window.scrollY || doc.scrollTop || (body && body.scrollTop) || 0;
@@ -1353,19 +1604,50 @@ function buildStandaloneImportedHtmlRuntimeScript({
       body ? body.offsetHeight || 0 : 0,
       viewportHeight,
     );
-    if (!scrollHeight || viewportHeight >= scrollHeight) return 100;
+    if (!scrollHeight || viewportHeight >= scrollHeight) return null;
     return Math.max(0, Math.min(100, Math.round(((scrollTop + viewportHeight) / scrollHeight) * 100)));
+  };
+
+  const calculateScrollDepthPct = () => {
+    const windowPct = calculateWindowScrollDepthPct();
+    const elementPct = calculateElementScrollDepthPct(lastScrollDepthElement);
+    if (typeof elementPct === "number" && Number.isFinite(elementPct)) {
+      return typeof windowPct === "number" && Number.isFinite(windowPct)
+        ? Math.max(windowPct, elementPct)
+        : elementPct;
+    }
+    return windowPct;
+  };
+
+  const resolveScrollDepthElement = (event) => {
+    const target = event && event.target;
+    if (!(target instanceof HTMLElement)) return null;
+    const maxScroll = Math.max(0, (target.scrollHeight || 0) - (target.clientHeight || 0));
+    if (maxScroll <= 8) return null;
+    return target;
   };
 
   const handleScrollDepthTracking = () => {
     scrollTrackingScheduled = false;
-    maxScrollDepthPct = Math.max(maxScrollDepthPct, calculateScrollDepthPct());
+    const scrollDepthPct = calculateScrollDepthPct();
+    if (typeof scrollDepthPct !== "number" || !Number.isFinite(scrollDepthPct)) {
+      return;
+    }
+    const scrollDepthState = resolveScrollDepthState();
+    scrollDepthState.maxScrollDepthPct = Math.max(
+      scrollDepthState.maxScrollDepthPct,
+      scrollDepthPct,
+    );
+    maxScrollDepthPct = Math.max(maxScrollDepthPct, scrollDepthState.maxScrollDepthPct);
     for (const milestone of SCROLL_DEPTH_MILESTONES) {
-      if (maxScrollDepthPct >= milestone && trackedScrollDepthMilestones[milestone] !== true) {
-        trackedScrollDepthMilestones[milestone] = true;
+      if (
+        scrollDepthState.maxScrollDepthPct >= milestone &&
+        scrollDepthState.trackedMilestones[milestone] !== true
+      ) {
+        scrollDepthState.trackedMilestones[milestone] = true;
         trackEvent("scroll_depth", {
           scrollDepthPct: milestone,
-          maxScrollDepthPct,
+          maxScrollDepthPct: scrollDepthState.maxScrollDepthPct,
           activeTimeMs: Math.round(currentActiveTimeMs()),
         });
       }
@@ -1373,7 +1655,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
     evaluateQualifiedSession("scroll_depth");
   };
 
-  const scheduleScrollDepthTracking = () => {
+  const scheduleScrollDepthTracking = (event) => {
+    const scrollElement = resolveScrollDepthElement(event);
+    if (scrollElement) {
+      lastScrollDepthElement = scrollElement;
+    }
     if (scrollTrackingScheduled) return;
     scrollTrackingScheduled = true;
     if (typeof window.requestAnimationFrame === "function") {
@@ -1394,10 +1680,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
       resumeActiveTime();
     });
     window.addEventListener("pagehide", pauseActiveTime);
-    window.addEventListener("scroll", scheduleScrollDepthTracking, { passive: true });
+    window.addEventListener("scroll", scheduleScrollDepthTracking, { passive: true, capture: true });
+    document.addEventListener("scroll", scheduleScrollDepthTracking, { passive: true, capture: true });
     window.addEventListener("resize", scheduleScrollDepthTracking);
     window.setInterval(() => evaluateQualifiedSession("active_time"), 1000);
-    scheduleScrollDepthTracking();
   };
 
   const observationTargetsFromManifest = () => {
@@ -1603,10 +1889,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
         event: target.event === "input" || target.event === "change" ? target.event : "click",
         source: target.source === "text" || target.source === "checked" ? target.source : "value",
         interactionType: cleanText(target.interactionType) || kind,
+        submitOnSelect: target.submitOnSelect === true,
         declaredProps: buildDeclaredTargetProps(target),
       });
     };
     const manifest = config.manifest || {};
+    if (Array.isArray(manifest.quizOptions)) {
+      manifest.quizOptions.forEach((target) => addTarget("quiz_option_selected", "quiz_option", target));
+    }
+    if (Array.isArray(manifest.quizSubmissions)) {
+      manifest.quizSubmissions.forEach((target) => addTarget("quiz_question_submitted", "quiz_submission", target));
+    }
     if (Array.isArray(manifest.selectors)) {
       manifest.selectors.forEach((target) => addTarget("selector_interaction", "selector", target));
     }
@@ -1654,11 +1947,28 @@ function buildStandaloneImportedHtmlRuntimeScript({
       interactionSequence,
       ...(target.kind === "selector" ? { selectorId: target.id } : {}),
       ...(target.kind === "product_detail" ? { productDetailId: target.id } : {}),
+      ...(target.kind === "quiz_option" ? { optionId: target.id, option_id: target.id } : {}),
+      ...(target.kind === "quiz_submission" ? { questionSubmitId: target.id, question_submit_id: target.id } : {}),
     };
-    trackEvent(target.eventType, props);
+    const enrichedProps = {
+      ...props,
+      ...((target.kind === "quiz_option" || target.kind === "quiz_submission")
+        ? updateQuizAnswerState(target.eventType, props)
+        : {}),
+    };
+    trackEvent(target.eventType, enrichedProps);
+    if (target.eventType === "quiz_option_selected") {
+      const autoSubmit = target.submitOnSelect === true || !isMultiSelectQuestion(null, enrichedProps);
+      if (autoSubmit) {
+        trackEvent("quiz_question_submitted", {
+          ...enrichedProps,
+          ...updateQuizAnswerState("quiz_question_submitted", enrichedProps),
+        });
+      }
+    }
     if (target.eventType === "selector_interaction" && selectedValueLooksSubscribed(selectedValue)) {
       trackEvent("subscription_selected", {
-        ...props,
+        ...enrichedProps,
         subscription_flag: true,
       });
     }
@@ -1675,6 +1985,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
         const key = [target.eventType, target.id, String(index), target.event].join(":");
         if (interactionListenerKeys[key] === true) return;
         interactionListenerKeys[key] = true;
+        if (target.kind === "quiz_option" || target.kind === "quiz_submission") {
+          element.dataset.mosDirectControlTracking = "true";
+        }
         element.addEventListener(target.event, () => trackInteractionTarget(target, element), {
           passive: true,
         });
@@ -1801,6 +2114,56 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return note;
   };
 
+  const CHECKOUT_INLINE_LABEL_SELECTOR =
+    "[data-tenor-cart-checkout-label], [data-mos-checkout-label], [data-checkout-label]";
+
+  const checkoutInlineLoadingLabel = (labelElement, label) => {
+    if (labelElement && labelElement.hasAttribute("data-tenor-cart-checkout-label")) {
+      return "Loading...";
+    }
+    return cleanText(label) || CHECKOUT_LOADING_LABEL;
+  };
+
+  const setCheckoutElementVisualWaiting = (element, waiting, label) => {
+    if (!(element instanceof HTMLElement)) return;
+    const labelTargets = Array.from(element.querySelectorAll(CHECKOUT_INLINE_LABEL_SELECTOR)).filter(
+      (target) => target instanceof HTMLElement,
+    );
+    if (waiting) {
+      if (!("mosCheckoutSavedIsLoadingClass" in element.dataset)) {
+        element.dataset.mosCheckoutSavedIsLoadingClass = element.classList.contains("is-loading") ? "true" : "false";
+      }
+      if (!("mosCheckoutSavedLoadingClass" in element.dataset)) {
+        element.dataset.mosCheckoutSavedLoadingClass = element.classList.contains("loading") ? "true" : "false";
+      }
+      element.classList.add("is-loading");
+      if (element.querySelector(".loading__spinner")) {
+        element.classList.add("loading");
+      }
+      labelTargets.forEach((target) => {
+        if (!("mosCheckoutSavedLabel" in target.dataset)) {
+          target.dataset.mosCheckoutSavedLabel = target.textContent || "";
+        }
+        target.textContent = checkoutInlineLoadingLabel(target, label);
+      });
+      return;
+    }
+    if (element.dataset.mosCheckoutSavedIsLoadingClass !== "true") {
+      element.classList.remove("is-loading");
+    }
+    if (element.dataset.mosCheckoutSavedLoadingClass !== "true") {
+      element.classList.remove("loading");
+    }
+    delete element.dataset.mosCheckoutSavedIsLoadingClass;
+    delete element.dataset.mosCheckoutSavedLoadingClass;
+    labelTargets.forEach((target) => {
+      if ("mosCheckoutSavedLabel" in target.dataset) {
+        target.textContent = target.dataset.mosCheckoutSavedLabel || "";
+        delete target.dataset.mosCheckoutSavedLabel;
+      }
+    });
+  };
+
   const setCheckoutElementWaiting = (bindingId, element, waiting, label) => {
     const note = ensureCheckoutStatusNote(bindingId, element);
     if (waiting) {
@@ -1825,11 +2188,13 @@ function buildStandaloneImportedHtmlRuntimeScript({
       if (element instanceof HTMLButtonElement) {
         element.disabled = true;
       }
+      setCheckoutElementVisualWaiting(element, true, label);
       note.textContent = cleanText(label) || CHECKOUT_LOADING_LABEL;
       note.style.display = "block";
       return;
     }
 
+    setCheckoutElementVisualWaiting(element, false, label);
     delete element.dataset.mosCheckoutWaiting;
     element.removeAttribute("aria-busy");
     element.removeAttribute("aria-disabled");
@@ -1966,10 +2331,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return JSON.stringify(value);
   };
 
-  const checkoutAttributionProps = ({ ctaId, transitionId } = {}) => {
+  const checkoutAttributionProps = ({ ctaId, transitionId, resolvedVariantId } = {}) => {
     const metaProps = resolveMetaAttributionProps(window.location.href);
     const clickProps = resolveClickAttribution();
     const experimentId = resolveExperimentId();
+    const metaAddToCartEventId = resolveMetaAddToCartCheckoutEventId(resolvedVariantId);
+    const metaInitiateCheckoutEventId = buildMetaInitiateCheckoutHandoffEventId(transitionId);
     return {
       ...(clickProps.clickId ? { clickId: clickProps.clickId, clickIdType: clickProps.clickIdType } : {}),
       ...(metaProps.fbp ? { fbp: metaProps.fbp } : {}),
@@ -1981,11 +2348,13 @@ function buildStandaloneImportedHtmlRuntimeScript({
       ...(experimentId ? { experimentId } : {}),
       ...(cleanText(ctaId) ? { ctaId: cleanText(ctaId) } : {}),
       ...(cleanText(transitionId) ? { transitionId: cleanText(transitionId) } : {}),
+      ...(metaAddToCartEventId ? { mosMetaAddToCartEventId: metaAddToCartEventId } : {}),
+      ...(metaInitiateCheckoutEventId ? { mosMetaInitiateCheckoutEventId: metaInitiateCheckoutEventId } : {}),
     };
   };
 
   const checkoutAttributeMap = ({ resolvedVariantId, resolvedSelection, ctaId, transitionId }) => {
-    const attribution = checkoutAttributionProps({ ctaId, transitionId });
+    const attribution = checkoutAttributionProps({ ctaId, transitionId, resolvedVariantId });
     return {
       funnel_slug: cleanText(config.funnelSlug),
       funnel_id: cleanText(config.funnelId),
@@ -2009,6 +2378,8 @@ function buildStandaloneImportedHtmlRuntimeScript({
       experiment_id: attribution.experimentId,
       cta_id: attribution.ctaId,
       transition_id: attribution.transitionId,
+      mos_meta_add_to_cart_event_id: attribution.mosMetaAddToCartEventId,
+      mos_meta_initiate_checkout_event_id: attribution.mosMetaInitiateCheckoutEventId,
     };
   };
 
@@ -2123,7 +2494,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       visitorId: config.visitorId,
       sessionId: config.sessionId,
       utm: getUtmParams(),
-      ...checkoutAttributionProps({ ctaId, transitionId }),
+      ...checkoutAttributionProps({ ctaId, transitionId, resolvedVariantId }),
     };
   };
 
@@ -2283,12 +2654,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
     );
     const resolvedVariantId = cleanText(variant && variant.id ? variant.id : variantId);
     const resolvedSelection = normalizeSelection(selection) || {};
+    const cacheKey = buildPreparedCheckoutCacheKey(resolvedVariantId, resolvedSelection);
+    if (cacheKey && !preparedCheckoutTransitionIds[cacheKey]) {
+      preparedCheckoutTransitionIds[cacheKey] = buildCanonicalEventId("checkout_transition");
+    }
     return {
       variant,
       resolvedVariantId,
       resolvedSelection,
       ctaId: bindingId,
-      cacheKey: buildPreparedCheckoutCacheKey(resolvedVariantId, resolvedSelection),
+      cacheKey,
+      transitionId: cacheKey ? preparedCheckoutTransitionIds[cacheKey] : buildCanonicalEventId("checkout_transition"),
     };
   };
 
@@ -3108,9 +3484,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
         if (!(element instanceof HTMLElement)) {
           continue;
         }
-        if (element.dataset.mosStandaloneImportedHtmlBound === "true") {
+        if (element.__mosStandaloneImportedHtmlBound === true) {
           continue;
         }
+        element.__mosStandaloneImportedHtmlBound = true;
         if (binding.type === "checkout" && binding.checkout) {
           registerCheckoutElement(String(binding.id || "unknown"), element);
         }
@@ -3140,7 +3517,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
           registerEmailCaptureSubmitBinding(binding, element);
           continue;
         }
-        element.addEventListener("click", async (event) => {
+        const handleBindingClick = async (event) => {
+          if (event.__mosStandaloneImportedHtmlBindingHandled === true) {
+            return;
+          }
+          event.__mosStandaloneImportedHtmlBindingHandled = true;
           const modifiedClick =
             event instanceof MouseEvent &&
             (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0);
@@ -3242,10 +3623,14 @@ function buildStandaloneImportedHtmlRuntimeScript({
               cacheKey: null,
               message: CHECKOUT_CLICK_LOADING_LABEL,
             });
-            const { variant, resolvedVariantId, resolvedSelection, cacheKey } = await syncCheckoutBindingWarmState(
-              binding,
-            );
-            const transitionId = buildCanonicalEventId("checkout_transition");
+            const {
+              variant,
+              resolvedVariantId,
+              resolvedSelection,
+              cacheKey,
+              transitionId: resolvedTransitionId,
+            } = await syncCheckoutBindingWarmState(binding);
+            const transitionId = cleanText(resolvedTransitionId) || buildCanonicalEventId("checkout_transition");
             const checkoutEventProps = {
               fromStage: config.pageStage,
               from_stage: config.pageStage,
@@ -3368,7 +3753,32 @@ function buildStandaloneImportedHtmlRuntimeScript({
               message: CHECKOUT_ERROR_LABEL,
             });
           }
-        });
+        };
+        if (binding.type === "internal_navigation") {
+          if (element.__mosStandaloneImportedHtmlClickOverrideBound !== true) {
+            element.__mosStandaloneImportedHtmlClickOverrideBound = true;
+            try {
+              element.click = () => {
+                const syntheticClick = new MouseEvent("click", {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                });
+                void handleBindingClick(syntheticClick);
+              };
+            } catch (_error) {}
+          }
+          document.addEventListener("click", (event) => {
+            const target = event && event.target instanceof Element
+              ? event.target.closest(selector)
+              : null;
+            if (!target) {
+              return;
+            }
+            void handleBindingClick(event);
+          }, { capture: true });
+        }
+        element.addEventListener("click", handleBindingClick);
       }
     }
   };

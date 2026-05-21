@@ -69,6 +69,103 @@ def test_validate_imported_html_document_manifest_accepts_sales_checkout_binding
     assert normalized["bindings"][0]["checkout"]["variantResolver"]["variantId"] == "variant-1"
 
 
+def test_validate_imported_html_document_manifest_requires_quiz_answer_metadata():
+    html_document = """
+    <!doctype html>
+    <html>
+      <body>
+        <section id="lead">Lead</section>
+        <section id="q1">Question one</section>
+        <button id="o1">Often</button>
+        <a id="to-sales">Continue</a>
+      </body>
+    </html>
+    """
+    manifest = {
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "quiz",
+        "pageStage": "pre_sales",
+        "quizId": "test-quiz",
+        "quizVersion": "v1",
+        "quizVariant": "control",
+        "quizLeads": [{"id": "lead", "selector": "#lead"}],
+        "quizQuestions": [
+            {
+                "id": "q1",
+                "selector": "#q1",
+                "questionId": "q1",
+                "questionText": "Question one",
+                "questionIndex": 1,
+                "questionType": "single_select",
+            }
+        ],
+        "quizOptions": [
+            {
+                "id": "o1",
+                "selector": "#o1",
+                "questionId": "q1",
+                "optionId": "o1",
+                "optionText": "Often",
+                "optionIndex": 1,
+                "selectionOrder": 1,
+                "submitOnSelect": True,
+            }
+        ],
+        "ctas": [{"id": "to-sales", "selector": "#to-sales", "ctaPosition": 1}],
+        "bindings": [
+            {
+                "id": "to-sales",
+                "type": "internal_navigation",
+                "selector": "#to-sales",
+                "targetPageId": "page-sales",
+                "trackEventType": "pre_sales_to_sales_click",
+            }
+        ],
+    }
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=html_document,
+        instrumentation_manifest=manifest,
+        current_page_stage="pre_sales",
+        current_page_id="page-quiz",
+        next_page_id="page-sales",
+        available_target_page_ids={"page-quiz", "page-sales"},
+        checkout_ready_variants=[],
+        require_stage_bindings=True,
+    )
+
+    assert normalized["quizQuestions"][0]["questionText"] == "Question one"
+    assert normalized["quizOptions"][0]["selectionOrder"] == 1
+
+    missing_text_manifest = json.loads(json.dumps(manifest))
+    del missing_text_manifest["quizOptions"][0]["optionText"]
+    with pytest.raises(ImportedHtmlRuntimeValidationError, match="optionText"):
+        validate_imported_html_document_manifest(
+            html_document=html_document,
+            instrumentation_manifest=missing_text_manifest,
+            current_page_stage="pre_sales",
+            current_page_id="page-quiz",
+            next_page_id="page-sales",
+            available_target_page_ids={"page-quiz", "page-sales"},
+            checkout_ready_variants=[],
+            require_stage_bindings=True,
+        )
+
+    missing_selection_manifest = json.loads(json.dumps(manifest))
+    del missing_selection_manifest["quizOptions"][0]["selectionOrder"]
+    with pytest.raises(ImportedHtmlRuntimeValidationError, match="selectionOrder"):
+        validate_imported_html_document_manifest(
+            html_document=html_document,
+            instrumentation_manifest=missing_selection_manifest,
+            current_page_stage="pre_sales",
+            current_page_id="page-quiz",
+            next_page_id="page-sales",
+            available_target_page_ids={"page-quiz", "page-sales"},
+            checkout_ready_variants=[],
+            require_stage_bindings=True,
+        )
+
+
 def test_validate_imported_html_document_manifest_accepts_custom_content_page():
     html_document = """
     <!doctype html>

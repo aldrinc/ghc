@@ -231,6 +231,10 @@ def _quiz_html_document() -> str:
             quizVersion: "v1",
             question_id: "q1",
             questionId: "q1",
+            question_text: "Local quiz question",
+            questionText: "Local quiz question",
+            question_type: "single_select",
+            questionType: "single_select",
             result_id: "result-a",
             resultId: "result-a",
             recommendation_id: "rec-a",
@@ -240,10 +244,23 @@ def _quiz_html_document() -> str:
           };
           emit("quiz_lead_viewed", base);
           emit("quiz_question_viewed", base);
-          emit("quiz_option_presented", base);
-          emit("quiz_option_selected", Object.assign({}, base, { option_id: "a", optionId: "a" }));
-          emit("quiz_question_submitted", base);
-          emit("quiz_completed", Object.assign({}, base, { answer_path_id: "path-a", answerPathId: "path-a" }));
+          emit("quiz_option_presented", Object.assign({}, base, { option_id: "a", optionId: "a", option_text: "Option A", optionText: "Option A" }));
+          emit("quiz_option_selected", Object.assign({}, base, { option_id: "a", optionId: "a", option_text: "Option A", optionText: "Option A", selected_option_ids: ["a"], selectedOptionIds: ["a"], selected_option_texts: ["Option A"], selectedOptionTexts: ["Option A"] }));
+          emit("quiz_question_submitted", Object.assign({}, base, { selected_option_ids: ["a"], selectedOptionIds: ["a"], selected_option_texts: ["Option A"], selectedOptionTexts: ["Option A"] }));
+          emit("quiz_completed", Object.assign({}, base, {
+            answer_path_id: "path-a",
+            answerPathId: "path-a",
+            answers: [{
+              question_id: "q1",
+              questionId: "q1",
+              question_text: "Local quiz question",
+              questionText: "Local quiz question",
+              selected_option_ids: ["a"],
+              selectedOptionIds: ["a"],
+              selected_option_texts: ["Option A"],
+              selectedOptionTexts: ["Option A"],
+            }],
+          }));
           emit("quiz_result_viewed", base);
           emit("quiz_recommendation_viewed", base);
           emit("quiz_cta_viewed", base);
@@ -547,14 +564,19 @@ def _write_quiz_candidate_site_from_fixture(
             "quizVersion": "v1",
             "quizVariant": "default",
             "quizLeads": [{"id": "quiz-lead", "selector": "#quiz-lead"}],
-            "quizQuestions": [{"id": "q1", "selector": "#quiz-question", "questionIndex": 1}],
+            "quizQuestions": [{"id": "q1", "selector": "#quiz-question", "questionId": "q1", "questionText": "Local quiz question", "questionIndex": 1, "questionType": "single_select"}],
             "quizOptions": [
                 {
                     "id": "a",
                     "selector": "#quiz-option",
                     "questionId": "q1",
+                    "questionText": "Local quiz question",
                     "questionIndex": 1,
                     "optionId": "a",
+                    "optionText": "Option A",
+                    "optionIndex": 1,
+                    "selectionOrder": 1,
+                    "submitOnSelect": True,
                 }
             ],
             "quizResults": [{"id": "result-a", "selector": "#quiz-result"}],
@@ -623,12 +645,6 @@ class CandidateHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlsplit(self.path)
-        if parsed.path == "/__mos/meta/fbevents.js":
-            self._send(200, b"window.fbq=function(){};/* /__mos/meta/tr */", "application/javascript")
-            return
-        if parsed.path == "/__mos/meta/tr/":
-            self._send(200, b"ok", "text/plain")
-            return
         if parsed.path == "/static/array.js":
             self._send(200, b"window.__localPosthogAssetLoaded=true;", "application/javascript")
             return
@@ -764,7 +780,21 @@ def main() -> None:
             )
             start_manifest = (
                 {
-                    "quizOptions": [{"id": "a", "selector": "#quiz-option", "questionIndex": 1}],
+                    "quizOptions": [
+                        {
+                            "id": "a",
+                            "selector": "#quiz-option",
+                            "questionId": "q1",
+                            "questionText": "Local quiz question",
+                            "questionIndex": 1,
+                            "questionType": "single_select",
+                            "optionId": "a",
+                            "optionText": "Option A",
+                            "optionIndex": 1,
+                            "selectionOrder": 1,
+                            "submitOnSelect": True,
+                        }
+                    ],
                 }
                 if start_artifact_kind == "quiz"
                 else {}

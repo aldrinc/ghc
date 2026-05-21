@@ -13,7 +13,6 @@ from app.services.campaign_destinations import normalize_destination_type
 from app.services.funnel_template_categories import resolve_funnel_template_public_stage
 from app.services.paid_ads_qa import clean_optional_text
 
-
 HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION = "html-deploy-v1"
 LEGACY_IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = "imported-html-instrumentation-v1"
 IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION
@@ -171,7 +170,9 @@ class ImportedHtmlOptionValuesVariantResolver(BaseModel):
     optionSelectors: list[ImportedHtmlOptionSelector] = Field(default_factory=list, min_length=1)
 
 
-ImportedHtmlVariantResolver = ImportedHtmlFixedVariantResolver | ImportedHtmlOptionValuesVariantResolver
+ImportedHtmlVariantResolver = (
+    ImportedHtmlFixedVariantResolver | ImportedHtmlOptionValuesVariantResolver
+)
 
 
 class ImportedHtmlExternalUrlByVariant(BaseModel):
@@ -193,7 +194,9 @@ class ImportedHtmlExternalCheckoutConfig(BaseModel):
 
     mode: Literal["external_checkout_url"]
     variantResolver: ImportedHtmlVariantResolver
-    externalUrlsByVariant: list[ImportedHtmlExternalUrlByVariant] = Field(default_factory=list, min_length=1)
+    externalUrlsByVariant: list[ImportedHtmlExternalUrlByVariant] = Field(
+        default_factory=list, min_length=1
+    )
 
 
 ImportedHtmlCheckoutConfig = ImportedHtmlPublicCheckoutConfig | ImportedHtmlExternalCheckoutConfig
@@ -248,13 +251,27 @@ class ImportedHtmlViewTarget(BaseModel):
     sectionId: str | None = Field(default=None, max_length=120)
     ctaPosition: int | None = Field(default=None, ge=1)
     questionId: str | None = Field(default=None, max_length=120)
+    questionText: str | None = Field(default=None, max_length=500)
     questionIndex: int | None = Field(default=None, ge=1)
+    questionType: str | None = Field(default=None, max_length=80)
     questionRole: str | None = Field(default=None, max_length=120)
+    isRequired: bool | None = None
     optionId: str | None = Field(default=None, max_length=120)
+    optionText: str | None = Field(default=None, max_length=500)
+    optionIndex: int | None = Field(default=None, ge=1)
+    optionPosition: int | None = Field(default=None, ge=1)
     optionRole: str | None = Field(default=None, max_length=120)
+    selectionOrder: int | None = Field(default=None, ge=1)
+    submitOnSelect: bool | None = None
     resultId: str | None = Field(default=None, max_length=120)
     segmentId: str | None = Field(default=None, max_length=120)
     recommendationId: str | None = Field(default=None, max_length=120)
+    screenIndex: int | None = Field(default=None, ge=0)
+    screenName: str | None = Field(default=None, max_length=160)
+    route: str | None = Field(default=None, max_length=160)
+    hash: str | None = Field(default=None, max_length=160)
+    titleContains: str | None = Field(default=None, max_length=500)
+    requiredBreakpoints: list[int] = Field(default_factory=list)
     offerId: str | None = Field(default=None, max_length=120)
     sku: str | None = Field(default=None, max_length=120)
     mechanismName: str | None = Field(default=None, max_length=160)
@@ -310,6 +327,8 @@ class ImportedHtmlInstrumentationManifest(BaseModel):
     quizLeads: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     quizQuestions: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     quizOptions: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizSubmissions: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizScrollTargets: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     quizResults: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     quizMechanisms: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     quizRecommendations: list[ImportedHtmlViewTarget] = Field(default_factory=list)
@@ -318,7 +337,10 @@ class ImportedHtmlInstrumentationManifest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_artifact_kind_stage(self) -> "ImportedHtmlInstrumentationManifest":
-        if self.htmlArtifactKind in {"listicle", "listicle_hybrid", "quiz"} and self.pageStage != "pre_sales":
+        if (
+            self.htmlArtifactKind in {"listicle", "listicle_hybrid", "quiz"}
+            and self.pageStage != "pre_sales"
+        ):
             raise ValueError(
                 f"htmlArtifactKind '{self.htmlArtifactKind}' requires pageStage 'pre_sales'."
             )
@@ -343,9 +365,159 @@ class ImportedHtmlInstrumentationManifest(BaseModel):
                     + "."
                 )
             if not self.quizQuestions:
-                raise ValueError("htmlArtifactKind 'quiz' requires at least one quizQuestions target.")
+                raise ValueError(
+                    "htmlArtifactKind 'quiz' requires at least one quizQuestions target."
+                )
             if not self.quizOptions:
-                raise ValueError("htmlArtifactKind 'quiz' requires at least one quizOptions target.")
+                raise ValueError(
+                    "htmlArtifactKind 'quiz' requires at least one quizOptions target."
+                )
+            question_ids: set[str] = set()
+            question_types: dict[str, str] = {}
+            for index, question in enumerate(self.quizQuestions):
+                missing_question_fields = [
+                    field_name
+                    for field_name, value in (
+                        ("questionId", question.questionId),
+                        ("questionText", question.questionText),
+                    )
+                    if not str(value or "").strip()
+                ]
+                if missing_question_fields:
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizQuestions["
+                        + str(index)
+                        + "] requires stable quiz answer metadata: "
+                        + ", ".join(missing_question_fields)
+                        + "."
+                    )
+                question_id = str(question.questionId).strip()
+                question_ids.add(question_id)
+                question_types[question_id] = (
+                    str(question.questionType or "single_select").strip().lower()
+                )
+            option_ids_by_question: dict[str, set[str]] = {}
+            selected_option_ids_by_question: dict[str, set[str]] = {}
+            selection_orders: set[int] = set()
+            for index, option in enumerate(self.quizOptions):
+                missing_option_fields = [
+                    field_name
+                    for field_name, value in (
+                        ("questionId", option.questionId),
+                        ("optionId", option.optionId),
+                        ("optionText", option.optionText),
+                    )
+                    if not str(value or "").strip()
+                ]
+                if missing_option_fields:
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizOptions["
+                        + str(index)
+                        + "] requires stable quiz answer metadata: "
+                        + ", ".join(missing_option_fields)
+                        + "."
+                    )
+                option_question_id = str(option.questionId or "").strip()
+                if option_question_id and option_question_id not in question_ids:
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizOptions["
+                        + str(index)
+                        + "] references unknown questionId '"
+                        + option_question_id
+                        + "'."
+                    )
+                option_id = str(option.optionId or "").strip()
+                option_ids = option_ids_by_question.setdefault(option_question_id, set())
+                if option_id in option_ids:
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizOptions["
+                        + str(index)
+                        + "] duplicates optionId '"
+                        + option_id
+                        + "' for questionId '"
+                        + option_question_id
+                        + "'."
+                    )
+                option_ids.add(option_id)
+                if option.selectionOrder is not None:
+                    if option.selectionOrder in selection_orders:
+                        raise ValueError(
+                            "htmlArtifactKind 'quiz' quizOptions["
+                            + str(index)
+                            + "] duplicates selectionOrder "
+                            + str(option.selectionOrder)
+                            + "."
+                        )
+                    selection_orders.add(option.selectionOrder)
+                    selected_option_ids_by_question.setdefault(option_question_id, set()).add(
+                        option_id
+                    )
+            for question_index, question in enumerate(self.quizQuestions):
+                question_id = str(question.questionId or "").strip()
+                if not option_ids_by_question.get(question_id):
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizQuestions["
+                        + str(question_index)
+                        + "] has no quizOptions for questionId '"
+                        + question_id
+                        + "'."
+                    )
+                if not selected_option_ids_by_question.get(question_id):
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizQuestions["
+                        + str(question_index)
+                        + "] requires at least one quizOptions target with selectionOrder "
+                        + "so validation can execute a deterministic answer path."
+                    )
+            submission_question_ids = {
+                str(submission.questionId or "").strip()
+                for submission in self.quizSubmissions
+                if str(submission.questionId or "").strip()
+            }
+            for index, submission in enumerate(self.quizSubmissions):
+                submission_question_id = str(submission.questionId or "").strip()
+                if not submission_question_id:
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizSubmissions["
+                        + str(index)
+                        + "] requires questionId."
+                    )
+                if submission_question_id not in question_ids:
+                    raise ValueError(
+                        "htmlArtifactKind 'quiz' quizSubmissions["
+                        + str(index)
+                        + "] references unknown questionId '"
+                        + submission_question_id
+                        + "'."
+                    )
+            multi_select_question_ids = {
+                question_id
+                for question_id, question_type in question_types.items()
+                if question_type.replace("-", "_")
+                in {
+                    "multi_select",
+                    "multiple_select",
+                    "checkbox",
+                    "checkbox_group",
+                }
+            }
+            for question_id in multi_select_question_ids:
+                selected_options = [
+                    option
+                    for option in self.quizOptions
+                    if str(option.questionId or "").strip() == question_id
+                    and option.selectionOrder is not None
+                ]
+                if selected_options and not any(
+                    option.submitOnSelect is True for option in selected_options
+                ):
+                    if question_id not in submission_question_ids:
+                        raise ValueError(
+                            "htmlArtifactKind 'quiz' multi-select questionId '"
+                            + question_id
+                            + "' requires a quizSubmissions target unless a selected option "
+                            + "sets submitOnSelect=true."
+                        )
         return self
 
 
@@ -382,19 +554,20 @@ def imported_html_instrumentation_schema() -> dict[str, Any]:
                 **{key: _inline(value) for key, value in extras.items()},
             }
 
-        return {
-            key: _inline(value)
-            for key, value in node.items()
-            if key != "$defs"
-        }
+        return {key: _inline(value) for key, value in node.items() if key != "$defs"}
 
     return _inline(raw_schema)
 
 
 def coerce_imported_html_instrumentation_manifest(raw: Any) -> dict[str, Any]:
     if raw is None:
-        raise ImportedHtmlRuntimeValidationError("instrumentationManifest is required for imported HTML pages.")
-    if isinstance(raw, dict) and raw.get("schemaVersion") == LEGACY_IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION:
+        raise ImportedHtmlRuntimeValidationError(
+            "instrumentationManifest is required for imported HTML pages."
+        )
+    if (
+        isinstance(raw, dict)
+        and raw.get("schemaVersion") == LEGACY_IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION
+    ):
         raise ImportedHtmlRuntimeValidationError(
             "instrumentationManifest.schemaVersion must be 'html-deploy-v1'. "
             "Rebuild this page with the HTML deploy manifest contract instead of the legacy imported HTML schema."
@@ -402,7 +575,9 @@ def coerce_imported_html_instrumentation_manifest(raw: Any) -> dict[str, Any]:
     try:
         manifest = ImportedHtmlInstrumentationManifest.model_validate(raw)
     except Exception as exc:  # noqa: BLE001
-        raise ImportedHtmlRuntimeValidationError(f"instrumentationManifest is invalid. {exc}") from exc
+        raise ImportedHtmlRuntimeValidationError(
+            f"instrumentationManifest is invalid. {exc}"
+        ) from exc
     return manifest.model_dump(mode="json", exclude_none=True)
 
 
@@ -448,6 +623,8 @@ def validate_imported_html_document_manifest(
         ("quiz_lead", manifest.quizLeads),
         ("quiz_question", manifest.quizQuestions),
         ("quiz_option", manifest.quizOptions),
+        ("quiz_submission", manifest.quizSubmissions),
+        ("quiz_scroll", manifest.quizScrollTargets),
         ("quiz_result", manifest.quizResults),
         ("quiz_mechanism", manifest.quizMechanisms),
         ("quiz_recommendation", manifest.quizRecommendations),
@@ -497,13 +674,21 @@ def validate_imported_html_document_manifest(
                 raise ImportedHtmlRuntimeValidationError(
                     f"Binding '{binding.id}' has unsupported internal navigation trackEventType '{binding.trackEventType}'."
                 )
-            if current_page_stage == "pre_sales" and next_page_id and binding.targetPageId != next_page_id:
+            if (
+                current_page_stage == "pre_sales"
+                and next_page_id
+                and binding.targetPageId != next_page_id
+            ):
                 raise ImportedHtmlRuntimeValidationError(
                     f"Pre-sales binding '{binding.id}' must target the configured next page '{next_page_id}'."
                 )
         elif binding.type == "checkout":
             checkout_count += 1
-            if binding.trackEventType not in {"sales_to_checkout_click", "checkout_started", "custom_page_click"}:
+            if binding.trackEventType not in {
+                "sales_to_checkout_click",
+                "checkout_started",
+                "custom_page_click",
+            }:
                 raise ImportedHtmlRuntimeValidationError(
                     f"Binding '{binding.id}' has unsupported checkout trackEventType '{binding.trackEventType}'."
                 )
@@ -515,7 +700,10 @@ def validate_imported_html_document_manifest(
             )
 
     if require_stage_bindings:
-        if manifest.htmlArtifactKind in {"listicle", "listicle_hybrid", "quiz"} and not manifest.ctas:
+        if (
+            manifest.htmlArtifactKind in {"listicle", "listicle_hybrid", "quiz"}
+            and not manifest.ctas
+        ):
             raise ImportedHtmlRuntimeValidationError(
                 f"HTML deploy {manifest.htmlArtifactKind} pages must include at least one CTA target."
             )

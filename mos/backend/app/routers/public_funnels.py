@@ -69,6 +69,7 @@ from app.services.paid_ads_qa import clean_optional_text
 from app.services.public_runtime_tracking import resolve_public_runtime_tracking
 from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.funnel_templates import resolve_funnel_template_page_type
+from app.services.html_deploy_payloads import strip_inline_html_deploy_asset_payloads
 from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services.commerce_provider import create_managed_checkout
 from app.services.media_storage import MediaStorage
@@ -106,6 +107,12 @@ from app.services.medusa_store_runtime import (
 )
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+
+def _public_puck_data_payload(puck_data: dict[str, Any]) -> dict[str, Any]:
+    return strip_inline_html_deploy_asset_payloads(puck_data)
+
+
 _PREPARED_CHECKOUT_STATUS_PENDING = "pending"
 _PREPARED_CHECKOUT_STATUS_READY = "ready"
 _PREPARED_CHECKOUT_STATUS_FAILED = "failed"
@@ -115,6 +122,9 @@ _PREPARED_CHECKOUT_PENDING_STALE_AFTER = timedelta(seconds=30)
 _PREPARED_CHECKOUT_POLL_AFTER_MS = 150
 _CHECKOUT_SELECTION_PURCHASE_MODE_KEY = "PurchaseMode"
 _CHECKOUT_SELECTION_RESERVED_KEYS = {_CHECKOUT_SELECTION_PURCHASE_MODE_KEY.lower()}
+_PUBLIC_EVENT_TYPE_ALIASES = {
+    "QuizCompleted": FunnelEventTypeEnum.quiz_completed.value,
+}
 
 
 def _resolve_public_medusa_stripe_account_id(
@@ -859,7 +869,7 @@ def _public_site_page_response(
                 template_id=page.template_id,
                 page_name=page.name,
             ),
-            "puckData": version.puck_data,
+            "puckData": _public_puck_data_payload(version.puck_data),
             "pageMap": page_map,
             "pageStageMap": page_stage_map,
             "pageTypeMap": page_type_map,
@@ -923,7 +933,7 @@ def _public_site_page_response(
             template_id=page.template_id,
             page_name=page.name,
         ),
-        "puckData": version.puck_data,
+        "puckData": _public_puck_data_payload(version.puck_data),
         "pageMap": page_map,
         "pageStageMap": page_stage_map,
         "pageTypeMap": page_type_map,
@@ -1190,6 +1200,8 @@ def _checkout_tracking_props(metadata: dict[str, Any] | None) -> dict[str, Any]:
         "experiment_id",
         "cta_id",
         "transition_id",
+        "mos_meta_add_to_cart_event_id",
+        "mos_meta_initiate_checkout_event_id",
         "purchase_mode",
     }
     return {
@@ -1222,6 +1234,8 @@ def _shopify_checkout_attributes(metadata: dict[str, Any]) -> dict[str, Any]:
         "experiment_id",
         "cta_id",
         "transition_id",
+        "mos_meta_add_to_cart_event_id",
+        "mos_meta_initiate_checkout_event_id",
     }
     return {
         key: value
@@ -1604,7 +1618,7 @@ def public_funnel_page(
                 template_id=page.template_id if page else None,
                 page_name=page.name if page else None,
             ),
-            "puckData": version.puck_data,
+            "puckData": _public_puck_data_payload(version.puck_data),
             "pageMap": public_page_map,
             "pageStageMap": page_stage_map,
             "pageTypeMap": page_type_map,
@@ -1727,7 +1741,7 @@ def public_funnel_page(
             template_id=page.template_id,
             page_name=page.name,
         ),
-        "puckData": version.puck_data,
+        "puckData": _public_puck_data_payload(version.puck_data),
         "pageMap": public_page_map,
         "pageStageMap": page_stage_map,
         "pageTypeMap": page_type_map,
@@ -2105,6 +2119,14 @@ def _resolve_public_checkout_context(
         "experiment_id": _metadata_value(payload.experimentId, "experimentId"),
         "cta_id": _metadata_value(payload.ctaId, "ctaId"),
         "transition_id": _metadata_value(payload.transitionId, "transitionId"),
+        "mos_meta_add_to_cart_event_id": _metadata_value(
+            payload.mosMetaAddToCartEventId,
+            "mosMetaAddToCartEventId",
+        ),
+        "mos_meta_initiate_checkout_event_id": _metadata_value(
+            payload.mosMetaInitiateCheckoutEventId,
+            "mosMetaInitiateCheckoutEventId",
+        ),
     }
     metadata = {key: value for key, value in metadata.items() if value}
     return {
@@ -3746,8 +3768,9 @@ def ingest_public_events(
     seen_event_ids: set[str] = set()
     for ev in payload.events:
         occurred_at = ev.occurredAt or datetime.now(timezone.utc)
+        event_type_value = _PUBLIC_EVENT_TYPE_ALIASES.get(ev.eventType, ev.eventType)
         try:
-            event_type = FunnelEventTypeEnum(ev.eventType)
+            event_type = FunnelEventTypeEnum(event_type_value)
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

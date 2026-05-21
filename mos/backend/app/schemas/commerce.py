@@ -26,6 +26,8 @@ class PublicCheckoutRequest(BaseModel):
     experimentId: Optional[str] = None
     ctaId: Optional[str] = None
     transitionId: Optional[str] = None
+    mosMetaAddToCartEventId: Optional[str] = None
+    mosMetaInitiateCheckoutEventId: Optional[str] = None
 
 
 class PublicPreparedCheckoutResponse(BaseModel):

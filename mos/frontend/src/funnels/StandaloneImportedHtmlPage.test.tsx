@@ -619,7 +619,9 @@ describe("StandaloneImportedHtmlPage", () => {
           selector: "#q1",
           quizId: "brain-quiz",
           questionId: "q1",
+          questionText: "Question one",
           questionIndex: 1,
+          questionType: "single_select",
           questionRole: "symptom",
         },
       ],
@@ -629,7 +631,12 @@ describe("StandaloneImportedHtmlPage", () => {
           selector: "#o1",
           quizId: "brain-quiz",
           questionId: "q1",
+          questionText: "Question one",
           optionId: "o1",
+          optionText: "Often",
+          optionIndex: 1,
+          selectionOrder: 1,
+          submitOnSelect: true,
           optionRole: "high_intent",
         },
       ],
@@ -708,6 +715,11 @@ describe("StandaloneImportedHtmlPage", () => {
     }) as typeof dom.window.requestAnimationFrame;
 
     dom.window.eval(runtimeScript);
+    const option = dom.window.document.getElementById("o1");
+    if (!(option instanceof dom.window.HTMLElement)) {
+      throw new Error("Quiz option was not found.");
+    }
+    option.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
 
     await waitFor(() => {
       const trackedEvents = eventBodies.flatMap((body) =>
@@ -718,6 +730,8 @@ describe("StandaloneImportedHtmlPage", () => {
           "quiz_lead_viewed",
           "quiz_question_viewed",
           "quiz_option_presented",
+          "quiz_option_selected",
+          "quiz_question_submitted",
           "quiz_result_viewed",
           "quiz_mechanism_viewed",
           "quiz_cta_viewed",
@@ -727,14 +741,36 @@ describe("StandaloneImportedHtmlPage", () => {
         expect.objectContaining({
           quiz_id: "brain-quiz",
           question_id: "q1",
+          question_text: "Question one",
           question_index: 1,
+          question_type: "single_select",
           question_role: "symptom",
         }),
       );
       expect(trackedEvents.find((event) => event.eventType === "quiz_option_presented")?.props).toEqual(
         expect.objectContaining({
+          question_id: "q1",
+          question_text: "Question one",
           option_id: "o1",
+          option_text: "Often",
           option_role: "high_intent",
+        }),
+      );
+      expect(trackedEvents.find((event) => event.eventType === "quiz_option_selected")?.props).toEqual(
+        expect.objectContaining({
+          question_id: "q1",
+          question_text: "Question one",
+          option_id: "o1",
+          option_text: "Often",
+          selected_option_ids: ["o1"],
+          selected_option_texts: ["Often"],
+        }),
+      );
+      expect(trackedEvents.find((event) => event.eventType === "quiz_question_submitted")?.props).toEqual(
+        expect.objectContaining({
+          question_id: "q1",
+          selected_option_ids: ["o1"],
+          selected_option_texts: ["Often"],
         }),
       );
     });
@@ -834,6 +870,95 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(consumeResolved).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 180));
     expect(consumeResolved).toBe(true);
+
+    dom.window.close();
+  });
+
+  it("applies host checkout loading classes and labels while intercepting checkout clicks", async () => {
+    const htmlDocument = `
+      <html>
+        <body>
+          <button id="cart-checkout" class="tenor-cart__checkout" type="button">
+            <span data-tenor-cart-checkout-label>Secure Checkout</span>
+            <svg aria-hidden="true"></svg>
+          </button>
+        </body>
+      </html>
+    `;
+    const instrumentationManifest: ImportedHtmlInstrumentationManifest = {
+      schemaVersion: "html-deploy-v1",
+      htmlArtifactKind: "sales",
+      pageStage: "sales",
+      bindings: [
+        {
+          id: "cart-checkout",
+          type: "checkout",
+          event: "click",
+          selector: "#cart-checkout",
+          trackEventType: "sales_to_checkout_click",
+          checkout: {
+            mode: "external_checkout_url",
+            variantResolver: {
+              type: "fixed",
+              variantId: "variant-3x-watermelon",
+            },
+            externalUrlsByVariant: [{ variantId: "variant-3x-watermelon", url: "#checkout" }],
+          },
+        },
+      ],
+    };
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument,
+      instrumentationManifest,
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM(htmlDocument, {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/sales-page",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/public/checkout/prepare")) {
+        return new Response(
+          JSON.stringify({
+            preparedCheckoutId: "prepared-checkout-1",
+            status: "ready",
+            checkoutUrl: "#checkout",
+            sessionId: "checkout-session-1",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      if (url.includes("/public/events")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+
+    dom.window.eval(runtimeScript);
+    const button = dom.window.document.getElementById("cart-checkout");
+    if (!(button instanceof dom.window.HTMLButtonElement)) {
+      throw new Error("Cart checkout button was not bound in the standalone runtime.");
+    }
+
+    button.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    const label = button.querySelector("[data-tenor-cart-checkout-label]");
+
+    expect(button).toHaveClass("is-loading");
+    expect(button.dataset.mosCheckoutWaiting).toBe("true");
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(button).toBeDisabled();
+    expect(label?.textContent).toBe("Loading...");
+    await new Promise((resolve) => setTimeout(resolve, 20));
 
     dom.window.close();
   });
@@ -1041,6 +1166,10 @@ describe("StandaloneImportedHtmlPage", () => {
         trackEvent: (eventType: string, props?: Record<string, unknown>) => void;
       };
     }).MOSStandaloneAnalytics;
+    analytics?.trackEvent("add_to_cart", {
+      content_ids: ["supplement-subscription", "book", "caddy"],
+      num_items: 3,
+    });
     analytics?.trackEvent("sales_to_checkout_click", { variantId: "variant-3x-watermelon" });
     analytics?.trackEvent("checkout_started", { variantId: "variant-3x-watermelon" });
 
@@ -1051,9 +1180,9 @@ describe("StandaloneImportedHtmlPage", () => {
           "track",
           "AddToCart",
           expect.objectContaining({
-            content_ids: ["variant-3x-watermelon"],
+            content_ids: ["supplement-subscription", "book", "caddy"],
             content_type: "product",
-            num_items: 1,
+            num_items: 3,
           }),
           expect.objectContaining({ eventID: expect.any(String) }),
         ],
@@ -1069,6 +1198,8 @@ describe("StandaloneImportedHtmlPage", () => {
         ],
       ]),
     );
+    const addToCartCalls = fbqQueue.filter((entry) => entry[1] === "AddToCart");
+    expect(addToCartCalls).toHaveLength(1);
 
     dom.window.close();
   });
