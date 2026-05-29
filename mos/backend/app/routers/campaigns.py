@@ -24,6 +24,8 @@ from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepositor
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.schemas.campaign_creative_context import (
+    CampaignCreativeContextAngleSummary,
+    CampaignCreativeContextAnglesResponse,
     CampaignCreativeContextProviderRequest,
     CampaignCreativeContextProviderResponse,
     CampaignCreativeContextReadinessResponse,
@@ -82,6 +84,7 @@ from app.services.campaign_delivery import (
 )
 from app.services.campaign_creative_context import (
     ensure_campaign_creative_context_ready,
+    load_campaign_creative_context,
     materialize_skills_campaign_creative_context,
     persist_manual_campaign_creative_context,
     set_campaign_creative_context_provider,
@@ -756,6 +759,95 @@ def materialize_campaign_skills_creative_context(
     return CampaignSkillsCreativeContextMaterializeResponse.model_validate(response_payload).model_dump(
         mode="json"
     )
+
+
+@router.get("/{campaign_id}/creative-context/angles")
+def get_campaign_creative_context_angles(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign is missing a product_id. Attach a product before loading creative context angles.",
+        )
+
+    try:
+        outputs = load_campaign_creative_context(
+            session=session,
+            org_id=auth.org_id,
+            client_id=str(campaign.client_id),
+            product_id=str(campaign.product_id),
+            campaign_id=str(campaign.id),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    provider = outputs.get("provider")
+    provider_value = getattr(provider, "value", provider)
+
+    selected_angle_id: str | None = None
+    angle_summaries: list[CampaignCreativeContextAngleSummary] = []
+
+    angles_doc = outputs.get("angles")
+    if isinstance(angles_doc, dict):
+        raw_selected_angle_id = str(angles_doc.get("selectedAngleId") or "").strip()
+        if raw_selected_angle_id:
+            selected_angle_id = raw_selected_angle_id
+        angle_library = angles_doc.get("angleLibrary") if isinstance(angles_doc.get("angleLibrary"), list) else []
+        for entry in angle_library:
+            if not isinstance(entry, dict):
+                continue
+            angle_id = str(entry.get("angleId") or "").strip()
+            angle_name = str(entry.get("angleName") or "").strip()
+            if not angle_id or not angle_name:
+                continue
+            evidence = [
+                str(item).strip()
+                for item in (entry.get("evidence") if isinstance(entry.get("evidence"), list) else [])
+                if str(item).strip()
+            ]
+            angle_summaries.append(
+                CampaignCreativeContextAngleSummary(
+                    angleId=angle_id,
+                    angleName=angle_name,
+                    description=str(entry.get("description") or "").strip() or None,
+                    evidence=evidence,
+                )
+            )
+
+    if not angle_summaries:
+        stage3 = outputs.get("stage3") if isinstance(outputs.get("stage3"), dict) else {}
+        selected_angle = stage3.get("selected_angle") if isinstance(stage3.get("selected_angle"), dict) else {}
+        angle_id = str(selected_angle.get("angle_id") or "").strip()
+        angle_name = str(selected_angle.get("angle_name") or "").strip()
+        if angle_id and angle_name:
+            selected_angle_id = angle_id
+            evidence_dict = selected_angle.get("evidence") if isinstance(selected_angle.get("evidence"), dict) else {}
+            top_quotes = evidence_dict.get("top_quotes") if isinstance(evidence_dict.get("top_quotes"), list) else []
+            evidence: list[str] = []
+            for item in top_quotes:
+                if isinstance(item, dict):
+                    quote = str(item.get("quote") or "").strip()
+                    if quote:
+                        evidence.append(quote)
+            angle_summaries.append(
+                CampaignCreativeContextAngleSummary(
+                    angleId=angle_id,
+                    angleName=angle_name,
+                    description=str(selected_angle.get("description") or "").strip() or None,
+                    evidence=evidence,
+                )
+            )
+
+    return CampaignCreativeContextAnglesResponse(
+        campaignId=str(campaign.id),
+        provider=provider_value,
+        selectedAngleId=selected_angle_id,
+        angles=angle_summaries,
+    ).model_dump(mode="json")
 
 
 @router.get("/{campaign_id}/strategy-v2-launches")

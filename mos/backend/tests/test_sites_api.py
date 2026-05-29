@@ -16,6 +16,7 @@ from app.db.models import (
     FunnelPage,
     FunnelPageVersion,
     Product,
+    ProductVariant,
     Site,
     SiteLink,
     SitePage,
@@ -24,6 +25,7 @@ from app.db.models import (
     SitePublicationPage,
 )
 from app.services import site_blueprints
+from app.services import site_funnel_preparation as site_funnel_preparation_service
 
 
 B2B_EXPECTED_PAGES = [
@@ -150,6 +152,81 @@ def _create_product(api_client: TestClient, *, client_id: str, title: str) -> st
     )
     assert response.status_code == 201
     return response.json()["id"]
+
+
+def _create_campaign(
+    api_client: TestClient,
+    *,
+    client_id: str,
+    product_id: str,
+    name: str,
+) -> str:
+    response = api_client.post(
+        "/campaigns",
+        json={
+            "client_id": client_id,
+            "product_id": product_id,
+            "name": name,
+            "channels": ["meta"],
+            "asset_brief_types": ["image"],
+            "start_planning": False,
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def _fake_manual_creative_context(*, selected_angle_id: str, selected_angle_name: str, selected_variant_id: str) -> dict[str, object]:
+    return {
+        "provider": "manual",
+        "angles": {
+            "selectedAngleId": selected_angle_id,
+            "angleLibrary": [
+                {
+                    "angleId": selected_angle_id,
+                    "angleName": selected_angle_name,
+                    "description": "Angle description",
+                    "evidence": ["Evidence quote"],
+                }
+            ],
+        },
+        "offer": {
+            "ump": "Quiet brain support",
+            "ums": "Creatine gummies",
+            "corePromise": "Trust your brain again",
+            "valueStackSummary": "Starter offer",
+            "guaranteeType": "30-day",
+            "pricingRationale": "Accessible offer",
+            "selectedVariantId": selected_variant_id,
+            "selectedVariantName": "Starter Pack",
+            "offerDetailsMarkdown": "Offer details",
+        },
+        "copy": {
+            "headline": "Trust Your Brain Again",
+            "promiseContract": {
+                "loopQuestion": "Why does focus feel so fragile?",
+                "specificPromise": "Restore clarity.",
+                "deliveryTest": "Sharper focus.",
+                "minimumDelivery": "30 days of support.",
+            },
+            "presellMarkdown": "Pre-sales markdown",
+            "salesPageMarkdown": "Sales markdown",
+            "templatePayloads": None,
+        },
+        "copy_context": {
+            "audienceProductMarkdown": "Audience product context",
+            "brandVoiceMarkdown": "Brand voice",
+            "complianceMarkdown": "Compliance",
+            "mentalModelsMarkdown": "Mental models",
+            "awarenessAngleMatrixMarkdown": "Awareness matrix",
+        },
+        "artifact_ids": {
+            "angles": "angles-artifact",
+            "offer": "offer-artifact",
+            "copy": "copy-artifact",
+            "copy_context": "copy-context-artifact",
+        },
+    }
 
 
 def test_list_site_families_returns_medusa_b2b_starter(api_client: TestClient):
@@ -465,6 +542,621 @@ def test_create_site_funnel_succeeds(api_client: TestClient):
     funnels = list_response.json()
     assert len(funnels) == 1
     assert funnels[0]["id"] == funnel["id"]
+
+
+def test_create_site_funnel_template_import_succeeds(api_client: TestClient):
+    client_id = _create_client(api_client, name="Site Funnel Template Import Workspace")
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Imported Template Site",
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+
+    response = api_client.post(
+        f"/sites/{site['id']}/funnel-template-imports?clientId={client_id}",
+        json={
+            "sourceLabel": "EMBER HTML Template",
+            "htmlDocument": "<!doctype html><html><body><h1>EMBER</h1></body></html>",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["siteId"] == site["id"]
+    assert payload["sourceLabel"] == "EMBER HTML Template"
+    assert payload["htmlSnapshot"] == "<!doctype html><html><body><h1>EMBER</h1></body></html>"
+    assert payload["htmlLength"] > 0
+    assert payload["htmlSha256"]
+
+
+def test_prepare_site_funnel_from_imported_html_creates_prepared_page(api_client: TestClient, db_session, monkeypatch):
+    client_id = _create_client(api_client, name="Prepared Funnel Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="EMBER")
+    campaign_id = _create_campaign(
+        api_client,
+        client_id=client_id,
+        product_id=product_id,
+        name="EMBER Campaign",
+    )
+
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Prepared Template Site",
+            "productId": product_id,
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+
+    template_import_response = api_client.post(
+        f"/sites/{site['id']}/funnel-template-imports?clientId={client_id}",
+        json={
+            "sourceLabel": "EMBER Sales HTML",
+            "htmlDocument": (
+                "<!doctype html><html><body>"
+                "<h1>Original Heading</h1>"
+                "<button id='buy-now'>Buy now</button>"
+                "</body></html>"
+            ),
+        },
+    )
+    assert template_import_response.status_code == 201
+    template_import = template_import_response.json()
+
+    variant = ProductVariant(
+        product_id=uuid.UUID(product_id),
+        title="Starter Pack",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123",
+        option_values={"offerId": "offer-1"},
+    )
+    db_session.add(variant)
+    db_session.commit()
+    db_session.refresh(variant)
+
+    funnel_response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "EMBER Sales Funnel",
+            "description": "Imported sales funnel",
+            "funnelType": "html_template",
+            "productId": product_id,
+            "templateImportId": template_import["id"],
+            "pageIntent": "sales",
+            "campaignId": campaign_id,
+            "selectedAngleId": "angle-focus-restored",
+        },
+    )
+    assert funnel_response.status_code == 201
+    funnel = funnel_response.json()
+
+    class _FakeLLMClient:
+        def __init__(self, *args, **kwargs):
+            self.default_model = "claude-test"
+
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.LLMClient",
+        _FakeLLMClient,
+    )
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.load_campaign_creative_context",
+        lambda **kwargs: _fake_manual_creative_context(
+            selected_angle_id="angle-focus-restored",
+            selected_angle_name="Focus Restored",
+            selected_variant_id=str(variant.id),
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.call_claude_structured_message",
+        lambda **kwargs: {
+            "parsed": {
+                "assistantMessage": "Prepared the imported page with compliant copy.",
+                "textReplacements": [],
+                "instrumentationManifest": {
+                    "schemaVersion": "imported-html-instrumentation-v1",
+                    "pageStage": "sales",
+                    "bindings": [
+                        {
+                            "id": "primary-checkout",
+                            "type": "checkout",
+                            "selector": "button#buy-now",
+                            "event": "click",
+                            "trackEventType": "sales_to_checkout_click",
+                            "checkout": {
+                                "mode": "public_checkout",
+                                "variantResolver": {
+                                    "type": "fixed",
+                                    "variantId": str(variant.id),
+                                },
+                            },
+                        }
+                    ],
+                },
+            }
+        },
+    )
+
+    response = api_client.post(f"/sites/{site['id']}/funnels/{funnel['id']}/prepare?clientId={client_id}")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["preparedPageId"] is not None
+    assert payload["preparedPageSlug"] == "ember-sales-funnel-sales-page"
+    assert payload["latestPreparedVersionId"] is not None
+    assert payload["preparedAt"] is not None
+    assert payload["preparationReadiness"]["status"] == "prepared"
+    assert payload["preparationReadiness"]["checkout"]["ready"] is True
+
+    page = db_session.query(SitePage).filter(SitePage.id == uuid.UUID(payload["preparedPageId"])).first()
+    assert page is not None
+    assert page.page_type == "sales"
+    assert page.page_role == "sales"
+
+    versions = (
+        db_session.query(SitePageVersion)
+        .filter(SitePageVersion.page_id == page.id)
+        .order_by(SitePageVersion.created_at.asc())
+        .all()
+    )
+    assert len(versions) == 2
+    assert {version.status for version in versions} == {"draft", "approved"}
+    imported_block = versions[-1].puck_data["content"][0]
+    assert imported_block["type"] == "ImportedHtmlDocument"
+    assert imported_block["props"]["instrumentationManifest"]["bindings"][0]["selector"] == "button#buy-now"
+
+
+def test_prepare_site_funnel_from_imported_html_generates_copy_for_selected_angle_when_materialized_angle_differs(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    client_id = _create_client(api_client, name="Angle Guard Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="EMBER")
+    campaign_id = _create_campaign(
+        api_client,
+        client_id=client_id,
+        product_id=product_id,
+        name="EMBER Campaign",
+    )
+
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Angle Guard Site",
+            "productId": product_id,
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+
+    template_import_response = api_client.post(
+        f"/sites/{site['id']}/funnel-template-imports?clientId={client_id}",
+        json={
+            "sourceLabel": "EMBER Sales HTML",
+            "htmlDocument": (
+                "<!doctype html><html><body>"
+                "<h1>Original Heading</h1>"
+                "<button id='buy-now'>Buy now</button>"
+                "</body></html>"
+            ),
+        },
+    )
+    assert template_import_response.status_code == 201
+    template_import = template_import_response.json()
+
+    variant = ProductVariant(
+        product_id=uuid.UUID(product_id),
+        title="Starter Pack",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/456",
+        option_values={"offerId": "offer-1"},
+    )
+    db_session.add(variant)
+    db_session.commit()
+
+    funnel_response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "EMBER Sales Funnel",
+            "description": "Imported sales funnel",
+            "funnelType": "html_template",
+            "productId": product_id,
+            "templateImportId": template_import["id"],
+            "pageIntent": "sales",
+            "campaignId": campaign_id,
+            "selectedAngleId": "angle-different",
+        },
+    )
+    assert funnel_response.status_code == 201
+    funnel = funnel_response.json()
+    captured_prompts: list[str] = []
+
+    class _FakeLLMClient:
+        def __init__(self, *args, **kwargs):
+            self.default_model = "claude-test"
+
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.LLMClient",
+        _FakeLLMClient,
+    )
+
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.load_campaign_creative_context",
+        lambda **kwargs: {
+            **_fake_manual_creative_context(
+                selected_angle_id="angle-materialized",
+                selected_angle_name="Materialized Angle",
+                selected_variant_id=str(variant.id),
+            ),
+            "angles": {
+                "selectedAngleId": "angle-materialized",
+                "angleLibrary": [
+                    {
+                        "angleId": "angle-materialized",
+                        "angleName": "Materialized Angle",
+                        "description": "Materialized angle",
+                        "evidence": ["Evidence quote"],
+                    },
+                    {
+                        "angleId": "angle-different",
+                        "angleName": "Different Angle",
+                        "description": "Different angle",
+                        "evidence": ["Different evidence"],
+                    },
+                ],
+            },
+        },
+    )
+    def _fake_structured_call(**kwargs):
+        prompt = kwargs["user_content"][0]["text"]
+        captured_prompts.append(prompt)
+        required = kwargs.get("output_schema", {}).get("required", [])
+        if "pageMarkdown" in required and "textReplacements" not in required:
+            return {
+                "parsed": {
+                    "headline": "Different Angle Headline",
+                    "promiseContract": {
+                        "loopQuestion": "Why does focus disappear by noon?",
+                        "specificPromise": "Rebuild calm clarity with a more stable routine.",
+                        "deliveryTest": "Feel steadier focus through the workday.",
+                        "minimumDelivery": "A calmer, clearer routine to follow daily.",
+                    },
+                    "pageMarkdown": "Generated sales markdown for the different selected angle.",
+                }
+            }
+        return {
+            "parsed": {
+                "assistantMessage": "Prepared the imported page with compliant copy.",
+                "textReplacements": [],
+                "instrumentationManifest": {
+                    "schemaVersion": "imported-html-instrumentation-v1",
+                    "pageStage": "sales",
+                    "bindings": [
+                        {
+                            "id": "primary-checkout",
+                            "type": "checkout",
+                            "selector": "button#buy-now",
+                            "event": "click",
+                            "trackEventType": "sales_to_checkout_click",
+                            "checkout": {
+                                "mode": "public_checkout",
+                                "variantResolver": {
+                                    "type": "fixed",
+                                    "variantId": str(variant.id),
+                                },
+                            },
+                        }
+                    ],
+                },
+            }
+        }
+
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.call_claude_structured_message",
+        _fake_structured_call,
+    )
+
+    response = api_client.post(f"/sites/{site['id']}/funnels/{funnel['id']}/prepare?clientId={client_id}")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["preparationReadiness"]["copy"]["source"] == "generated_for_selected_angle"
+    assert len(captured_prompts) == 2
+    assert "Different Angle" in captured_prompts[0]
+    assert "Page intent: sales." in captured_prompts[0]
+
+    approved_version = (
+        db_session.query(SitePageVersion)
+        .filter(SitePageVersion.id == uuid.UUID(payload["latestPreparedVersionId"]))
+        .first()
+    )
+    assert approved_version is not None
+    assert approved_version.ai_metadata["strategyCopySource"] == "generated_for_selected_angle"
+
+
+def test_generate_selected_angle_copy_packet_uses_presales_guidance(monkeypatch):
+    captured_prompts: list[str] = []
+
+    class _FakeLLMClient:
+        def __init__(self, *args, **kwargs):
+            self.default_model = "claude-test"
+
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.LLMClient",
+        _FakeLLMClient,
+    )
+
+    def _fake_structured_call(**kwargs):
+        captured_prompts.append(kwargs["user_content"][0]["text"])
+        return {
+            "parsed": {
+                "headline": "What if clearer mornings started smaller?",
+                "promiseContract": {
+                    "loopQuestion": "Why can focus feel inconsistent even when routines look healthy?",
+                    "specificPromise": "Show how a steadier brain-support ritual can feel easier to keep.",
+                    "deliveryTest": "Readers should feel more curious and open to learning the mechanism.",
+                    "minimumDelivery": "A useful next step that feels low-pressure and credible.",
+                },
+                "pageMarkdown": "Curiosity-driven pre-sales markdown.",
+            }
+        }
+
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.call_claude_structured_message",
+        _fake_structured_call,
+    )
+
+    packet = site_funnel_preparation_service._generate_selected_angle_copy_packet(
+        strategy_outputs=_fake_manual_creative_context(
+            selected_angle_id="angle-materialized",
+            selected_angle_name="Materialized Angle",
+            selected_variant_id="variant-123",
+        ),
+        selected_angle={
+            "angleId": "angle-curiosity",
+            "angleName": "Curiosity Angle",
+            "description": "Lead with engagement before the offer.",
+            "evidence": ["Supportive proof point"],
+        },
+        template_kind="pre-sales-listicle",
+        page_intent="pre_sales",
+        product_context="Product context for pre-sales.",
+    )
+
+    assert packet["headline"] == "What if clearer mornings started smaller?"
+    assert captured_prompts
+    assert "Page intent: pre-sales." in captured_prompts[0]
+    assert "Reduce hard-close sales language" in captured_prompts[0]
+
+
+def test_create_site_funnel_from_template_import_requires_page_intent(api_client: TestClient):
+    client_id = _create_client(api_client, name="Template Funnel Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Template Funnel Product")
+    campaign_id = _create_campaign(
+        api_client,
+        client_id=client_id,
+        product_id=product_id,
+        name="Template Funnel Campaign",
+    )
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Template Funnel Site",
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+
+    template_import = api_client.post(
+        f"/sites/{site['id']}/funnel-template-imports?clientId={client_id}",
+        json={
+            "sourceLabel": "Preserved Template",
+            "htmlDocument": "<!doctype html><html><body><button id='cta'>Go</button></body></html>",
+        },
+    )
+    assert template_import.status_code == 201
+    template_import_id = template_import.json()["id"]
+
+    missing_intent = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "Imported Template Funnel",
+            "funnelType": "html_template",
+            "templateImportId": template_import_id,
+            "productId": product_id,
+        },
+    )
+    assert missing_intent.status_code == 400
+    assert "pageIntent is required" in missing_intent.json()["detail"]
+
+    missing_campaign = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "Imported Template Funnel",
+            "funnelType": "html_template",
+            "templateImportId": template_import_id,
+            "pageIntent": "pre_sales",
+            "productId": product_id,
+        },
+    )
+    assert missing_campaign.status_code == 400
+    assert "campaignId is required" in missing_campaign.json()["detail"]
+
+    response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "Imported Template Funnel",
+            "funnelType": "html_template",
+            "templateImportId": template_import_id,
+            "pageIntent": "pre_sales",
+            "productId": product_id,
+            "campaignId": campaign_id,
+            "selectedAngleId": "angle-1",
+        },
+    )
+    assert response.status_code == 201
+    funnel = response.json()
+    assert funnel["templateImportId"] == template_import_id
+    assert funnel["templateImportLabel"] == "Preserved Template"
+    assert funnel["pageIntent"] == "pre_sales"
+    assert funnel["campaignId"] == campaign_id
+    assert funnel["selectedAngleId"] == "angle-1"
+
+
+def test_imported_html_site_funnel_can_prepare_then_publish_site(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    client_id = _create_client(api_client, name="Prepared Publish Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="EMBER")
+    campaign_id = _create_campaign(
+        api_client,
+        client_id=client_id,
+        product_id=product_id,
+        name="Prepared Publish Campaign",
+    )
+
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Prepared Publish Site",
+            "productId": product_id,
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+
+    template_import_response = api_client.post(
+        f"/sites/{site['id']}/funnel-template-imports?clientId={client_id}",
+        json={
+            "sourceLabel": "EMBER Sales HTML",
+            "htmlDocument": (
+                "<!doctype html><html><body>"
+                "<h1>Original Heading</h1>"
+                "<button id='buy-now'>Buy now</button>"
+                "</body></html>"
+            ),
+        },
+    )
+    assert template_import_response.status_code == 201
+    template_import = template_import_response.json()
+
+    variant = ProductVariant(
+        product_id=uuid.UUID(product_id),
+        title="Starter Pack",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/321",
+        option_values={"offerId": "offer-1"},
+    )
+    db_session.add(variant)
+    db_session.commit()
+    db_session.refresh(variant)
+
+    funnel_response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "EMBER Sales Funnel",
+            "description": "Imported sales funnel",
+            "funnelType": "html_template",
+            "productId": product_id,
+            "templateImportId": template_import["id"],
+            "pageIntent": "sales",
+            "campaignId": campaign_id,
+            "selectedAngleId": "angle-focus-restored",
+        },
+    )
+    assert funnel_response.status_code == 201
+    funnel = funnel_response.json()
+
+    class _FakeLLMClient:
+        def __init__(self, *args, **kwargs):
+            self.default_model = "claude-test"
+
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.LLMClient",
+        _FakeLLMClient,
+    )
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.load_campaign_creative_context",
+        lambda **kwargs: _fake_manual_creative_context(
+            selected_angle_id="angle-focus-restored",
+            selected_angle_name="Focus Restored",
+            selected_variant_id=str(variant.id),
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation.call_claude_structured_message",
+        lambda **kwargs: {
+            "parsed": {
+                "assistantMessage": "Prepared the imported page with compliant copy.",
+                "textReplacements": [],
+                "instrumentationManifest": {
+                    "schemaVersion": "imported-html-instrumentation-v1",
+                    "pageStage": "sales",
+                    "bindings": [
+                        {
+                            "id": "primary-checkout",
+                            "type": "checkout",
+                            "selector": "button#buy-now",
+                            "event": "click",
+                            "trackEventType": "sales_to_checkout_click",
+                            "checkout": {
+                                "mode": "public_checkout",
+                                "variantResolver": {
+                                    "type": "fixed",
+                                    "variantId": str(variant.id),
+                                },
+                            },
+                        }
+                    ],
+                },
+            }
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.site_funnel_preparation._resolve_public_meta_tracking",
+        lambda **kwargs: {
+            "provider": "meta",
+            "mode": "public_funnel_runtime",
+            "metaPixelId": "1234567890",
+        },
+    )
+
+    prepare_response = api_client.post(
+        f"/sites/{site['id']}/funnels/{funnel['id']}/prepare?clientId={client_id}"
+    )
+    assert prepare_response.status_code == 200
+
+    publish_response = api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+    assert publish_response.status_code == 200
+    publish_payload = publish_response.json()
+    assert publish_payload["publicationId"]
+
+    refreshed_site_response = api_client.get(f"/sites/{site['id']}?clientId={client_id}")
+    assert refreshed_site_response.status_code == 200
+    refreshed_site = refreshed_site_response.json()
+    assert refreshed_site["activeSitePublicationId"] == publish_payload["publicationId"]
+    assert refreshed_site["lastPublishedAt"] is not None
 
 
 def test_update_site_funnel_accepts_paused_status(api_client: TestClient):
@@ -1264,6 +1956,57 @@ def test_site_publish_invalid_workspace(api_client: TestClient, db_session):
     wrong_client_id = str(uuid.uuid4())
     publish_response = api_client.post(f"/sites/{site['id']}/publish?clientId={wrong_client_id}")
     assert publish_response.status_code == 404
+
+
+def test_site_publish_blocks_unprepared_imported_html_funnels(api_client: TestClient):
+    client_id = _create_client(api_client, name="Imported HTML Publish Guard")
+    product_id = _create_product(api_client, client_id=client_id, title="EMBER")
+    campaign_id = _create_campaign(
+        api_client,
+        client_id=client_id,
+        product_id=product_id,
+        name="Imported HTML Campaign",
+    )
+
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Imported HTML Site",
+            "productId": product_id,
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+
+    template_import_response = api_client.post(
+        f"/sites/{site['id']}/funnel-template-imports?clientId={client_id}",
+        json={
+            "sourceLabel": "EMBER Sales HTML",
+            "htmlDocument": "<!doctype html><html><body><button id='cta'>Go</button></body></html>",
+        },
+    )
+    assert template_import_response.status_code == 201
+    template_import = template_import_response.json()
+
+    funnel_response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "Imported HTML Funnel",
+            "funnelType": "html_template",
+            "productId": product_id,
+            "templateImportId": template_import["id"],
+            "pageIntent": "sales",
+            "campaignId": campaign_id,
+            "selectedAngleId": "angle-1",
+        },
+    )
+    assert funnel_response.status_code == 201
+
+    publish_response = api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+    assert publish_response.status_code == 400
+    assert "must be prepared before publishing this site" in publish_response.json()["detail"]
 
 
 # =============================================================================

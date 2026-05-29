@@ -110,6 +110,8 @@ class SiteSummary(BaseModel):
     routeSlug: Optional[str] = None
     primaryDomain: Optional[str] = None
     templateId: Optional[str] = None
+    activeSitePublicationId: Optional[str] = None
+    lastPublishedAt: Optional[str] = None
     createdAt: str
     updatedAt: str
 
@@ -146,6 +148,8 @@ class SiteDetail(BaseModel):
     routeSlug: Optional[str] = None
     primaryDomain: Optional[str] = None
     templateId: Optional[str] = None
+    activeSitePublicationId: Optional[str] = None
+    lastPublishedAt: Optional[str] = None
     entryPageId: Optional[str] = None
     pages: list[SitePageDetail]
     createdAt: str

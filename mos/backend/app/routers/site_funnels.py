@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.models import Client, Site, SitePage
+from app.db.models import Client, Site, SitePage, SiteFunnelTemplateImport
 from app.schemas.site_funnels import (
     SiteFunnelSummary,
     SiteFunnelDetail,
@@ -34,6 +34,7 @@ from app.services.site_funnels import (
     delete_funnel_step,
     SiteFunnelError,
 )
+from app.services.site_funnel_preparation import SiteFunnelPreparationError, prepare_site_funnel_template
 
 router = APIRouter(prefix="/sites/{site_id}/funnels", tags=["site-funnels"])
 
@@ -59,6 +60,89 @@ def _serialize_step(session: Session, step) -> SiteFunnelStepSummary:
     )
 
 
+def _read_template_import_label(session: Session, template_import_id: str | None) -> str | None:
+    if not template_import_id:
+        return None
+    template_import = session.scalars(
+        select(SiteFunnelTemplateImport).where(SiteFunnelTemplateImport.id == template_import_id)
+    ).first()
+    if template_import is None:
+        return None
+    return template_import.source_label
+
+
+def _serialize_funnel_summary(session: Session, funnel, site_name: str | None = None) -> SiteFunnelSummary:
+    prepared_page = None
+    if funnel.prepared_page_id:
+        prepared_page = session.scalars(
+            select(SitePage).where(SitePage.id == funnel.prepared_page_id)
+        ).first()
+    return SiteFunnelSummary(
+        id=str(funnel.id),
+        siteId=str(funnel.site_id),
+        siteName=site_name,
+        name=funnel.name,
+        description=funnel.description,
+        status=funnel.status,
+        funnelType=funnel.funnel_type,
+        entryPageId=str(funnel.entry_page_id) if funnel.entry_page_id else None,
+        productId=str(funnel.product_id) if funnel.product_id else None,
+        selectedOfferId=str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
+        templateImportId=str(funnel.template_import_id) if funnel.template_import_id else None,
+        templateImportLabel=_read_template_import_label(session, str(funnel.template_import_id) if funnel.template_import_id else None),
+        pageIntent=funnel.page_intent,
+        campaignId=str(funnel.campaign_id) if funnel.campaign_id else None,
+        selectedAngleId=funnel.selected_angle_id,
+        preparedPageId=str(funnel.prepared_page_id) if funnel.prepared_page_id else None,
+        preparedPageSlug=prepared_page.slug if prepared_page else None,
+        latestPreparedVersionId=(
+            str(funnel.latest_prepared_version_id) if funnel.latest_prepared_version_id else None
+        ),
+        preparationReadiness=funnel.preparation_readiness if isinstance(funnel.preparation_readiness, dict) else {},
+        preparedAt=funnel.prepared_at,
+        trackingConfig=funnel.tracking_config,
+        stepCount=len(get_funnel_steps(session, str(funnel.id))),
+        createdAt=funnel.created_at,
+        updatedAt=funnel.updated_at,
+    )
+
+
+def _serialize_funnel_detail(session: Session, funnel) -> SiteFunnelDetail:
+    steps = get_funnel_steps(session, str(funnel.id))
+    prepared_page = None
+    if funnel.prepared_page_id:
+        prepared_page = session.scalars(
+            select(SitePage).where(SitePage.id == funnel.prepared_page_id)
+        ).first()
+    return SiteFunnelDetail(
+        id=str(funnel.id),
+        siteId=str(funnel.site_id),
+        name=funnel.name,
+        description=funnel.description,
+        status=funnel.status,
+        funnelType=funnel.funnel_type,
+        entryPageId=str(funnel.entry_page_id) if funnel.entry_page_id else None,
+        productId=str(funnel.product_id) if funnel.product_id else None,
+        selectedOfferId=str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
+        templateImportId=str(funnel.template_import_id) if funnel.template_import_id else None,
+        templateImportLabel=_read_template_import_label(session, str(funnel.template_import_id) if funnel.template_import_id else None),
+        pageIntent=funnel.page_intent,
+        campaignId=str(funnel.campaign_id) if funnel.campaign_id else None,
+        selectedAngleId=funnel.selected_angle_id,
+        preparedPageId=str(funnel.prepared_page_id) if funnel.prepared_page_id else None,
+        preparedPageSlug=prepared_page.slug if prepared_page else None,
+        latestPreparedVersionId=(
+            str(funnel.latest_prepared_version_id) if funnel.latest_prepared_version_id else None
+        ),
+        preparationReadiness=funnel.preparation_readiness if isinstance(funnel.preparation_readiness, dict) else {},
+        preparedAt=funnel.prepared_at,
+        trackingConfig=funnel.tracking_config,
+        steps=[_serialize_step(session, step) for step in steps],
+        createdAt=funnel.created_at,
+        updatedAt=funnel.updated_at,
+    )
+
+
 @router.get("/workspace", response_model=list[SiteFunnelSummary], include_in_schema=False)
 def _noop_workspace_alias() -> list[SiteFunnelSummary]:  # pragma: no cover
     return []
@@ -75,25 +159,7 @@ def list_workspace_site_funnels(
 ) -> list[SiteFunnelSummary]:
     _get_workspace_or_404(session, clientId, auth.org_id)
     rows = list_workspace_funnels(session, clientId)
-    return [
-        SiteFunnelSummary(
-            id=str(funnel.id),
-            siteId=str(funnel.site_id),
-            siteName=site_name,
-            name=funnel.name,
-            description=funnel.description,
-            status=funnel.status,
-            funnelType=funnel.funnel_type,
-            entryPageId=str(funnel.entry_page_id) if funnel.entry_page_id else None,
-            productId=str(funnel.product_id) if funnel.product_id else None,
-            selectedOfferId=str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-            trackingConfig=funnel.tracking_config,
-            stepCount=len(get_funnel_steps(session, str(funnel.id))),
-            createdAt=funnel.created_at,
-            updatedAt=funnel.updated_at,
-        )
-        for funnel, site_name in rows
-    ]
+    return [_serialize_funnel_summary(session, funnel, site_name) for funnel, site_name in rows]
 
 
 def _get_workspace_or_404(session: Session, client_id: str, org_id: str) -> Client:
@@ -153,24 +219,7 @@ def list_site_funnels(
     _get_site_for_workspace_or_404(session, site_id=site_id, client_id=clientId, org_id=auth.org_id)
 
     funnels = list_funnels(session, site_id)
-    return [
-        SiteFunnelSummary(
-            id=str(f.id),
-            siteId=str(f.site_id),
-            name=f.name,
-            description=f.description,
-            status=f.status,
-            funnelType=f.funnel_type,
-            entryPageId=str(f.entry_page_id) if f.entry_page_id else None,
-            productId=str(f.product_id) if f.product_id else None,
-            selectedOfferId=str(f.selected_offer_id) if f.selected_offer_id else None,
-            trackingConfig=f.tracking_config,
-            stepCount=len(get_funnel_steps(session, str(f.id))),
-            createdAt=f.created_at,
-            updatedAt=f.updated_at,
-        )
-        for f in funnels
-    ]
+    return [_serialize_funnel_summary(session, funnel) for funnel in funnels]
 
 
 @router.post("", response_model=SiteFunnelDetail, status_code=status.HTTP_201_CREATED)
@@ -209,28 +258,15 @@ def create_site_funnel(
             entry_page_id=request.entryPageId,
             product_id=request.productId,
             selected_offer_id=request.selectedOfferId,
+            template_import_id=request.templateImportId,
+            page_intent=request.pageIntent,
+            campaign_id=request.campaignId,
+            selected_angle_id=request.selectedAngleId,
             tracking_config=request.trackingConfig,
             steps=steps_data if steps_data else None,
         )
         session.commit()
-
-        steps = get_funnel_steps(session, str(funnel.id))
-
-        return SiteFunnelDetail(
-            id=str(funnel.id),
-            siteId=str(funnel.site_id),
-            name=funnel.name,
-            description=funnel.description,
-            status=funnel.status,
-            funnelType=funnel.funnel_type,
-            entryPageId=str(funnel.entry_page_id) if funnel.entry_page_id else None,
-            productId=str(funnel.product_id) if funnel.product_id else None,
-            selectedOfferId=str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-            trackingConfig=funnel.tracking_config,
-            steps=[_serialize_step(session, step) for step in steps],
-            createdAt=funnel.created_at,
-            updatedAt=funnel.updated_at,
-        )
+        return _serialize_funnel_detail(session, funnel)
     except SiteFunnelError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -259,23 +295,7 @@ def get_site_funnel(
             detail="Funnel not found.",
         )
 
-    steps = get_funnel_steps(session, str(funnel.id))
-
-    return SiteFunnelDetail(
-        id=str(funnel.id),
-        siteId=str(funnel.site_id),
-        name=funnel.name,
-        description=funnel.description,
-        status=funnel.status,
-        funnelType=funnel.funnel_type,
-        entryPageId=str(funnel.entry_page_id) if funnel.entry_page_id else None,
-        productId=str(funnel.product_id) if funnel.product_id else None,
-        selectedOfferId=str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-        trackingConfig=funnel.tracking_config,
-        steps=[_serialize_step(session, step) for step in steps],
-        createdAt=funnel.created_at,
-        updatedAt=funnel.updated_at,
-    )
+    return _serialize_funnel_detail(session, funnel)
 
 
 @router.patch("/{funnel_id}", response_model=SiteFunnelDetail)
@@ -308,29 +328,49 @@ def update_site_funnel(
             entry_page_id=request.entryPageId,
             product_id=request.productId,
             selected_offer_id=request.selectedOfferId,
+            template_import_id=request.templateImportId,
+            page_intent=request.pageIntent,
+            campaign_id=request.campaignId,
+            selected_angle_id=request.selectedAngleId,
             tracking_config=request.trackingConfig,
         )
         session.commit()
-
-        steps = get_funnel_steps(session, str(funnel.id))
-
-        return SiteFunnelDetail(
-            id=str(funnel.id),
-            siteId=str(funnel.site_id),
-            name=funnel.name,
-            description=funnel.description,
-            status=funnel.status,
-            funnelType=funnel.funnel_type,
-            entryPageId=str(funnel.entry_page_id) if funnel.entry_page_id else None,
-            productId=str(funnel.product_id) if funnel.product_id else None,
-            selectedOfferId=str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-            trackingConfig=funnel.tracking_config,
-            steps=[_serialize_step(session, step) for step in steps],
-            createdAt=funnel.created_at,
-            updatedAt=funnel.updated_at,
-        )
+        return _serialize_funnel_detail(session, funnel)
     except SiteFunnelError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/{funnel_id}/prepare",
+    response_model=SiteFunnelDetail,
+    status_code=status.HTTP_200_OK,
+)
+def prepare_site_funnel_endpoint(
+    site_id: str,
+    funnel_id: str,
+    clientId: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SiteFunnelDetail:
+    _get_workspace_or_404(session, clientId, auth.org_id)
+    _parse_uuid_or_400(site_id, "siteId")
+    _parse_uuid_or_400(funnel_id, "funnelId")
+    _get_site_for_workspace_or_404(session, site_id=site_id, client_id=clientId, org_id=auth.org_id)
+
+    try:
+        funnel = prepare_site_funnel_template(
+            session=session,
+            org_id=auth.org_id,
+            client_id=clientId,
+            site_id=site_id,
+            funnel_id=funnel_id,
+            created_by_user_external_id=auth.user_id,
+        )
+        session.commit()
+        return _serialize_funnel_detail(session, funnel)
+    except SiteFunnelPreparationError as exc:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post(

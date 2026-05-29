@@ -8,7 +8,11 @@ import { SiteDetailPage } from "./SiteDetailPage";
 const mockSiteState = vi.hoisted(() => ({
   value: null as Record<string, unknown> | null,
 }));
+const mockFunnelsState = vi.hoisted(() => ({
+  value: [] as Array<Record<string, unknown>>,
+}));
 const mockCreateSiteTemplateFromSite = vi.fn();
+const mockCreateSiteFunnelTemplateImport = vi.fn();
 
 const designSystems = [
   {
@@ -55,6 +59,11 @@ vi.mock("@/api/clients", () => ({
   }),
 }));
 
+vi.mock("@/api/campaigns", () => ({
+  useCampaignsForProduct: () => ({ data: [], isLoading: false }),
+  useCampaignCreativeContextAngles: () => ({ data: null, isLoading: false }),
+}));
+
 vi.mock("@/api/products", () => ({
   useProducts: () => ({
     data: [],
@@ -77,9 +86,19 @@ vi.mock("@/api/sites", () => ({
 }));
 
 vi.mock("@/api/siteFunnels", () => ({
-  useSiteFunnels: () => ({ data: [], isLoading: false, error: null }),
+  useSiteFunnels: () => ({ data: mockFunnelsState.value, isLoading: false, error: null }),
   useCreateSiteFunnel: () => ({ mutateAsync: vi.fn(), isPending: false, isError: false, error: null }),
   useDeleteSiteFunnel: () => ({ mutateAsync: vi.fn(), isPending: false, isError: false, error: null }),
+}));
+
+vi.mock("@/api/siteFunnelTemplateImports", () => ({
+  useSiteFunnelTemplateImports: () => ({ data: [], isLoading: false, error: null }),
+  useCreateSiteFunnelTemplateImport: () => ({
+    mutateAsync: mockCreateSiteFunnelTemplateImport,
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
 vi.mock("@/api/siteProductBindings", () => ({
@@ -131,6 +150,8 @@ function buildSite(themeBindingMode: "standalone" | "workspace_default" | "desig
     routeSlug: "acme-store",
     primaryDomain: null,
     templateId: null,
+    activeSitePublicationId: null,
+    lastPublishedAt: null,
     entryPageId: "page-1",
     pages: [
       {
@@ -156,6 +177,7 @@ function renderPage() {
     <MemoryRouter initialEntries={["/workspaces/sites/site-1"]}>
       <Routes>
         <Route path="/workspaces/sites/:siteId" element={<SiteDetailPage />} />
+        <Route path="/workspaces/sites/:siteId/funnels" element={<SiteDetailPage />} />
         <Route path="/workspaces/sites/templates/:templateId" element={<div>Template Detail</div>} />
       </Routes>
     </MemoryRouter>,
@@ -165,7 +187,9 @@ function renderPage() {
 describe("SiteDetailPage theme tab", () => {
   beforeEach(() => {
     mockSiteState.value = buildSite("standalone");
+    mockFunnelsState.value = [];
     mockCreateSiteTemplateFromSite.mockResolvedValue({ id: "template-1" });
+    mockCreateSiteFunnelTemplateImport.mockResolvedValue({ id: "html-import-1" });
   });
 
   afterEach(() => {
@@ -220,5 +244,90 @@ describe("SiteDetailPage theme tab", () => {
       name: "OMNI One Product Template",
       description: "Store description",
     });
+  });
+
+  it("imports preserved html from the funnels tab", async () => {
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await user.click(screen.getByRole("tab", { name: /Funnels/i }));
+    await user.click(screen.getByRole("button", { name: /Import HTML/i }));
+    await user.type(screen.getByPlaceholderText("e.g., Ember Hero Landing Template"), "EMBER Sales Template");
+    await user.type(screen.getByPlaceholderText("Paste your HTML here..."), "<!doctype html><html><body><h1>EMBER</h1></body></html>");
+    await user.click(screen.getByRole("button", { name: /Import Template/i }));
+
+    expect(mockCreateSiteFunnelTemplateImport).toHaveBeenCalledWith({
+      sourceLabel: "EMBER Sales Template",
+      htmlDocument: "<!doctype html><html><body><h1>EMBER</h1></body></html>",
+    });
+  });
+
+  it("shows imported html funnel publication status in the funnels tab", async () => {
+    const user = userEvent.setup();
+    mockSiteState.value = {
+      ...buildSite("standalone"),
+      activeSitePublicationId: "publication-1234",
+      lastPublishedAt: "2026-04-08T11:45:00Z",
+    };
+    mockFunnelsState.value = [
+      {
+        id: "funnel-1",
+        siteId: "site-1",
+        name: "EMBER Sales Funnel",
+        description: "Imported funnel",
+        status: "draft",
+        funnelType: "html_template",
+        entryPageId: null,
+        productId: "product-1",
+        selectedOfferId: null,
+        templateImportId: "template-1",
+        templateImportLabel: "EMBER Sales HTML",
+        pageIntent: "sales",
+        campaignId: "campaign-1",
+        selectedAngleId: "angle-1",
+        preparedPageId: "page-2",
+        preparedPageSlug: "ember-sales-page",
+        latestPreparedVersionId: "version-1",
+        preparationReadiness: {},
+        preparedAt: "2026-04-08T11:40:00Z",
+        trackingConfig: null,
+        createdAt: "2026-04-08T11:30:00Z",
+        updatedAt: "2026-04-08T11:40:00Z",
+      },
+      {
+        id: "funnel-2",
+        siteId: "site-1",
+        name: "EMBER Pre-sales Funnel",
+        description: "Imported pre-sales funnel",
+        status: "draft",
+        funnelType: "html_template",
+        entryPageId: null,
+        productId: "product-1",
+        selectedOfferId: null,
+        templateImportId: "template-2",
+        templateImportLabel: "EMBER Presell HTML",
+        pageIntent: "pre_sales",
+        campaignId: "campaign-2",
+        selectedAngleId: "angle-2",
+        preparedPageId: "page-3",
+        preparedPageSlug: "ember-presell-page",
+        latestPreparedVersionId: "version-2",
+        preparationReadiness: {},
+        preparedAt: "2026-04-08T11:50:00Z",
+        trackingConfig: null,
+        createdAt: "2026-04-08T11:32:00Z",
+        updatedAt: "2026-04-08T11:50:00Z",
+      },
+    ];
+
+    renderPage();
+
+    await user.click(screen.getByRole("tab", { name: /Funnels/i }));
+
+    expect(screen.getByText("Site Funnel Publishing")).toBeInTheDocument();
+    expect(screen.getByText("publicat...")).toBeInTheDocument();
+    expect(screen.getByText("Published")).toBeInTheDocument();
+    expect(screen.getByText("Ready to publish")).toBeInTheDocument();
   });
 });

@@ -3,14 +3,22 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Edit, Loader2, Plus, Trash2, Funnel, Save, X } from "lucide-react";
 
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { useSite } from "@/api/sites";
-import { useSiteFunnel, useUpdateSiteFunnel, useCreateSiteFunnelStep, useDeleteSiteFunnelStep } from "@/api/siteFunnels";
+import { useSite, usePublishSite } from "@/api/sites";
+import {
+  useSiteFunnel,
+  useUpdateSiteFunnel,
+  useCreateSiteFunnelStep,
+  useDeleteSiteFunnelStep,
+  usePrepareSiteFunnel,
+} from "@/api/siteFunnels";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 function formatFunnelStatus(status: string): "success" | "warning" | "danger" | "neutral" {
@@ -20,16 +28,46 @@ function formatFunnelStatus(status: string): "success" | "warning" | "danger" | 
   return "neutral";
 }
 
+function formatPageIntent(intent: string | null | undefined): string {
+  if (intent === "sales") return "Sales";
+  if (intent === "pre_sales") return "Pre-sales";
+  return "Not set";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getReadinessFlag(readiness: Record<string, unknown>, key: string): boolean | null {
+  const candidate = readiness[key];
+  if (!isRecord(candidate)) return null;
+  const ready = candidate.ready;
+  return typeof ready === "boolean" ? ready : null;
+}
+
+function getReadinessRequirement(
+  readiness: Record<string, unknown>,
+  key: string,
+): { required: boolean; ready: boolean | null; detail: Record<string, unknown> | null } {
+  const candidate = readiness[key];
+  if (!isRecord(candidate)) return { required: false, ready: null, detail: null };
+  const required = typeof candidate.required === "boolean" ? candidate.required : false;
+  const ready = typeof candidate.ready === "boolean" ? candidate.ready : null;
+  return { required, ready, detail: candidate };
+}
+
 export function SiteFunnelDetailPage() {
   const { siteId, funnelId } = useParams<{ siteId: string; funnelId: string }>();
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   
   const { data: site, isLoading: siteLoading } = useSite(siteId || null);
+  const publishSite = usePublishSite(siteId || null);
   const { data: funnel, isLoading: funnelLoading } = useSiteFunnel(siteId || null, funnelId || null);
   const updateFunnel = useUpdateSiteFunnel(siteId || null, funnelId || null);
   const createStep = useCreateSiteFunnelStep(siteId || null, funnelId || null);
   const deleteStep = useDeleteSiteFunnelStep(siteId || null, funnelId || null);
+  const prepareFunnel = usePrepareSiteFunnel(siteId || null, funnelId || null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -130,6 +168,48 @@ export function SiteFunnelDetailPage() {
     label: `${page.name} (/${page.slug})`,
     value: page.id,
   }));
+  const readiness = isRecord(funnel.preparationReadiness) ? funnel.preparationReadiness : {};
+  const navigationReadiness = getReadinessRequirement(readiness, "navigation");
+  const checkoutReadiness = getReadinessRequirement(readiness, "checkout");
+  const trackingReadiness = getReadinessRequirement(readiness, "tracking");
+  const copyReadiness = getReadinessRequirement(readiness, "copy");
+  const navigationReady = navigationReadiness.ready;
+  const checkoutReady = checkoutReadiness.ready;
+  const trackingReady = trackingReadiness.ready;
+  const copyReady = copyReadiness.ready;
+  const selectedAngleName =
+    typeof readiness.selectedAngleName === "string" && readiness.selectedAngleName.trim()
+      ? readiness.selectedAngleName.trim()
+      : null;
+  const copySource =
+    copyReadiness.detail && typeof copyReadiness.detail.source === "string"
+      ? copyReadiness.detail.source
+      : null;
+  const missingDeployRequirements = [
+    navigationReadiness.required && navigationReadiness.ready !== true ? "navigation" : null,
+    checkoutReadiness.required && checkoutReadiness.ready !== true ? "checkout" : null,
+    trackingReadiness.required && trackingReadiness.ready !== true ? "tracking" : null,
+    copyReadiness.required && copyReadiness.ready !== true ? "copy" : null,
+  ].filter(Boolean) as string[];
+  const publishReady = Boolean(funnel.latestPreparedVersionId) && missingDeployRequirements.length === 0;
+
+  const handlePrepareTemplate = async () => {
+    try {
+      await prepareFunnel.mutateAsync({});
+      toast.success("Template prepared");
+    } catch (error) {
+      console.error("Failed to prepare template:", error);
+    }
+  };
+
+  const handlePublishSite = async () => {
+    try {
+      const result = await publishSite.mutateAsync();
+      toast.success(`Site published (${result.routeSlug})`);
+    } catch (error) {
+      console.error("Failed to publish site:", error);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -251,8 +331,175 @@ export function SiteFunnelDetailPage() {
                   </div>
                 </div>
               )}
+
+              <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                  Page Intent
+                </div>
+                <div className="mt-1 text-sm font-semibold text-content">
+                  {formatPageIntent(funnel.pageIntent)}
+                </div>
+              </div>
+
+              {funnel.templateImportLabel && (
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    HTML Template
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-content">
+                    {funnel.templateImportLabel}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {funnel.templateImportId && (
+            <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+              <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Template Preparation</div>
+                  <div className="text-xs text-content-muted">
+                    Generate a prepared site page from the preserved HTML template with campaign copy.
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={handlePrepareTemplate} disabled={prepareFunnel.isPending}>
+                    {prepareFunnel.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Funnel className="mr-2 h-4 w-4" />
+                    )}
+                    Prepare Template
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handlePublishSite}
+                    disabled={!publishReady || publishSite.isPending}
+                  >
+                    {publishSite.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Publish Site
+                  </Button>
+                </div>
+              </div>
+
+              {!publishReady ? (
+                <Callout variant="warning" size="sm" className="mt-4" title="Deploy readiness pending">
+                  {!funnel.latestPreparedVersionId
+                    ? "Prepare the template before publishing this site."
+                    : `Resolve these required checks before publishing: ${missingDeployRequirements.join(", ")}.`}
+                </Callout>
+              ) : null}
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Campaign
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-content">
+                    {funnel.campaignId ? `${funnel.campaignId.slice(0, 8)}...` : "Not set"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Selected Angle
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-content">
+                    {selectedAngleName || (funnel.selectedAngleId ? `${funnel.selectedAngleId.slice(0, 8)}...` : "Not set")}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Prepared Page
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-content">
+                    {funnel.preparedPageSlug ? `/${funnel.preparedPageSlug}` : "Not prepared"}
+                  </div>
+                  {funnel.preparedPageId ? (
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/workspaces/sites/${site.id}/pages/${funnel.preparedPageId}`)}
+                      >
+                        <Edit className="mr-1 h-3 w-3" />
+                        Open Page
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Last Prepared
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-content">
+                    {funnel.preparedAt ? new Date(funnel.preparedAt).toLocaleString() : "Never"}
+                  </div>
+                  <div className="mt-2 text-xs text-content-muted">
+                    {funnel.latestPreparedVersionId
+                      ? `Version ${funnel.latestPreparedVersionId.slice(0, 8)}...`
+                      : "No prepared version yet"}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Copy Ready
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <Badge tone={copyReady ? "success" : "warning"}>
+                      {copyReady ? "Ready" : "Needs configuration"}
+                    </Badge>
+                    {copySource ? (
+                      <Badge tone="neutral">
+                        {copySource === "campaign_materialized" ? "Campaign copy" : "Generated for selected angle"}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Navigation Ready
+                  </div>
+                  <div className="mt-1">
+                    <Badge tone={navigationReady ? "success" : "warning"}>
+                      {navigationReady ? "Ready" : "Needs configuration"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Checkout Ready
+                  </div>
+                  <div className="mt-1">
+                    <Badge tone={checkoutReady ? "success" : "warning"}>
+                      {checkoutReady ? "Ready" : "Needs configuration"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Tracking Ready
+                  </div>
+                  <div className="mt-1">
+                    <Badge tone={trackingReady ? "success" : "warning"}>
+                      {trackingReady ? "Ready" : "Needs configuration"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Funnel Steps */}
           <div className="rounded-2xl border border-border bg-surface px-4 py-4">

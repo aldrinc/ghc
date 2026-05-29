@@ -4002,6 +4002,8 @@ class SiteFunnel(Base):
     __table_args__ = (
         sa.Index("idx_site_funnels_site", "site_id"),
         sa.Index("idx_site_funnels_site_entry_page", "site_id", "entry_page_id"),
+        sa.Index("idx_site_funnels_template_import", "template_import_id"),
+        sa.Index("idx_site_funnels_prepared_page", "prepared_page_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -4019,6 +4021,26 @@ class SiteFunnel(Base):
     selected_offer_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("product_offers.id", ondelete="SET NULL"), nullable=True
     )
+    template_import_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_funnel_template_imports.id", ondelete="SET NULL"), nullable=True
+    )
+    page_intent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    selected_angle_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    prepared_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="SET NULL"), nullable=True
+    )
+    latest_prepared_version_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_page_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    preparation_readiness: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    prepared_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     tracking_config: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -4052,6 +4074,33 @@ class SiteFunnelStep(Base):
     step_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     cta_label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteFunnelTemplateImport(Base):
+    """Stored HTML template imports used as source material for site funnels."""
+
+    __tablename__ = "site_funnel_template_imports"
+    __table_args__ = (
+        sa.Index("idx_site_funnel_template_imports_site", "site_id"),
+        sa.Index("idx_site_funnel_template_imports_site_created", "site_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    source_label: Mapped[str] = mapped_column(Text, nullable=False)
+    html_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
+    html_sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,

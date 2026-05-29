@@ -50,6 +50,7 @@ from app.routers import (
     site_templates,
     page_templates,
     site_funnels,
+    site_funnel_template_imports,
     site_product_bindings,
     site_imports,
     postiz,
@@ -192,6 +193,7 @@ def create_app() -> FastAPI:
     app.include_router(page_templates.router)
     app.include_router(site_funnels.router)
     app.include_router(site_funnels.workspace_router)
+    app.include_router(site_funnel_template_imports.router)
     app.include_router(site_product_bindings.router)
     app.include_router(site_product_bindings.products_router)
     app.include_router(site_imports.router)

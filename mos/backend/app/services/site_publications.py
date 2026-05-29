@@ -42,6 +42,62 @@ class SitePublicationError(Exception):
     pass
 
 
+def _is_readiness_ready(readiness: dict[str, Any], key: str) -> bool:
+    candidate = readiness.get(key)
+    return isinstance(candidate, dict) and candidate.get("ready") is True
+
+
+def _validate_imported_html_funnel_publishability(
+    session: Session,
+    *,
+    site_id: str,
+    funnel: SiteFunnel,
+) -> None:
+    if not funnel.template_import_id:
+        return
+
+    if not funnel.prepared_page_id or not funnel.latest_prepared_version_id:
+        raise SitePublicationError(
+            f"Imported HTML funnel '{funnel.name}' ({funnel.id}) must be prepared before publishing this site."
+        )
+
+    prepared_page = session.scalars(
+        select(SitePage).where(
+            SitePage.id == funnel.prepared_page_id,
+            SitePage.site_id == site_id,
+        )
+    ).first()
+    if not prepared_page:
+        raise SitePublicationError(
+            f"Imported HTML funnel '{funnel.name}' ({funnel.id}) references a missing prepared page."
+        )
+
+    prepared_version = session.scalars(
+        select(SitePageVersion).where(
+            SitePageVersion.id == funnel.latest_prepared_version_id,
+            SitePageVersion.page_id == prepared_page.id,
+            SitePageVersion.status.in_(["approved", "published"]),
+        )
+    ).first()
+    if not prepared_version:
+        raise SitePublicationError(
+            f"Imported HTML funnel '{funnel.name}' ({funnel.id}) is missing the approved prepared version required for publishing."
+        )
+
+    readiness = funnel.preparation_readiness if isinstance(funnel.preparation_readiness, dict) else {}
+    required_checks = ["copy", "tracking"]
+    if str(funnel.page_intent or "").strip() == "sales":
+        required_checks.append("checkout")
+    if str(funnel.page_intent or "").strip() == "pre_sales":
+        required_checks.append("navigation")
+    missing_checks = [check for check in required_checks if not _is_readiness_ready(readiness, check)]
+    if missing_checks:
+        raise SitePublicationError(
+            f"Imported HTML funnel '{funnel.name}' ({funnel.id}) is not deploy-ready. "
+            f"Resolve these preparation checks before publishing: {', '.join(missing_checks)}."
+        )
+
+
 def validate_site_for_publish(
     session: Session,
     *,
@@ -89,6 +145,12 @@ def validate_site_for_publish(
     funnels = list(session.scalars(select(SiteFunnel).where(SiteFunnel.site_id == site_id)).all())
 
     for funnel in funnels:
+        _validate_imported_html_funnel_publishability(
+            session,
+            site_id=site_id,
+            funnel=funnel,
+        )
+
         if funnel.entry_page_id:
             entry_page = session.scalars(
                 select(SitePage).where(

@@ -33,6 +33,16 @@ class SiteFunnelSummary(BaseModel):
     entryPageId: Optional[str] = None
     productId: Optional[str] = None
     selectedOfferId: Optional[str] = None
+    templateImportId: Optional[str] = None
+    templateImportLabel: Optional[str] = None
+    pageIntent: Optional[str] = None
+    campaignId: Optional[str] = None
+    selectedAngleId: Optional[str] = None
+    preparedPageId: Optional[str] = None
+    preparedPageSlug: Optional[str] = None
+    latestPreparedVersionId: Optional[str] = None
+    preparationReadiness: dict[str, Any] = Field(default_factory=dict)
+    preparedAt: Optional[datetime] = None
     trackingConfig: Optional[dict[str, Any]] = None
     siteName: Optional[str] = None
     stepCount: int = 0
@@ -52,6 +62,16 @@ class SiteFunnelDetail(BaseModel):
     entryPageId: Optional[str] = None
     productId: Optional[str] = None
     selectedOfferId: Optional[str] = None
+    templateImportId: Optional[str] = None
+    templateImportLabel: Optional[str] = None
+    pageIntent: Optional[str] = None
+    campaignId: Optional[str] = None
+    selectedAngleId: Optional[str] = None
+    preparedPageId: Optional[str] = None
+    preparedPageSlug: Optional[str] = None
+    latestPreparedVersionId: Optional[str] = None
+    preparationReadiness: dict[str, Any] = Field(default_factory=dict)
+    preparedAt: Optional[datetime] = None
     trackingConfig: Optional[dict[str, Any]] = None
     steps: list[SiteFunnelStepSummary] = Field(default_factory=list)
     createdAt: datetime
@@ -77,6 +97,10 @@ class SiteFunnelCreateRequest(BaseModel):
     entryPageId: Optional[str] = None
     productId: Optional[str] = None
     selectedOfferId: Optional[str] = None
+    templateImportId: Optional[str] = None
+    pageIntent: Optional[str] = None
+    campaignId: Optional[str] = None
+    selectedAngleId: Optional[str] = None
     trackingConfig: Optional[dict[str, Any]] = None
     steps: list[SiteFunnelStepCreateRequest] = Field(default_factory=list)
 
@@ -91,4 +115,8 @@ class SiteFunnelUpdateRequest(BaseModel):
     entryPageId: Optional[str] = None
     productId: Optional[str] = None
     selectedOfferId: Optional[str] = None
+    templateImportId: Optional[str] = None
+    pageIntent: Optional[str] = None
+    campaignId: Optional[str] = None
+    selectedAngleId: Optional[str] = None
     trackingConfig: Optional[dict[str, Any]] = None
