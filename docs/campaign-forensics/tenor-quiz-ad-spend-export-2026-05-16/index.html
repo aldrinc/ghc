@@ -1,0 +1,2337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tenor Quiz Funnel Ad Spend Export - 2026-05-14 to 2026-05-16</title>
+<style>
+:root { color-scheme: light; --ink:#15171a; --muted:#626973; --line:#d9dee5; --soft:#f5f7fa; --accent:#d71920; --accent2:#0f6bff; --good:#0a7a3b; --warn:#9d5a00; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:#fff; }
+header { padding:32px 40px 24px; border-bottom:1px solid var(--line); background:#101318; color:#fff; }
+h1 { margin:0 0 8px; font-size:30px; letter-spacing:0; }
+header p { margin:4px 0; color:#d7dbe2; max-width:1100px; }
+main { padding:28px 40px 56px; }
+.kpis { display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:12px; margin:0 0 24px; }
+.kpi { border:1px solid var(--line); border-radius:8px; padding:14px 16px; background:var(--soft); }
+.kpi .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+.kpi .value { font-size:24px; font-weight:750; margin-top:4px; }
+.controls { display:flex; gap:12px; align-items:center; margin:18px 0; flex-wrap:wrap; }
+input[type='search'] { width:min(520px, 100%); padding:11px 12px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+.table-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; }
+table { width:100%; border-collapse:collapse; min-width:1120px; }
+th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; font-size:13px; }
+th { position:sticky; top:0; background:#f1f3f6; z-index:1; color:#303741; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+tr:hover td { background:#fafcff; }
+.rank { font-weight:800; color:var(--accent); }
+.muted { color:var(--muted); }
+.tag { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:12px; color:#333; margin:2px 4px 2px 0; }
+.cards { margin-top:28px; display:flex; flex-direction:column; gap:28px; }
+.card { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff; box-shadow:0 1px 2px rgba(16,19,24,.04); }
+.card-head { display:grid; grid-template-columns: 1fr auto; gap:16px; padding:18px 20px; background:#f7f8fa; border-bottom:1px solid var(--line); }
+.card h2 { margin:0; font-size:20px; }
+.meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.metrics { display:grid; grid-template-columns: repeat(6, minmax(92px,1fr)); gap:8px; min-width:560px; }
+.metric { background:#fff; border:1px solid var(--line); border-radius:7px; padding:9px 10px; }
+.metric b { display:block; font-size:16px; }
+.metric span { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+.card-body { display:grid; grid-template-columns: minmax(340px, .95fr) minmax(360px, 1.25fr); gap:20px; padding:20px; }
+.images { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:12px; align-items:start; }
+.figure { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#f4f5f7; }
+.figure img { width:100%; display:block; max-height:520px; object-fit:contain; background:#e8ebef; }
+.figcap { padding:8px 10px; font-size:12px; color:var(--muted); border-top:1px solid var(--line); background:#fff; }
+.copy-block { display:flex; flex-direction:column; gap:14px; }
+.copy-block h3 { margin:0 0 6px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:#333; }
+.copy-box { border:1px solid var(--line); border-radius:8px; padding:12px; background:#fff; }
+.copy-box pre { margin:0; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.45; }
+.small-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; }
+.note { border-left:4px solid var(--accent2); background:#f2f7ff; padding:11px 12px; border-radius:6px; color:#1b324f; font-size:13px; }
+footer { padding:20px 40px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
+@media (max-width: 1000px) { main, header, footer { padding-left:18px; padding-right:18px; } .kpis { grid-template-columns: repeat(2,1fr); } .card-head { grid-template-columns:1fr; } .metrics { min-width:0; grid-template-columns: repeat(2,1fr); } .card-body { grid-template-columns:1fr; } }
+</style>
+<script>
+function filterAds() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  document.querySelectorAll('[data-ad-card], tbody tr').forEach(el => {
+    const txt = el.getAttribute('data-search') || el.textContent;
+    el.style.display = txt.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+</script>
+</head>
+<body>
+<header>
+  <h1>Tenor Quiz Funnel Ad Spend Export</h1>
+  <p>Campaign: <b>120246144705220293</b> · Meta account: <b>Radiant / act_1635930427754775</b> · Date range: <b>2026-05-14 through 2026-05-16</b>.</p>
+  <p>Sorted by Meta spend descending. Includes exact ad ID, adset/concept, spend metrics, primary copy, destination, and downloaded Meta image assets.</p>
+</header>
+<main>
+  <section class="kpis">
+    <div class="kpi"><div class="label">Ads Exported</div><div class="value">19</div></div>
+    <div class="kpi"><div class="label">Total Spend</div><div class="value">$190.47</div></div>
+    <div class="kpi"><div class="label">Link Clicks</div><div class="value">96</div></div>
+    <div class="kpi"><div class="label">Impressions</div><div class="value">2,447</div></div>
+  </section>
+  <div class="controls"><input id="search" type="search" placeholder="Filter by ad ID, ad name, hook, copy, concept..." oninput="filterAds()"><span class="muted">Generated 2026-05-16 16:26:01  from backend APIs. No frontend/manual Meta UI data entry.</span></div>
+  <section class="table-wrap">
+    <table>
+      <thead><tr><th>Rank</th><th>Ad</th><th>Adset / Concept</th><th>Spend</th><th>Impr.</th><th>Link Clicks</th><th>CTR</th><th>CPC</th><th>PH Landed</th><th>PH Answered</th><th>PH Full</th><th>Headline</th></tr></thead>
+      <tbody>
+<tr data-search="120246144705200293 ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <td class="rank">#1</td>
+  <td><b>ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee</b><br><span class="muted">120246144705200293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$83.76</b></td>
+  <td>893</td>
+  <td>41</td>
+  <td>5.26%</td>
+  <td>$1.78</td>
+  <td>34</td>
+  <td>5 (14.7%)</td>
+  <td>1 (2.9%)</td>
+  <td>429,576+ Men Took This 60-Second Test</td>
+</tr>
+
+<tr data-search="120246144705180293 ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <td class="rank">#2</td>
+  <td><b>ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee</b><br><span class="muted">120246144705180293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$43.85</b></td>
+  <td>622</td>
+  <td>24</td>
+  <td>4.66%</td>
+  <td>$1.51</td>
+  <td>25</td>
+  <td>4 (16.0%)</td>
+  <td>4 (16.0%)</td>
+  <td>429,576+ Men Took This 60-Second Test</td>
+</tr>
+
+<tr data-search="120246144705060293 ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <td class="rank">#3</td>
+  <td><b>ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee</b><br><span class="muted">120246144705060293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$20.93</b></td>
+  <td>160</td>
+  <td>7</td>
+  <td>5.62%</td>
+  <td>$2.33</td>
+  <td>5</td>
+  <td>1 (20.0%)</td>
+  <td>1 (20.0%)</td>
+  <td>429,576+ Men Took This 60-Second Test</td>
+</tr>
+
+<tr data-search="120246144704940293 ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works. Concept 4 - Quiz Daily Decline / System Problem Why Your Grandfather Felt Better at 60 Than You Do at 35 Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.">
+  <td class="rank">#4</td>
+  <td><b>ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.</b><br><span class="muted">120246144704940293</span></td>
+  <td>Concept 4 - Quiz Daily Decline / System Problem<br><span class="muted">120246144705210293</span></td>
+  <td><b>$15.36</b></td>
+  <td>157</td>
+  <td>4</td>
+  <td>8.28%</td>
+  <td>$1.18</td>
+  <td>4</td>
+  <td>1 (25.0%)</td>
+  <td>1 (25.0%)</td>
+  <td>Why Your Grandfather Felt Better at 60 Than You Do at 35</td>
+</tr>
+
+<tr data-search="120246144705040293 ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <td class="rank">#5</td>
+  <td><b>ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee</b><br><span class="muted">120246144705040293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$7.79</b></td>
+  <td>152</td>
+  <td>5</td>
+  <td>3.29%</td>
+  <td>$1.56</td>
+  <td>4</td>
+  <td>0 (0%)</td>
+  <td>0 (0%)</td>
+  <td>429,576+ Men Took This 60-Second Test</td>
+</tr>
+
+<tr data-search="120246144705250293 ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 52% Off + 90-Day Guarantee 810,000+ men didn&#x27;t start Tenor because of a slick ad.
+
+They started because something changed.
+
+One man&#x27;s wife told him he seemed &quot;more there&quot; after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: &quot;The energy felt clean, not forced.&quot;
+
+Then there&#x27;s the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don&#x27;t crash anymore and his workouts feel purposeful again.
+
+These aren&#x27;t cherry-picked outliers. In a survey of 1,203 customers:
+
+→ 94% reported sustained morning energy
+
+→ 81% noticed improved endurance
+
+→ 87% felt more focused and present
+
+→ 92% said they felt more like themselves
+
+The protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).
+
+Every batch third-party tested. cGMP certified. Made in the USA.
+
+Get your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund.">
+  <td class="rank">#6</td>
+  <td><b>ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee</b><br><span class="muted">120246144705250293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$3.75</b></td>
+  <td>61</td>
+  <td>1</td>
+  <td>1.64%</td>
+  <td>$3.75</td>
+  <td>1</td>
+  <td>0 (0%)</td>
+  <td>0 (0%)</td>
+  <td>52% Off + 90-Day Guarantee</td>
+</tr>
+
+<tr data-search="120246144705260293 ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works. Concept 4 - Quiz Daily Decline / System Problem Why Your Grandfather Felt Better at 60 Than You Do at 35 Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.">
+  <td class="rank">#7</td>
+  <td><b>ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.</b><br><span class="muted">120246144705260293</span></td>
+  <td>Concept 4 - Quiz Daily Decline / System Problem<br><span class="muted">120246144705210293</span></td>
+  <td><b>$3.28</b></td>
+  <td>134</td>
+  <td>3</td>
+  <td>1.49%</td>
+  <td>$1.64</td>
+  <td>3</td>
+  <td>1 (33.3%)</td>
+  <td>0 (0%)</td>
+  <td>Why Your Grandfather Felt Better at 60 Than You Do at 35</td>
+</tr>
+
+<tr data-search="120246144705190293 ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee The &quot;Moobs&quot; Are Telling You Something The soft spot on your chest.
+
+The roll over your belt.
+
+The pec definition that&#x27;s been &quot;almost back&quot; for two years and never quite gets there.
+
+Here&#x27;s what most men miss:
+
+It&#x27;s not pizza. It&#x27;s not skipping chest day. It&#x27;s not a willpower problem.
+
+It&#x27;s a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn&#x27;t fix itself with another set of bench presses.
+
+Your body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can&#x27;t even use it.
+
+Three systems. All working against you. Crunches won&#x27;t fix that. Neither will another crash diet.
+
+👉 60-second test. Find out exactly which system is hitting you hardest — and where to actually start.">
+  <td class="rank">#8</td>
+  <td><b>ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705190293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$3.04</b></td>
+  <td>50</td>
+  <td>2</td>
+  <td>4.00%</td>
+  <td>$1.52</td>
+  <td>2</td>
+  <td>0 (0%)</td>
+  <td>0 (0%)</td>
+  <td>The &quot;Moobs&quot; Are Telling You Something</td>
+</tr>
+
+<tr data-search="120246144705020293 ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee 52% Off Limited-Time Welcome Offer SAVE 52% + $35 WELCOME KIT VALUE
+
+21 active ingredients. Disclosed doses. Third-party tested.
+
+See how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.
+
+Two capsules every morning. No prescription. No clinic. No needles.
+
+Get The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.">
+  <td class="rank">#9</td>
+  <td><b>ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705020293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$2.47</b></td>
+  <td>42</td>
+  <td>0</td>
+  <td>0.00%</td>
+  <td>$0.00</td>
+  <td>0</td>
+  <td>0 (0%)</td>
+  <td>0 (0%)</td>
+  <td>52% Off Limited-Time Welcome Offer</td>
+</tr>
+
+<tr data-search="120246144705230293 ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer Concept 4 - Quiz Daily Decline / System Problem 3 Hormones Are Stealing Your Testosterone Right Now Your testosterone is dropping right now.
+
+Not next year. Not &quot;eventually.&quot; This minute. While you&#x27;re scrolling.
+
+Three thieves are running the heist:
+
+One converts the T you make into estrogen.
+One locks up what&#x27;s left so your body can&#x27;t even use it.
+One — cortisol, from work stress, bad sleep, modern life — tanks production at the source.
+
+That brain fog at 2 p.m.? The gut that won&#x27;t budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?
+
+That&#x27;s not laziness. That&#x27;s the heist.
+
+And it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.
+
+Most men can&#x27;t tell you which thief is hitting them hardest — so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.
+
+👉 60-second test. Find out which thief is hitting you hardest — and where to actually start.">
+  <td class="rank">#10</td>
+  <td><b>ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705230293</span></td>
+  <td>Concept 4 - Quiz Daily Decline / System Problem<br><span class="muted">120246144705210293</span></td>
+  <td><b>$2.12</b></td>
+  <td>59</td>
+  <td>3</td>
+  <td>6.78%</td>
+  <td>$0.53</td>
+  <td>3</td>
+  <td>0 (0%)</td>
+  <td>0 (0%)</td>
+  <td>3 Hormones Are Stealing Your Testosterone Right Now</td>
+</tr>
+
+<tr data-search="120246144705240293 ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer Concept 4 - Quiz Daily Decline / System Problem 3 Hormones Are Stealing Your Testosterone Right Now Your testosterone is dropping right now.
+
+Not next year. Not &quot;eventually.&quot; This minute. While you&#x27;re scrolling.
+
+Three thieves are running the heist:
+
+One converts the T you make into estrogen.
+One locks up what&#x27;s left so your body can&#x27;t even use it.
+One — cortisol, from work stress, bad sleep, modern life — tanks production at the source.
+
+That brain fog at 2 p.m.? The gut that won&#x27;t budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?
+
+That&#x27;s not laziness. That&#x27;s the heist.
+
+And it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.
+
+Most men can&#x27;t tell you which thief is hitting them hardest — so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.
+
+👉 60-second test. Find out which thief is hitting you hardest — and where to actually start.">
+  <td class="rank">#11</td>
+  <td><b>ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705240293</span></td>
+  <td>Concept 4 - Quiz Daily Decline / System Problem<br><span class="muted">120246144705210293</span></td>
+  <td><b>$2.05</b></td>
+  <td>31</td>
+  <td>2</td>
+  <td>0.00%</td>
+  <td>$0.00</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>3 Hormones Are Stealing Your Testosterone Right Now</td>
+</tr>
+
+<tr data-search="120246144705160293 ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today. Concept 4 - Quiz Daily Decline / System Problem Eat Clean, Train Hard, Still Crashing at 2 p.m.? You eat clean.
+You train hard.
+You don&#x27;t drink like you used to.
+
+And you&#x27;re STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you&#x27;re dragging an extra body across the gym floor.
+
+This isn&#x27;t motivation. It isn&#x27;t willpower. It isn&#x27;t &quot;I need to try harder.&quot;
+
+It&#x27;s your testosterone — quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.
+
+T drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence — and any feeling that your body is actually responding to the work you&#x27;re putting in.
+
+Most men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that&#x27;s actually draining.
+
+👉 60-second test. Find out where you actually stand — and what&#x27;s behind the crash.">
+  <td class="rank">#12</td>
+  <td><b>ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.</b><br><span class="muted">120246144705160293</span></td>
+  <td>Concept 4 - Quiz Daily Decline / System Problem<br><span class="muted">120246144705210293</span></td>
+  <td><b>$0.93</b></td>
+  <td>36</td>
+  <td>1</td>
+  <td>2.78%</td>
+  <td>$0.93</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>Eat Clean, Train Hard, Still Crashing at 2 p.m.?</td>
+</tr>
+
+<tr data-search="120246144705050293 ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <td class="rank">#13</td>
+  <td><b>ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee</b><br><span class="muted">120246144705050293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$0.49</b></td>
+  <td>6</td>
+  <td>2</td>
+  <td>50.00%</td>
+  <td>$0.16</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>429,576+ Men Took This 60-Second Test</td>
+</tr>
+
+<tr data-search="120246144705170293 ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee The &quot;Moobs&quot; Are Telling You Something The soft spot on your chest.
+
+The roll over your belt.
+
+The pec definition that&#x27;s been &quot;almost back&quot; for two years and never quite gets there.
+
+Here&#x27;s what most men miss:
+
+It&#x27;s not pizza. It&#x27;s not skipping chest day. It&#x27;s not a willpower problem.
+
+It&#x27;s a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn&#x27;t fix itself with another set of bench presses.
+
+Your body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can&#x27;t even use it.
+
+Three systems. All working against you. Crunches won&#x27;t fix that. Neither will another crash diet.
+
+👉 60-second test. Find out exactly which system is hitting you hardest — and where to actually start.">
+  <td class="rank">#14</td>
+  <td><b>ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705170293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$0.37</b></td>
+  <td>7</td>
+  <td>0</td>
+  <td>0.00%</td>
+  <td>$0.00</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>The &quot;Moobs&quot; Are Telling You Something</td>
+</tr>
+
+<tr data-search="120246144705270293 ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today. Concept 4 - Quiz Daily Decline / System Problem Eat Clean, Train Hard, Still Crashing at 2 p.m.? You eat clean.
+You train hard.
+You don&#x27;t drink like you used to.
+
+And you&#x27;re STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you&#x27;re dragging an extra body across the gym floor.
+
+This isn&#x27;t motivation. It isn&#x27;t willpower. It isn&#x27;t &quot;I need to try harder.&quot;
+
+It&#x27;s your testosterone — quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.
+
+T drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence — and any feeling that your body is actually responding to the work you&#x27;re putting in.
+
+Most men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that&#x27;s actually draining.
+
+👉 60-second test. Find out where you actually stand — and what&#x27;s behind the crash.">
+  <td class="rank">#15</td>
+  <td><b>ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today.</b><br><span class="muted">120246144705270293</span></td>
+  <td>Concept 4 - Quiz Daily Decline / System Problem<br><span class="muted">120246144705210293</span></td>
+  <td><b>$0.22</b></td>
+  <td>12</td>
+  <td>1</td>
+  <td>16.67%</td>
+  <td>$0.11</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>Eat Clean, Train Hard, Still Crashing at 2 p.m.?</td>
+</tr>
+
+<tr data-search="120246144705010293 ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee Your Stress Is Eating Your Testosterone Alive Your stress is eating your testosterone alive.
+
+Every deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every &quot;I&#x27;m fine, I just need a minute.&quot;
+
+Your body responds the same way every time — it floods you with cortisol.
+
+And here&#x27;s what nobody tells you:
+
+Cortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It&#x27;s not a theory. It&#x27;s basic endocrinology.
+
+So that gut you can&#x27;t lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?
+
+That&#x27;s not aging. That&#x27;s cortisol winning.
+
+And every month you don&#x27;t fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.
+
+👉 60-second test. Find out where you actually stand — and which hormone is calling the shots in your body right now.">
+  <td class="rank">#16</td>
+  <td><b>ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705010293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$0.04</b></td>
+  <td>8</td>
+  <td>0</td>
+  <td>0.00%</td>
+  <td>$0.00</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>Your Stress Is Eating Your Testosterone Alive</td>
+</tr>
+
+<tr data-search="120246144705080293 ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee Your Stress Is Eating Your Testosterone Alive Your stress is eating your testosterone alive.
+
+Every deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every &quot;I&#x27;m fine, I just need a minute.&quot;
+
+Your body responds the same way every time — it floods you with cortisol.
+
+And here&#x27;s what nobody tells you:
+
+Cortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It&#x27;s not a theory. It&#x27;s basic endocrinology.
+
+So that gut you can&#x27;t lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?
+
+That&#x27;s not aging. That&#x27;s cortisol winning.
+
+And every month you don&#x27;t fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.
+
+👉 60-second test. Find out where you actually stand — and which hormone is calling the shots in your body right now.">
+  <td class="rank">#17</td>
+  <td><b>ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705080293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$0.02</b></td>
+  <td>3</td>
+  <td>0</td>
+  <td>0.00%</td>
+  <td>$0.00</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>Your Stress Is Eating Your Testosterone Alive</td>
+</tr>
+
+<tr data-search="120246144704930293 ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works. Concept 4 - Quiz Daily Decline / System Problem Why Your Grandfather Felt Better at 60 Than You Do at 35 Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.">
+  <td class="rank">#18</td>
+  <td><b>ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.</b><br><span class="muted">120246144704930293</span></td>
+  <td>Concept 4 - Quiz Daily Decline / System Problem<br><span class="muted">120246144705210293</span></td>
+  <td><b>$0.00</b></td>
+  <td>4</td>
+  <td>0</td>
+  <td>0.00%</td>
+  <td>$0.00</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>Why Your Grandfather Felt Better at 60 Than You Do at 35</td>
+</tr>
+
+<tr data-search="120246144705030293 ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee 52% Off Limited-Time Welcome Offer SAVE 52% + $35 WELCOME KIT VALUE
+
+21 active ingredients. Disclosed doses. Third-party tested.
+
+See how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.
+
+Two capsules every morning. No prescription. No clinic. No needles.
+
+Get The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.">
+  <td class="rank">#19</td>
+  <td><b>ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer</b><br><span class="muted">120246144705030293</span></td>
+  <td>Concept 5 - Quiz Offer / Proof / Guarantee<br><span class="muted">120246144705150293</span></td>
+  <td><b>$0.00</b></td>
+  <td>10</td>
+  <td>0</td>
+  <td>0.00%</td>
+  <td>$0.00</td>
+  <td>-</td>
+  <td>-</td>
+  <td>-</td>
+  <td>52% Off Limited-Time Welcome Offer</td>
+</tr>
+</tbody>
+    </table>
+  </section>
+  <section class="cards">
+<section class="card" data-ad-card data-search="120246144705200293 ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#1</span> ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705200293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 1976835619866764</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$83.76</b><span>Spend</span></div>
+      <div class="metric"><b>41</b><span>Link Clicks</span></div>
+      <div class="metric"><b>893</b><span>Impressions</span></div>
+      <div class="metric"><b>5.26%</b><span>CTR</span></div>
+      <div class="metric"><b>$1.78</b><span>CPC</span></div>
+      <div class="metric"><b>1 (2.9%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705200293_4-5_a5af73f4f9.jpg" alt="ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="a5af73f4f951239b256707b4db654ac0">a5af73f4f951</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705200293_1-1_23012f3c3e.jpg" alt="ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="23012f3c3e46570505ce67dd213472ea">23012f3c3e46</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705200293_9-16_fdbf15eb1d.jpg" alt="ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="fdbf15eb1db955a405df74be03d8f7fc">fdbf15eb1db9</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>429,576+ Men Took This 60-Second Test</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>See why they did — and what showed up in their bloodwork after.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 34
+Answered any quiz question: 5 (14.7%)
+Full in-session completion: 1 (2.9%)
+Broader completion signal: 3 (8.8%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 30</span><span class="tag">link_click: 41</span><span class="tag">offsite_content_view_add_meta_leads: 5</span><span class="tag">offsite_conversion.custom.1498235888522157: 35</span><span class="tag">offsite_conversion.custom.4455407368061391: 7</span><span class="tag">offsite_conversion.fb_pixel_custom: 49</span><span class="tag">offsite_conversion.fb_pixel_view_content: 5</span><span class="tag">omni_landing_page_view: 30</span><span class="tag">omni_view_content: 5</span><span class="tag">onsite_web_app_view_content: 5</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705180293 ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#2</span> ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705180293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 974496854950476</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$43.85</b><span>Spend</span></div>
+      <div class="metric"><b>24</b><span>Link Clicks</span></div>
+      <div class="metric"><b>622</b><span>Impressions</span></div>
+      <div class="metric"><b>4.66%</b><span>CTR</span></div>
+      <div class="metric"><b>$1.51</b><span>CPC</span></div>
+      <div class="metric"><b>4 (16.0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705180293_1-1_1b0ed3a702.jpg" alt="ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="1b0ed3a7022894c1d1ab967b3355131e">1b0ed3a70228</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705180293_4-5_04e3c47b24.jpg" alt="ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="04e3c47b24d8e81a9a5b635aa55748dc">04e3c47b24d8</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705180293_9-16_546074ff5d.jpg" alt="ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="546074ff5dfa53d3f4223b4e8c379cb0">546074ff5dfa</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>429,576+ Men Took This 60-Second Test</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>See why they did — and what showed up in their bloodwork after.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 25
+Answered any quiz question: 4 (16.0%)
+Full in-session completion: 4 (16.0%)
+Broader completion signal: 9 (36.0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">add_to_cart: 1</span><span class="tag">landing_page_view: 20</span><span class="tag">link_click: 24</span><span class="tag">offsite_content_view_add_meta_leads: 10</span><span class="tag">offsite_conversion.custom.1498235888522157: 23</span><span class="tag">offsite_conversion.custom.4455407368061391: 10</span><span class="tag">offsite_conversion.fb_pixel_add_to_cart: 1</span><span class="tag">offsite_conversion.fb_pixel_custom: 58</span><span class="tag">offsite_conversion.fb_pixel_view_content: 10</span><span class="tag">omni_add_to_cart: 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705060293 ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#3</span> ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705060293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 1486646086528022</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$20.93</b><span>Spend</span></div>
+      <div class="metric"><b>7</b><span>Link Clicks</span></div>
+      <div class="metric"><b>160</b><span>Impressions</span></div>
+      <div class="metric"><b>5.62%</b><span>CTR</span></div>
+      <div class="metric"><b>$2.33</b><span>CPC</span></div>
+      <div class="metric"><b>1 (20.0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705060293_9-16_f6910f30fd.jpg" alt="ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="f6910f30fd96528bb396534a6e4a4ddb">f6910f30fd96</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705060293_1-1_98a6e5888e.jpg" alt="ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="98a6e5888efc8539740ee94da68263d5">98a6e5888efc</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705060293_4-5_bc0093ce80.jpg" alt="ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="bc0093ce800494a900b8f8434f16ad16">bc0093ce8004</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>429,576+ Men Took This 60-Second Test</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>See why they did — and what showed up in their bloodwork after.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 5
+Answered any quiz question: 1 (20.0%)
+Full in-session completion: 1 (20.0%)
+Broader completion signal: 1 (20.0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 7</span><span class="tag">link_click: 7</span><span class="tag">offsite_content_view_add_meta_leads: 1</span><span class="tag">offsite_conversion.custom.1498235888522157: 5</span><span class="tag">offsite_conversion.custom.4455407368061391: 1</span><span class="tag">offsite_conversion.fb_pixel_custom: 8</span><span class="tag">offsite_conversion.fb_pixel_view_content: 1</span><span class="tag">omni_landing_page_view: 7</span><span class="tag">omni_view_content: 1</span><span class="tag">onsite_web_app_view_content: 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144704940293 ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works. Concept 4 - Quiz Daily Decline / System Problem Why Your Grandfather Felt Better at 60 Than You Do at 35 Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#4</span> ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144704940293</span>
+        <span class="tag">Adset: Concept 4 - Quiz Daily Decline / System Problem</span>
+        <span class="tag">Creative ID: 2055646292036554</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$15.36</b><span>Spend</span></div>
+      <div class="metric"><b>4</b><span>Link Clicks</span></div>
+      <div class="metric"><b>157</b><span>Impressions</span></div>
+      <div class="metric"><b>8.28%</b><span>CTR</span></div>
+      <div class="metric"><b>$1.18</b><span>CPC</span></div>
+      <div class="metric"><b>1 (25.0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144704940293_1-1_3868a723c5.jpg" alt="ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works. 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="3868a723c53fdd026e72269aaa62d7d3">3868a723c53f</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144704940293_4-5_83d6e92eb5.jpg" alt="ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works. 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="83d6e92eb5e5a63b305316aff403cdaa">83d6e92eb5e5</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144704940293_9-16_59f52261b7.jpg" alt="ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works. 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="59f52261b7d57d1eaf8a3251ab81734c">59f52261b7d5</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>Why Your Grandfather Felt Better at 60 Than You Do at 35</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test to find out where yours actually stands.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 4
+Answered any quiz question: 1 (25.0%)
+Full in-session completion: 1 (25.0%)
+Broader completion signal: 1 (25.0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 4</span><span class="tag">link_click: 4</span><span class="tag">offsite_conversion.custom.1498235888522157: 4</span><span class="tag">offsite_conversion.fb_pixel_custom: 4</span><span class="tag">omni_landing_page_view: 4</span><span class="tag">onsite_conversion.post_net_like: 1</span><span class="tag">page_engagement: 5</span><span class="tag">post_engagement: 5</span><span class="tag">post_interaction_gross: 1</span><span class="tag">post_interaction_net: 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705040293 ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#5</span> ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705040293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 1641028544695431</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$7.79</b><span>Spend</span></div>
+      <div class="metric"><b>5</b><span>Link Clicks</span></div>
+      <div class="metric"><b>152</b><span>Impressions</span></div>
+      <div class="metric"><b>3.29%</b><span>CTR</span></div>
+      <div class="metric"><b>$1.56</b><span>CPC</span></div>
+      <div class="metric"><b>0 (0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705040293_1-1_fa09a6ade5.jpg" alt="ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="fa09a6ade5eb8704d2e54c3c60acbf78">fa09a6ade5eb</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705040293_4-5_71ef2acf59.jpg" alt="ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="71ef2acf59d8bd64af327234a7a9fbc2">71ef2acf59d8</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705040293_9-16_1f4a57b42b.jpg" alt="ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="1f4a57b42b800ddce3bc34c269e65bce">1f4a57b42b80</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>429,576+ Men Took This 60-Second Test</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>See why they did — and what showed up in their bloodwork after.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 4
+Answered any quiz question: 0 (0%)
+Full in-session completion: 0 (0%)
+Broader completion signal: 3 (75.0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 4</span><span class="tag">link_click: 5</span><span class="tag">offsite_conversion.custom.1498235888522157: 4</span><span class="tag">offsite_conversion.fb_pixel_custom: 4</span><span class="tag">omni_landing_page_view: 4</span><span class="tag">page_engagement: 5</span><span class="tag">post_engagement: 5</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705250293 ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 52% Off + 90-Day Guarantee 810,000+ men didn&#x27;t start Tenor because of a slick ad.
+
+They started because something changed.
+
+One man&#x27;s wife told him he seemed &quot;more there&quot; after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: &quot;The energy felt clean, not forced.&quot;
+
+Then there&#x27;s the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don&#x27;t crash anymore and his workouts feel purposeful again.
+
+These aren&#x27;t cherry-picked outliers. In a survey of 1,203 customers:
+
+→ 94% reported sustained morning energy
+
+→ 81% noticed improved endurance
+
+→ 87% felt more focused and present
+
+→ 92% said they felt more like themselves
+
+The protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).
+
+Every batch third-party tested. cGMP certified. Made in the USA.
+
+Get your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#6</span> ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705250293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 981571857608636</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$3.75</b><span>Spend</span></div>
+      <div class="metric"><b>1</b><span>Link Clicks</span></div>
+      <div class="metric"><b>61</b><span>Impressions</span></div>
+      <div class="metric"><b>1.64%</b><span>CTR</span></div>
+      <div class="metric"><b>$3.75</b><span>CPC</span></div>
+      <div class="metric"><b>0 (0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705250293_1-1_b079c60bef.jpg" alt="ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="b079c60befed2420cc6295c027aa9440">b079c60befed</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705250293_4-5_d157556c93.jpg" alt="ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="d157556c93c2efef52e5250712c154a0">d157556c93c2</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705250293_9-16_c6039c0f1b.jpg" alt="ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="c6039c0f1b555b066827e630caf2e2b5">c6039c0f1b55</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>52% Off + 90-Day Guarantee</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>-
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>810,000+ men didn&#x27;t start Tenor because of a slick ad.
+
+They started because something changed.
+
+One man&#x27;s wife told him he seemed &quot;more there&quot; after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: &quot;The energy felt clean, not forced.&quot;
+
+Then there&#x27;s the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don&#x27;t crash anymore and his workouts feel purposeful again.
+
+These aren&#x27;t cherry-picked outliers. In a survey of 1,203 customers:
+
+→ 94% reported sustained morning energy
+
+→ 81% noticed improved endurance
+
+→ 87% felt more focused and present
+
+→ 92% said they felt more like themselves
+
+The protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).
+
+Every batch third-party tested. cGMP certified. Made in the USA.
+
+Get your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 1
+Answered any quiz question: 0 (0%)
+Full in-session completion: 0 (0%)
+Broader completion signal: 0 (0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 1</span><span class="tag">link_click: 1</span><span class="tag">offsite_conversion.custom.1498235888522157: 2</span><span class="tag">offsite_conversion.fb_pixel_custom: 2</span><span class="tag">omni_landing_page_view: 1</span><span class="tag">page_engagement: 1</span><span class="tag">post_engagement: 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705260293 ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works. Concept 4 - Quiz Daily Decline / System Problem Why Your Grandfather Felt Better at 60 Than You Do at 35 Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#7</span> ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705260293</span>
+        <span class="tag">Adset: Concept 4 - Quiz Daily Decline / System Problem</span>
+        <span class="tag">Creative ID: 2128723477673079</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$3.28</b><span>Spend</span></div>
+      <div class="metric"><b>3</b><span>Link Clicks</span></div>
+      <div class="metric"><b>134</b><span>Impressions</span></div>
+      <div class="metric"><b>1.49%</b><span>CTR</span></div>
+      <div class="metric"><b>$1.64</b><span>CPC</span></div>
+      <div class="metric"><b>0 (0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705260293_1-1_9edb06a4c8.jpg" alt="ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works. 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="9edb06a4c864ee148e61f0b3af4bc7f8">9edb06a4c864</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705260293_4-5_7749456ad0.jpg" alt="ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works. 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="7749456ad03b7e6c65f98d0d898a6118">7749456ad03b</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705260293_9-16_ea942c7da3.jpg" alt="ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works. 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="ea942c7da375530a903ded29d3e00615">ea942c7da375</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>Why Your Grandfather Felt Better at 60 Than You Do at 35</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test to find out where yours actually stands.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 3
+Answered any quiz question: 1 (33.3%)
+Full in-session completion: 0 (0%)
+Broader completion signal: 0 (0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 4</span><span class="tag">link_click: 3</span><span class="tag">offsite_conversion.custom.1498235888522157: 3</span><span class="tag">offsite_conversion.fb_pixel_custom: 3</span><span class="tag">omni_landing_page_view: 4</span><span class="tag">onsite_conversion.post_net_like: 1</span><span class="tag">page_engagement: 4</span><span class="tag">post_engagement: 4</span><span class="tag">post_interaction_gross: 1</span><span class="tag">post_interaction_net: 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705190293 ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee The &quot;Moobs&quot; Are Telling You Something The soft spot on your chest.
+
+The roll over your belt.
+
+The pec definition that&#x27;s been &quot;almost back&quot; for two years and never quite gets there.
+
+Here&#x27;s what most men miss:
+
+It&#x27;s not pizza. It&#x27;s not skipping chest day. It&#x27;s not a willpower problem.
+
+It&#x27;s a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn&#x27;t fix itself with another set of bench presses.
+
+Your body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can&#x27;t even use it.
+
+Three systems. All working against you. Crunches won&#x27;t fix that. Neither will another crash diet.
+
+👉 60-second test. Find out exactly which system is hitting you hardest — and where to actually start.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#8</span> ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705190293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 831794046669845</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$3.04</b><span>Spend</span></div>
+      <div class="metric"><b>2</b><span>Link Clicks</span></div>
+      <div class="metric"><b>50</b><span>Impressions</span></div>
+      <div class="metric"><b>4.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$1.52</b><span>CPC</span></div>
+      <div class="metric"><b>0 (0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705190293_4-5_d338f41139.jpg" alt="ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="d338f4113914b2d128aba4c61a28b10c">d338f4113914</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705190293_1-1_1abdeaf22b.jpg" alt="ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="1abdeaf22b7ffbfd7acae6860fb456ac">1abdeaf22b7f</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705190293_9-16_754a85c4d5.jpg" alt="ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="754a85c4d54b03523ef622a400034c04">754a85c4d54b</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>The &quot;Moobs&quot; Are Telling You Something</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals what&#x27;s actually causing them.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>The soft spot on your chest.
+
+The roll over your belt.
+
+The pec definition that&#x27;s been &quot;almost back&quot; for two years and never quite gets there.
+
+Here&#x27;s what most men miss:
+
+It&#x27;s not pizza. It&#x27;s not skipping chest day. It&#x27;s not a willpower problem.
+
+It&#x27;s a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn&#x27;t fix itself with another set of bench presses.
+
+Your body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can&#x27;t even use it.
+
+Three systems. All working against you. Crunches won&#x27;t fix that. Neither will another crash diet.
+
+👉 60-second test. Find out exactly which system is hitting you hardest — and where to actually start.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 2
+Answered any quiz question: 0 (0%)
+Full in-session completion: 0 (0%)
+Broader completion signal: 1 (50.0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 2</span><span class="tag">link_click: 2</span><span class="tag">offsite_conversion.custom.1498235888522157: 2</span><span class="tag">offsite_conversion.fb_pixel_custom: 2</span><span class="tag">omni_landing_page_view: 2</span><span class="tag">page_engagement: 2</span><span class="tag">post_engagement: 2</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705020293 ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee 52% Off Limited-Time Welcome Offer SAVE 52% + $35 WELCOME KIT VALUE
+
+21 active ingredients. Disclosed doses. Third-party tested.
+
+See how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.
+
+Two capsules every morning. No prescription. No clinic. No needles.
+
+Get The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#9</span> ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705020293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 3070116089845115</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$2.47</b><span>Spend</span></div>
+      <div class="metric"><b>0</b><span>Link Clicks</span></div>
+      <div class="metric"><b>42</b><span>Impressions</span></div>
+      <div class="metric"><b>0.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.00</b><span>CPC</span></div>
+      <div class="metric"><b>0 (0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705020293_1-1_e530ae6f91.jpg" alt="ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="e530ae6f91681abef015198d2210d55e">e530ae6f9168</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705020293_4-5_7dda1ab09e.jpg" alt="ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="7dda1ab09ef88e0446b1b6b228c21e1e">7dda1ab09ef8</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705020293_9-16_1c8443a693.jpg" alt="ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="1c8443a6930e1a9841f875c0518791b9">1c8443a6930e</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>52% Off Limited-Time Welcome Offer</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>✅ 90-Day Guarantee
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>SAVE 52% + $35 WELCOME KIT VALUE
+
+21 active ingredients. Disclosed doses. Third-party tested.
+
+See how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.
+
+Two capsules every morning. No prescription. No clinic. No needles.
+
+Get The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 0
+Answered any quiz question: 0 (0%)
+Full in-session completion: 0 (0%)
+Broader completion signal: 0 (0%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="muted">No actions returned in this insight row.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705230293 ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer Concept 4 - Quiz Daily Decline / System Problem 3 Hormones Are Stealing Your Testosterone Right Now Your testosterone is dropping right now.
+
+Not next year. Not &quot;eventually.&quot; This minute. While you&#x27;re scrolling.
+
+Three thieves are running the heist:
+
+One converts the T you make into estrogen.
+One locks up what&#x27;s left so your body can&#x27;t even use it.
+One — cortisol, from work stress, bad sleep, modern life — tanks production at the source.
+
+That brain fog at 2 p.m.? The gut that won&#x27;t budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?
+
+That&#x27;s not laziness. That&#x27;s the heist.
+
+And it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.
+
+Most men can&#x27;t tell you which thief is hitting them hardest — so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.
+
+👉 60-second test. Find out which thief is hitting you hardest — and where to actually start.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#10</span> ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705230293</span>
+        <span class="tag">Adset: Concept 4 - Quiz Daily Decline / System Problem</span>
+        <span class="tag">Creative ID: 1401106595387459</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$2.12</b><span>Spend</span></div>
+      <div class="metric"><b>3</b><span>Link Clicks</span></div>
+      <div class="metric"><b>59</b><span>Impressions</span></div>
+      <div class="metric"><b>6.78%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.53</b><span>CPC</span></div>
+      <div class="metric"><b>0 (0%)</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705230293_1-1_cfc77f7db7.jpg" alt="ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="cfc77f7db7b654a9d916901f928729b9">cfc77f7db7b6</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705230293_4-5_19551461dd.jpg" alt="ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="19551461dd9d562f61f39c6b5391f96e">19551461dd9d</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705230293_9-16_f57c9edb32.jpg" alt="ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="f57c9edb32f0615dd85d27c8485235a5">f57c9edb32f0</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>3 Hormones Are Stealing Your Testosterone Right Now</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals which one is hitting you hardest.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>Your testosterone is dropping right now.
+
+Not next year. Not &quot;eventually.&quot; This minute. While you&#x27;re scrolling.
+
+Three thieves are running the heist:
+
+One converts the T you make into estrogen.
+One locks up what&#x27;s left so your body can&#x27;t even use it.
+One — cortisol, from work stress, bad sleep, modern life — tanks production at the source.
+
+That brain fog at 2 p.m.? The gut that won&#x27;t budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?
+
+That&#x27;s not laziness. That&#x27;s the heist.
+
+And it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.
+
+Most men can&#x27;t tell you which thief is hitting them hardest — so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.
+
+👉 60-second test. Find out which thief is hitting you hardest — and where to actually start.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: 3
+Answered any quiz question: 0 (0%)
+Full in-session completion: 0 (0%)
+Broader completion signal: 2 (66.7%)</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 1</span><span class="tag">link_click: 3</span><span class="tag">offsite_conversion.custom.1498235888522157: 2</span><span class="tag">offsite_conversion.fb_pixel_custom: 2</span><span class="tag">omni_landing_page_view: 1</span><span class="tag">page_engagement: 3</span><span class="tag">post_engagement: 3</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705240293 ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer Concept 4 - Quiz Daily Decline / System Problem 3 Hormones Are Stealing Your Testosterone Right Now Your testosterone is dropping right now.
+
+Not next year. Not &quot;eventually.&quot; This minute. While you&#x27;re scrolling.
+
+Three thieves are running the heist:
+
+One converts the T you make into estrogen.
+One locks up what&#x27;s left so your body can&#x27;t even use it.
+One — cortisol, from work stress, bad sleep, modern life — tanks production at the source.
+
+That brain fog at 2 p.m.? The gut that won&#x27;t budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?
+
+That&#x27;s not laziness. That&#x27;s the heist.
+
+And it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.
+
+Most men can&#x27;t tell you which thief is hitting them hardest — so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.
+
+👉 60-second test. Find out which thief is hitting you hardest — and where to actually start.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#11</span> ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705240293</span>
+        <span class="tag">Adset: Concept 4 - Quiz Daily Decline / System Problem</span>
+        <span class="tag">Creative ID: 1325682809663682</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$2.05</b><span>Spend</span></div>
+      <div class="metric"><b>2</b><span>Link Clicks</span></div>
+      <div class="metric"><b>31</b><span>Impressions</span></div>
+      <div class="metric"><b>0.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.00</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705240293_1-1_a4009010a2.jpg" alt="ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="a4009010a20922418517335792b65916">a4009010a209</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705240293_4-5_6ed73b9c6b.jpg" alt="ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="6ed73b9c6b12788ccf912de885b2fb7c">6ed73b9c6b12</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705240293_9-16_e2526548bf.jpg" alt="ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="e2526548bf95b0e8bb20f5c97dcbab07">e2526548bf95</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>3 Hormones Are Stealing Your Testosterone Right Now</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals which one is hitting you hardest.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>Your testosterone is dropping right now.
+
+Not next year. Not &quot;eventually.&quot; This minute. While you&#x27;re scrolling.
+
+Three thieves are running the heist:
+
+One converts the T you make into estrogen.
+One locks up what&#x27;s left so your body can&#x27;t even use it.
+One — cortisol, from work stress, bad sleep, modern life — tanks production at the source.
+
+That brain fog at 2 p.m.? The gut that won&#x27;t budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?
+
+That&#x27;s not laziness. That&#x27;s the heist.
+
+And it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.
+
+Most men can&#x27;t tell you which thief is hitting them hardest — so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.
+
+👉 60-second test. Find out which thief is hitting you hardest — and where to actually start.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">link_click: 2</span><span class="tag">page_engagement: 2</span><span class="tag">post_engagement: 2</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705160293 ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today. Concept 4 - Quiz Daily Decline / System Problem Eat Clean, Train Hard, Still Crashing at 2 p.m.? You eat clean.
+You train hard.
+You don&#x27;t drink like you used to.
+
+And you&#x27;re STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you&#x27;re dragging an extra body across the gym floor.
+
+This isn&#x27;t motivation. It isn&#x27;t willpower. It isn&#x27;t &quot;I need to try harder.&quot;
+
+It&#x27;s your testosterone — quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.
+
+T drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence — and any feeling that your body is actually responding to the work you&#x27;re putting in.
+
+Most men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that&#x27;s actually draining.
+
+👉 60-second test. Find out where you actually stand — and what&#x27;s behind the crash.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#12</span> ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705160293</span>
+        <span class="tag">Adset: Concept 4 - Quiz Daily Decline / System Problem</span>
+        <span class="tag">Creative ID: 994434706835989</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.93</b><span>Spend</span></div>
+      <div class="metric"><b>1</b><span>Link Clicks</span></div>
+      <div class="metric"><b>36</b><span>Impressions</span></div>
+      <div class="metric"><b>2.78%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.93</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705160293_1-1_0b580bfbe7.jpg" alt="ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today. 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="0b580bfbe7b89c9042d2df71261a6e31">0b580bfbe7b8</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705160293_4-5_0974257bea.jpg" alt="ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today. 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="0974257beae9eccd0afcb1eb549feb97">0974257beae9</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705160293_9-16_e38777a340.jpg" alt="ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today. 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="e38777a34011f9550a90c1bc16e06d8c">e38777a34011</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>Eat Clean, Train Hard, Still Crashing at 2 p.m.?</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals what&#x27;s actually behind it.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>You eat clean.
+You train hard.
+You don&#x27;t drink like you used to.
+
+And you&#x27;re STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you&#x27;re dragging an extra body across the gym floor.
+
+This isn&#x27;t motivation. It isn&#x27;t willpower. It isn&#x27;t &quot;I need to try harder.&quot;
+
+It&#x27;s your testosterone — quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.
+
+T drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence — and any feeling that your body is actually responding to the work you&#x27;re putting in.
+
+Most men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that&#x27;s actually draining.
+
+👉 60-second test. Find out where you actually stand — and what&#x27;s behind the crash.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 1</span><span class="tag">link_click: 1</span><span class="tag">offsite_conversion.custom.1498235888522157: 1</span><span class="tag">offsite_conversion.fb_pixel_custom: 1</span><span class="tag">omni_landing_page_view: 1</span><span class="tag">page_engagement: 1</span><span class="tag">post_engagement: 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705050293 ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee Concept 5 - Quiz Offer / Proof / Guarantee 429,576+ Men Took This 60-Second Test 429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#13</span> ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705050293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 976624672014243</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.49</b><span>Spend</span></div>
+      <div class="metric"><b>2</b><span>Link Clicks</span></div>
+      <div class="metric"><b>6</b><span>Impressions</span></div>
+      <div class="metric"><b>50.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.16</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705050293_1-1_c2710440bd.jpg" alt="ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="c2710440bd08f4880fb8a8340ead3a02">c2710440bd08</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705050293_4-5_92fd291fe5.jpg" alt="ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="92fd291fe5a9dbc47216835289f244aa">92fd291fe5a9</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705050293_9-16_910c5e3124.jpg" alt="ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="910c5e3124cff95b5daf0fe27a9da246">910c5e3124cf</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>429,576+ Men Took This 60-Second Test</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>See why they did — and what showed up in their bloodwork after.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>429,576+ men took this 60-second test.
+
+Not because of a slick ad. Because something they couldn&#x27;t ignore showed up in their bloodwork.
+
+One guy&#x27;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#x27;t explain.
+
+Another spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: &quot;The bloodwork doesn&#x27;t lie.&quot;
+
+Then there&#x27;s the guy who walked away from TRT entirely — and came back six months later with higher numbers than he ever had on the needle.
+
+A 52-year-old who dropped 30 pounds says his wife can&#x27;t keep her hands off him.
+
+They all started in the same place: 60 seconds. 7 questions. Free.
+
+It tells you where you actually stand — and which of the three hormones is hitting you hardest right now.
+
+👉 Take the test.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">link_click: 2</span><span class="tag">offsite_conversion.custom.1498235888522157: 2</span><span class="tag">offsite_conversion.fb_pixel_custom: 2</span><span class="tag">page_engagement: 2</span><span class="tag">post_engagement: 2</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705170293 ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee The &quot;Moobs&quot; Are Telling You Something The soft spot on your chest.
+
+The roll over your belt.
+
+The pec definition that&#x27;s been &quot;almost back&quot; for two years and never quite gets there.
+
+Here&#x27;s what most men miss:
+
+It&#x27;s not pizza. It&#x27;s not skipping chest day. It&#x27;s not a willpower problem.
+
+It&#x27;s a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn&#x27;t fix itself with another set of bench presses.
+
+Your body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can&#x27;t even use it.
+
+Three systems. All working against you. Crunches won&#x27;t fix that. Neither will another crash diet.
+
+👉 60-second test. Find out exactly which system is hitting you hardest — and where to actually start.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#14</span> ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705170293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 1498645615269455</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.37</b><span>Spend</span></div>
+      <div class="metric"><b>0</b><span>Link Clicks</span></div>
+      <div class="metric"><b>7</b><span>Impressions</span></div>
+      <div class="metric"><b>0.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.00</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705170293_4-5_526f8ebde1.jpg" alt="ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="526f8ebde11de28f57ff8ebef61a1ab4">526f8ebde11d</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705170293_1-1_562bed44c3.jpg" alt="ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="562bed44c39b1356c49589afce0738f8">562bed44c39b</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705170293_9-16_70f77e606f.jpg" alt="ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="70f77e606f94eeeef4743741d699a00e">70f77e606f94</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>The &quot;Moobs&quot; Are Telling You Something</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals what&#x27;s actually causing them.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>The soft spot on your chest.
+
+The roll over your belt.
+
+The pec definition that&#x27;s been &quot;almost back&quot; for two years and never quite gets there.
+
+Here&#x27;s what most men miss:
+
+It&#x27;s not pizza. It&#x27;s not skipping chest day. It&#x27;s not a willpower problem.
+
+It&#x27;s a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn&#x27;t fix itself with another set of bench presses.
+
+Your body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can&#x27;t even use it.
+
+Three systems. All working against you. Crunches won&#x27;t fix that. Neither will another crash diet.
+
+👉 60-second test. Find out exactly which system is hitting you hardest — and where to actually start.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="muted">No actions returned in this insight row.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705270293 ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today. Concept 4 - Quiz Daily Decline / System Problem Eat Clean, Train Hard, Still Crashing at 2 p.m.? You eat clean.
+You train hard.
+You don&#x27;t drink like you used to.
+
+And you&#x27;re STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you&#x27;re dragging an extra body across the gym floor.
+
+This isn&#x27;t motivation. It isn&#x27;t willpower. It isn&#x27;t &quot;I need to try harder.&quot;
+
+It&#x27;s your testosterone — quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.
+
+T drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence — and any feeling that your body is actually responding to the work you&#x27;re putting in.
+
+Most men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that&#x27;s actually draining.
+
+👉 60-second test. Find out where you actually stand — and what&#x27;s behind the crash.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#15</span> ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today.</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705270293</span>
+        <span class="tag">Adset: Concept 4 - Quiz Daily Decline / System Problem</span>
+        <span class="tag">Creative ID: 1501304814855504</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.22</b><span>Spend</span></div>
+      <div class="metric"><b>1</b><span>Link Clicks</span></div>
+      <div class="metric"><b>12</b><span>Impressions</span></div>
+      <div class="metric"><b>16.67%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.11</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705270293_4-5_65e70bda16.jpg" alt="ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today. 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="65e70bda166047687429057f1177a7e9">65e70bda1660</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705270293_1-1_d249bcf02d.jpg" alt="ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today. 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="d249bcf02da4bd36a7cc0f0c969fefe7">d249bcf02da4</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705270293_9-16_8719d73401.jpg" alt="ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today. 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="8719d73401fc4fc9fb301a77b3892d8f">8719d73401fc</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>Eat Clean, Train Hard, Still Crashing at 2 p.m.?</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals what&#x27;s actually behind it.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>You eat clean.
+You train hard.
+You don&#x27;t drink like you used to.
+
+And you&#x27;re STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you&#x27;re dragging an extra body across the gym floor.
+
+This isn&#x27;t motivation. It isn&#x27;t willpower. It isn&#x27;t &quot;I need to try harder.&quot;
+
+It&#x27;s your testosterone — quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.
+
+T drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence — and any feeling that your body is actually responding to the work you&#x27;re putting in.
+
+Most men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that&#x27;s actually draining.
+
+👉 60-second test. Find out where you actually stand — and what&#x27;s behind the crash.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="tag">landing_page_view: 4</span><span class="tag">link_click: 1</span><span class="tag">offsite_content_view_add_meta_leads: 1</span><span class="tag">offsite_conversion.custom.1498235888522157: 3</span><span class="tag">offsite_conversion.custom.4455407368061391: 1</span><span class="tag">offsite_conversion.fb_pixel_custom: 8</span><span class="tag">offsite_conversion.fb_pixel_view_content: 1</span><span class="tag">omni_landing_page_view: 4</span><span class="tag">omni_view_content: 1</span><span class="tag">onsite_conversion.post_net_like: 1</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705010293 ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee Your Stress Is Eating Your Testosterone Alive Your stress is eating your testosterone alive.
+
+Every deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every &quot;I&#x27;m fine, I just need a minute.&quot;
+
+Your body responds the same way every time — it floods you with cortisol.
+
+And here&#x27;s what nobody tells you:
+
+Cortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It&#x27;s not a theory. It&#x27;s basic endocrinology.
+
+So that gut you can&#x27;t lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?
+
+That&#x27;s not aging. That&#x27;s cortisol winning.
+
+And every month you don&#x27;t fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.
+
+👉 60-second test. Find out where you actually stand — and which hormone is calling the shots in your body right now.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#16</span> ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705010293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 2449855758831294</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.04</b><span>Spend</span></div>
+      <div class="metric"><b>0</b><span>Link Clicks</span></div>
+      <div class="metric"><b>8</b><span>Impressions</span></div>
+      <div class="metric"><b>0.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.00</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705010293_1-1_89d5c6473e.jpg" alt="ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="89d5c6473e2e756c8625b3c31c260cee">89d5c6473e2e</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705010293_4-5_daf02c8aff.jpg" alt="ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="daf02c8aff6250b12af345d4db823b7c">daf02c8aff62</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705010293_9-16_55fd924abe.jpg" alt="ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="55fd924abe0e4800f7192724d8a3b5c1">55fd924abe0e</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>Your Stress Is Eating Your Testosterone Alive</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals which hormone is calling the shots.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>Your stress is eating your testosterone alive.
+
+Every deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every &quot;I&#x27;m fine, I just need a minute.&quot;
+
+Your body responds the same way every time — it floods you with cortisol.
+
+And here&#x27;s what nobody tells you:
+
+Cortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It&#x27;s not a theory. It&#x27;s basic endocrinology.
+
+So that gut you can&#x27;t lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?
+
+That&#x27;s not aging. That&#x27;s cortisol winning.
+
+And every month you don&#x27;t fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.
+
+👉 60-second test. Find out where you actually stand — and which hormone is calling the shots in your body right now.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="muted">No actions returned in this insight row.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705080293 ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee Your Stress Is Eating Your Testosterone Alive Your stress is eating your testosterone alive.
+
+Every deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every &quot;I&#x27;m fine, I just need a minute.&quot;
+
+Your body responds the same way every time — it floods you with cortisol.
+
+And here&#x27;s what nobody tells you:
+
+Cortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It&#x27;s not a theory. It&#x27;s basic endocrinology.
+
+So that gut you can&#x27;t lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?
+
+That&#x27;s not aging. That&#x27;s cortisol winning.
+
+And every month you don&#x27;t fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.
+
+👉 60-second test. Find out where you actually stand — and which hormone is calling the shots in your body right now.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#17</span> ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705080293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 1493824962400995</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.02</b><span>Spend</span></div>
+      <div class="metric"><b>0</b><span>Link Clicks</span></div>
+      <div class="metric"><b>3</b><span>Impressions</span></div>
+      <div class="metric"><b>0.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.00</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705080293_1-1_288ae9dc76.jpg" alt="ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="288ae9dc764e171a4edf67913438349c">288ae9dc764e</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705080293_9-16_10d96ed47f.jpg" alt="ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="10d96ed47f264830d4576d5ab4e68d0d">10d96ed47f26</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705080293_4-5_0bfb4aa12b.jpg" alt="ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="0bfb4aa12b270388d27ae2b1e8cd7b32">0bfb4aa12b27</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>Your Stress Is Eating Your Testosterone Alive</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test reveals which hormone is calling the shots.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>Your stress is eating your testosterone alive.
+
+Every deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every &quot;I&#x27;m fine, I just need a minute.&quot;
+
+Your body responds the same way every time — it floods you with cortisol.
+
+And here&#x27;s what nobody tells you:
+
+Cortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It&#x27;s not a theory. It&#x27;s basic endocrinology.
+
+So that gut you can&#x27;t lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?
+
+That&#x27;s not aging. That&#x27;s cortisol winning.
+
+And every month you don&#x27;t fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.
+
+👉 60-second test. Find out where you actually stand — and which hormone is calling the shots in your body right now.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="muted">No actions returned in this insight row.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144704930293 ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works. Concept 4 - Quiz Daily Decline / System Problem Why Your Grandfather Felt Better at 60 Than You Do at 35 Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#18</span> ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144704930293</span>
+        <span class="tag">Adset: Concept 4 - Quiz Daily Decline / System Problem</span>
+        <span class="tag">Creative ID: 27354232147503330</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.00</b><span>Spend</span></div>
+      <div class="metric"><b>0</b><span>Link Clicks</span></div>
+      <div class="metric"><b>4</b><span>Impressions</span></div>
+      <div class="metric"><b>0.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.00</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144704930293_1-1_82e4f5317c.jpg" alt="ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works. 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="82e4f5317c98e5bd3aa8dd86886775fa">82e4f5317c98</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144704930293_4-5_ad4d69c405.jpg" alt="ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works. 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="ad4d69c40530edb19d82aed939bc811f">ad4d69c40530</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144704930293_9-16_1a2bf474df.jpg" alt="ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works. 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="1a2bf474df72a7c21047695d0fa88ed3">1a2bf474df72</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>Why Your Grandfather Felt Better at 60 Than You Do at 35</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>60-second test to find out where yours actually stands.
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>Your grandfather had more testosterone at 60 than you have at 35.
+
+He didn&#x27;t have:
+
+❌ Plastics leaching estrogen into his drinking water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11 p.m.
+❌ A phone glued to his hand from 6 a.m. to midnight
+❌ A workweek powered by stress and caffeine
+
+You do. Every day. For years.
+
+You&#x27;re not weak. You&#x27;re not lazy. You&#x27;re not &quot;just getting older.&quot;
+
+You&#x27;re surviving a modern life he never had to.
+
+And until you know where your T actually stands right now — not the &quot;normal range&quot; your doctor reads off a screen, but where YOU actually stand — every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.
+
+👉 60-second test. Find out exactly what&#x27;s hitting you hardest.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="muted">No actions returned in this insight row.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" data-ad-card data-search="120246144705030293 ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer Concept 5 - Quiz Offer / Proof / Guarantee 52% Off Limited-Time Welcome Offer SAVE 52% + $35 WELCOME KIT VALUE
+
+21 active ingredients. Disclosed doses. Third-party tested.
+
+See how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.
+
+Two capsules every morning. No prescription. No clinic. No needles.
+
+Get The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.">
+  <div class="card-head">
+    <div>
+      <h2><span class="rank">#19</span> ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer</h2>
+      <div class="meta">
+        <span class="tag">Ad ID: 120246144705030293</span>
+        <span class="tag">Adset: Concept 5 - Quiz Offer / Proof / Guarantee</span>
+        <span class="tag">Creative ID: 2175794379845164</span>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>$0.00</b><span>Spend</span></div>
+      <div class="metric"><b>0</b><span>Link Clicks</span></div>
+      <div class="metric"><b>10</b><span>Impressions</span></div>
+      <div class="metric"><b>0.00%</b><span>CTR</span></div>
+      <div class="metric"><b>$0.00</b><span>CPC</span></div>
+      <div class="metric"><b>-</b><span>Full Quiz</span></div>
+    </div>
+  </div>
+  <div class="card-body">
+    <div>
+      <div class="images">
+<div class="figure">
+  <img src="assets/images/120246144705030293_1-1_b5d4c50df6.jpg" alt="ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer 1:1">
+  <div class="figcap"><b>1:1</b> · 1024x1024<br><span title="b5d4c50df6de37f17a540537279bf762">b5d4c50df6de</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705030293_4-5_c7a8a69373.jpg" alt="ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer 4:5">
+  <div class="figcap"><b>4:5</b> · 1024x1280<br><span title="c7a8a693732cfdba4605b5b2638790b3">c7a8a693732c</span></div>
+</div>
+
+<div class="figure">
+  <img src="assets/images/120246144705030293_9-16_f5c4ee7205.jpg" alt="ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer 9:16">
+  <div class="figcap"><b>9:16</b> · 1024x1824<br><span title="f5c4ee720555e47513cc14bf3cb1f032">f5c4ee720555</span></div>
+</div>
+</div>
+    </div>
+    <div class="copy-block">
+      <div class="small-grid">
+        <div class="copy-box"><h3>Headline</h3><pre>52% Off Limited-Time Welcome Offer</pre></div>
+        <div class="copy-box"><h3>Description / CTA</h3><pre>✅ 90-Day Guarantee
+
+CTA: LEARN_MORE</pre></div>
+      </div>
+      <div class="copy-box"><h3>Primary Text</h3><pre>SAVE 52% + $35 WELCOME KIT VALUE
+
+21 active ingredients. Disclosed doses. Third-party tested.
+
+See how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.
+
+Two capsules every morning. No prescription. No clinic. No needles.
+
+Get The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.</pre></div>
+      <div class="copy-box"><h3>Destination</h3><pre>https://shoptenorco.com/8b89a76d/testosterone-support/quiz</pre></div>
+      <div class="copy-box"><h3>PostHog Clean Quiz Overlay</h3><pre>Landed sessions: -
+Answered any quiz question: -
+Full in-session completion: -
+Broader completion signal: -</pre></div>
+      <div class="copy-box"><h3>Meta Actions</h3><span class="muted">No actions returned in this insight row.</span></div>
+    </div>
+  </div>
+</section>
+</section>
+</main>
+<footer>
+  Source: Meta Marketing API ad-level insights and creative asset feed specs for campaign 120246144705220293. PostHog overlay uses clean paid quiz-session extraction when available. Secrets and API tokens are not included in this export.
+</footer>
+</body>
+</html>

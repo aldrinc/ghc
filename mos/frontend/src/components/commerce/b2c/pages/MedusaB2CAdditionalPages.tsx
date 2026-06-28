@@ -19,7 +19,7 @@ import {
   type StripeElementsOptions,
 } from '@stripe/stripe-js';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { useFunnelRuntime } from '@/funnels/puckConfig';
+import { useFunnelRuntime } from '@/funnels/funnelRuntime';
 import {
   buildPublicFunnelPath,
   resolvePublicApiBaseUrl,

@@ -1,0 +1,76 @@
+{
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "delivery": {
+    "id": "0c594a87-7023-4907-8b01-d9685fd97ec2",
+    "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "deliveryMode": "external_urls",
+    "preSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+    "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page",
+    "checkoutUrl": null,
+    "thankYouUrl": null,
+    "validationStatus": "valid",
+    "validationError": null,
+    "validatedAt": "2026-05-02T19:23:56.591758+00:00",
+    "createdAt": "2026-05-02T19:05:23.727523+00:00",
+    "updatedAt": "2026-05-02T19:26:18.979846+00:00"
+  },
+  "manualContext": {
+    "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+    "provider": "manual",
+    "creativeContextArtifactId": "cf8bc7b6-a8bf-4351-9e3b-b13745eb0f58",
+    "experimentSpecArtifactId": "7e286e56-a7a1-4825-ac4c-8e285829ab69",
+    "artifactIds": {
+      "campaign_loaded_angles": "476e5c65-8e33-4478-aaba-cb8f6898a7bb",
+      "campaign_loaded_offer": "bf96babe-bd95-422c-bc49-72688e16205e",
+      "campaign_loaded_copy": "3d3b1b8d-e558-440e-9b9e-022527181c87",
+      "campaign_loaded_copy_context": "f874aaf8-96b3-48e6-ad35-2b3e21f50ecb",
+      "campaign_creative_context": "cf8bc7b6-a8bf-4351-9e3b-b13745eb0f58"
+    },
+    "uploadedDocKeys": [
+      "campaign_loaded_angles",
+      "campaign_loaded_offer",
+      "campaign_loaded_copy",
+      "campaign_loaded_copy_context",
+      "campaign_creative_context",
+      "experiment_specs:3ff5811c-741b-4dc2-8050-46506dea14bc"
+    ],
+    "checkedAt": "2026-05-02T19:26:12.839045+00:00"
+  },
+  "readiness": {
+    "provider": "manual",
+    "ready": true,
+    "checkedAt": "2026-05-02T19:26:18.893943+00:00",
+    "reason": null,
+    "sourceStrategyV2WorkflowRunId": null,
+    "sourceStrategyV2TemporalWorkflowId": null,
+    "launchContextArtifactId": null,
+    "manualCreativeContextArtifactId": "cf8bc7b6-a8bf-4351-9e3b-b13745eb0f58",
+    "creativeContextArtifactId": "cf8bc7b6-a8bf-4351-9e3b-b13745eb0f58",
+    "materializedCreativeContextArtifactId": null,
+    "materializedArtifactIds": null,
+    "strategyBundleId": null,
+    "strategyBundleType": null,
+    "refreshed": false,
+    "staleArtifactId": null,
+    "missingArtifacts": []
+  },
+  "assetBriefSeed": {
+    "status": "updated",
+    "artifactId": "ac685e85-cb95-487c-b3ae-d93cccdf3acd",
+    "briefId": "brief_editorial_wound_scene"
+  },
+  "destinationContext": {
+    "headline": "\"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.",
+    "subheadline": "Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.",
+    "primaryProblem": "Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.",
+    "promise": "Understand the daily protocol men are trying before committing to TRT.",
+    "mechanismDisclosureLevel": "Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.",
+    "proofType": "Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.",
+    "ctaUrgency": "Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.",
+    "compliancePosture": "Matches the downstream advertorial posture and funnel stage.",
+    "assetStage": "Ad to advertorial/listicle, before the sales page.",
+    "visualEmphasis": "Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly."
+  },
+  "updatedAt": "2026-05-02T19:26:23.915Z"
+}

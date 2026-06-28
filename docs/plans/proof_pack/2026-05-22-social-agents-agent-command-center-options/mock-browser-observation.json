@@ -1,0 +1,67 @@
+{
+  "setup": {
+    "activeView": "view-setup",
+    "bodyText": "A\nAurora Sleep Lab\nWorkspace\n\nWorkspace\n\nOverview\nStrategy\nBrand\nSites\n\nExecution\n\nCampaigns\nAnalytics\nPostiz\nSocial Agents\n\nAssets\n\nCreative Library\nMeta Ads\nWorkspaces\n/\nSocial Agents\nWorkspace Product\nLumaRest Magnesium Cocoa\nMarketing Agent\n\nApproval-gated TikTok work through Postiz.\n\nPostiz\nSetup\nReview\nVisual mock\nStep 1 of 5 Needs mission\nSet mission\nContinue\nMission\nNext: Channels\nAgent name\nProduct or offer\nMission\nAgent\nTikTok Carousel\nApproval required\nPostiz\nMission\nGrow LumaRest\nAssets\n4/6\nAdd 2 assets.\nStatus\nMission saved\nSource linked\nAssets incomplete",
+    "clientWidth": 1366,
+    "forbiddenPhrasesPresent": [],
+    "horizontalOverflow": false,
+    "primaryButtons": [
+      "Continue"
+    ],
+    "railTextLength": 146,
+    "scrollWidth": 1366,
+    "switchButtons": [
+      "Setup",
+      "Review"
+    ],
+    "viewIds": [
+      "view-setup",
+      "view-review"
+    ]
+  },
+  "review": {
+    "activeView": "view-review",
+    "bodyText": "A\nAurora Sleep Lab\nWorkspace\n\nWorkspace\n\nOverview\nStrategy\nBrand\nSites\n\nExecution\n\nCampaigns\nAnalytics\nPostiz\nSocial Agents\n\nAssets\n\nCreative Library\nMeta Ads\nWorkspaces\n/\nSocial Agents\nWorkspace Product\nLumaRest Magnesium Cocoa\nMarketing Agent\n\nApproval-gated TikTok work through Postiz.\n\nPostiz\nSetup\nReview\nVisual mock\nAgent configured Assets 4/6\nReview carousel\nAdd 2 assets\nOK\nDraft ready\nSix slides\n4/6\nAssets missing\nAdd 2\nP\nPostiz\nConnected\nDraft\nPostiz\nPOV: your routine looks calm\n1\nHook\nYou tried every fix\n2\nProblem\nSo I tried a cleaner loop\n3\nDiscovery\nWait, this feels doable\n4\nShift\nThis reset finally stuck\n5\nProof\nTry the app, link in bio\n6\nCTA\nAgent\nTikTok Carousel\nApproval required\nPostiz\nMission\nGrow LumaRest\nAssets\n4/6\nAdd 2 assets.\nStatus\nMission saved\nSource linked\nAssets incomplete",
+    "clientWidth": 1366,
+    "forbiddenPhrasesPresent": [],
+    "horizontalOverflow": false,
+    "primaryButtons": [
+      "Add 2 assets"
+    ],
+    "railTextLength": 146,
+    "scrollWidth": 1366,
+    "switchButtons": [
+      "Setup",
+      "Review"
+    ],
+    "viewIds": [
+      "view-setup",
+      "view-review"
+    ]
+  },
+  "mobile": {
+    "activeView": "view-setup",
+    "bodyText": "Workspaces\n/\nSocial Agents\nWorkspace Product\nLumaRest Magnesium Cocoa\nMarketing Agent\n\nApproval-gated TikTok work through Postiz.\n\nPostiz\nSetup\nReview\nVisual mock\nStep 1 of 5 Needs mission\nSet mission\nContinue\nMission\nNext: Channels\nAgent name\nProduct or offer\nMission\nAgent\nTikTok Carousel\nApproval required\nPostiz\nMission\nGrow LumaRest\nAssets\n4/6\nAdd 2 assets.\nStatus\nMission saved\nSource linked\nAssets incomplete",
+    "clientWidth": 342,
+    "forbiddenPhrasesPresent": [],
+    "horizontalOverflow": false,
+    "primaryButtons": [
+      "Continue"
+    ],
+    "railTextLength": 146,
+    "scrollWidth": 342,
+    "switchButtons": [
+      "Setup",
+      "Review"
+    ],
+    "viewIds": [
+      "view-setup",
+      "view-review"
+    ],
+    "viewport": {
+      "height": 770,
+      "width": 356
+    },
+    "sidebarHidden": true
+  }
+}

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { resolveRuntimePagePath, useFunnelRuntime } from '@/funnels/puckConfig'
+import { resolveRuntimePagePath, useFunnelRuntime } from '@/funnels/funnelRuntime'
 import { navigationClickEventForStages, resolvePublicFunnelStage } from '@/lib/funnelTracking'
 import {
   buildPresaleAttributedInternalPath,

@@ -1,0 +1,59 @@
+{
+  "createdAt": "2026-04-28T17:53:56.648Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-collection-swipe-no-product-no-mechanism-clean-2026-04-28T17-52-49-888Z",
+  "source": {
+    "collectionId": "b89e89f4-2565-4b5d-afd1-195532613bfb",
+    "collectionName": "Tenor initial swipe collection",
+    "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+    "sourceSwipeTitle": "fatigue.jpg",
+    "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1
+  },
+  "payload": {
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1,
+    "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+    "swipeRequiresProductImage": false,
+    "swipeContextMode": "minimal",
+    "swipeBrandName": "Tenor",
+    "swipeProductName": "Tenor",
+    "swipeHook": "\"In the normal range\" is the most expensive sentence in men's health.",
+    "swipeAngle": "Adapt the selected collection swipe as a blind problem-tease ad for the existing normal-range gap angle. Keep the swipe's core design DNA: older man, serious fatigue mood, bold stacked headline, dark editorial atmosphere, and simple direct-response layout. Compliance creative direction: do not showcase or name the product. No product bottle, package, label, capsule, pills, supplement shelf, formula, ingredient list, dose, price, guarantee, ratings, or purchase language. Do not reveal mechanism. No cascade, lever, hormone pathway, protocol, TRT explanation, ingredient science, chart, table, checklist, comparison grid, or explanation of how the solution works. Do not mention alcohol, drinking, a program, money back, stars, or ratings from the source swipe. Use only this readable copy: FATIGUE IS OK; BUT NOT FEELING LIKE YOURSELF IS NOT; READ THE NOTE. Use Tenor only as a small brand mark if needed. Preserve the existing Tenor editorial palette: bone, graphite, and one restrained warm red accent.",
+    "aspectRatio": "1:1",
+    "count": 1
+  },
+  "workflow": {
+    "workflow_run_id": "66d5baeb-981b-4fba-8fe4-f8f124f79bf6",
+    "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-64d241ac-0498-4324-b8e0-2ba732b05050"
+  },
+  "result": {
+    "workflowRunId": "66d5baeb-981b-4fba-8fe4-f8f124f79bf6",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-64d241ac-0498-4324-b8e0-2ba732b05050",
+    "assetId": "788c6b1f-8869-496c-b2e6-945862f35755",
+    "publicId": "1ec53eed-fdef-4da7-b364-b4852cf665ed",
+    "publicUrl": "https://api.moshq.app/public/assets/1ec53eed-fdef-4da7-b364-b4852cf665ed",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-collection-swipe-no-product-no-mechanism-clean-2026-04-28T17-52-49-888Z/01-fatigue-clean-no-product-no-mechanism.jpg",
+    "contentType": "image/jpeg",
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:6015ebae18e3c79432083478aaf77af0611362bdb30de06d",
+      "asset_ids": [
+        "788c6b1f-8869-496c-b2e6-945862f35755"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "lines": 2922,
+  "counts": {
+    "values": 11,
+    "messages-tuple": 2910,
+    "end": 1
+  },
+  "lastTools": [
+    {
+      "line": 101,
+      "name": "web_search",
+      "preview": "{\n  \"query\": \"testosterone support supplement competitor to mengotomars 2024 2025\",\n  \"total_results\": 5,\n  \"results\": [\n    {\n      \"title\": \"Best Testosterone Booster | Expert recommendations in 2026\",\n      \"url\": \"https://www.innerbody.com/best-testosterone-booster\",\n      \"content\": \"In our opi"
+    },
+    {
+      "line": 165,
+      "name": "web_fetch",
+      "preview": "# The Best Testosterone Booster in 2026\n\n![The five best testosterone boosters lined up against a blue background.](https://innerbody.imgix.net/best-testosterone-booster-upper-image-with-large-group.jpg?auto=format,compress&fit=max&w=826&q=75)\n\nPhoto by Innerbody Research\n\nTestosterone deficiency is"
+    }
+  ]
+}

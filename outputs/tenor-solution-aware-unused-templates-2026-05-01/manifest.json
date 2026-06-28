@@ -1,0 +1,348 @@
+{
+  "createdAt": "2026-05-01T18:00:14.747Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/generated",
+  "sourceTemplateDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/source-templates",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "validationIntent": {
+    "inputMode": "solution_aware_only_plus_approved_compliance_lines",
+    "awarenessLevel": "Solution-Aware",
+    "forbiddenSourceTemplates": [
+      "11.png",
+      "fatigue.jpg",
+      "fb_message_ad.jpg",
+      "big_text.jpg",
+      "Static #2.png"
+    ],
+    "selectedSourceTemplates": [
+      "5.png",
+      "6.png",
+      "7.png",
+      "8.png",
+      "9.png",
+      "10.png"
+    ],
+    "productImagesAllowed": false,
+    "mechanismRevealAllowed": false,
+    "creativeGuidanceAddedByOperator": false
+  },
+  "outputs": [
+    {
+      "key": "solution-aware-unused-01",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+        "sourceSwipeTitle": "5.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-solution-aware-unused-01-1777657988187.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "029abc80-b748-44a0-85c6-10f5dd64bdcd",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-5b0131e0-a225-4f25-9de4-51ac07f36a5a"
+      },
+      "result": {
+        "workflowRunId": "029abc80-b748-44a0-85c6-10f5dd64bdcd",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-5b0131e0-a225-4f25-9de4-51ac07f36a5a",
+        "assetId": "5f5b2c07-6966-4d22-a635-522f03b4040e",
+        "publicId": "77650cee-a0ed-4dd4-8658-327d66435592",
+        "publicUrl": "https://api.moshq.app/public/assets/77650cee-a0ed-4dd4-8658-327d66435592",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/generated/solution-aware-unused-01.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:60a845b770a53f0427579a889d4004d17d3e3d5b80291996",
+          "asset_ids": [
+            "5f5b2c07-6966-4d22-a635-522f03b4040e"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/workflow-solution-aware-unused-01.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-02",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "sourceSwipeTitle": "6.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-solution-aware-unused-02-1777658088140.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "a6b655ef-8c5f-4397-98a2-381ca17d1d69",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-cc763c60-f136-4771-a8c8-b42cef45a8cd"
+      },
+      "result": {
+        "workflowRunId": "a6b655ef-8c5f-4397-98a2-381ca17d1d69",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-cc763c60-f136-4771-a8c8-b42cef45a8cd",
+        "assetId": "f1a35c42-5080-45b9-a781-a93360a1e4a2",
+        "publicId": "b66132ab-546d-454b-b65e-6e694ad3cb1c",
+        "publicUrl": "https://api.moshq.app/public/assets/b66132ab-546d-454b-b65e-6e694ad3cb1c",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/generated/solution-aware-unused-02.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:97ea9fb115a6bbd4ccef91d44d28b8b689c7d0501b6e4c6e",
+          "asset_ids": [
+            "f1a35c42-5080-45b9-a781-a93360a1e4a2"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/workflow-solution-aware-unused-02.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-03",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "058b868e-4568-578e-99bc-21f0491ed671",
+        "sourceSwipeTitle": "7.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "058b868e-4568-578e-99bc-21f0491ed671",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-solution-aware-unused-03-1777658154411.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "dd8ecb41-71ed-40e3-ba87-6146e3bbfef8",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-95c6bf6f-b3e5-48f2-aa4f-b9ad00cc7387"
+      },
+      "result": {
+        "workflowRunId": "dd8ecb41-71ed-40e3-ba87-6146e3bbfef8",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-95c6bf6f-b3e5-48f2-aa4f-b9ad00cc7387",
+        "assetId": "4bf3303f-8381-481d-ba4b-de84220c0504",
+        "publicId": "ce35acd2-068b-42de-bae4-cf2711e2bd03",
+        "publicUrl": "https://api.moshq.app/public/assets/ce35acd2-068b-42de-bae4-cf2711e2bd03",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/generated/solution-aware-unused-03.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:55a1e290c18e1802e8f3feb1597823215d311045f292025b",
+          "asset_ids": [
+            "4bf3303f-8381-481d-ba4b-de84220c0504"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/workflow-solution-aware-unused-03.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-04",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+        "sourceSwipeTitle": "8.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-solution-aware-unused-04-1777658220627.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "152b8e30-2b96-494f-bab8-b22f0e5e1832",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-d6cc4428-d6de-4a31-8250-ae057c78bfa9"
+      },
+      "result": {
+        "workflowRunId": "152b8e30-2b96-494f-bab8-b22f0e5e1832",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-d6cc4428-d6de-4a31-8250-ae057c78bfa9",
+        "assetId": "82ae7524-8249-4d83-a04f-81f9acf983ed",
+        "publicId": "f7b87352-9a55-43b2-bcc1-9245892180ed",
+        "publicUrl": "https://api.moshq.app/public/assets/f7b87352-9a55-43b2-bcc1-9245892180ed",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/generated/solution-aware-unused-04.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d6fb54ef47227a629c1f487180062e0f05dc6254f229db96",
+          "asset_ids": [
+            "82ae7524-8249-4d83-a04f-81f9acf983ed"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/workflow-solution-aware-unused-04.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-05",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+        "sourceSwipeTitle": "9.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-solution-aware-unused-05-1777658276323.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "af1080b3-a776-4b22-b22d-90d9ca5193fa",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e5b60e31-9ae4-4c03-bec4-382d4cd10f2e"
+      },
+      "result": {
+        "workflowRunId": "af1080b3-a776-4b22-b22d-90d9ca5193fa",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e5b60e31-9ae4-4c03-bec4-382d4cd10f2e",
+        "assetId": "9e91a3a4-64c9-4d23-bfd8-5f07e54506dc",
+        "publicId": "6e45ae1f-c6ad-49fc-a141-b2d4d94ab66a",
+        "publicUrl": "https://api.moshq.app/public/assets/6e45ae1f-c6ad-49fc-a141-b2d4d94ab66a",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/generated/solution-aware-unused-05.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d03b544741012e37c7e954b6352044b7d1c245fd2e20dd0e",
+          "asset_ids": [
+            "9e91a3a4-64c9-4d23-bfd8-5f07e54506dc"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/workflow-solution-aware-unused-05.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-06",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+        "sourceSwipeTitle": "10.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-solution-aware-unused-06-1777658342890.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "57ff46d2-b871-4cb6-b69e-9accc8ebdd80",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-5583f48d-95d2-400e-81cf-169b8e3174ed"
+      },
+      "result": {
+        "workflowRunId": "57ff46d2-b871-4cb6-b69e-9accc8ebdd80",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-5583f48d-95d2-400e-81cf-169b8e3174ed",
+        "assetId": "57b0c4a0-996b-4b05-be9e-fd03b574bd7f",
+        "publicId": "a048f601-3764-4a33-9381-ca83892d596a",
+        "publicUrl": "https://api.moshq.app/public/assets/a048f601-3764-4a33-9381-ca83892d596a",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/generated/solution-aware-unused-06.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:5eace86d0a9ca01e371a79f1c08e3bdf1db5d78530c0ae28",
+          "asset_ids": [
+            "57b0c4a0-996b-4b05-be9e-fd03b574bd7f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-2026-05-01/workflow-solution-aware-unused-06.json"
+      }
+    }
+  ]
+}

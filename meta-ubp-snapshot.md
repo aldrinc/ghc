@@ -1,0 +1,134 @@
+- generic [ref=e7]:
+  - link "Skip to main content" [ref=e8] [cursor=pointer]:
+    - /url: "#mdc-main-content"
+    - generic [ref=e11]: Skip to main content
+  - navigation "Main" [ref=e12]:
+    - generic [ref=e21]:
+      - button "Open mobile navigation menu" [ref=e23] [cursor=pointer]:
+        - img [ref=e26]
+      - link "Meta home" [ref=e28] [cursor=pointer]:
+        - /url: /
+        - img "Meta" [ref=e29]
+  - main [ref=e32]:
+    - generic [ref=e34]:
+      - navigation "Breadcrumbs" [ref=e36]:
+        - list [ref=e37]:
+          - listitem [ref=e38]:
+            - generic [ref=e39]:
+              - link "Home" [ref=e40] [cursor=pointer]:
+                - /url: /
+                - generic [ref=e42]: Home
+              - img [ref=e43]
+          - listitem [ref=e45]:
+            - generic [ref=e46]:
+              - link "Policies" [ref=e47] [cursor=pointer]:
+                - /url: /policies/
+                - generic [ref=e49]: Policies
+              - img [ref=e50]
+          - listitem [ref=e52]:
+            - generic [ref=e53]:
+              - link "Ad Standards" [ref=e54] [cursor=pointer]:
+                - /url: /policies/ad-standards/
+                - generic [ref=e56]: Ad Standards
+              - img [ref=e57]
+          - listitem [ref=e59]:
+            - generic [ref=e62]: Unacceptable Business Practices
+      - heading "Unacceptable Business Practices" [level=1] [ref=e63]
+    - generic [ref=e68]:
+      - heading "Policy details" [level=3] [ref=e69]
+      - generic [ref=e70]: CHANGE LOG
+      - generic [ref=e72]:
+        - tablist [ref=e73]:
+          - tab "Today" [selected] [ref=e74] [cursor=pointer]:
+            - generic [ref=e76]: Today
+          - tab "Mar 20, 2026" [ref=e77] [cursor=pointer]:
+            - generic [ref=e79]: Mar 20, 2026
+          - tab "Apr 21, 2025" [ref=e80] [cursor=pointer]:
+            - generic [ref=e82]: Apr 21, 2025
+          - tab "Jul 25, 2024" [ref=e83] [cursor=pointer]:
+            - generic [ref=e85]: Jul 25, 2024
+          - tab "Jul 18, 2024" [ref=e86] [cursor=pointer]:
+            - generic [ref=e88]: Jul 18, 2024
+        - tabpanel "Today" [ref=e89]:
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: Unacceptable Business Practices in Advertising
+              - generic [ref=e94]: Ads must not promote products, services, schemes or offers using identified deceptive or misleading practices, including those meant to scam people out of money or personal information. When we detect that advertisers are engaging in potentially suspicious behavior, including potential inauthentic behavior, or are running ads in certain categories likely to be targeted by scammers, we may require those advertisers to complete additional verification processes.
+            - generic [ref=e95]:
+              - generic [ref=e96]: Overview
+              - generic [ref=e97]: Advertisers can’t run ads that promote products, services, schemes or offers that use identified deceptive or misleading practices, including scams to take money from people or access personal information. We do this to protect people from being taken advantage of by advertisers.
+            - generic [ref=e98]:
+              - generic [ref=e99]: Guidelines for Ads
+              - generic [ref=e100]:
+                - text: "Ads can't:"
+                - list [ref=e101]
+                - text: "We often see these types of violations in schemes related to:"
+                - list [ref=e111]
+            - generic [ref=e121]:
+              - text: Scams are a problem that affects people across platforms and industries, and we take a comprehensive approach to making our technologies a safer place. Learn how we’re working to help keep you safer on our
+              - link "technologies" [ref=e122] [cursor=pointer]:
+                - /url: https://about.meta.com/actions/safety/anti-scam/
+              - text: .
+    - generic [ref=e128]:
+      - generic [ref=e130]:
+        - link "Enforcement" [ref=e131] [cursor=pointer]:
+          - /url: /enforcement/
+          - generic [ref=e133]:
+            - img [ref=e135]
+            - generic [ref=e138]: Enforcement
+        - generic [ref=e139]: We have the same policies around the world, for everyone on Facebook.
+      - generic [ref=e141]:
+        - link "Review teams" [ref=e142] [cursor=pointer]:
+          - /url: /enforcement/detecting-violations/how-review-teams-work/
+          - generic [ref=e144]:
+            - img [ref=e146]
+            - generic [ref=e149]: Review teams
+        - generic [ref=e150]: Our global team of over 15,000 reviewers work every day to keep people on Facebook safe.
+      - generic [ref=e152]:
+        - link "Stakeholder engagement" [ref=e153] [cursor=pointer]:
+          - /url: /policies/improving/stakeholders-help-us-develop-community-standards/
+          - generic [ref=e155]:
+            - img [ref=e157]
+            - generic [ref=e160]: Stakeholder engagement
+        - generic [ref=e161]: Outside experts, academics, NGOs and policymakers help inform the Facebook Community Standards.
+  - contentinfo [ref=e162]:
+    - generic [ref=e163]:
+      - separator [ref=e164]
+      - generic [ref=e166]:
+        - generic [ref=e168]:
+          - img "Meta" [ref=e172]
+          - generic [ref=e174]:
+            - generic [ref=e175]:
+              - generic [ref=e177]:
+                - heading "Policies" [level=2] [ref=e178]
+                - list [ref=e180]
+              - generic [ref=e197]:
+                - heading "Features" [level=2] [ref=e198]
+                - list [ref=e200]
+              - generic [ref=e232]:
+                - heading "Research tools" [level=2] [ref=e233]
+                - list [ref=e235]
+            - generic [ref=e245]:
+              - generic [ref=e247]:
+                - heading "Enforcement" [level=2] [ref=e248]
+                - list [ref=e250]
+              - generic [ref=e258]:
+                - heading "Governance" [level=2] [ref=e259]
+                - list [ref=e261]
+            - generic [ref=e292]:
+              - generic [ref=e294]:
+                - heading "Security" [level=2] [ref=e295]
+                - list [ref=e297]
+              - generic [ref=e308]:
+                - heading "Reports" [level=2] [ref=e309]
+                - list [ref=e311]
+        - generic [ref=e336]:
+          - button "Change language" [ref=e337] [cursor=pointer]:
+            - generic [ref=e339]: English (US)
+          - generic [ref=e340]:
+            - link "Privacy Policy" [ref=e342] [cursor=pointer]:
+              - /url: https://www.facebook.com/privacy/policy/
+            - link "Terms of Service" [ref=e344] [cursor=pointer]:
+              - /url: https://www.facebook.com/legal/terms/
+            - link "Cookies" [ref=e346] [cursor=pointer]:
+              - /url: https://www.facebook.com/privacy/policies/cookies/

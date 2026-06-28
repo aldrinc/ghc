@@ -1,0 +1,295 @@
+{
+  "funnel": {
+    "id": "be65d76e-ced9-4948-9465-18723c8446fd",
+    "name": "Tenor Creative Launch Funnel",
+    "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "campaign_id": null
+  },
+  "pages": [
+    {
+      "id": "ab3102f4-a179-410a-9eb0-66aa3020cafc",
+      "name": "Advertorial",
+      "slug": "presales",
+      "template_id": null,
+      "latestDraftVersionId": "3142a6ca-81ae-4759-a5a5-f02221bb4e30",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": ">\n                    </div>\n\n                    <!-- Sidebar Card 2: Customer Reviews Stats Box\n                         ========================================================\n                         LOCKED COMPONENT — DO NOT REBRAND WITH PRODUCT COPY.\n                         Per FutrGroup_fra"
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "41d50ca2-c916-4053-8546-6fa78fd53f6f",
+      "name": "Sales Page",
+      "slug": "sales-page",
+      "template_id": null,
+      "latestDraftVersionId": "48417fc8-c6eb-4c72-8f37-f95b852aa4ce",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "checkout": 5,
+        "option_values": 5,
+        "internal_navigation": 4
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": "y bottles included.</p>\n</div>\n</div>\n</div>\n</div>\n</div>\n</section>\n<!-- Lead Testimonial (Frankie Rule 2: full-paragraph quote, placed ABOVE product) -->\n<section class=\"w-full bg-[#F4F0E8] py-16 px-6 border-t-2 border-[#0F0F0F]\">\n<div class=\"max-w-[820px] mx-auto\">\n<div class=\"flex items-center "
+        }
+      ]
+    },
+    {
+      "id": "584fe2ff-c0e6-43a3-a313-efe7470e0ed2",
+      "name": "Terms of Service",
+      "slug": "terms-of-service",
+      "template_id": "compliance-terms",
+      "latestDraftVersionId": "66985b6a-1181-41c3-a884-60dacc9a9cfa",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "FunnelCompliancePage": 1
+      },
+      "textMatches": []
+    },
+    {
+      "id": "b24bcb9d-b175-4099-88a0-ebe1ea6984e4",
+      "name": "Privacy Policy",
+      "slug": "privacy-policy",
+      "template_id": "compliance-privacy",
+      "latestDraftVersionId": "a92e08ad-77f2-44d8-a6c7-42122f22a431",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "FunnelCompliancePage": 1
+      },
+      "textMatches": []
+    },
+    {
+      "id": "ed999dc9-2a35-404d-ac5b-f01e08256de1",
+      "name": "Refund Policy",
+      "slug": "refund-policy",
+      "template_id": "compliance-refunds",
+      "latestDraftVersionId": "416f862f-b114-431a-b10b-cd1245419edf",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "FunnelCompliancePage": 1
+      },
+      "textMatches": []
+    },
+    {
+      "id": "06f34fbd-3c97-46bc-a7bd-bbb34cdb059d",
+      "name": "Contact Us",
+      "slug": "contact-us",
+      "template_id": "compliance-contact",
+      "latestDraftVersionId": "85d06ce0-fac8-4882-941b-a90be574e884",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "FunnelCompliancePage": 1
+      },
+      "textMatches": []
+    },
+    {
+      "id": "355e5962-2bdb-401b-ac66-ee3fa262d123",
+      "name": "01 Personal Transformation Advertorial",
+      "slug": "01-personal-transformation",
+      "template_id": null,
+      "latestDraftVersionId": "fa595fc9-f71d-4d51-aa62-1bf52a6bc171",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "27e58aec-284c-4b8e-ba49-04f841da8422",
+      "name": "02 Agitation Advertorial",
+      "slug": "02-agitation",
+      "template_id": null,
+      "latestDraftVersionId": "93bae183-fd3a-4bb3-8e59-2302e05b1c0c",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "f20ae277-534e-4ca3-b1b3-35f3e2c73b19",
+      "name": "03 Breakthrough Discovery Advertorial",
+      "slug": "03-breakthrough-discovery",
+      "template_id": null,
+      "latestDraftVersionId": "277e6a7b-9448-4f4e-b190-5a8f7291a383",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "91f27d0a-bed1-4e77-b416-8b0e9fc4b367",
+      "name": "04 How Simple Thing Advertorial",
+      "slug": "04-how-simple-thing",
+      "template_id": null,
+      "latestDraftVersionId": "248d145f-6527-4f2f-89e7-1665fdfdbf7d",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "20f607aa-7aca-4f4c-ad31-acf488816e28",
+      "name": "05 Question Advertorial",
+      "slug": "05-question",
+      "template_id": null,
+      "latestDraftVersionId": "918c12fb-08aa-4661-a9ca-58564bc21f65",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "cd277019-25c1-4307-b9b5-a2d89a9f03a1",
+      "name": "06 Secret Hidden Cause Advertorial",
+      "slug": "06-secret-hidden-cause",
+      "template_id": null,
+      "latestDraftVersionId": "a4f704d5-97ad-4bea-a0d9-8c7c2ee32aa7",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "a93cf911-5ec5-413c-967d-641c5b9bd4a8",
+      "name": "07 Specific Result Advertorial",
+      "slug": "07-specific-result",
+      "template_id": null,
+      "latestDraftVersionId": "bacc48e7-144b-4b31-81c9-c6ea98cfc5a4",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    },
+    {
+      "id": "b41949d0-631a-450b-84fe-d3420d9c980c",
+      "name": "08 One Simple Thing Advertorial",
+      "slug": "08-one-simple-thing",
+      "template_id": null,
+      "latestDraftVersionId": "e12eb229-0b4d-48f5-aacd-0d2ee10c333f",
+      "latestApprovedVersionId": null,
+      "componentCounts": {
+        "ImportedHtmlDocument": 1,
+        "internal_navigation": 2
+      },
+      "textMatches": [
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "reviews",
+          "snippet": "ray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider\">Customer Reviews</h4>\n\n                        <!-- LOCKED: Summary row (stars + count + \"Ratings\"). Rule 59 forbids\n                             inventing an average score or a \"X out of 5\" value. Label is\n                      "
+        },
+        {
+          "path": "content.0.props.htmlDocument",
+          "needle": "testimonial",
+          "snippet": " class=\"comment-divider ml-[60px]\"></div>\n\n            <!-- Comment 2 (Reply) — testimonial, TRT-averse natural-first tester -->\n            <div class=\"flex gap-4 mb-6 relative ml-[60px]\">\n                <div class=\"w-[45px] h-[45px] rounded-full shrink-0 bg-[#0F0F0F] border border-[#2A2A2A] flex "
+        }
+      ]
+    }
+  ]
+}

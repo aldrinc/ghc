@@ -83,6 +83,7 @@ _POLL_TIMEOUT_SECONDS = int(os.getenv("LLM_POLL_TIMEOUT_SECONDS", "3600"))
 _ANTHROPIC_DEFAULT_BASE_URL = "https://api.anthropic.com"
 _OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
 _BASETEN_DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
+_DEEPSEEK_DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
 
 
 @dataclass(frozen=True)
@@ -254,6 +255,14 @@ class LLMClient:
         )
 
     @staticmethod
+    def _deepseek_base_url() -> str:
+        return LLMClient._validated_http_base_url(
+            env_var_name="DEEPSEEK_BASE_URL",
+            configured_base_url=os.getenv("DEEPSEEK_BASE_URL"),
+            default_base_url=_DEEPSEEK_DEFAULT_BASE_URL,
+        )
+
+    @staticmethod
     def _anthropic_base_url() -> str:
         configured_base_url = os.getenv("ANTHROPIC_API_BASE_URL")
         if configured_base_url is None:
@@ -270,7 +279,7 @@ class LLMClient:
         provider_model = normalized_model
         if ":" in normalized_model:
             provider_prefix, _, explicit_model = normalized_model.partition(":")
-            if provider_prefix in {"openai", "anthropic", "gemini", "baseten"}:
+            if provider_prefix in {"openai", "anthropic", "gemini", "baseten", "deepseek"}:
                 explicit_provider = provider_prefix
                 provider_model = explicit_model.strip()
                 if not provider_model:
@@ -294,6 +303,15 @@ class LLMClient:
                 client_family="openai_compatible",
                 base_url=self._baseten_base_url(),
                 api_key_env="BASETEN_API_KEY",
+                supports_responses_api=False,
+            )
+        if explicit_provider == "deepseek":
+            return _ResolvedModelTarget(
+                provider="deepseek",
+                model_name=provider_model,
+                client_family="openai_compatible",
+                base_url=self._deepseek_base_url(),
+                api_key_env="DEEPSEEK_API_KEY",
                 supports_responses_api=False,
             )
         if explicit_provider == "anthropic":
@@ -333,7 +351,7 @@ class LLMClient:
         raise LLMClientConfigError(
             "Unable to resolve an LLM provider for model "
             f"'{normalized_model}'. Use an explicit provider prefix such as "
-            "'openai:', 'anthropic:', 'gemini:', or 'baseten:'."
+            "'openai:', 'anthropic:', 'gemini:', 'baseten:', or 'deepseek:'."
         )
 
     def _ensure_anthropic_client(self) -> None:

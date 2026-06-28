@@ -1,0 +1,289 @@
+{
+  "migratedAt": "2026-04-30T04:42:56.956368+00:00",
+  "reason": "User clarified addendum ads must live in the original approved Meta campaign; separate addendum campaign archived.",
+  "originalRunId": "aeaf09ad-8465-4669-a55c-d53497e5faf3",
+  "addendumRunId": "75594bf6-5418-4720-a394-f3bdad7b4f7a",
+  "originalMetaCampaignBefore": {
+    "id": "120245038391240293",
+    "name": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - Compliance Clean 15",
+    "status": "ACTIVE",
+    "effective_status": "ACTIVE"
+  },
+  "originalMetaCampaignAfter": {
+    "id": "120245038391240293",
+    "name": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - Compliance Clean 15",
+    "status": "ACTIVE",
+    "effective_status": "ACTIVE"
+  },
+  "originalAdsetsAfter": [
+    {
+      "id": "120245038391810293",
+      "name": "CBO Bucket 1",
+      "status": "ACTIVE",
+      "effective_status": "ACTIVE"
+    },
+    {
+      "id": "120245038395060293",
+      "name": "CBO Bucket 2",
+      "status": "ACTIVE",
+      "effective_status": "ACTIVE"
+    },
+    {
+      "id": "120245038396550293",
+      "name": "CBO Bucket 3",
+      "status": "ACTIVE",
+      "effective_status": "ACTIVE"
+    },
+    {
+      "id": "120245038397320293",
+      "name": "CBO Bucket 4",
+      "status": "ACTIVE",
+      "effective_status": "ACTIVE"
+    },
+    {
+      "id": "120245038400410293",
+      "name": "CBO Bucket 5",
+      "status": "ACTIVE",
+      "effective_status": "ACTIVE"
+    }
+  ],
+  "addendumMetaCampaignBefore": {
+    "id": "120245038828230293",
+    "name": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - User Approved Addendum 13",
+    "status": "ACTIVE",
+    "effective_status": "ACTIVE"
+  },
+  "addendumArchiveResponse": {
+    "success": true
+  },
+  "addendumMetaCampaignAfter": {
+    "id": "120245038828230293",
+    "name": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - User Approved Addendum 13",
+    "status": "ARCHIVED",
+    "effective_status": "ARCHIVED"
+  },
+  "createdOriginalCampaignAds": [
+    {
+      "adId": "AV-A3",
+      "assetId": "6caaf28e-644b-44f9-b043-6a77fc1681bf",
+      "bucketIndex": 1,
+      "sourceAddendumMetaAdId": "120245038869310293",
+      "sourceAddendumMetaAdsetId": "120245038829160293",
+      "metaCreativeId": "967081345792653",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038391810293",
+      "newOriginalMetaAdId": "120245038959600293",
+      "remote": {
+        "id": "120245038959600293",
+        "name": "AV-A3 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "PDP3",
+      "assetId": "e06c0f25-bdfd-4be2-875a-510e28908c75",
+      "bucketIndex": 1,
+      "sourceAddendumMetaAdId": "120245038842570293",
+      "sourceAddendumMetaAdsetId": "120245038829160293",
+      "metaCreativeId": "1285081413186942",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038391810293",
+      "newOriginalMetaAdId": "120245038960110293",
+      "remote": {
+        "id": "120245038960110293",
+        "name": "PDP3 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "AV-C4",
+      "assetId": "f67f24bb-b915-4c47-a9af-ee3935220aa5",
+      "bucketIndex": 1,
+      "sourceAddendumMetaAdId": "120245038856670293",
+      "sourceAddendumMetaAdsetId": "120245038829160293",
+      "metaCreativeId": "2291916828005566",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038391810293",
+      "newOriginalMetaAdId": "120245038960600293",
+      "remote": {
+        "id": "120245038960600293",
+        "name": "AV-C4 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "PDP4",
+      "assetId": "2bccdb26-a6ae-495b-b76a-9954c6d71d48",
+      "bucketIndex": 2,
+      "sourceAddendumMetaAdId": "120245038838770293",
+      "sourceAddendumMetaAdsetId": "120245038830340293",
+      "metaCreativeId": "836272012308322",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038395060293",
+      "newOriginalMetaAdId": "120245038961280293",
+      "remote": {
+        "id": "120245038961280293",
+        "name": "PDP4 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "L1",
+      "assetId": "4e8c716c-a303-4907-9d9e-558effa0b61d",
+      "bucketIndex": 2,
+      "sourceAddendumMetaAdId": "120245038854910293",
+      "sourceAddendumMetaAdsetId": "120245038830340293",
+      "metaCreativeId": "1648159393114196",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038395060293",
+      "newOriginalMetaAdId": "120245038961810293",
+      "remote": {
+        "id": "120245038961810293",
+        "name": "L1 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "AV-B1",
+      "assetId": "68e67a56-31e1-4b34-a185-24867fdbf265",
+      "bucketIndex": 2,
+      "sourceAddendumMetaAdId": "120245038867610293",
+      "sourceAddendumMetaAdsetId": "120245038830340293",
+      "metaCreativeId": "1341120817925149",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038395060293",
+      "newOriginalMetaAdId": "120245038962350293",
+      "remote": {
+        "id": "120245038962350293",
+        "name": "AV-B1 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "PDP5",
+      "assetId": "4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9",
+      "bucketIndex": 3,
+      "sourceAddendumMetaAdId": "120245038836160293",
+      "sourceAddendumMetaAdsetId": "120245038831590293",
+      "metaCreativeId": "988571237016934",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038396550293",
+      "newOriginalMetaAdId": "120245038963470293",
+      "remote": {
+        "id": "120245038963470293",
+        "name": "PDP5 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "L5",
+      "assetId": "896cfb58-2d82-4ae3-88b0-0ea94eacb6ca",
+      "bucketIndex": 3,
+      "sourceAddendumMetaAdId": "120245038851750293",
+      "sourceAddendumMetaAdsetId": "120245038831590293",
+      "metaCreativeId": "26953940550910612",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038396550293",
+      "newOriginalMetaAdId": "120245038964170293",
+      "remote": {
+        "id": "120245038964170293",
+        "name": "L5 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "AV-B2",
+      "assetId": "efeff0d8-4b2e-4eb2-83cc-1c0935348639",
+      "bucketIndex": 3,
+      "sourceAddendumMetaAdId": "120245038864480293",
+      "sourceAddendumMetaAdsetId": "120245038831590293",
+      "metaCreativeId": "1430471425429003",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038396550293",
+      "newOriginalMetaAdId": "120245038964730293",
+      "remote": {
+        "id": "120245038964730293",
+        "name": "AV-B2 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "L6",
+      "assetId": "1cd420bb-4419-44eb-8ad7-dec45f49aeb5",
+      "bucketIndex": 4,
+      "sourceAddendumMetaAdId": "120245038848260293",
+      "sourceAddendumMetaAdsetId": "120245038832470293",
+      "metaCreativeId": "967458389538334",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038397320293",
+      "newOriginalMetaAdId": "120245038965360293",
+      "remote": {
+        "id": "120245038965360293",
+        "name": "L6 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "AV-B3",
+      "assetId": "3e529cc4-5975-4ddc-b905-5026f107e9d6",
+      "bucketIndex": 4,
+      "sourceAddendumMetaAdId": "120245038862390293",
+      "sourceAddendumMetaAdsetId": "120245038832470293",
+      "metaCreativeId": "834394932502272",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038397320293",
+      "newOriginalMetaAdId": "120245038965890293",
+      "remote": {
+        "id": "120245038965890293",
+        "name": "AV-B3 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "PDP1",
+      "assetId": "64f570c3-93b4-4283-b059-3640137f18cd",
+      "bucketIndex": 5,
+      "sourceAddendumMetaAdId": "120245038845340293",
+      "sourceAddendumMetaAdsetId": "120245038833560293",
+      "metaCreativeId": "977836644601577",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038400410293",
+      "newOriginalMetaAdId": "120245038966770293",
+      "remote": {
+        "id": "120245038966770293",
+        "name": "PDP1 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    },
+    {
+      "adId": "AV-C3",
+      "assetId": "b23b6840-d51a-4f90-9baa-29158a8853d3",
+      "bucketIndex": 5,
+      "sourceAddendumMetaAdId": "120245038859410293",
+      "sourceAddendumMetaAdsetId": "120245038833560293",
+      "metaCreativeId": "26880840321532631",
+      "targetOriginalMetaCampaignId": "120245038391240293",
+      "targetOriginalMetaAdsetId": "120245038400410293",
+      "newOriginalMetaAdId": "120245038968250293",
+      "remote": {
+        "id": "120245038968250293",
+        "name": "AV-C3 - Tenor Pipeline V3 - original campaign",
+        "status": "ACTIVE",
+        "effective_status": "IN_PROCESS"
+      }
+    }
+  ],
+  "createdCount": 13
+}

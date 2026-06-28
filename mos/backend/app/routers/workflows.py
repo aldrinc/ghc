@@ -573,6 +573,57 @@ def _sanitize_research_filename(value: str) -> str:
     return cleaned[:80] or "document"
 
 
+def _build_workflow_research_zip_response(
+    *,
+    session: Session,
+    org_id: str,
+    run: WorkflowRun,
+    documents: list[dict[str, str]],
+    archive_prefix: str = "research-documents",
+) -> StreamingResponse:
+    if not documents:
+        raise HTTPException(status_code=404, detail="No research documents found for this workflow.")
+
+    used_filenames: dict[str, int] = {}
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for document in documents:
+            step_key = document["step_key"]
+            title = document["title"]
+            content = _normalize_research_markdown_content(
+                title or step_key,
+                _load_research_document_content(
+                    session=session,
+                    org_id=org_id,
+                    step_key=step_key,
+                    title=title,
+                    doc_url=document["doc_url"],
+                    doc_id=document["doc_id"],
+                ),
+            )
+            if not content.strip():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f'Research artifact "{title or step_key}" has no content available to download.',
+                )
+            filename_base = _sanitize_research_filename(f"{step_key}-{title or step_key}")
+            duplicate_count = used_filenames.get(filename_base, 0)
+            used_filenames[filename_base] = duplicate_count + 1
+            archive_name = (
+                f"{filename_base}.md" if duplicate_count == 0 else f"{filename_base}-{duplicate_count + 1}.md"
+            )
+            zip_file.writestr(archive_name, content)
+
+    zip_buffer.seek(0)
+    archive_filename = f"{archive_prefix}-{_sanitize_research_filename(str(run.id))}.zip"
+    headers = {"Content-Disposition": f'attachment; filename="{archive_filename}"'}
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers=headers,
+    )
+
+
 def _require_nonempty_string(*, value: Any, field_name: str) -> str:
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -1319,46 +1370,55 @@ def download_workflow_research_markdown_archive(
         org_id=auth.org_id,
         run=run,
     )
-    if not documents:
-        raise HTTPException(status_code=404, detail="No research documents found for this workflow.")
+    return _build_workflow_research_zip_response(
+        session=session,
+        org_id=auth.org_id,
+        run=run,
+        documents=documents,
+        archive_prefix="research-documents",
+    )
 
-    used_filenames: dict[str, int] = {}
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
-        for document in documents:
-            step_key = document["step_key"]
-            title = document["title"]
-            content = _normalize_research_markdown_content(
-                title or step_key,
-                _load_research_document_content(
-                    session=session,
-                    org_id=auth.org_id,
-                    step_key=step_key,
-                    title=title,
-                    doc_url=document["doc_url"],
-                    doc_id=document["doc_id"],
-                ),
-            )
-            if not content.strip():
-                raise HTTPException(
-                    status_code=409,
-                    detail=f'Research artifact "{title or step_key}" has no content available to download.',
-                )
-            filename_base = _sanitize_research_filename(f"{step_key}-{title or step_key}")
-            duplicate_count = used_filenames.get(filename_base, 0)
-            used_filenames[filename_base] = duplicate_count + 1
-            archive_name = (
-                f"{filename_base}.md" if duplicate_count == 0 else f"{filename_base}-{duplicate_count + 1}.md"
-            )
-            zip_file.writestr(archive_name, content)
 
-    zip_buffer.seek(0)
-    archive_filename = f"research-documents-{_sanitize_research_filename(str(run.id))}.zip"
-    headers = {"Content-Disposition": f'attachment; filename="{archive_filename}"'}
-    return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers=headers,
+@router.get("/{workflow_run_id}/research/download")
+def download_workflow_research_zip(
+    workflow_run_id: str,
+    scope: str = "all",
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    normalized_scope = scope.strip().lower()
+    if normalized_scope not in {"all", "foundational"}:
+        raise HTTPException(status_code=400, detail="scope must be one of: all, foundational")
+
+    repo = WorkflowsRepository(session)
+    run = _resolve_workflow_run(
+        repo=repo,
+        org_id=auth.org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+
+    documents = _list_workflow_research_documents(
+        session=session,
+        org_id=auth.org_id,
+        run=run,
+    )
+    archive_prefix = "research-documents"
+    if normalized_scope == "foundational":
+        documents = [
+            document
+            for document in documents
+            if document["step_key"].startswith("v2-02.foundation.")
+        ]
+        archive_prefix = "foundational-research-documents"
+
+    return _build_workflow_research_zip_response(
+        session=session,
+        org_id=auth.org_id,
+        run=run,
+        documents=documents,
+        archive_prefix=archive_prefix,
     )
 
 

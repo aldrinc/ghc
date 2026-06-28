@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "generated_at": "2026-05-21T01:38:52.931Z",
+  "objective": "Validate setup success screen copy, width class, ETA/email messaging, and shorter checklist.",
+  "files": {
+    "wizard": "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx",
+    "css": "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/styles/design-system.css",
+    "test": "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.test.tsx"
+  },
+  "checks": {
+    "title_updated": true,
+    "old_title_removed": true,
+    "eta_copy_visible": true,
+    "email_copy_visible": true,
+    "mos_agent_language": true,
+    "final_ready_step_removed": true,
+    "cta_updated": true,
+    "success_width_860": true,
+    "description_width_76ch": true
+  },
+  "failed": []
+}

@@ -1,0 +1,30 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/step01-1to1-plan.contract.json",
+  "verified_at": "2026-05-21T18:47:12.752654+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [],
+  "run_logs": [
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134706-jq--e-.prompt_template_sha256-d8819beae6d365a448cb7207f5ce6384ac72246e9072c12da0.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134707-grep--q-SUMMARY-outputs-deerflow-dsv4-step01-raw.md-grep--q-CONTENT-outputs-deer.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134707-jq--e-.business_context-Tenor-Daily-Protocol-Helps-support-male-testosterone-out.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134707-jq--e-.category_niche-supplement-outputs-rendered-strategy-v2-step01-prompt.meta.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134708-jq--e-.status-completed-and-.no_output_token_cap-true-and-.tool_counts.web_searc.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134708-jq--e-.calculator_tool_called-true-outputs-deerflow-dsv4-step01-validation.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134709-test--s-outputs-deerflow-dsv4-step01-raw.md-test--s-outputs-deerflow-dsv4-step01.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134709-jq--e-.pass-true-and-.citation_url_count-15-and-.has_all_phase_1_to_9_headings-t.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134709-jq--e-.prompt_is_strategy_v2_step01-true-and-.prompt_is_not_older_precanon_promp.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134710-grep--q-calculator_tool-Users-aldrinclement-Documents-programming-marketi-.local.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134710-grep--q-SUMMARY-outputs-deerflow-dsv4-step01-raw.md-grep--q-CONTENT-outputs-deer.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134710-jq--e-.has_all_phase_1_to_9_headings-true-and-.phase_heading_count-9-outputs-dee.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134711-jq--e-.has_traction_score-true-and-.has_d1_to_d5_columns_or_mentions-true-and-.c.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134711-jq--e-.citation_url_count-15-and-.unique_url_count-50-outputs-deerflow-dsv4-step.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134711-Users-aldrinclement-.codex-bin-capturectl-verify-sources-deerflow-web-source_ma.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134712-test--f-step01-1to1-plan.contract.json-test--f-proof_pack-planctl-repair.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134712-Users-aldrinclement-.codex-bin-plangatecheck-plan-gate-proof.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134712-Users-aldrinclement-.codex-bin-lanecheck-lane-proof.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134712-Users-aldrinclement-.codex-bin-capturectl-verify-sources-deerflow-web-source_ma.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134712-Users-aldrinclement-.codex-bin-provcheck-outputs-deerflow-dsv4-step01-content.m.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/proof_pack/verify-20260521-134712-jq--e-.pass-true-outputs-deerflow-dsv4-step01-validation.json.log"
+  ]
+}

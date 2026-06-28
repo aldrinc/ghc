@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Config } from "@measured/puck";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -26,6 +26,13 @@ import {
 } from "@/components/imported-site/ImportedSourceSectionBlocks";
 import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRuntimeSection";
 import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import {
+  FunnelRuntimeProvider,
+  resolveRuntimePagePath,
+  resolveRuntimeSitePath,
+  useFunnelRuntime,
+  type FunnelRuntimeContextValue,
+} from "@/funnels/funnelRuntime";
 import { FunnelCompliancePage } from "@/funnels/FunnelCompliancePage";
 import { ImportedHtmlDocument as ImportedHtmlDocumentRenderer } from "@/funnels/ImportedHtmlDocument";
 import {
@@ -137,81 +144,13 @@ import { pendingMetaPurchaseStorageKey, writePendingMetaPurchase } from "@/lib/m
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
 
-type FunnelRuntimeContextValue = {
-  productSlug: string;
-  funnelSlug: string;
-  pageMap: Record<string, string>;
-  pageStageMap: Record<string, PublicFunnelStage>;
-  pageTypeMap?: Record<string, SitePageType>;
-  bundleMode?: boolean;
-  entrySlug?: string | null;
-  pageStage?: PublicFunnelStage;
-  trackEvent?: (event: RuntimeTrackingEvent) => void;
-  commerce?: PublicFunnelCommerce | null;
-  commerceError?: string | null;
-  pageId?: string | null;
-  nextPageId?: string | null;
-  visitorId?: string | null;
-  sessionId?: string | null;
-  resolvePagePath?: (slug: string) => string;
-  resolveSitePath?: (sitePath: string) => string;
-  publicRuntime?: boolean;
+export {
+  FunnelRuntimeProvider,
+  resolveRuntimePagePath,
+  resolveRuntimeSitePath,
+  useFunnelRuntime,
 };
-
-const FunnelRuntimeContext = createContext<FunnelRuntimeContextValue | null>(null);
-
-export function FunnelRuntimeProvider({
-  value,
-  children,
-}: {
-  value: FunnelRuntimeContextValue;
-  children: ReactNode;
-}) {
-  return <FunnelRuntimeContext.Provider value={value}>{children}</FunnelRuntimeContext.Provider>;
-}
-
-export function useFunnelRuntime() {
-  return useContext(FunnelRuntimeContext);
-}
-
-export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug: string): string {
-  const normalizedSlug = (slug || "").trim();
-  if (!normalizedSlug) {
-    return "#";
-  }
-  if (runtime.resolvePagePath) {
-    return runtime.resolvePagePath(normalizedSlug);
-  }
-  if (runtime.bundleMode) {
-    return `/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
-  }
-  return `/f/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
-}
-
-export function resolveRuntimeSitePath(runtime: FunnelRuntimeContextValue, sitePath: string): string {
-  const rawSitePath = (sitePath || "").trim();
-  const normalizedSitePath = rawSitePath.replace(/^\/+/, "");
-  if (!normalizedSitePath) {
-    if (runtime.resolveSitePath) {
-      return runtime.resolveSitePath("");
-    }
-    return buildPublicFunnelPath({
-      productSlug: runtime.productSlug,
-      funnelSlug: runtime.funnelSlug,
-      bundleMode: runtime.bundleMode || false,
-      sitePath: "",
-    });
-  }
-  if (runtime.resolveSitePath) {
-    return runtime.resolveSitePath(normalizedSitePath);
-  }
-  return buildPublicFunnelPath({
-    productSlug: runtime.productSlug,
-    funnelSlug: runtime.funnelSlug,
-    bundleMode: runtime.bundleMode || false,
-    sitePath: normalizedSitePath,
-  });
-}
+export type { FunnelRuntimeContextValue };
 
 type PageOption = { label: string; value: string };
 

@@ -1,0 +1,108 @@
+{
+  "createdAt": "2026-04-28T19:32:28.359Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "stagingFunnelId": "be65d76e-ced9-4948-9465-18723c8446fd",
+  "stagingPageId": "ab3102f4-a179-410a-9eb0-66aa3020cafc",
+  "outputs": [
+    {
+      "key": "01-product-hero-v3",
+      "sourceFile": "01-tenor-product-hero-source-v3.jpg",
+      "sourceAttachment": {
+        "assetId": "a946f7f3-8de9-45bb-a12e-ea5cad7e67e7",
+        "publicId": "cdf6f3b3-7a7f-477f-af78-ef37038e5771",
+        "filename": "01-tenor-product-hero-source-v3.jpg",
+        "contentType": "image/jpeg",
+        "width": 1024,
+        "height": 1024,
+        "url": "/public/assets/cdf6f3b3-7a7f-477f-af78-ef37038e5771"
+      },
+      "workflowRunId": "5ab392fb-4b93-4b8c-bb87-041a6589d55a",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1f83a581-42a6-4036-8d5e-a0bfe23f7456",
+      "assetId": "b68bf44b-c077-4f80-9f42-7c662abc05f5",
+      "publicId": "a96e3d02-3bca-49f0-9d54-d7d3e3433233",
+      "publicUrl": "https://api.moshq.app/public/assets/a96e3d02-3bca-49f0-9d54-d7d3e3433233",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated-v3/01-product-hero-v3.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/cdf6f3b3-7a7f-477f-af78-ef37038e5771",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Clean product still-life, no added words",
+        "swipeAngle": "Create a square Tenor carousel hero image using the attached source swipe as the composition target. The updated black Daily Drive Essentials bottle is the hero. Do not add any headline, captions, benefit labels, badges, diagram labels, icons with text, or typography outside the product bottle label itself. Surround the bottle with simple flat-style natural vitality elements only: red fruit, orange/citrus, green leaves, maca/ginseng-like roots, and a few small pale mineral shapes. Keep the supporting elements flat illustration / paper-cut style, organic, warm, and premium. Use a bright warm ivory background. Avoid orbit rings, circular diagrams, radial grids, science diagrams, dark backgrounds, sachets, powder, scoop, IM8 branding, celebrity language, and any extra text.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:f4be5f614f44f279050de239804f7b863b786fe82a03079c",
+        "asset_ids": [
+          "b68bf44b-c077-4f80-9f42-7c662abc05f5"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "03-formula-v3",
+      "sourceFile": "03-tenor-formula-source-v3.jpg",
+      "sourceAttachment": {
+        "assetId": "b6291383-b8c4-4e83-8446-0ca6c84b11c6",
+        "publicId": "1cc4e8b3-fcc9-4d93-bf0f-3d4ff00ee79f",
+        "filename": "03-tenor-formula-source-v3.jpg",
+        "contentType": "image/jpeg",
+        "width": 1024,
+        "height": 1024,
+        "url": "/public/assets/1cc4e8b3-fcc9-4d93-bf0f-3d4ff00ee79f"
+      },
+      "workflowRunId": "2801323e-0218-4ba9-9240-8085d342796f",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1490b3b9-f039-440b-a3cc-b6a2889d2e53",
+      "assetId": "10b65a08-2e79-4597-bdb3-9a4715a51c9b",
+      "publicId": "7b4a7889-15ed-49fc-9bad-9a9658662331",
+      "publicUrl": "https://api.moshq.app/public/assets/7b4a7889-15ed-49fc-9bad-9a9658662331",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated-v3/03-formula-v3.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/1cc4e8b3-fcc9-4d93-bf0f-3d4ff00ee79f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Five core levers. No proprietary blend.",
+        "swipeAngle": "Create a square Tenor carousel formula card from the attached source swipe. Keep the whole image light: bright ivory / warm white background, white formula cards, soft shadows only, no dark panels, no tan/brown heavy background, no black footer block. Do not show the product bottle or any packaging. Use flat-style ingredient illustrations only: red maca-like botanicals, citrus/fruit accents, green leaves, roots, and pale mineral shapes. Required text exactly: Formula; Five core levers; No proprietary blend; Exact active doses disclosed on the label; Tongkat Ali 400 mg; Zinc 50 mg; Maca 250 mg; L-Arginine 250 mg; Ginseng + Eleuthero 125 mg; Built for men who want a daily protocol before clinics, prescriptions, or needles. Do not say one scoop replaces anything, do not show sachets or powder, do not include a bottle, and do not invent additional doses.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:1f924043ca4362fff7b6cff12a79396617104e795c77988d",
+        "asset_ids": [
+          "10b65a08-2e79-4597-bdb3-9a4715a51c9b"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

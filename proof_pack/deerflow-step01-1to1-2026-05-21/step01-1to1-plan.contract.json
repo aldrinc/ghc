@@ -1,0 +1,685 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "step01-1to1-plan",
+  "created_at": "2026-05-21T18:21:40.804228+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/step01-1to1-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21",
+  "proof_dir": "proof_pack",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Render the real Strategy V2 foundational Step 1 prompt from `V2 Fixes/Foundational Docs/clean_prompts/01_competitor_research_v2.md`.",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Rendered prompt uses the Strategy V2 Step 1 prompt template hash from the production prompt file."
+      ],
+      "verify_commands": [
+        "jq -e '.prompt_template_sha256 == \"d8819beae6d365a448cb7207f5ce6384ac72246e9072c12da0ab7c8d8628b428\"' outputs/rendered-strategy-v2-step01-prompt.meta.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P02",
+      "objective": "Use the same tagged-output guardrail shape from `strategy_v2_activities._append_tagged_output_guardrails`.",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Raw output includes both required tagged blocks."
+      ],
+      "verify_commands": [
+        "grep -q '<SUMMARY>' outputs/deerflow-dsv4-step01-raw.md && grep -q '<CONTENT>' outputs/deerflow-dsv4-step01-raw.md"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P03",
+      "objective": "Use the Tenor production Stage 0 artifact and recovered Strategy V2 context.",
+      "source_line": 11,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Rendered variables use Tenor Stage 0 product name and description recovered from production export."
+      ],
+      "verify_commands": [
+        "jq -e '.business_context == \"Tenor Daily Protocol: Helps support male testosterone\"' outputs/rendered-strategy-v2-step01-prompt.meta.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P04",
+      "objective": "Use `CATEGORY_NICHE=supplement`, matching the production activity log.",
+      "source_line": 12,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Rendered prompt metadata records CATEGORY_NICHE as supplement."
+      ],
+      "verify_commands": [
+        "jq -e '.category_niche == \"supplement\"' outputs/rendered-strategy-v2-step01-prompt.meta.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P05",
+      "objective": "Run through DeerFlow with `deepseek-v4-pro`, thinking enabled, web search/fetch enabled, no output-token cap.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow run completes with DSV4 Pro, web search/fetch tool calls, thinking harness, and no output token cap."
+      ],
+      "verify_commands": [
+        "jq -e '.status == \"completed\" and .no_output_token_cap == true and .tool_counts.web_search >= 1 and .tool_counts.web_fetch >= 1' outputs/deerflow-dsv4-step01-run.meta.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P06",
+      "objective": "Provide a calculator tool so scoring/ranking can be tool-computed.",
+      "source_line": 14,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Calculator tool is exposed and called for scoring/ranking."
+      ],
+      "verify_commands": [
+        "jq -e '.calculator_tool_called == true' outputs/deerflow-dsv4-step01-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P07",
+      "objective": "Save raw output, parsed `<SUMMARY>` and `<CONTENT>`, event log, source manifest, and comparison against the GPT artifact.",
+      "source_line": 15,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "acceptance": [
+        "Raw, parsed summary, parsed content, event log, source manifest, and validation artifacts exist."
+      ],
+      "verify_commands": [
+        "test -s outputs/deerflow-dsv4-step01-raw.md && test -s outputs/deerflow-dsv4-step01-content.md && test -s outputs/deerflow-dsv4-step01-summary.md && test -s outputs/deerflow-dsv4-step01-events.jsonl"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P08",
+      "objective": "Validate prompt shape, tags, citations, competitor coverage, scoring table, and completion of Phases 1-9.",
+      "source_line": 16,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Validator passes prompt shape, tags, phase coverage, citations, scoring table, and completion checks."
+      ],
+      "verify_commands": [
+        "jq -e '.pass == true and .citation_url_count >= 15 and .has_all_phase_1_to_9_headings == true' outputs/deerflow-dsv4-step01-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P09",
+      "objective": "Rendered prompt exists and contains the v2 Step 1 prompt, not the older PreCanon prompt.",
+      "source_line": 24,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Validation proves v2 Strategy Step 1 prompt and rejects older PreCanon prompt."
+      ],
+      "verify_commands": [
+        "jq -e '.prompt_is_strategy_v2_step01 == true and .prompt_is_not_older_precanon_prompt == true' outputs/deerflow-dsv4-step01-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P10",
+      "objective": "DeerFlow config exposes `web_search`, `web_fetch`, and `calculator`.",
+      "source_line": 25,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/.local/deer-flow/config.yaml"
+      ],
+      "acceptance": [
+        "DeerFlow config includes web_search, web_fetch, and calculator tool entries."
+      ],
+      "verify_commands": [
+        "grep -q 'calculator_tool' /Users/aldrinclement/Documents/programming/marketi/.local/deer-flow/config.yaml && grep -q 'web_search' /Users/aldrinclement/Documents/programming/marketi/.local/deer-flow/config.yaml && grep -q 'web_fetch' /Users/aldrinclement/Documents/programming/marketi/.local/deer-flow/config.yaml"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P11",
+      "objective": "Raw DSV4 output has `<SUMMARY>` and `<CONTENT>` blocks.",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Raw output contains SUMMARY and CONTENT tags."
+      ],
+      "verify_commands": [
+        "grep -q '<SUMMARY>' outputs/deerflow-dsv4-step01-raw.md && grep -q '<CONTENT>' outputs/deerflow-dsv4-step01-raw.md"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P12",
+      "objective": "Output includes Phase 1-9 headings.",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Parsed content contains all Phase 1 through Phase 9 headings."
+      ],
+      "verify_commands": [
+        "jq -e '.has_all_phase_1_to_9_headings == true and .phase_heading_count >= 9' outputs/deerflow-dsv4-step01-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P13",
+      "objective": "Output includes a ranked traction table with D1-D5 and scores.",
+      "source_line": 28,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Parsed content contains ranked traction scoring with D1-D5 signals."
+      ],
+      "verify_commands": [
+        "jq -e '.has_traction_score == true and .has_d1_to_d5_columns_or_mentions == true and .calculator_tool_called == true' outputs/deerflow-dsv4-step01-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P14",
+      "objective": "Output cites sources with URLs.",
+      "source_line": 29,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Parsed output includes enough citation URLs for source-backed review."
+      ],
+      "verify_commands": [
+        "jq -e '.citation_url_count >= 15 and .unique_url_count >= 50' outputs/deerflow-dsv4-step01-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P15",
+      "objective": "Source manifest verifies.",
+      "source_line": 30,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "capturectl verifies the source manifest."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify sources/deerflow-web/source_manifest.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    },
+    {
+      "id": "P16",
+      "objective": "Plan contract verifies.",
+      "source_line": 31,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "Plan contract verifies after statuses, artifacts, gates, and proof files are filled."
+      ],
+      "verify_commands": [
+        "test -f step01-1to1-plan.contract.json && test -f proof_pack/planctl-repair.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "outputs/rendered-strategy-v2-step01-prompt.meta.json",
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-summary.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json",
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json",
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json",
+        "outputs/dsv4-vs-gpt-step01-comparison.md"
+      ],
+      "notes": "Done. Verified in DeerFlow DSV4 Pro Strategy V2 Step 1 proof pack."
+    }
+  ],
+  "global_verify_commands": [
+    "/Users/aldrinclement/.codex/bin/plangatecheck plan-gate-proof.json",
+    "/Users/aldrinclement/.codex/bin/lanecheck lane-proof.json",
+    "/Users/aldrinclement/.codex/bin/capturectl verify sources/deerflow-web/source_manifest.json",
+    "/Users/aldrinclement/.codex/bin/provcheck outputs/deerflow-dsv4-step01-content.md",
+    "jq -e '.pass == true' outputs/deerflow-dsv4-step01-validation.json"
+  ],
+  "global_acceptance": [
+    "Strategy V2 Step 1 prompt parity is verified.",
+    "DeerFlow DSV4 Pro run completed with tool evidence.",
+    "Source manifest, provenance, lane proof, and plan gate pass."
+  ],
+  "plan_gate_required": true,
+  "plan_gate_proof": "plan-gate-proof.json",
+  "lane_evidence_required": true,
+  "parallelism_mode": "local_parallel_tools",
+  "lane_proof": "lane-proof.json"
+}

@@ -1,0 +1,66 @@
+{
+  "assetBriefId": "brief_editorial_wound_scene",
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "creativeServiceJobId": "embedded-freestyle:ba5764d9e9d09afdf7cb336ef484807126f30dad1e406f64",
+  "generatedAssetIds": [
+    "1d835f9b-83de-4798-8e1e-696e5aa917bb",
+    "28580c13-fdb4-4c85-b3da-9250df1d2fef",
+    "20d4d4d2-e3cf-4b97-9fc7-736cf3e34fe9"
+  ],
+  "images": [
+    {
+      "assetId": "1d835f9b-83de-4798-8e1e-696e5aa917bb",
+      "bytes": 688375,
+      "contentType": "image/jpeg",
+      "index": 1,
+      "remoteImagePath": "/tmp/mos-codex-swipe-image-flow-2026-05-04-retry/candidate-1-ce642682-0d94-4e1f-808c-86859f175345.jpg",
+      "sha256": "cac166d56c7a57932f1671504315c4ce27c4ed500ba071a5ff8febb1f1d1a87f"
+    },
+    {
+      "assetId": "28580c13-fdb4-4c85-b3da-9250df1d2fef",
+      "bytes": 673231,
+      "contentType": "image/jpeg",
+      "index": 2,
+      "remoteImagePath": "/tmp/mos-codex-swipe-image-flow-2026-05-04-retry/candidate-2-ce642682-0d94-4e1f-808c-86859f175345.jpg",
+      "sha256": "cd57e23aaf2d831cb0571cd88740aca62e1e9abb7f3f715b18af964c66934293"
+    },
+    {
+      "assetId": "20d4d4d2-e3cf-4b97-9fc7-736cf3e34fe9",
+      "bytes": 588375,
+      "contentType": "image/jpeg",
+      "index": 3,
+      "remoteImagePath": "/tmp/mos-codex-swipe-image-flow-2026-05-04-retry/candidate-3-ce642682-0d94-4e1f-808c-86859f175345.jpg",
+      "sha256": "1b52f4aa4d2407118f6e98ac98902cb95a2d449096f39e1ff8fc975553128e82"
+    }
+  ],
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "result": {
+    "asset_ids": [
+      "1d835f9b-83de-4798-8e1e-696e5aa917bb",
+      "28580c13-fdb4-4c85-b3da-9250df1d2fef",
+      "20d4d4d2-e3cf-4b97-9fc7-736cf3e34fe9"
+    ],
+    "gemini_rag_bundle_doc_keys": [],
+    "gemini_rag_doc_keys": [],
+    "gemini_rag_document_names": [],
+    "image_prompt": "A portrait 9:16 aspect ratio split-screen comparison image with a smooth, neutral grey radial gradient background (lighter in the center, darker towards the edges). The composition features two side-by-side male thighs from mid-thigh to just below the knee, separated by a thin white vertical divider line. Both thighs have the bottom hem of black athletic shorts visible at the very top edge of the photo area. \n\nVisual Contrast (Crucial): \nLeft thigh: Highly exaggerated loose, sagging post-weight-loss skin, deep wrinkles, heavy creasing, poor muscle tone, and a pale, aged appearance. \nRight thigh: Extremely tight skin, highly muscular definition, pronounced vascularity (prominent veins), tanned, and healthy. \nRealism: Honest skin texture, natural lighting with mixed practical sources, avoiding any glossy CGI or plastic airbrushed look.\n\nTypography Zones & Layout:\nTop Left Area (floating in the grey background, centered over the left thigh): The text \"After\\nGLP-1\" in a bold, black, clean sans-serif font.\nTop Right Area (floating in the grey background, centered over the right thigh): The text \"After GLP-1\\n+ Tenor\" where \"After GLP-1\" is in bold black sans-serif, and \"+ Tenor\" is on the second line in a bold rust-orange sans-serif font.\nBottom Footer: A solid black horizontal bar spanning the full width of the bottom edge. Centered inside this black bar is the word \"TENOR\" in small, clean, white sans-serif capital letters, maintaining subtle padding and not oversized. Directly below \"TENOR\" is a tiny white disclaimer text reading: \"RESULTS ARE NOT GUARANTEED AND MAY VARY BY INDIVIDUAL\".",
+    "job_id": "embedded-freestyle:ba5764d9e9d09afdf7cb336ef484807126f30dad1e406f64",
+    "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+    "stores_attached": 0,
+    "swipe_context_mode": "minimal",
+    "swipe_copy_model": null,
+    "swipe_copy_pack": null,
+    "swipe_copy_packs": [],
+    "swipe_prompt_markdown": "1) WHY THIS COMPETITOR AD WORKS (short)\n*   **Clear Visual Dichotomy:** The split-screen format instantly communicates the \"problem\" vs. \"solution\" without requiring the user to read much text.\n*   **High-Contrast Proof:** The stark difference between the loose, wrinkled skin on the left and the vascular, tight muscle on the right serves as undeniable visual proof of efficacy.\n*   **Color-Coded Typography:** Using a rust/orange color for the \"+ Mars Men\" text immediately draws the eye to the product addition as the variable that caused the change.\n*   **Distraction-Free Background:** The smooth grey gradient background forces all attention onto the physical transformation and the simple text.\n\n2) ADAPT IT TO MY BRAND (keep vs swap)\n*   **KEEP (design DNA):** The 9:16 portrait layout, the smooth neutral grey radial gradient background, the split-screen composition with a thin white vertical divider, the black shorts visible at the top of the legs, the exact placement and styling of the top text (black and rust-orange), and the solid black footer bar at the bottom.\n*   **SWAP (branding & angle):** Change the right-side text from \"+ Mars Men\" to \"+ Tenor\". Change the footer logo from \"MARS MEN\" to \"TENOR\" (keeping it small and centered with subtle padding). Exaggerate the visual contrast of the legs per the angle: make the left thigh look significantly worse with pronounced loose, sagging post-weight-loss skin and deep creasing, while keeping the right thigh tight, muscular, and vascular.\n\n3) OUTPUT: NEW IMAGE IDEA (1:1)\n\nA) TEXT I SEE (verbatim from competitor)\nHeadline: After GLP-1 (left) / After GLP-1 + Mars Men (right)\nSubhead: [UNKNOWN]\nBody: [UNKNOWN]\nEquation line: [UNKNOWN]\nCTA: [UNKNOWN]\nFine print: RESULTS ARE NOT GUARANTEED AND MAY VARY BY INDIVIDUAL\n\nB) NEW IMAGE PROMPT (MUST BE MARKDOWN)\n```text\nA portrait 9:16 aspect ratio split-screen comparison image with a smooth, neutral grey radial gradient background (lighter in the center, darker towards the edges). The composition features two side-by-side male thighs from mid-thigh to just below the knee, separated by a thin white vertical divider line. Both thighs have the bottom hem of black athletic shorts visible at the very top edge of the photo area. \n\nVisual Contrast (Crucial): \nLeft thigh: Highly exaggerated loose, sagging post-weight-loss skin, deep wrinkles, heavy creasing, poor muscle tone, and a pale, aged appearance. \nRight thigh: Extremely tight skin, highly muscular definition, pronounced vascularity (prominent veins), tanned, and healthy. \nRealism: Honest skin texture, natural lighting with mixed practical sources, avoiding any glossy CGI or plastic airbrushed look.\n\nTypography Zones & Layout:\nTop Left Area (floating in the grey background, centered over the left thigh): The text \"After\\nGLP-1\" in a bold, black, clean sans-serif font.\nTop Right Area (floating in the grey background, centered over the right thigh): The text \"After GLP-1\\n+ Tenor\" where \"After GLP-1\" is in bold black sans-serif, and \"+ Tenor\" is on the second line in a bold rust-orange sans-serif font.\nBottom Footer: A solid black horizontal bar spanning the full width of the bottom edge. Centered inside this black bar is the word \"TENOR\" in small, clean, white sans-serif capital letters, maintaining subtle padding and not oversized. Directly below \"TENOR\" is a tiny white disclaimer text reading: \"RESULTS ARE NOT GUARANTEED AND MAY VARY BY INDIVIDUAL\".\n```",
+    "swipe_prompt_model": "gemini-3.1-pro-preview",
+    "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+    "swipe_render_provider": "creative_service"
+  },
+  "sourceSwipeImageUrl": "https://static-gp.gethookd.ai/media/ads_media/92775828/media-00e7d202abe0.jpg",
+  "swipeAngle": "Preserve the source ad layout literally while increasing the visual contrast: the left thigh must look much worse, with pronounced loose sagging post-weight-loss skin, wrinkles, creasing, and poor tone; the right thigh should remain tight, muscular, and vascular. Keep the source's subtle footer proportions: TENOR should be small and centered in the black bottom bar, with source-like padding, not oversized or pushed low.",
+  "swipeHook": "After GLP-1 vs After GLP-1 + Tenor, with a clearly worse left-side loose-skin result and a source-faithful small footer logo.",
+  "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-c01477ec-0f7b-4d4c-bffb-e6cfe72d1152",
+  "workflowRunId": "ce642682-0d94-4e1f-808c-86859f175345",
+  "workflowUrl": "https://moshq.app/workflows/ce642682-0d94-4e1f-808c-86859f175345"
+}

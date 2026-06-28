@@ -1,0 +1,7 @@
+absent mos/backend/alembic/versions/0085_gethookd_sync_docs_alignment.py
+absent mos/backend/alembic/versions/0086_meta_management_report_artifact.py
+absent mos/backend/app/services/tenor_import_adapter.py
+absent mos/backend/scripts/load_tenor_creative_context.py
+absent mos/backend/tests/test_tenor_import_adapter.py
+absent mos/backend/marketi.db
+absent marketi.db

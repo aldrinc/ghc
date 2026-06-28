@@ -1,0 +1,270 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-21-dsv4-step04-sidecar-plan",
+  "created_at": "2026-05-21T20:56:39.311889+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-dsv4-step04-sidecar-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/docs/plans",
+  "proof_dir": "proof_pack",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Keep GPT Step 4 routed through the current `_run_tagged_foundational_step` implementation.",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py"
+      ],
+      "acceptance": [
+        "When STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER is gpt, Step 4 calls _run_tagged_foundational_step with step_key=04, use_web_search=True, and _FOUNDTN_STEP04_MAX_TOKENS."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py tests/test_config_env_precedence.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "Add a `STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER` flag with default `gpt`.",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/config.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/.env.example",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_config_env_precedence.py"
+      ],
+      "acceptance": [
+        "Config exposes STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER default gpt and STRATEGY_V2_FOUNDATIONAL_STEP04_DEERFLOW_MODEL default deepseek-v4-pro."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_config_env_precedence.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "objective": "Add a DSV4 Step 4 path that uses DeerFlow for research, then synthesizes from captured evidence with DSV4 without tools.",
+      "source_line": 11,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/services/deerflow_foundational.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/scripts/run_deerflow_foundational_step.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py"
+      ],
+      "acceptance": [
+        "DSV4 Step 4 uses a distinct run_deerflow_foundational_step04 function and records DeerFlow evidence before synthesis."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-synthesis-smoke-2026-05-21/meta.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-synthesis-smoke-2026-05-21/raw.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "Add output validation so Step 4 cannot pass with status text or placeholder content.",
+      "source_line": 12,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/scripts/run_deerflow_foundational_step.py"
+      ],
+      "acceptance": [
+        "Validator rejects missing tags, status-only text, placeholder content, missing A-I categories, low quote count, and short content."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "objective": "Add focused tests for provider routing, config defaults, and Step 4 validation helpers.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_strategy_v2_foundational_step01_provider.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_config_env_precedence.py"
+      ],
+      "acceptance": [
+        "Tests cover GPT Step 4 staying on the old path, DSV4 Step 4 using distinct sidecar function, and DSV4 validation rejects bad outputs."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py tests/test_config_env_precedence.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "objective": "GPT Step 4 provider uses the existing `_run_tagged_foundational_step` call shape.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "acceptance": [
+        "Provider routing test asserts GPT Step 4 does not call DeerFlow."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "DSV4 Step 4 provider calls a distinct DeerFlow Step 4 function with `deepseek-v4-pro`.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/services/deerflow_foundational.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "acceptance": [
+        "Provider routing test asserts DSV4 Step 4 calls run_deerflow_foundational_step04 with model deepseek-v4-pro."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P08",
+      "objective": "Invalid DSV4 outputs like \"Let me write it now\" fail validation.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/scripts/run_deerflow_foundational_step.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "acceptance": [
+        "Unit test asserts status-only output returns validation errors."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P09",
+      "objective": "Placeholder GPT-style content is detected by the stricter DSV4 validator.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/scripts/run_deerflow_foundational_step.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "acceptance": [
+        "Unit test asserts skeleton placeholder content returns validation errors."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P10",
+      "objective": "Unit tests pass for the changed backend paths.",
+      "source_line": 21,
+      "status": "blocked",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_strategy_v2_foundational_step01_provider.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_config_env_precedence.py"
+      ],
+      "acceptance": [
+        "Targeted pytest command passes."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py tests/test_config_env_precedence.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-sidecar-implementation-2026-05-21/verification.md"
+      ],
+      "notes": "Targeted pytest is blocked before test load because local Postgres localhost:5433 refuses connections. Manual no-DB routing checks, py_compile, focused ruff checks, provcheck, and live DSV4 synthesis smoke all passed."
+    }
+  ],
+  "global_verify_commands": [
+    "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run pytest tests/test_strategy_v2_foundational_step01_provider.py tests/test_config_env_precedence.py"
+  ],
+  "global_acceptance": [
+    "GPT Step 4 remains on the old path unless STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER is set to deerflow.",
+    "DSV4 Step 4 has a separate DeerFlow research plus direct DSV4 synthesis path.",
+    "DSV4 Step 4 validates semantic completeness before accepting output."
+  ]
+}

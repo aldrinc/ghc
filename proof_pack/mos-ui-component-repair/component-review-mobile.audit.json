@@ -1,0 +1,143 @@
+{
+  "url": "http://localhost:5275/dev/components",
+  "viewport": {
+    "width": 375,
+    "height": 900,
+    "scrollWidth": 375,
+    "scrollHeight": 6760
+  },
+  "horizontalOverflow": false,
+  "offenders": [],
+  "buttons": [
+    {
+      "text": "Show toast",
+      "height": 36,
+      "radius": "999px",
+      "fontSize": "13px"
+    },
+    {
+      "text": "Get started",
+      "height": 46,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Get started",
+      "height": 46,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Book a demo",
+      "height": 46,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Ghost",
+      "height": 46,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Delete campaign",
+      "height": 46,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Read the docs",
+      "height": 27,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Small",
+      "height": 36,
+      "radius": "999px",
+      "fontSize": "13px"
+    },
+    {
+      "text": "Default",
+      "height": 46,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Large",
+      "height": 54,
+      "radius": "999px",
+      "fontSize": "16px"
+    },
+    {
+      "text": "Extra large",
+      "height": 64,
+      "radius": "999px",
+      "fontSize": "17px"
+    },
+    {
+      "text": "",
+      "height": 46,
+      "radius": "999px",
+      "fontSize": "16px"
+    }
+  ],
+  "fields": [
+    {
+      "tag": "input",
+      "height": 54,
+      "width": 277,
+      "radius": "12px",
+      "fontSize": "16px"
+    },
+    {
+      "tag": "select",
+      "height": 54,
+      "width": 277,
+      "radius": "12px",
+      "fontSize": "16px"
+    },
+    {
+      "tag": "input",
+      "height": 54,
+      "width": 277,
+      "radius": "12px",
+      "fontSize": "16px"
+    },
+    {
+      "tag": "input",
+      "height": 54,
+      "width": 277,
+      "radius": "12px",
+      "fontSize": "16px"
+    },
+    {
+      "tag": "textarea",
+      "height": 124,
+      "width": 277,
+      "radius": "12px",
+      "fontSize": "16px"
+    },
+    {
+      "tag": "input",
+      "height": 54,
+      "width": 235,
+      "radius": "12px",
+      "fontSize": "16px"
+    },
+    {
+      "tag": "input",
+      "height": 54,
+      "width": 235,
+      "radius": "12px",
+      "fontSize": "16px"
+    },
+    {
+      "tag": "input",
+      "height": 54,
+      "width": 235,
+      "radius": "12px",
+      "fontSize": "16px"
+    }
+  ]
+}

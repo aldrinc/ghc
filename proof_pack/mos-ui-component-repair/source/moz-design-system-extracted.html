@@ -1,0 +1,4255 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moz — Design System</title>
+<style>/* ──────────────────────────────────────────────────────────
+   Moz — Design Tokens
+   The full source of truth. Everything visual derives from here.
+   ────────────────────────────────────────────────────────── */
+
+/* latin-ext */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("6972f588-a00d-4607-a69c-56bbba52a25c") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("9d309f93-7799-42ab-bea8-94d1c387bd80") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("6972f588-a00d-4607-a69c-56bbba52a25c") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("9d309f93-7799-42ab-bea8-94d1c387bd80") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("6972f588-a00d-4607-a69c-56bbba52a25c") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("9d309f93-7799-42ab-bea8-94d1c387bd80") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("6972f588-a00d-4607-a69c-56bbba52a25c") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("9d309f93-7799-42ab-bea8-94d1c387bd80") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("2bf7099d-d66c-446d-a74b-b9eed3e653ee") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("0b3d945f-039f-40cb-8cc4-4c58f7f03a48") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("88cc0145-6fa5-492b-96a6-5c3d75caa65c") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("a0bc72cb-067c-4499-85ca-6065efbbda45") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("88cc0145-6fa5-492b-96a6-5c3d75caa65c") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("a0bc72cb-067c-4499-85ca-6065efbbda45") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+
+:root {
+  /* ── Brand ───────────────────────────────────────────────── */
+  --moz-blue-50:  #EFF4FF;
+  --moz-blue-100: #DBE6FE;
+  --moz-blue-200: #BFD3FE;
+  --moz-blue-300: #93B4FD;
+  --moz-blue-400: #608AFA;
+  --moz-blue-500: #3B6AF6;
+  --moz-blue-600: #2563EB;   /* primary */
+  --moz-blue-700: #1D4FD8;
+  --moz-blue-800: #1E40AF;
+  --moz-blue-900: #1E3A8A;
+  --moz-blue-950: #172554;
+
+  --moz-blue:    var(--moz-blue-600);
+
+  /* ── Ink (cool black + neutrals) ─────────────────────────── */
+  --ink:         #0B0D12;
+  --ink-soft:    #15181F;
+  --ink-mute:    #2A2F3A;
+
+  --slate-50:    #F7F8FA;
+  --slate-100:   #F0F2F6;
+  --slate-200:   #E3E6EE;
+  --slate-300:   #CDD2DD;
+  --slate-400:   #99A1B3;
+  --slate-500:   #6B7280;
+  --slate-600:   #4B5260;
+  --slate-700:   #353A45;
+  --slate-800:   #1F232C;
+  --slate-900:   #0B0D12;
+
+  /* ── Surfaces ────────────────────────────────────────────── */
+  --bg:           #FFFFFF;
+  --bg-soft:      #F8FAFC;
+  --bg-tint:      #F4F7FB;     /* very light blue wash */
+  --bg-paper:     #FFFFFF;     /* elevated / pure white (inputs, dropdowns) */
+  --border:       #E6E9F0;
+  --border-soft:  #EEF0F5;
+
+  /* ── Semantic ────────────────────────────────────────────── */
+  --success:    #10B981;
+  --success-bg: #E7F8F1;
+  --warning:    #F59E0B;
+  --warning-bg: #FEF4DE;
+  --danger:     #EF4444;
+  --danger-bg:  #FEECEC;
+  --info:       var(--moz-blue-600);
+  --info-bg:    var(--moz-blue-50);
+
+  /* ── Typography ──────────────────────────────────────────── */
+  --font-display: "Libre Baskerville", "Source Serif Pro", Georgia, serif;
+  --font-sans:    "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Type scale — serif display large, DM Sans body normal */
+  --text-2xs:  11px;
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-md:   15px;
+  --text-base: 16px;
+  --text-lg:   18px;
+  --text-xl:   21px;
+  --text-2xl:  26px;
+  --text-3xl:  34px;
+  --text-4xl:  44px;
+  --text-5xl:  56px;
+  --text-6xl:  72px;
+  --text-7xl:  92px;
+
+  /* Letter spacing */
+  --tracking-tight:   -0.02em;
+  --tracking-tighter: -0.035em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.04em;
+  --tracking-caps:    0.08em;
+
+  /* Line heights */
+  --lh-tight:   1.02;
+  --lh-snug:    1.15;
+  --lh-normal:  1.4;
+  --lh-relaxed: 1.55;
+  --lh-loose:   1.7;
+
+  /* ── Spacing scale (4-based) ─────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  48px;
+  --space-10: 64px;
+  --space-11: 80px;
+  --space-12: 96px;
+  --space-13: 128px;
+
+  /* ── Radii ───────────────────────────────────────────────── */
+  --radius-xs:  4px;
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  /* ── Shadows (soft, layered) ─────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 2px 4px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 24px 56px rgba(15, 23, 42, 0.12), 0 8px 16px rgba(15, 23, 42, 0.05);
+
+  --shadow-blue:  0 8px 24px rgba(37, 99, 235, 0.22);
+  --shadow-blue-lg: 0 16px 40px rgba(37, 99, 235, 0.28);
+  --shadow-ink:  0 8px 24px rgba(11, 13, 18, 0.18);
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast:   140ms;
+  --dur-base:   220ms;
+  --dur-slow:   420ms;
+}
+
+/* ── Base reset / globals ─────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings use serif display */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+h1 em, h2 em, h3 em, h4 em, h5 em, h6 em {
+  font-style: italic;
+  font-weight: 400;
+}
+img { display: block; max-width: 100%; }
+button { font: inherit; }
+a { color: inherit; text-decoration: none; }
+
+::selection {
+  background: var(--moz-blue-200);
+  color: var(--ink);
+}
+</style>
+<style>/* ──────────────────────────────────────────────────────────
+   Moz — Components
+   Buttons, cards, inputs, chat, badges, nav, footer.
+   ────────────────────────────────────────────────────────── */
+
+/* ═══ Layout primitives ═══════════════════════════════════ */
+
+.page {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 var(--space-8);
+}
+
+.section {
+  padding: var(--space-12) 0;
+  border-top: 1px solid var(--border);
+}
+.section:first-of-type { border-top: 0; }
+
+.section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--moz-blue-700);
+  margin-bottom: var(--space-4);
+}
+.section-eyebrow::before {
+  content: "";
+  width: 22px;
+  height: 1px;
+  background: var(--moz-blue-600);
+}
+
+.section-title {
+  font-size: var(--text-4xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tighter);
+  line-height: var(--lh-snug);
+  margin: 0 0 var(--space-3);
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.section-subtitle {
+  font-size: var(--text-lg);
+  color: var(--slate-600);
+  max-width: 60ch;
+  margin: 0 0 var(--space-9);
+  line-height: var(--lh-relaxed);
+  text-wrap: pretty;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-8);
+  margin-bottom: var(--space-9);
+  flex-wrap: wrap;
+}
+.section-head .section-subtitle { margin-bottom: 0; }
+
+/* ═══ Buttons ═════════════════════════════════════════════ */
+
+.btn {
+  /* Primary = flat black ink. Pill shape, bold text, halo-ring hover. */
+  --btn-bg: var(--ink);
+  --btn-fg: #fff;
+  --btn-border: var(--ink);
+  --btn-halo: rgba(11, 13, 18, 0.12);     /* ink halo for ink button */
+  --btn-ring: rgba(11, 13, 18, 0.20);
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  padding: 0 22px;
+  height: 46px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  isolation: isolate;
+  user-select: none;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out);
+}
+.btn .btn-icon-arrow { transition: transform var(--dur-base) var(--ease-out); }
+
+/* HOVER: pulsing tinted halo + tiny scale-up. No gradient washes, no color flip. */
+.btn:hover {
+  box-shadow: 0 0 0 4px var(--btn-halo);
+  transform: scale(1.015);
+}
+.btn:hover .btn-icon-arrow { transform: translateX(3px); }
+.btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 0 0 2px var(--btn-halo);
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--btn-ring);
+}
+
+.btn--blue {
+  --btn-bg: var(--moz-blue-600);
+  --btn-fg: #fff;
+  --btn-border: var(--moz-blue-600);
+  --btn-halo: rgba(37, 99, 235, 0.30);
+  --btn-ring: rgba(37, 99, 235, 0.35);
+}
+
+.btn--ghost {
+  --btn-bg: transparent;
+  --btn-fg: var(--ink);
+  --btn-border: var(--slate-300);
+  --btn-halo: rgba(11, 13, 18, 0.08);
+  --btn-ring: rgba(11, 13, 18, 0.10);
+}
+.btn--ghost:hover { border-color: var(--ink); }
+
+.btn--link {
+  --btn-bg: transparent;
+  --btn-fg: var(--ink);
+  --btn-border: transparent;
+  padding-left: 6px;
+  padding-right: 6px;
+  height: auto;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  overflow: visible;
+}
+.btn--link:hover { box-shadow: none; transform: none; }
+.btn--link::after {
+  content: "";
+  position: absolute;
+  left: 6px; right: 6px;
+  bottom: -3px;
+  height: 1.5px;
+  background: currentColor;
+  opacity: 0.35;
+  transform-origin: left;
+  transform: scaleX(0.5);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.btn--link:hover::after { opacity: 1; transform: scaleX(1); }
+
+.btn--sm { height: 36px; padding: 0 16px; font-size: 13px; }
+.btn--lg { height: 54px; padding: 0 28px; font-size: 16px; }
+.btn--xl { height: 64px; padding: 0 32px; font-size: 17px; gap: 10px; }
+
+.btn[aria-disabled="true"], .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* ═══ Cards ═══════════════════════════════════════════════ */
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-7);
+  transition: border-color var(--dur-base) var(--ease-out),
+              background var(--dur-base) var(--ease-out);
+}
+.card:hover {
+  border-color: var(--slate-300);
+  background: var(--bg-soft);
+}
+
+.card--feature {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.card--feature .card-icon {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--moz-blue-50);
+  color: var(--moz-blue-700);
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--moz-blue-100);
+}
+.card--feature h3 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  margin: 0;
+}
+.card--feature p {
+  font-size: var(--text-md);
+  color: var(--slate-600);
+  margin: 0;
+  line-height: var(--lh-relaxed);
+}
+
+.card--testimonial {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.card--testimonial blockquote {
+  font-size: var(--text-xl);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  margin: 0;
+  font-weight: 500;
+  text-wrap: pretty;
+}
+.card--testimonial .who {
+  display: flex; align-items: center; gap: var(--space-3);
+}
+.card--testimonial .avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--moz-blue-400), var(--moz-blue-700));
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+.card--testimonial .name { font-weight: 600; font-size: var(--text-sm); color: var(--ink); }
+.card--testimonial .role { font-size: var(--text-xs); color: var(--slate-500); }
+
+.card--pricing {
+  background: var(--bg-paper);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-8);
+}
+.card--pricing.is-featured {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+}
+.card--pricing.is-featured h3,
+.card--pricing.is-featured .price { color: white; }
+.card--pricing.is-featured .price-sub { color: var(--slate-400); }
+.card--pricing.is-featured li { color: var(--slate-100); }
+.card--pricing.is-featured ul { border-top-color: rgba(255,255,255,0.14); }
+.card--pricing.is-featured li svg { color: var(--moz-blue-400); }
+.card--pricing h3 { font-family: var(--font-display); font-size: var(--text-xl); margin: 0; font-weight: 700; letter-spacing: -0.005em; }
+.card--pricing .price-row { display: flex; align-items: baseline; gap: var(--space-2); }
+.card--pricing .price { font-family: var(--font-display); font-size: var(--text-6xl); font-weight: 400; letter-spacing: -0.025em; color: var(--ink); line-height: 1; }
+.card--pricing .price-sub { font-size: 14px; color: var(--slate-500); }
+.card--pricing ul {
+  list-style: none; padding: var(--space-5) 0 0;
+  margin: 0;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: var(--space-3);
+  font-size: 14px;
+  color: var(--slate-700);
+}
+.card--pricing ul li {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+}
+.card--pricing ul li svg { flex-shrink: 0; margin-top: 2px; color: var(--ink); }
+
+/* ═══ Inputs ══════════════════════════════════════════════ */
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  height: 54px;
+  padding: 0 18px;
+  font-size: 16px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  background: var(--bg-paper);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 12px;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.input::placeholder, .textarea::placeholder {
+  color: var(--slate-400);
+  font-weight: 400;
+}
+.input:hover, .textarea:hover, .select:hover {
+  border-color: var(--slate-400);
+}
+.input:focus, .textarea:focus, .select:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: var(--bg-paper);
+  box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.07);
+}
+.textarea {
+  height: auto;
+  padding: 14px 18px;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 124px;
+}
+
+.input--with-icon {
+  position: relative;
+}
+.input--with-icon .input { padding-left: 48px; }
+.input--with-icon svg {
+  position: absolute;
+  top: 50%; left: 18px;
+  transform: translateY(-50%);
+  color: var(--slate-500);
+  pointer-events: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.input--with-icon:focus-within svg { color: var(--ink); }
+
+/* States */
+.input.is-success {
+  border-color: var(--success);
+  padding-right: 48px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310B981' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
+  background-size: 20px 20px;
+}
+.input.is-success:focus { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.14); border-color: var(--success); }
+
+.input.is-error {
+  border-color: var(--danger);
+  padding-right: 48px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
+  background-size: 20px 20px;
+}
+.input.is-error:focus { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.14); border-color: var(--danger); }
+
+.input:disabled, .textarea:disabled, .select:disabled {
+  background: var(--slate-100);
+  color: var(--slate-400);
+  cursor: not-allowed;
+  border-color: var(--slate-200);
+}
+
+/* Compound input (with prefix) */
+.input-group {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 12px;
+  background: var(--bg-paper);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.input-group:hover { border-color: var(--slate-400); }
+.input-group:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.07);
+}
+.input-group .input-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--bg-paper);
+  color: var(--slate-600);
+  font-size: 14px;
+  font-weight: 500;
+  border-right: 1.5px solid var(--slate-200);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+.input-group .input-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--bg-paper);
+  color: var(--slate-600);
+  font-size: 14px;
+  font-weight: 500;
+  border-left: 1.5px solid var(--slate-200);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+.input-group .input-prefix--button,
+.input-group .input-prefix--right {
+  cursor: pointer;
+  border: 0;
+  background: var(--bg-paper);
+  font-family: var(--font-sans);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.input-group .input-prefix--button:hover { background: var(--slate-50); }
+.input-group .input-prefix--right { border-right: 0; border-left: 1.5px solid var(--slate-200); }
+
+.input-group .input {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  height: 50px;
+  background: var(--bg-paper);
+}
+.input-group .input:focus { box-shadow: none; }
+
+/* Trailing element inside .input--with-icon (right side, e.g. show/hide, ⌘K) */
+.input--with-icon .input-trailing {
+  position: absolute;
+  top: 50%; right: 10px;
+  transform: translateY(-50%);
+  display: flex; align-items: center;
+  color: var(--slate-500);
+  pointer-events: auto;
+  height: 32px;
+}
+.input--with-icon .input-trailing--button {
+  border: 0;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.input--with-icon .input-trailing--button:hover { background: var(--slate-100); color: var(--ink); }
+.input--with-icon .input { padding-right: 52px; }
+
+/* Spinning icon — keep the icon centered vertically while rotating */
+@keyframes spin-icon-y {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to   { transform: translateY(-50%) rotate(360deg); }
+}
+.input--with-icon svg.is-spinning {
+  animation: spin-icon-y 0.8s linear infinite;
+}
+
+/* Strength meter for password fields */
+.strength-meter {
+  display: flex; align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.strength-track {
+  flex: 1;
+  height: 4px;
+  background: var(--slate-200);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.strength-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.strength-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+/* OTP code input */
+.otp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.otp-cell {
+  width: 48px;
+  height: 56px;
+  border: 1.5px solid var(--slate-200);
+  background: var(--bg-paper);
+  border-radius: 10px;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  caret-color: var(--ink);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.otp-cell:hover { border-color: var(--slate-400); }
+.otp-cell:focus,
+.otp-cell.is-focused {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.07);
+}
+.otp-sep {
+  font-size: 22px;
+  color: var(--slate-400);
+  padding: 0 4px;
+  font-weight: 300;
+}
+
+/* Select / dropdown */
+.select {
+  padding-right: 48px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%230B0D12' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+
+.field-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 10px;
+  letter-spacing: -0.005em;
+}
+.field-hint { font-size: 13px; color: var(--slate-500); margin-top: 10px; }
+.field-error { font-size: 13px; color: var(--danger); margin-top: 10px; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.field-success { font-size: 13px; color: var(--success); margin-top: 10px; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+
+/* ═══ Choice cards (onboarding single/multi-select) ══════ */
+/* Vertical stack of full-width selectable cards: icon + title + subtitle + radio indicator.
+   Like Ferndesk's "Welcome" screen. */
+.choice-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.choice {
+  --choice-border: var(--slate-200);
+  --choice-bg: var(--bg-paper);
+  --choice-ring-bg: var(--bg-paper);
+  --choice-ring-border: var(--slate-300);
+
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--choice-bg);
+  border: 1.5px solid var(--choice-border);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  transition: border-color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.choice:hover {
+  --choice-border: var(--slate-400);
+  --choice-ring-border: var(--slate-500);
+}
+.choice:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.08);
+}
+.choice.is-selected {
+  --choice-border: var(--ink);
+  --choice-ring-bg: var(--ink);
+  --choice-ring-border: var(--ink);
+}
+.choice .choice-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--slate-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  flex-shrink: 0;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.choice.is-selected .choice-icon {
+  background: var(--ink);
+  color: white;
+}
+.choice .choice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.choice .choice-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.choice .choice-subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--slate-600);
+  line-height: 1.4;
+}
+.choice .choice-ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--choice-ring-bg);
+  border: 1.5px solid var(--choice-ring-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.choice .choice-ring svg {
+  color: white;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.choice.is-selected .choice-ring svg { opacity: 1; }
+
+/* Square (checkbox) ring variant for multi-select */
+.choice--multi .choice-ring { border-radius: 6px; }
+
+/* Compact variant — no icon, tighter padding */
+.choice--compact {
+  grid-template-columns: 1fr auto;
+  padding: 14px 18px;
+}
+.choice--compact .choice-icon { display: none; }
+
+/* Horizontal grid layout (for 2-up or 3-up choices) */
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.choice--card {
+  flex-direction: column;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
+  text-align: left;
+  padding: 20px;
+  gap: 14px;
+  min-height: 140px;
+}
+.choice--card .choice-icon { width: 36px; height: 36px; }
+.choice--card .choice-ring {
+  position: absolute;
+  top: 16px; right: 16px;
+}
+.combobox {
+  position: relative;
+  width: 100%;
+}
+.combobox-trigger {
+  width: 100%;
+  height: 54px;
+  padding: 0 18px;
+  background: var(--bg-paper);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.combobox-trigger:hover { border-color: var(--slate-400); }
+.combobox.is-open .combobox-trigger {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.07);
+}
+.combobox-trigger .placeholder { color: var(--slate-400); font-weight: 400; }
+.combobox-trigger .caret { color: var(--slate-500); transition: transform var(--dur-base) var(--ease-out); flex-shrink: 0; }
+.combobox.is-open .combobox-trigger .caret { transform: rotate(180deg); color: var(--ink); }
+
+.combobox-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0; right: 0;
+  background: var(--bg-paper);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 14px;
+  padding: 8px;
+  z-index: 20;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.15s var(--ease-out),
+              visibility 0.15s var(--ease-out),
+              transform 0.18s var(--ease-out);
+}
+.combobox.is-open .combobox-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.combobox-group { padding: 4px 0; }
+.combobox-group + .combobox-group { border-top: 1px solid var(--slate-200); margin-top: 4px; padding-top: 8px; }
+.combobox-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--slate-500);
+  padding: 6px 14px 4px;
+}
+.combobox-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 6px;
+  margin-top: 6px;
+  border-top: 1px solid var(--slate-200);
+  font-size: 12px;
+  color: var(--slate-500);
+}
+.combobox-footer .btn--link { font-size: 12px; }
+
+/* Value pills shown INSIDE the combobox trigger when multi-selected */
+.combobox-trigger .combobox-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 400;
+}
+.combobox-trigger .value-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.combobox-trigger .value-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--slate-100);
+  color: var(--ink);
+  border-radius: 999px;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+/* Selected = ink check mark on the left, bg stays light with subtle tint */
+.combobox-option {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+  position: relative;
+}
+.combobox-option .opt-check {
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.combobox-option .opt-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.combobox-option .opt-title {
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.combobox-option .opt-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--slate-500);
+}
+.combobox-option .opt-kbd {
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border: 1px solid var(--slate-200);
+  border-radius: 4px;
+  color: var(--slate-500);
+  background: var(--bg-soft);
+}
+.combobox-option:hover { background: var(--slate-100); }
+.combobox-option.is-selected { background: transparent; }
+.combobox-option.is-selected:hover { background: var(--slate-100); }
+.combobox-option.is-selected .opt-check { opacity: 1; }
+.combobox-option.is-focused { background: var(--slate-100); }
+.combobox-option .opt-meta { font-size: 12px; color: var(--slate-500); font-weight: 400; }
+
+.combobox-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--slate-200);
+  margin-bottom: 6px;
+}
+.combobox-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  outline: none;
+}
+.combobox-search svg { color: var(--slate-500); }
+
+/* Autocomplete dropdown — appears under the Search docs input */
+.autocomplete-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0; right: 0;
+  background: var(--bg-paper);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 14px;
+  padding: 6px;
+  z-index: 20;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s var(--ease-out),
+              visibility 0.15s var(--ease-out),
+              transform 0.18s var(--ease-out);
+}
+.autocomplete-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.autocomplete-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.autocomplete-row:hover,
+.autocomplete-row.is-focused { background: var(--slate-100); }
+.autocomplete-cat {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+.autocomplete-empty {
+  padding: 22px 14px;
+  font-size: 13px;
+  color: var(--slate-500);
+  text-align: center;
+}
+
+/* ═══ Tooltips ═══════════════════════════════════════════ */
+.tooltip-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--slate-100);
+  color: var(--slate-500);
+  cursor: help;
+  margin-left: 6px;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.help-icon:hover { background: var(--slate-200); color: var(--ink); }
+.help-icon svg { width: 10px; height: 10px; }
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--ink);
+  color: white;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  padding: 8px 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 30;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s var(--ease-out),
+              visibility 0.15s var(--ease-out),
+              transform 0.18s var(--ease-out);
+}
+.tooltip-trigger:hover .tooltip,
+.tooltip-trigger:focus .tooltip,
+.tooltip-trigger:focus-within .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+.tooltip--right {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + 10px);
+  transform: translateY(-50%) translateX(4px);
+}
+.tooltip-trigger:hover .tooltip--right,
+.tooltip-trigger:focus .tooltip--right,
+.tooltip-trigger:focus-within .tooltip--right {
+  transform: translateY(-50%) translateX(0);
+}
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--ink);
+}
+.tooltip--multiline {
+  white-space: normal;
+  width: 240px;
+  text-align: left;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+.tooltip--multiline strong { font-weight: 600; display: block; margin-bottom: 2px; }
+.tooltip--right::after {
+  top: 50%;
+  left: auto;
+  right: 100%;
+  transform: translateY(-50%);
+  border-top-color: transparent;
+  border-right-color: var(--ink);
+}
+
+/* Chips */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 12px;
+  height: 30px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--slate-700);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.chip:hover { border-color: var(--slate-400); color: var(--ink); }
+.chip.is-active {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+  padding-right: 6px;
+}
+.chip--blue.is-active {
+  background: var(--moz-blue-600);
+  border-color: var(--moz-blue-600);
+}
+
+/* Inline X glyph (no button chrome — sits inside an active chip) */
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  margin-left: 2px;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  color: currentColor;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.chip-remove:hover { opacity: 1; background: rgba(255,255,255,0.18); }
+.chip-remove svg { width: 10px; height: 10px; stroke: currentColor; }
+
+/* ═══ Badges / Pills / Tags ═══════════════════════════════ */
+
+.badge {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 2px var(--space-2);
+  height: 22px;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: -0.002em;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  background: var(--slate-100);
+  color: var(--slate-700);
+  border: 1px solid var(--slate-200);
+}
+.badge--blue   { background: var(--moz-blue-50); color: var(--moz-blue-800); border-color: var(--moz-blue-100); }
+.badge--ink    { background: var(--ink); color: white; border-color: var(--ink); }
+.badge--success { background: var(--success-bg); color: #065F46; border-color: #C0EDDC; }
+.badge--warning { background: var(--warning-bg); color: #92400E; border-color: #FCE5A5; }
+.badge--danger  { background: var(--danger-bg); color: #991B1B; border-color: #FBC9C9; }
+
+.dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--slate-400);
+}
+.dot--blue { background: var(--moz-blue-600); box-shadow: 0 0 0 3px var(--moz-blue-100); }
+.dot--live { background: var(--success); box-shadow: 0 0 0 3px var(--success-bg); animation: dot-pulse 1.8s var(--ease-in-out) infinite; }
+.dot--warn { background: var(--warning); }
+
+@keyframes dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--success-bg); }
+  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15); }
+}
+
+.status-tag {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 26px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  color: var(--slate-700);
+}
+
+/* ═══ Chat / Message bubbles ══════════════════════════════ */
+
+.chat {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6);
+  display: flex; flex-direction: column; gap: var(--space-5);
+}
+.msg {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+}
+.msg .av {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: white;
+  background: var(--slate-400);
+  margin-top: 2px;
+}
+.msg--moz .av {
+  background: var(--ink);
+  color: white;
+}
+.msg .body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
+.msg .meta {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+}
+.msg .meta .who { font-weight: 600; color: var(--ink); }
+.msg .bubble {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  border-top-left-radius: 4px;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  line-height: var(--lh-relaxed);
+  color: var(--ink);
+  max-width: 480px;
+  width: max-content;
+}
+.msg--moz .bubble {
+  background: var(--moz-blue-600);
+  color: white;
+  border-color: var(--moz-blue-600);
+}
+.msg--user { flex-direction: row-reverse; }
+.msg--user .body { align-items: flex-end; }
+.msg--user .bubble { border-top-left-radius: var(--radius-lg); border-top-right-radius: 4px; }
+.msg--user .av { background: var(--slate-300); color: var(--slate-700); }
+.msg--user .meta { flex-direction: row-reverse; }
+
+.typing {
+  display: inline-flex; gap: 4px; padding: var(--space-3) var(--space-4);
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  border-top-left-radius: 4px;
+}
+.typing span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--slate-400);
+  animation: typing-bounce 1.2s var(--ease-in-out) infinite;
+}
+.typing span:nth-child(2) { animation-delay: 0.15s; }
+.typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ═══ Nav ═════════════════════════════════════════════════ */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border-soft);
+}
+.nav-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px;
+}
+.nav-links {
+  display: flex; align-items: center; gap: var(--space-7);
+  font-size: var(--text-sm);
+  color: var(--slate-600);
+}
+.nav-links a { transition: color var(--dur-fast) var(--ease-out); }
+.nav-links a:hover { color: var(--ink); }
+.nav-cta { display: flex; align-items: center; gap: var(--space-3); }
+
+/* ═══ Footer ══════════════════════════════════════════════ */
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding: var(--space-12) 0 var(--space-9);
+  background: var(--bg-soft);
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(4, 1fr);
+  gap: var(--space-9);
+}
+.footer-brand p {
+  font-size: var(--text-sm);
+  color: var(--slate-600);
+  max-width: 36ch;
+  margin: var(--space-4) 0 var(--space-6);
+  line-height: var(--lh-relaxed);
+}
+.footer-col h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--slate-500);
+  margin: 0 0 var(--space-5);
+}
+.footer-col ul {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.footer-col li a {
+  font-size: var(--text-sm);
+  color: var(--slate-700);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.footer-col li a:hover { color: var(--moz-blue-700); }
+.footer-bottom {
+  margin-top: var(--space-10);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+}
+.footer-social { display: flex; gap: var(--space-3); }
+.footer-social a {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--slate-600);
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.footer-social a:hover {
+  color: var(--moz-blue-700);
+  border-color: var(--moz-blue-300);
+}
+
+/* ═══ Token-display utilities ═════════════════════════════ */
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--space-4);
+}
+.swatch {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg);
+}
+.swatch-color {
+  aspect-ratio: 5 / 3;
+  display: flex; align-items: flex-end;
+  padding: var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+.swatch-color.is-light { color: var(--ink); }
+.swatch-color.is-dark  { color: white; }
+.swatch-meta {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.swatch-name { font-size: var(--text-xs); font-weight: 600; color: var(--ink); }
+.swatch-token { font-family: var(--font-sans); font-size: var(--text-2xs); color: var(--slate-500); }
+
+.type-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 160px;
+  gap: var(--space-5);
+  align-items: baseline;
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.type-row:last-child { border-bottom: 0; }
+.type-row .label {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+}
+.type-row .specs {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+  text-align: right;
+}
+
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-5);
+}
+.spec-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-3);
+  background: var(--bg);
+}
+.spec-card .demo { min-height: 60px; display: flex; align-items: center; justify-content: center; }
+.spec-card .label { font-size: var(--text-xs); font-weight: 600; color: var(--ink); }
+.spec-card .token { font-family: var(--font-sans); font-size: var(--text-2xs); color: var(--slate-500); }
+
+.demo-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg);
+  padding: var(--space-8);
+  position: relative;
+}
+.demo-frame::before {
+  content: attr(data-label);
+  position: absolute;
+  top: -10px; left: var(--space-6);
+  background: var(--bg);
+  padding: 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+
+.row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; gap: var(--space-3); }
+.stack-lg { display: flex; flex-direction: column; gap: var(--space-8); }
+.stack-md { display: flex; flex-direction: column; gap: var(--space-5); }
+
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-5); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-5); }
+
+@media (max-width: 900px) {
+  .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr; }
+}
+</style>
+<style>/* ──────────────────────────────────────────────────────────
+   Moz — Design system SHOWCASE styles
+   Page-only layout — not part of the design system itself.
+   ────────────────────────────────────────────────────────── */
+
+/* ─── Logo lockup ─────────────────────────────────────────── */
+.logo-lockup {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  line-height: 1;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.logo-mark {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  color: var(--ink);
+  flex-shrink: 0;
+  line-height: 0;
+}
+.logo-mark svg {
+  height: 100%;
+  width: auto;
+  display: block;
+}
+/* Sizes — height drives scale; width is auto from the SVG aspect (≈ 60:28) */
+.logo-mark              { height: 22px; }
+.logo-mark--sm          { height: 16px; }
+.logo-mark--md          { height: 22px; }
+.logo-mark--lg          { height: 40px; }
+.logo-mark--xl          { height: 96px; }
+
+.wordmark {
+  font-family: var(--font-sans);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+  text-transform: lowercase;
+  font-feature-settings: "kern", "ss01";
+}
+.wordmark--sm { font-size: 22px; }
+.wordmark--md { font-size: 30px; }
+.wordmark--lg { font-size: 60px; }
+
+.logo-lockup--lg { gap: 14px; }
+.logo-lockup--lg .logo-mark { height: 42px; }
+
+/* ─── Hero ────────────────────────────────────────────────── */
+.hero {
+  padding: var(--space-12) 0 var(--space-11);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: var(--space-11);
+  align-items: center;
+}
+.hero-h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-7xl);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.0;
+  margin: 0 0 var(--space-6);
+  color: var(--ink);
+  text-wrap: balance;
+}
+.hero-h1 em {
+  font-style: italic;
+  color: var(--moz-blue-600);
+}
+.hero-lede {
+  font-size: var(--text-lg);
+  color: var(--slate-600);
+  margin: 0 0 var(--space-7);
+  max-width: 56ch;
+  line-height: 1.55;
+}
+.hero-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+
+.hero-meta {
+  margin-top: var(--space-8);
+  display: flex; gap: var(--space-7);
+  flex-wrap: wrap;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
+.hero-meta div { display: flex; align-items: center; gap: var(--space-2); }
+.hero-meta strong { color: var(--ink); font-weight: 500; }
+
+.hero-art {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hero-mark-xl {
+  display: inline-flex;
+  width: 62%;
+  color: var(--ink);
+}
+.hero-mark-xl svg { width: 100%; height: auto; }
+.hero-tick {
+  position: absolute;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--slate-500);
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-tick::before {
+  content: attr(data-label);
+  font-weight: 500;
+  color: var(--moz-blue-600);
+}
+.hero-tick:nth-of-type(2) { top: 24px; left: 28px; }
+.hero-tick:nth-of-type(3) { top: 24px; right: 28px; }
+.hero-tick:nth-of-type(4) { bottom: 24px; left: 28px; }
+.hero-tick:nth-of-type(5) { bottom: 24px; right: 28px; }
+
+/* ─── TOC ─────────────────────────────────────────────────── */
+.toc {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: var(--space-10);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.toc a {
+  padding: var(--space-5);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.toc a:first-child { border-left: 0; }
+.toc a:hover { background: var(--bg-soft); }
+.toc-num {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.toc-title { font-size: var(--text-base); color: var(--ink); }
+
+/* ─── Section sub-blocks ──────────────────────────────────── */
+.sub-block + .sub-block {
+  margin-top: var(--space-12);
+  padding-top: var(--space-11);
+  border-top: 1px dashed var(--border);
+}
+.sub-head {
+  margin-bottom: var(--space-8);
+  max-width: 70ch;
+}
+.sub-title {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 400;
+  letter-spacing: -0.012em;
+  line-height: 1.1;
+  color: var(--ink);
+  margin: 0 0 var(--space-3);
+}
+.sub-desc {
+  font-size: var(--text-md);
+  color: var(--slate-600);
+  margin: 0;
+  line-height: 1.55;
+}
+.sub-desc strong { color: var(--ink); font-weight: 500; }
+.sub-desc code {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  background: var(--bg-soft);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.mini-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  margin: 0 0 var(--space-4);
+}
+
+/* ─── Type stack ──────────────────────────────────────────── */
+.type-stack {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 0 var(--space-7);
+}
+.type-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 180px;
+  gap: var(--space-6);
+  align-items: baseline;
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.type-row:last-child { border-bottom: 0; }
+.type-row .label {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
+.type-row .display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ink);
+}
+.type-row .body-sample {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--ink);
+  line-height: 1.55;
+}
+.type-row .specs {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+  text-align: right;
+}
+
+/* ─── Spacing list ────────────────────────────────────────── */
+.spacing-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-6);
+}
+.spacing-row {
+  display: grid;
+  grid-template-columns: 120px 60px 1fr;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.spacing-row:last-child { border-bottom: 0; }
+.spacing-token {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-700);
+}
+.spacing-px {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+  text-align: right;
+}
+
+/* ─── Demo frame ──────────────────────────────────────────── */
+.demo-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg);
+  padding: var(--space-8);
+  position: relative;
+}
+.demo-frame::before {
+  content: attr(data-label);
+  position: absolute;
+  top: -8px; left: var(--space-5);
+  background: var(--bg);
+  padding: 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+.frame-caption {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--slate-500);
+  margin: var(--space-5) 0 0;
+}
+
+/* ─── Logo gallery ────────────────────────────────────────── */
+.logo-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+}
+.logo-tile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-9) var(--space-6);
+  min-height: 200px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: var(--space-7);
+  text-align: center;
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+.logo-tile:hover { border-color: var(--slate-300); }
+.logo-tile.is-dark { background: var(--ink); border-color: var(--ink); }
+.logo-tile.is-blue { background: var(--moz-blue-600); border-color: var(--moz-blue-600); }
+.logo-tile-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
+.logo-tile.is-dark .logo-tile-label,
+.logo-tile.is-blue .logo-tile-label {
+  color: rgba(255,255,255,0.7);
+}
+
+/* ─── Construction grid ───────────────────────────────────── */
+.construction {
+  display: flex; flex-direction: column; align-items: center;
+}
+.construction-grid {
+  position: relative;
+  width: 250px; height: 200px;
+  margin: var(--space-5) 0;
+}
+.cg-line {
+  position: absolute;
+  background: var(--moz-blue-300);
+  opacity: 0.5;
+}
+.cg-h { left: -16px; right: -16px; height: 1px; }
+.cg-v { top: -16px; bottom: -16px; width: 1px; }
+.construction-grid .logo-mark {
+  position: relative; z-index: 2;
+}
+
+/* ─── Do / Don't ──────────────────────────────────────────── */
+.do-tile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-7);
+  display: flex; flex-direction: column; gap: var(--space-5);
+  position: relative;
+}
+.do-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  border-radius: var(--radius-sm);
+}
+.do-yes { background: var(--success-bg); color: #065F46; }
+.do-no  { background: var(--danger-bg); color: #991B1B; }
+.do-art {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 160px;
+  padding: var(--space-7);
+  background: var(--bg-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+}
+.do-caption {
+  font-size: var(--text-sm);
+  color: var(--slate-600);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── Form grid (inputs demo) ─────────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+.form-grid > div:last-child { grid-column: 1 / -1; }
+
+/* ─── Icon grid ───────────────────────────────────────────── */
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+.icon-cell {
+  aspect-ratio: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: var(--space-3);
+  border-right: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  padding: var(--space-3);
+  color: var(--ink);
+}
+.icon-cell:hover { background: var(--bg-soft); color: var(--moz-blue-700); }
+.icon-cell .iname {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--slate-500);
+}
+
+/* ─── Pricing extras ──────────────────────────────────────── */
+.price-blurb {
+  font-size: 14px;
+  color: var(--slate-500);
+  margin: 0 0 var(--space-2);
+}
+.card--pricing.is-featured .price-blurb { color: var(--slate-300); }
+
+/* ─── Applied hero ────────────────────────────────────────── */
+.applied-hero {
+  background: var(--bg-soft);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-11) var(--space-10);
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: var(--space-10);
+  align-items: center;
+  border: 1px solid var(--border);
+}
+.applied-hero h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  margin: 0 0 var(--space-5);
+  color: var(--ink);
+  text-wrap: balance;
+}
+.applied-hero h2 em { font-style: italic; color: var(--moz-blue-600); }
+.applied-hero p {
+  font-size: var(--text-lg);
+  color: var(--slate-600);
+  margin: 0 0 var(--space-6);
+  line-height: 1.55;
+}
+.applied-hero ul {
+  list-style: none; padding: 0; margin: 0 0 var(--space-7);
+  display: flex; flex-direction: column; gap: var(--space-2);
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+.applied-hero ul li { display: flex; gap: var(--space-3); align-items: center; }
+.applied-hero ul svg { color: var(--moz-blue-600); flex-shrink: 0; }
+.applied-hero-art .chat { background: white; }
+
+/* ─── Campaign card (applied-hero art replacement) ───────── */
+.campaign-card {
+  background: var(--bg-paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.campaign-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.campaign-card .eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--slate-500);
+}
+.campaign-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+.campaign-list li {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 14px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.campaign-list li:first-child { border-top: 0; }
+.campaign-status {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.campaign-status.done    { background: var(--ink); }
+.campaign-status.live    { background: var(--success); box-shadow: 0 0 0 4px rgba(16,185,129,0.12); }
+.campaign-status.running { background: var(--moz-blue-600); }
+.campaign-status.queued  { background: transparent; border: 1.5px dashed var(--slate-400); }
+.campaign-title {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+  min-width: 0;
+}
+.campaign-meta {
+  font-size: 12px;
+  color: var(--slate-500);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.campaign-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--slate-600);
+}
+.campaign-foot strong { color: var(--ink); font-weight: 600; }
+
+/* Field anatomy diagram */
+.anatomy-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+.anatomy-tag {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: white;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+.anatomy-callout {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--moz-blue-700);
+  background: var(--moz-blue-50);
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* ─── Mark exploration ────────────────────────────────────── */
+.mark-explore {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+}
+.mark-tile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg-paper);
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: border-color var(--dur-base) var(--ease-out),
+              background var(--dur-base) var(--ease-out);
+  cursor: pointer;
+}
+.mark-tile:hover {
+  border-color: var(--ink);
+  background: var(--bg-soft);
+}
+.mark-tile-art {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  padding: var(--space-7);
+}
+.mark-tile-art svg { width: 65%; height: auto; }
+.mark-tile-foot {
+  padding: 14px 18px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mark-tile-letter {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--slate-500);
+}
+.mark-tile-name {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.mark-tile-locked {
+  margin-top: var(--space-4);
+  padding: var(--space-5);
+  border: 1px dashed var(--slate-300);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+  font-size: 13px;
+  color: var(--slate-600);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ─── Input state showcase ────────────────────────────────── */
+.input-states {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-5);
+}
+.input-state-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--slate-500);
+  margin-bottom: 8px;
+}
+
+/* ─── Button state showcase ───────────────────────────────── */
+.button-state-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+}
+.button-state-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-paper);
+}
+.button-state-cell .state-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--slate-500);
+}
+
+@media (max-width: 1100px) {
+  .mark-explore { grid-template-columns: repeat(3, 1fr); }
+  .input-states { grid-template-columns: 1fr; }
+  .button-state-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .mark-explore { grid-template-columns: repeat(2, 1fr); }
+  .button-state-grid { grid-template-columns: 1fr; }
+  .campaign-list li { grid-template-columns: 14px 1fr; }
+  .campaign-list li .campaign-meta { grid-column: 2; }
+}
+
+/* ─── Logo strip ──────────────────────────────────────────── */
+.logo-strip {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--space-7);
+  padding: var(--space-7) var(--space-6);
+  margin-top: var(--space-11);
+  background: var(--bg-paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+.logo-strip .label {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--slate-500);
+}
+.fake-logo {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--slate-400);
+  letter-spacing: -0.01em;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.fake-logo:hover { color: var(--slate-700); }
+
+/* ─── Steps ───────────────────────────────────────────────── */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+}
+.step {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-7);
+  background: var(--bg-paper);
+  display: flex; flex-direction: column; gap: var(--space-5);
+  transition: border-color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.step:hover { border-color: var(--slate-300); background: var(--bg-soft); }
+.step-num {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--moz-blue-600);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.step h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  margin: 0;
+  color: var(--ink);
+}
+.step p {
+  font-size: var(--text-sm);
+  color: var(--slate-600);
+  margin: 0;
+  line-height: 1.55;
+}
+.step-visual {
+  aspect-ratio: 4 / 3;
+  background: var(--moz-blue-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moz-blue-100);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--moz-blue-700);
+}
+
+/* ─── CTA ─────────────────────────────────────────────────── */
+.cta {
+  background: var(--ink);
+  color: white;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-12) var(--space-10);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta::before {
+  content: "";
+  position: absolute;
+  inset: -50% -10% auto auto;
+  width: 70%; aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.45), transparent 60%);
+  pointer-events: none;
+}
+.cta h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
+  margin: 0 0 var(--space-4);
+  color: white;
+  text-wrap: balance;
+  position: relative;
+}
+.cta h2 em { font-style: italic; color: var(--moz-blue-400); }
+.cta p {
+  font-size: var(--text-lg);
+  color: var(--slate-300);
+  margin: 0 auto var(--space-7);
+  max-width: 56ch;
+  line-height: 1.55;
+  position: relative;
+}
+.cta-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  position: relative;
+  flex-wrap: wrap;
+}
+.cta .btn {
+  --btn-bg: white;
+  --btn-fg: var(--ink);
+  --btn-bg-hover: var(--slate-100);
+  --btn-border: white;
+  --btn-border-hover: var(--slate-100);
+}
+.cta .btn--ghost {
+  --btn-bg: transparent;
+  --btn-fg: white;
+  --btn-bg-hover: rgba(255,255,255,0.08);
+  --btn-border: rgba(255,255,255,0.22);
+  --btn-border-hover: rgba(255,255,255,0.35);
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .hero-art { max-width: 480px; margin: 0 auto; }
+  .applied-hero { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  .logo-gallery { grid-template-columns: 1fr 1fr; }
+  .icon-grid { grid-template-columns: repeat(6, 1fr); }
+  .toc { grid-template-columns: 1fr 1fr; }
+  .toc a:nth-child(3) { border-top: 1px solid var(--border); border-left: 0; }
+  .toc a:nth-child(4) { border-top: 1px solid var(--border); }
+}
+@media (max-width: 700px) {
+  .hero-h1 { font-size: var(--text-5xl); }
+  .form-grid { grid-template-columns: 1fr; }
+  .icon-grid { grid-template-columns: repeat(4, 1fr); }
+  .steps { grid-template-columns: 1fr; }
+  .logo-gallery { grid-template-columns: 1fr; }
+  .type-row { grid-template-columns: 1fr; gap: var(--space-2); }
+  .type-row .specs { text-align: left; }
+  .toc { grid-template-columns: 1fr; }
+  .toc a { border-left: 0 !important; border-top: 1px solid var(--border); }
+  .toc a:first-child { border-top: 0; }
+  .applied-hero, .cta { padding: var(--space-9) var(--space-6); }
+}
+</style>
+
+
+</head>
+<body>
+
+<!-- ═══ Reusable Moz mark (SVG sprite) ═══ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Moz mark: broadcast — source dot + 3 concentric arcs radiating outward -->
+    <symbol id="moz-mark" viewBox="0 0 40 32">
+      <!-- Moz mark: a bold filled half-disc (the source) projecting two echo dots.
+           Big block of weight on the left, decaying signal to the right. -->
+      <path d="M 6 4 A 12 12 0 0 1 6 28 Z" fill="currentColor"></path>
+      <circle cx="26" cy="16" r="3" fill="currentColor"></circle>
+      <circle cx="35.5" cy="16" r="1.5" fill="currentColor"></circle>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ═══ NAV ═══ -->
+<header class="nav">
+  <div class="page nav-inner">
+    <a href="#top" class="logo-lockup" aria-label="Moz home">
+      <span class="logo-mark"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+      <span class="wordmark">Moz</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#foundations">Foundations</a>
+      <a href="#brand">Brand</a>
+      <a href="#components">Components</a>
+      <a href="#patterns">Patterns</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn--ghost btn--sm" href="#">Sign in</a>
+      <a class="btn btn--sm" href="#">Get started</a>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero" id="top">
+  <div class="page">
+    <div class="hero-grid">
+      <div>
+        <span class="badge badge--blue" style="margin-bottom: var(--space-5);">
+          <span class="dot dot--blue"></span> Design system · v1.0
+        </span>
+        <h1 class="hero-h1">The system behind <em>Moz</em>.</h1>
+        <p class="hero-lede">Moz is the AI agent that markets your business — studying the market, understanding your customer, and shipping content while you sleep. This is the visual language behind it: warm, confident, and human.</p>
+        <div class="hero-actions">
+          <a class="btn btn--lg" href="#components">Browse components</a>
+          <a class="btn btn--ghost btn--lg" href="#brand">Brand guidelines</a>
+        </div>
+        <div class="hero-meta">
+          <div><strong>Libre Baskerville</strong> display</div>
+          <div><strong>DM Sans</strong> body</div>
+          <div><strong>Royal blue</strong> accent</div>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <span class="hero-mark-xl"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+        <span class="hero-tick" data-label="01">Studies</span>
+        <span class="hero-tick" data-label="02">Understands</span>
+        <span class="hero-tick" data-label="03">Ships</span>
+        <span class="hero-tick" data-label="04">Iterates</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Table of contents">
+      <a href="#foundations"><span class="toc-num">01 / Foundations</span><span class="toc-title">Color, type, space, motion</span></a>
+      <a href="#brand"><span class="toc-num">02 / Brand</span><span class="toc-title">Logo, mark, lockups</span></a>
+      <a href="#components"><span class="toc-num">03 / Components</span><span class="toc-title">Buttons, inputs, choices, cards</span></a>
+      <a href="#patterns"><span class="toc-num">04 / Patterns</span><span class="toc-title">Sample sections</span></a>
+    </nav>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     01 — FOUNDATIONS
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="foundations">
+  <div class="page">
+
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">01 / Foundations</span>
+        <h2 class="section-title">The raw materials.</h2>
+      </div>
+      <p class="section-subtitle">Every visible decision in Moz reduces to one of these tokens. Use them everywhere; never invent a new value inline.</p>
+    </div>
+
+    <!-- COLOR -->
+    <div class="sub-block">
+      <div class="sub-head">
+        <h3 class="sub-title">Color</h3>
+        <p class="sub-desc">Black anchors the system; blue carries the brand. Everything else is a neutral or a semantic state.</p>
+      </div>
+
+      <h4 class="mini-label">Brand · Royal blue</h4>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--moz-blue-50)">#EFF4FF</div><div class="swatch-meta"><span class="swatch-name">Blue 50</span><span class="swatch-token">--moz-blue-50</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--moz-blue-100)">#DBE6FE</div><div class="swatch-meta"><span class="swatch-name">Blue 100</span><span class="swatch-token">--moz-blue-100</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--moz-blue-300)">#93B4FD</div><div class="swatch-meta"><span class="swatch-name">Blue 300</span><span class="swatch-token">--moz-blue-300</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--moz-blue-500)">#3B6AF6</div><div class="swatch-meta"><span class="swatch-name">Blue 500</span><span class="swatch-token">--moz-blue-500</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--moz-blue-600)">#2563EB ·  Primary</div><div class="swatch-meta"><span class="swatch-name">Blue 600</span><span class="swatch-token">--moz-blue-600</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--moz-blue-700)">#1D4FD8</div><div class="swatch-meta"><span class="swatch-name">Blue 700</span><span class="swatch-token">--moz-blue-700</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--moz-blue-900)">#1E3A8A</div><div class="swatch-meta"><span class="swatch-name">Blue 900</span><span class="swatch-token">--moz-blue-900</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--moz-blue-950)">#172554</div><div class="swatch-meta"><span class="swatch-name">Blue 950</span><span class="swatch-token">--moz-blue-950</span></div></div>
+      </div>
+
+      <h4 class="mini-label" style="margin-top:var(--space-8)">Ink &amp; neutrals</h4>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--ink)">#0B0D12 ·  Ink</div><div class="swatch-meta"><span class="swatch-name">Ink</span><span class="swatch-token">--ink</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--slate-800)">#1F232C</div><div class="swatch-meta"><span class="swatch-name">Slate 800</span><span class="swatch-token">--slate-800</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--slate-600)">#4B5260</div><div class="swatch-meta"><span class="swatch-name">Slate 600</span><span class="swatch-token">--slate-600</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--slate-400)">#99A1B3</div><div class="swatch-meta"><span class="swatch-name">Slate 400</span><span class="swatch-token">--slate-400</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--slate-200)">#E3E6EE</div><div class="swatch-meta"><span class="swatch-name">Slate 200</span><span class="swatch-token">--slate-200</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--slate-100)">#F0F2F6</div><div class="swatch-meta"><span class="swatch-name">Slate 100</span><span class="swatch-token">--slate-100</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--bg-soft)">#F8FAFC</div><div class="swatch-meta"><span class="swatch-name">Bg soft</span><span class="swatch-token">--bg-soft</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--bg);border-bottom:1px solid var(--border)">#FFFFFF</div><div class="swatch-meta"><span class="swatch-name">Background</span><span class="swatch-token">--bg</span></div></div>
+      </div>
+
+      <h4 class="mini-label" style="margin-top:var(--space-8)">Semantic</h4>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--success)">#10B981</div><div class="swatch-meta"><span class="swatch-name">Success</span><span class="swatch-token">--success</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--success-bg)">#E7F8F1</div><div class="swatch-meta"><span class="swatch-name">Success bg</span><span class="swatch-token">--success-bg</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--warning)">#F59E0B</div><div class="swatch-meta"><span class="swatch-name">Warning</span><span class="swatch-token">--warning</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--warning-bg)">#FEF4DE</div><div class="swatch-meta"><span class="swatch-name">Warning bg</span><span class="swatch-token">--warning-bg</span></div></div>
+        <div class="swatch"><div class="swatch-color is-dark" style="background:var(--danger)">#EF4444</div><div class="swatch-meta"><span class="swatch-name">Danger</span><span class="swatch-token">--danger</span></div></div>
+        <div class="swatch"><div class="swatch-color is-light" style="background:var(--danger-bg)">#FEECEC</div><div class="swatch-meta"><span class="swatch-name">Danger bg</span><span class="swatch-token">--danger-bg</span></div></div>
+      </div>
+    </div>
+
+    <!-- TYPE -->
+    <div class="sub-block">
+      <div class="sub-head">
+        <h3 class="sub-title">Typography</h3>
+        <p class="sub-desc"><strong>Libre Baskerville</strong> handles every heading — generous, editorial, with italics for emphasis. <strong>DM Sans</strong> handles everything else: body copy, UI labels, overlines, even token names. Two fonts, no more.</p>
+      </div>
+
+      <div class="type-stack">
+        <div class="type-row">
+          <span class="label">Display</span>
+          <span class="display" style="font-size:var(--text-7xl)">The quiet hum of growth.</span>
+          <span class="specs">92 / 1.0 · −0.045em</span>
+        </div>
+        <div class="type-row">
+          <span class="label">H1</span>
+          <span class="display" style="font-size:var(--text-5xl)">Marketing that listens first.</span>
+          <span class="specs">56 / 1.08 · −0.02em</span>
+        </div>
+        <div class="type-row">
+          <span class="label">H2</span>
+          <span class="display" style="font-size:var(--text-4xl)">Studies your market.</span>
+          <span class="specs">44 / 1.1 · −0.018em</span>
+        </div>
+        <div class="type-row">
+          <span class="label">H3</span>
+          <span class="display" style="font-size:var(--text-2xl);font-weight:700">Understands the customer</span>
+          <span class="specs">26 / 1.2 · 700</span>
+        </div>
+        <div class="type-row">
+          <span class="label">Lede</span>
+          <span class="body-sample" style="font-size:var(--text-xl);color:var(--slate-700)">Moz reads your codebase, support tickets, and product launches — and turns them into campaigns that ship themselves.</span>
+          <span class="specs">21 / 1.45 · DM Sans 400</span>
+        </div>
+        <div class="type-row">
+          <span class="label">Body</span>
+          <span class="body-sample">Standard body copy is set in DM Sans at 16 pixels with a 1.55 leading. It reads quietly underneath the serif and supports long-form sections without fatigue. Use it for paragraphs, descriptions, and most UI labels.</span>
+          <span class="specs">16 / 1.55 · DM Sans 400</span>
+        </div>
+        <div class="type-row">
+          <span class="label">Small</span>
+          <span class="body-sample" style="font-size:var(--text-sm);color:var(--slate-600)">Captions, meta, and dense UI rows live at the small size.</span>
+          <span class="specs">13 / 1.55 · DM Sans 400</span>
+        </div>
+        
+      </div>
+    </div>
+
+    <!-- SPACING / RADIUS / SHADOWS -->
+    <div class="sub-block">
+      <div class="sub-head">
+        <h3 class="sub-title">Space, shape &amp; depth</h3>
+        <p class="sub-desc">A 4-pixel grid governs all spacing. Radii are rounded but never balloon. Shadows are quiet — soft greys, never blue glows except for buttons.</p>
+      </div>
+
+      <h4 class="mini-label">Spacing scale</h4>
+      <div class="spacing-list">
+        <div class="spacing-row"><span class="spacing-token">--space-1</span><span class="spacing-px">4</span><span class="space-demo" style="width:4px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-2</span><span class="spacing-px">8</span><span class="space-demo" style="width:8px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-3</span><span class="spacing-px">12</span><span class="space-demo" style="width:12px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-4</span><span class="spacing-px">16</span><span class="space-demo" style="width:16px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-5</span><span class="spacing-px">20</span><span class="space-demo" style="width:20px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-6</span><span class="spacing-px">24</span><span class="space-demo" style="width:24px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-7</span><span class="spacing-px">32</span><span class="space-demo" style="width:32px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-8</span><span class="spacing-px">40</span><span class="space-demo" style="width:40px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-9</span><span class="spacing-px">48</span><span class="space-demo" style="width:48px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-10</span><span class="spacing-px">64</span><span class="space-demo" style="width:64px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-11</span><span class="spacing-px">80</span><span class="space-demo" style="width:80px"></span></div>
+        <div class="spacing-row"><span class="spacing-token">--space-12</span><span class="spacing-px">96</span><span class="space-demo" style="width:96px"></span></div>
+      </div>
+
+      <h4 class="mini-label" style="margin-top:var(--space-9)">Radii</h4>
+      <div class="spec-grid">
+        <div class="spec-card"><div class="demo"><div class="radius-box" style="border-radius:var(--radius-xs)"></div></div><span class="label">XS · 4px</span><span class="token">--radius-xs</span></div>
+        <div class="spec-card"><div class="demo"><div class="radius-box" style="border-radius:var(--radius-sm)"></div></div><span class="label">SM · 6px</span><span class="token">--radius-sm</span></div>
+        <div class="spec-card"><div class="demo"><div class="radius-box" style="border-radius:var(--radius-md)"></div></div><span class="label">MD · 10px</span><span class="token">--radius-md</span></div>
+        <div class="spec-card"><div class="demo"><div class="radius-box" style="border-radius:var(--radius-lg)"></div></div><span class="label">LG · 14px</span><span class="token">--radius-lg</span></div>
+        <div class="spec-card"><div class="demo"><div class="radius-box" style="border-radius:var(--radius-xl)"></div></div><span class="label">XL · 20px</span><span class="token">--radius-xl</span></div>
+        <div class="spec-card"><div class="demo"><div class="radius-box" style="border-radius:var(--radius-2xl)"></div></div><span class="label">2XL · 28px</span><span class="token">--radius-2xl</span></div>
+      </div>
+
+      <h4 class="mini-label" style="margin-top:var(--space-9)">Shadows</h4>
+      <div class="spec-grid">
+        <div class="spec-card"><div class="demo"><div class="shadow-box" style="box-shadow:var(--shadow-xs)"></div></div><span class="label">XS</span><span class="token">--shadow-xs</span></div>
+        <div class="spec-card"><div class="demo"><div class="shadow-box" style="box-shadow:var(--shadow-sm)"></div></div><span class="label">SM</span><span class="token">--shadow-sm</span></div>
+        <div class="spec-card"><div class="demo"><div class="shadow-box" style="box-shadow:var(--shadow-md)"></div></div><span class="label">MD</span><span class="token">--shadow-md</span></div>
+        <div class="spec-card"><div class="demo"><div class="shadow-box" style="box-shadow:var(--shadow-lg)"></div></div><span class="label">LG</span><span class="token">--shadow-lg</span></div>
+        <div class="spec-card"><div class="demo"><div class="shadow-box" style="box-shadow:var(--shadow-xl)"></div></div><span class="label">XL</span><span class="token">--shadow-xl</span></div>
+        <div class="spec-card"><div class="demo"><div class="shadow-box" style="box-shadow:var(--shadow-blue)"></div></div><span class="label">Blue glow</span><span class="token">--shadow-blue</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     02 — BRAND
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="brand">
+  <div class="page">
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">02 / Brand</span>
+        <h2 class="section-title">The mark, the wordmark, the lockup.</h2>
+      </div>
+      <p class="section-subtitle">A bold filled source projects two echo dots — the signal weakens as it travels. It says what Moz does without spelling it out: amplify the message, reach further, fade gracefully.</p>
+    </div>
+
+    <!-- ─── Mark exploration (review & choose) ─── -->
+    <div class="sub-block">
+      <div class="sub-head">
+        <h3 class="sub-title">Mark exploration <span style="color:var(--slate-500);font-weight:400">— megaphone &amp; stamp variants</span></h3>
+        <p class="sub-desc">Four megaphone takes (A1–A4) and four stamp takes (B1–B4). Each variant turns one knob: cone angle, output gesture, aperture shape, weight. Pick the row, then the variant.</p>
+      </div>
+
+      <div class="mini-label" style="margin-top:var(--space-6)">Row A · Megaphone family</div>
+      <div class="mark-explore">
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 44 32">
+              <!-- A1 · Classic horn: handle pill + tapered cone + rim, single output dot -->
+              <path d="M 3 13 H 7 V 19 H 3 A 1.5 1.5 0 0 1 1.5 17.5 V 14.5 A 1.5 1.5 0 0 1 3 13 Z" fill="currentColor"></path>
+              <path d="M 9 11 L 26 4 A 1.5 1.5 0 0 1 28.5 5.4 V 26.6 A 1.5 1.5 0 0 1 26 28 L 9 21 Z" fill="currentColor"></path>
+              <rect x="28.5" y="3" width="3" height="26" rx="1" fill="currentColor"></rect>
+              <circle cx="37" cy="16" r="2" fill="currentColor"></circle>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">Classic horn</span>
+            <span class="mark-tile-letter">A1</span>
+          </div>
+        </div>
+
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 42 32">
+              <!-- A2 · Wide flare: smaller mouthpiece, dramatic flare opening, no echo dot -->
+              <path d="M 2 14 H 8 V 18 H 2 A 1.5 1.5 0 0 1 0.5 16.5 V 15.5 A 1.5 1.5 0 0 1 2 14 Z" fill="currentColor"></path>
+              <path d="M 9 14 L 30 2 A 2 2 0 0 1 33 3.7 V 28.3 A 2 2 0 0 1 30 30 L 9 18 Z" fill="currentColor"></path>
+              <g fill="currentColor">
+                <rect x="36" y="15.2" width="5" height="1.6" rx="0.8"></rect>
+                <rect x="35" y="9" width="4" height="1.6" rx="0.8" transform="rotate(-35 37 9.8)"></rect>
+                <rect x="35" y="22" width="4" height="1.6" rx="0.8" transform="rotate(35 37 22.8)"></rect>
+              </g>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">Wide flare</span>
+            <span class="mark-tile-letter">A2</span>
+          </div>
+        </div>
+
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 44 32">
+              <!-- A3 · Tilted horn: angled up-right, like it's actively projecting -->
+              <g transform="rotate(-15 16 16)">
+                <path d="M 3 14 H 7 V 18 H 3 A 1.5 1.5 0 0 1 1.5 16.5 V 15.5 A 1.5 1.5 0 0 1 3 14 Z" fill="currentColor"></path>
+                <path d="M 9 12 L 27 4 A 1.5 1.5 0 0 1 29.5 5.4 V 26.6 A 1.5 1.5 0 0 1 27 28 L 9 20 Z" fill="currentColor"></path>
+                <rect x="29.5" y="3" width="3" height="26" rx="1" fill="currentColor"></rect>
+              </g>
+              <circle cx="40" cy="6" r="1.8" fill="currentColor"></circle>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">Tilted horn</span>
+            <span class="mark-tile-letter">A3</span>
+          </div>
+        </div>
+
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 44 32">
+              <!-- A4 · Two-tone: handle + cone, with output sound rendered as 3 chevrons (>>>) -->
+              <path d="M 3 13 H 7 V 19 H 3 A 1.5 1.5 0 0 1 1.5 17.5 V 14.5 A 1.5 1.5 0 0 1 3 13 Z" fill="currentColor"></path>
+              <path d="M 9 11 L 26 4 A 1.5 1.5 0 0 1 28.5 5.4 V 26.6 A 1.5 1.5 0 0 1 26 28 L 9 21 Z" fill="currentColor"></path>
+              <rect x="28.5" y="3" width="3" height="26" rx="1" fill="currentColor"></rect>
+              <path d="M 34 10 L 38 16 L 34 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M 38.5 13 L 41 16 L 38.5 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"></path>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">Horn + chevrons</span>
+            <span class="mark-tile-letter">A4</span>
+          </div>
+        </div>
+
+        <div class="mark-tile" style="opacity:0.4;background:var(--bg-soft);cursor:default" aria-hidden="true">
+          <div class="mark-tile-art"></div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name" style="color:var(--slate-400)">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mini-label" style="margin-top:var(--space-8)">Row B · Stamp family</div>
+      <div class="mark-explore">
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 36 32">
+              <!-- B1 · Rounded square + circular aperture (original) -->
+              <path d="M 6 4 H 20 A 4 4 0 0 1 24 8 V 24 A 4 4 0 0 1 20 28 H 6 A 4 4 0 0 1 2 24 V 8 A 4 4 0 0 1 6 4 Z M 13 16 m -3.5 0 a 3.5 3.5 0 1 0 7 0 a 3.5 3.5 0 1 0 -7 0" fill="currentColor" fill-rule="evenodd"></path>
+              <circle cx="30" cy="16" r="2.5" fill="currentColor"></circle>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">Round aperture</span>
+            <span class="mark-tile-letter">B1</span>
+          </div>
+        </div>
+
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 38 32">
+              <!-- B2 · Stamp + chevron aperture (>) -->
+              <path d="M 6 4 H 20 A 4 4 0 0 1 24 8 V 24 A 4 4 0 0 1 20 28 H 6 A 4 4 0 0 1 2 24 V 8 A 4 4 0 0 1 6 4 Z" fill="currentColor"></path>
+              <path d="M 9 11 L 17 16 L 9 21" fill="none" stroke="var(--bg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+              <circle cx="30" cy="13" r="2.2" fill="currentColor"></circle>
+              <circle cx="33" cy="19" r="1.4" fill="currentColor"></circle>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">Chevron stamp</span>
+            <span class="mark-tile-letter">B2</span>
+          </div>
+        </div>
+
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 38 32">
+              <!-- B3 · Stamp with bold lowercase 'm' counter-formed -->
+              <path d="M 6 4 H 20 A 4 4 0 0 1 24 8 V 24 A 4 4 0 0 1 20 28 H 6 A 4 4 0 0 1 2 24 V 8 A 4 4 0 0 1 6 4 Z M 6 22 V 14 A 3 3 0 0 1 11 14 V 22 M 11 14 A 3 3 0 0 1 16 14 V 22" fill="currentColor" fill-rule="evenodd"></path>
+              <circle cx="30" cy="16" r="2.5" fill="currentColor"></circle>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">m-stamp</span>
+            <span class="mark-tile-letter">B3</span>
+          </div>
+        </div>
+
+        <div class="mark-tile">
+          <div class="mark-tile-art">
+            <svg viewBox="0 0 38 32">
+              <!-- B4 · Stamp + slot aperture (horizontal mouth) -->
+              <path d="M 6 4 H 20 A 4 4 0 0 1 24 8 V 24 A 4 4 0 0 1 20 28 H 6 A 4 4 0 0 1 2 24 V 8 A 4 4 0 0 1 6 4 Z M 7 14 H 19 A 2 2 0 0 1 19 18 H 7 A 2 2 0 0 1 7 14 Z" fill="currentColor" fill-rule="evenodd"></path>
+              <rect x="28" y="14.5" width="7" height="3" rx="1.5" fill="currentColor"></rect>
+            </svg>
+          </div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name">Slot stamp</span>
+            <span class="mark-tile-letter">B4</span>
+          </div>
+        </div>
+
+        <div class="mark-tile" style="opacity:0.4;background:var(--bg-soft);cursor:default" aria-hidden="true">
+          <div class="mark-tile-art"></div>
+          <div class="mark-tile-foot">
+            <span class="mark-tile-name" style="color:var(--slate-400)">—</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="frame-caption" style="margin-top:var(--space-5)">↑ Reply with a code (A2, B3, etc.) and I'll lock it across the system.</p>
+    </div>
+
+    <!-- Lockup gallery -->
+    <div class="logo-gallery">
+      <div class="logo-tile">
+        <span class="logo-mark logo-mark--xl"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+        <span class="logo-tile-label">Mark · Ink</span>
+      </div>
+      <div class="logo-tile">
+        <span class="logo-mark logo-mark--xl" style="color:var(--moz-blue-600)"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+        <span class="logo-tile-label">Mark · Blue</span>
+      </div>
+      <div class="logo-tile is-dark">
+        <span class="logo-mark logo-mark--xl" style="color:white"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+        <span class="logo-tile-label">Mark · Inverted</span>
+      </div>
+      <div class="logo-tile is-blue">
+        <span class="logo-mark logo-mark--xl" style="color:white"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+        <span class="logo-tile-label">Mark · On blue</span>
+      </div>
+    </div>
+
+    <!-- Wordmark + lockups -->
+    <div class="grid-2" style="margin-top:var(--space-7)">
+      <div class="demo-frame" data-label="Wordmark">
+        <span class="wordmark" style="font-size:80px">Moz</span>
+        <p class="frame-caption">DM Sans 600 · lowercase · −0.04em tracking</p>
+      </div>
+      <div class="demo-frame" data-label="Horizontal lockup">
+        <div class="logo-lockup logo-lockup--lg">
+          <span class="logo-mark logo-mark--lg"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+          <span class="wordmark wordmark--lg">Moz</span>
+        </div>
+        <p class="frame-caption">Mark + wordmark, baseline-aligned</p>
+      </div>
+    </div>
+
+    <!-- Construction grid -->
+    <div class="demo-frame" data-label="Construction" style="margin-top:var(--space-7)">
+      <div class="construction">
+        <div class="construction-grid">
+          <span class="logo-mark" style="width:250px;height:200px"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+          <span class="cg-line cg-h" style="top:0"></span>
+          <span class="cg-line cg-h" style="top:50%"></span>
+          <span class="cg-line cg-h" style="bottom:0"></span>
+          <span class="cg-line cg-v" style="left:0"></span>
+          <span class="cg-line cg-v" style="left:25%"></span>
+          <span class="cg-line cg-v" style="left:50%"></span>
+          <span class="cg-line cg-v" style="left:75%"></span>
+          <span class="cg-line cg-v" style="right:0"></span>
+        </div>
+        <p class="frame-caption">Built on a 40×32 grid. The source half-disc has a 12-unit radius; echo dots step down by half.</p>
+      </div>
+    </div>
+
+    <!-- Do / Don't -->
+    <div class="grid-2" style="margin-top:var(--space-7)">
+      <div class="do-tile">
+        <span class="do-badge do-yes">Do</span>
+        <div class="do-art">
+          <div class="logo-lockup logo-lockup--lg">
+            <span class="logo-mark logo-mark--lg"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+            <span class="wordmark wordmark--lg">Moz</span>
+          </div>
+        </div>
+        <p class="do-caption">Keep the mark in ink, blue, or inverted white. Maintain at least 0.5× mark-height clearspace.</p>
+      </div>
+      <div class="do-tile">
+        <span class="do-badge do-no">Don't</span>
+        <div class="do-art">
+          <div class="logo-lockup logo-lockup--lg" style="transform:skew(-8deg);opacity:0.7">
+            <span class="logo-mark logo-mark--lg" style="color:#10B981"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+            <span class="wordmark wordmark--lg" style="font-family:var(--font-sans);color:#10B981">Moz</span>
+          </div>
+        </div>
+        <p class="do-caption">Don't re-color, skew, or substitute the wordmark typeface. The serif is non-negotiable.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     03 — COMPONENTS
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="components">
+  <div class="page">
+
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">03 / Components</span>
+        <h2 class="section-title">A small kit, used heavily.</h2>
+      </div>
+      <p class="section-subtitle">Ten components cover ninety percent of Moz. Every screen is built from the same parts.</p>
+    </div>
+
+    <!-- BUTTONS -->
+    <div class="sub-block">
+      <h3 class="sub-title">Buttons</h3>
+      <p class="sub-desc">Buttons are pill-shaped, bold, and flat. Primary stays black; hover darkens with a subtle top-edge sheen — no shadow, no color flip, just the kind of surface response you'd expect from Linear or Vercel.</p>
+
+      <div class="demo-frame" data-label="Variants &amp; sizes">
+        <div class="row" style="margin-bottom: var(--space-5)">
+          <button class="btn">Get started</button>
+          <button class="btn btn--blue">Get started</button>
+          <button class="btn btn--ghost">Book a demo</button>
+          <a class="btn btn--link" href="#">Read the docs →</a>
+        </div>
+        <div class="row">
+          <button class="btn btn--sm">Small</button>
+          <button class="btn">Default</button>
+          <button class="btn btn--lg">Large</button>
+          <button class="btn btn--xl">Extra large</button>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="States" style="margin-top:var(--space-5)">
+        <div class="button-state-grid">
+          <div class="button-state-cell">
+            <span class="state-label">Default</span>
+            <button class="btn">Launch campaign</button>
+          </div>
+          <div class="button-state-cell">
+            <span class="state-label">Hover</span>
+            <button class="btn" style="box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.12); transform: scale(1.015)">Launch campaign</button>
+          </div>
+          <div class="button-state-cell">
+            <span class="state-label">Focused</span>
+            <button class="btn" style="box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.20)">Launch campaign</button>
+          </div>
+          <div class="button-state-cell">
+            <span class="state-label">Loading</span>
+            <button class="btn" aria-busy="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="animation: spin 0.8s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"></path></svg>
+              Launching…
+            </button>
+          </div>
+          <div class="button-state-cell">
+            <span class="state-label">With icon</span>
+            <button class="btn">
+              Continue
+              <svg class="btn-icon-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+            </button>
+          </div>
+          <div class="button-state-cell">
+            <span class="state-label">Icon-only</span>
+            <button class="btn btn--ghost" aria-label="Search" style="width:44px;padding:0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+            </button>
+          </div>
+          <div class="button-state-cell">
+            <span class="state-label">Destructive</span>
+            <button class="btn" style="--btn-bg:var(--danger);--btn-border:var(--danger);--btn-bg-hover:#C8242B;--btn-border-hover:#C8242B">Delete campaign</button>
+          </div>
+          <div class="button-state-cell">
+            <span class="state-label">Disabled</span>
+            <button class="btn" disabled="" style="opacity:0.4;cursor:not-allowed">Launch campaign</button>
+          </div>
+        </div>
+      </div>
+      <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    </div>
+
+    <!-- INPUTS -->
+    <div class="sub-block">
+      <h3 class="sub-title">Inputs &amp; chips</h3>
+      <p class="sub-desc">Fields rest at a soft border. Hover deepens it; focus locks to ink-black with a soft ring. Every state is explicit — no guessing where the cursor lives.</p>
+
+      <div class="demo-frame" data-label="State showcase">
+        <div class="input-states">
+          <div>
+            <span class="input-state-label">Default</span>
+            <input class="input" type="text" placeholder="acme.com">
+          </div>
+          <div>
+            <span class="input-state-label">Hover</span>
+            <input class="input" type="text" placeholder="acme.com" style="border-color:var(--slate-400)">
+          </div>
+          <div>
+            <span class="input-state-label">Focused</span>
+            <input class="input" type="text" value="acme.com" style="border-color:var(--ink);box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.07)">
+          </div>
+          <div>
+            <span class="input-state-label">Filled</span>
+            <input class="input" type="text" value="Acme Inc.">
+          </div>
+          <div>
+            <span class="input-state-label">Success</span>
+            <input class="input is-success" type="text" value="ada@acme.com">
+          </div>
+          <div>
+            <span class="input-state-label">Error</span>
+            <input class="input is-error" type="text" value="ada@">
+          </div>
+          <div>
+            <span class="input-state-label">With prefix</span>
+            <div class="input-group">
+              <span class="input-prefix">https://</span>
+              <input class="input" type="text" placeholder="acme.com">
+            </div>
+          </div>
+          <div>
+            <span class="input-state-label">Disabled</span>
+            <input class="input" type="text" value="Locked value" disabled="">
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="Fields in context" style="margin-top:var(--space-5)">
+        <div class="form-grid">
+          <div>
+            <label class="field-label">Company name</label>
+            <input class="input" type="text" placeholder="Acme, Inc.">
+            <p class="field-hint">We'll use this on your landing pages.</p>
+          </div>
+          <div>
+            <label class="field-label">Website</label>
+            <div class="input--with-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"></path></svg>
+              <input class="input" type="url" placeholder="acme.com">
+            </div>
+          </div>
+          <div>
+            <label class="field-label">What does Moz market for you?</label>
+            <textarea class="textarea" placeholder="We sell a B2B accounting tool to small CFOs. Our voice is dry-witty, our customers are skeptical, and we close on demos…"></textarea>
+            <p class="field-hint">A paragraph is plenty — Moz learns the rest from your site.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="Chips" style="margin-top:var(--space-5)">
+        <div class="row">
+          <button class="chip is-active">All channels</button>
+          <button class="chip">Email</button>
+          <button class="chip">LinkedIn</button>
+          <button class="chip">Twitter</button>
+          <button class="chip">Blog</button>
+          <button class="chip">Ads</button>
+        </div>
+        <div class="row" style="margin-top:var(--space-4)">
+          <span class="chip chip--blue is-active">B2B SaaS
+            <button class="chip-remove" aria-label="Remove B2B SaaS">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2 L10 10 M10 2 L2 10"></path></svg>
+            </button>
+          </span>
+          <span class="chip chip--blue is-active">Series A
+            <button class="chip-remove" aria-label="Remove Series A">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2 L10 10 M10 2 L2 10"></path></svg>
+            </button>
+          </span>
+          <span class="chip chip--blue is-active">United States
+            <button class="chip-remove" aria-label="Remove United States">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2 L10 10 M10 2 L2 10"></path></svg>
+            </button>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DROPDOWNS -->
+    <div class="sub-block">
+      <h3 class="sub-title">Dropdowns &amp; selects</h3>
+      <p class="sub-desc">All dropdowns use the same branded combobox panel — no native browser styling. The trigger matches the input field exactly, and the panel opens with optional search, hover/focus rings, and a check on the left for selected items.</p>
+
+      <div class="demo-frame" data-label="Closed states — click to open">
+        <div class="form-grid">
+          <div>
+            <label class="field-label">Industry</label>
+            <div class="combobox" data-combobox="">
+              <button class="combobox-trigger" type="button">
+                <span>B2B SaaS</span>
+                <svg class="caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="combobox-panel" role="listbox">
+                <div class="combobox-option is-selected">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">B2B SaaS</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Consumer apps</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">E-commerce</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Marketplaces</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Fintech</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Developer tools</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Brand voice</label>
+            <div class="combobox" data-combobox="">
+              <button class="combobox-trigger" type="button">
+                <span class="placeholder">Pick a tone…</span>
+                <svg class="caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="combobox-panel" role="listbox">
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Warm &amp; human</span><span class="opt-sub">Friendly, conversational</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Confident &amp; punchy</span><span class="opt-sub">Linear / Vercel energy</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Playful &amp; clever</span></span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label"><span class="opt-title">Technical &amp; precise</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="Open state — with search" style="margin-top:var(--space-5)">
+        <div style="max-width:480px; margin: 0 auto; min-height: 480px;">
+          <label class="field-label">Connected channels</label>
+          <div class="combobox is-open" data-combobox="" data-stay-open="true">
+            <button class="combobox-trigger" type="button">
+              <span class="combobox-value">
+                <span class="value-pills">
+                  <span class="value-pill">LinkedIn</span>
+                  <span class="value-pill">Email</span>
+                  <span class="value-pill">+1 more</span>
+                </span>
+              </span>
+              <svg class="caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div class="combobox-panel" role="listbox">
+              <div class="combobox-search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+                <input type="text" placeholder="Search channels…" value="">
+                <span class="opt-kbd">⌘K</span>
+              </div>
+              <div class="combobox-group">
+                <div class="combobox-group-label">Connected</div>
+                <div class="combobox-option is-selected">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label">
+                    <span class="opt-title">LinkedIn</span>
+                    <span class="opt-sub">12,400 followers</span>
+                  </span>
+                </div>
+                <div class="combobox-option is-selected is-focused">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label">
+                    <span class="opt-title">Email</span>
+                    <span class="opt-sub">5,400 subscribers</span>
+                  </span>
+                </div>
+                <div class="combobox-option is-selected">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label">
+                    <span class="opt-title">Blog</span>
+                    <span class="opt-sub">Long-form on your domain</span>
+                  </span>
+                </div>
+              </div>
+              <div class="combobox-group">
+                <div class="combobox-group-label">Available</div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label">
+                    <span class="opt-title">Twitter / X</span>
+                    <span class="opt-sub">Connect to start posting</span>
+                  </span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label">
+                    <span class="opt-title">Reddit</span>
+                  </span>
+                  <span class="opt-meta">Beta</span>
+                </div>
+                <div class="combobox-option">
+                  <span class="opt-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                  <span class="opt-label">
+                    <span class="opt-title">YouTube</span>
+                  </span>
+                </div>
+              </div>
+              <div class="combobox-footer">
+                <span>3 of 6 selected</span>
+                <button class="btn btn--link" type="button">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FIELD TYPES -->
+    <div class="sub-block">
+      <h3 class="sub-title">More field types</h3>
+      <p class="sub-desc">Specialist inputs for SaaS forms — phone, currency, search, password, copyable values, OTP codes. All inherit the same resting / hover / focused / error styling.</p>
+
+      <div class="demo-frame" data-label="Specialty inputs">
+        <div class="form-grid">
+          <div>
+            <label class="field-label">Phone number</label>
+            <div class="input-group">
+              <button class="input-prefix input-prefix--button" type="button">
+                <span style="font-size:14px">🇺🇸</span>
+                <span style="font-weight:600">+1</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <input class="input" type="tel" placeholder="(555) 123-4567">
+            </div>
+            <p class="field-hint">We'll text you onboarding tips.</p>
+          </div>
+          <div>
+            <label class="field-label">Monthly ad budget</label>
+            <div class="input-group">
+              <span class="input-prefix">$</span>
+              <input class="input" type="text" inputmode="decimal" value="5,400" style="text-align:right;font-variant-numeric:tabular-nums">
+              <span class="input-suffix">USD</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Search docs</label>
+            <div class="input--with-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              <input class="input" type="search" placeholder="Search the docs…">
+              <span class="input-trailing"><span class="opt-kbd">⌘K</span></span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Password</label>
+            <div class="input--with-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+              <input class="input" type="password" value="••••••••••••">
+              <button class="input-trailing input-trailing--button" type="button" aria-label="Show password">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+            <div class="strength-meter">
+              <span class="strength-track"><span class="strength-fill" style="width:75%;background:var(--success)"></span></span>
+              <span class="strength-label">Strong password</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">API key</label>
+            <div class="input-group">
+              <input class="input" type="text" value="moz_sk_live_4f8a92ec…b7c3" readonly="" style="font-family:ui-monospace,Menlo,monospace;font-size:13.5px;color:var(--slate-700)">
+              <button class="input-prefix input-prefix--button input-prefix--right" type="button" aria-label="Copy">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <p class="field-hint">Rotate keys every 90 days for safety.</p>
+          </div>
+          <div>
+            <label class="field-label">Two-factor code</label>
+            <div class="otp">
+              <input class="otp-cell" type="text" inputmode="numeric" maxlength="1" value="3">
+              <input class="otp-cell" type="text" inputmode="numeric" maxlength="1" value="8">
+              <input class="otp-cell" type="text" inputmode="numeric" maxlength="1" value="4">
+              <span class="otp-sep">–</span>
+              <input class="otp-cell is-focused" type="text" inputmode="numeric" maxlength="1" value="">
+              <input class="otp-cell" type="text" inputmode="numeric" maxlength="1" value="">
+              <input class="otp-cell" type="text" inputmode="numeric" maxlength="1" value="">
+            </div>
+            <p class="field-hint">Sent to your authenticator app.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="Saas-y states — loading, async, locked, character count" style="margin-top:var(--space-5)">
+        <div class="form-grid">
+          <div>
+            <label class="field-label">Workspace URL</label>
+            <div class="input-group">
+              <input class="input" type="text" value="acme">
+              <span class="input-suffix">.moz.app</span>
+            </div>
+            <p class="field-success">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Available
+            </p>
+          </div>
+          <div>
+            <label class="field-label">Checking availability…</label>
+            <div class="input--with-icon">
+              <svg class="is-spinning" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 11-6.219-8.56"></path></svg>
+              <input class="input" type="text" value="lattice" disabled="">
+            </div>
+            <p class="field-hint">Looking up your domain…</p>
+          </div>
+          <div>
+            <label class="field-label" style="display:flex;justify-content:space-between">
+              <span>One-line pitch</span>
+              <span style="font-weight:400;color:var(--slate-500);font-variant-numeric:tabular-nums">62 / 80</span>
+            </label>
+            <input class="input" type="text" value="Marketing on autopilot for shipping teams.">
+            <p class="field-hint">Used on social previews and OG cards.</p>
+          </div>
+          <div>
+            <label class="field-label">Workspace ID</label>
+            <input class="input" type="text" value="ws_8f4a92e1" readonly="" style="font-family:ui-monospace,Menlo,monospace;color:var(--slate-600)">
+            <p class="field-hint" style="display:flex;align-items:center;gap:6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+              Read-only — assigned by Moz
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FIELD ANATOMY -->
+    <div class="sub-block">
+      <h3 class="sub-title">Field anatomy &amp; tooltips</h3>
+      <p class="sub-desc">A field is more than the input itself — label, optional help icon, hint, error, and success. Tooltips attach to help icons next to labels for explanations that don't deserve permanent hint text.</p>
+
+      <div class="demo-frame" data-label="Anatomy diagram">
+        <div style="max-width:560px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px;">
+          <!-- 1. Default -->
+          <div class="anatomy-row">
+            <span class="anatomy-tag">1</span>
+            <div style="flex:1">
+              <label class="field-label">
+                Workspace name
+                <span class="anatomy-callout">label</span>
+              </label>
+              <input class="input" type="text" placeholder="e.g. Acme Inc.">
+              <p class="field-hint">
+                Visible to your teammates and on shared previews.
+                <span class="anatomy-callout">hint</span>
+              </p>
+            </div>
+          </div>
+
+          <!-- 2. With tooltip on help icon -->
+          <div class="anatomy-row">
+            <span class="anatomy-tag">2</span>
+            <div style="flex:1">
+              <label class="field-label" style="display:inline-flex;align-items:center">
+                Default sending domain
+                <span class="tooltip-trigger" tabindex="0">
+                  <span class="help-icon" aria-label="What is this?">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                  </span>
+                  <span class="tooltip tooltip--multiline">
+                    <strong>Sending domain</strong>
+                    The domain Moz uses for outbound emails. Adding DNS records improves deliverability.
+                  </span>
+                </span>
+                <span class="anatomy-callout" style="margin-left:8px">help &amp; tooltip</span>
+              </label>
+              <div class="input-group">
+                <span class="input-prefix">mail.</span>
+                <input class="input" type="text" value="acme.com">
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Required + counter -->
+          <div class="anatomy-row">
+            <span class="anatomy-tag">3</span>
+            <div style="flex:1">
+              <label class="field-label" style="display:flex;justify-content:space-between;align-items:center">
+                <span style="display:inline-flex;align-items:center;gap:4px">
+                  Tagline
+                  <span style="color:var(--danger);font-weight:600">*</span>
+                  <span class="anatomy-callout">required</span>
+                </span>
+                <span style="font-weight:400;color:var(--slate-500);font-variant-numeric:tabular-nums;font-size:12px">
+                  47 / 80
+                  <span class="anatomy-callout">counter</span>
+                </span>
+              </label>
+              <input class="input" type="text" value="Marketing on autopilot for shipping teams.">
+            </div>
+          </div>
+
+          <!-- 4. Error state -->
+          <div class="anatomy-row">
+            <span class="anatomy-tag">4</span>
+            <div style="flex:1">
+              <label class="field-label">Billing email</label>
+              <input class="input is-error" type="email" value="finance@">
+              <p class="field-error">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                That email looks incomplete.
+                <span class="anatomy-callout">error</span>
+              </p>
+            </div>
+          </div>
+
+          <!-- 5. Success state -->
+          <div class="anatomy-row">
+            <span class="anatomy-tag">5</span>
+            <div style="flex:1">
+              <label class="field-label">Subdomain</label>
+              <div class="input-group">
+                <input class="input is-success" type="text" value="acme">
+                <span class="input-suffix">.moz.app</span>
+              </div>
+              <p class="field-success">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Available — secured to your workspace
+                <span class="anatomy-callout">success</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="Tooltip styles" style="margin-top:var(--space-5)">
+        <div style="display:flex;flex-wrap:wrap;gap:48px;justify-content:center;align-items:center;padding:60px 20px">
+          <span class="tooltip-trigger" tabindex="0">
+            <button class="btn btn--ghost btn--sm" type="button">Hover me · top</button>
+            <span class="tooltip">Short hint</span>
+          </span>
+          <span class="tooltip-trigger" tabindex="0">
+            <button class="btn btn--ghost btn--sm" type="button">Multi-line</button>
+            <span class="tooltip tooltip--multiline">
+              <strong>Pro tip</strong>
+              Use tooltips for context that helps but isn't strictly required to fill the field.
+            </span>
+          </span>
+          <span class="tooltip-trigger" tabindex="0">
+            <button class="btn btn--ghost btn--sm" type="button">Right ⏵</button>
+            <span class="tooltip tooltip--right">Positions to the right</span>
+          </span>
+          <span class="tooltip-trigger" tabindex="0">
+            <span class="help-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
+            <span class="tooltip">Inline help icon</span>
+          </span>
+        </div>
+      </div>
+    </div>
+    <!-- CHOICE CARDS -->
+    <div class="sub-block">
+      <h3 class="sub-title">Choice cards</h3>
+      <p class="sub-desc">For onboarding and survey moments — large, tappable, scannable. A stack of full-width cards beats a radio group every time. Each card is icon + title + subtitle + selection ring. Works as single-select (radio) or multi-select (checkbox).</p>
+
+      <div class="demo-frame" data-label="Single-select stack — onboarding">
+        <div style="max-width: 520px; margin: 0 auto;">
+          <h4 style="font-family: var(--font-display); font-size: 28px; font-weight: 400; letter-spacing: -0.015em; margin: 0 0 6px;">Welcome to Moz</h4>
+          <p style="font-size: 15px; color: var(--slate-600); margin: 0 0 24px;">What sounds the most like you right now?</p>
+          <div class="choice-stack">
+            <button class="choice" type="button">
+              <span class="choice-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">Our marketing is kind of a mess</span>
+                <span class="choice-subtitle">Inconsistent, scattered, or embarrassing to review</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+            <button class="choice is-selected" type="button">
+              <span class="choice-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">We ship faster than we market</span>
+                <span class="choice-subtitle">Product is great, but no one's hearing about it</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+            <button class="choice" type="button">
+              <span class="choice-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">Same content, every single day</span>
+                <span class="choice-subtitle">Customers won't shut up about the same questions</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+            <button class="choice" type="button">
+              <span class="choice-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">All of the above</span>
+                <span class="choice-subtitle">Let's fix everything</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+          </div>
+          <div style="display:flex; justify-content: flex-end; margin-top: 24px;">
+            <button class="btn">Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="Multi-select stack" style="margin-top:var(--space-5)">
+        <div style="max-width: 520px; margin: 0 auto;">
+          <h4 style="font-family: var(--font-display); font-size: 22px; font-weight: 400; letter-spacing: -0.012em; margin: 0 0 6px;">Where should Moz publish?</h4>
+          <p style="font-size: 14px; color: var(--slate-600); margin: 0 0 18px;">Pick all that apply — we'll connect them next.</p>
+          <div class="choice-stack">
+            <button class="choice choice--multi is-selected" type="button">
+              <span class="choice-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h14zM8 17v-7H6v7h2zM7 8.5a1.2 1.2 0 100-2.4 1.2 1.2 0 000 2.4zM18 17v-4.2c0-1.7-.9-2.8-2.5-2.8-1.1 0-1.7.6-2 1.1V10h-2v7h2v-3.7c0-.9.4-1.5 1.2-1.5.8 0 1.3.5 1.3 1.5V17h2z"></path></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">LinkedIn</span>
+                <span class="choice-subtitle">B2B reach · 12k followers</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+            <button class="choice choice--multi is-selected" type="button">
+              <span class="choice-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><polyline points="3 8 12 13 21 8"></polyline></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">Email</span>
+                <span class="choice-subtitle">5,400 subscribers in your list</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+            <button class="choice choice--multi" type="button">
+              <span class="choice-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">Twitter / X</span>
+                <span class="choice-subtitle">Connect to start posting</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+            <button class="choice choice--multi" type="button">
+              <span class="choice-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg>
+              </span>
+              <div class="choice-body">
+                <span class="choice-title">Blog</span>
+                <span class="choice-subtitle">Long-form posts on your domain</span>
+              </div>
+              <span class="choice-ring">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-frame" data-label="Compact (no icon)" style="margin-top:var(--space-5)">
+        <div style="max-width: 480px; margin: 0 auto;">
+          <p style="font-size: 14px; font-weight: 600; color: var(--ink); margin: 0 0 12px;">How many people are on your team?</p>
+          <div class="choice-stack">
+            <button class="choice choice--compact" type="button">
+              <span class="choice-title">Just me</span>
+              <span class="choice-ring"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+            </button>
+            <button class="choice choice--compact is-selected" type="button">
+              <span class="choice-title">2 – 10</span>
+              <span class="choice-ring"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+            </button>
+            <button class="choice choice--compact" type="button">
+              <span class="choice-title">11 – 50</span>
+              <span class="choice-ring"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+            </button>
+            <button class="choice choice--compact" type="button">
+              <span class="choice-title">50+</span>
+              <span class="choice-ring"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sub-block">
+      <h3 class="sub-title">Badges, pills &amp; status</h3>
+      <p class="sub-desc">Small labels with calm color. Use the semantic variants only when the meaning matches.</p>
+
+      <div class="demo-frame" data-label="Badges">
+        <div class="row">
+          <span class="badge">Default</span>
+          <span class="badge badge--blue">New</span>
+          <span class="badge badge--ink">Beta</span>
+          <span class="badge badge--success">Published</span>
+          <span class="badge badge--warning">Pending review</span>
+          <span class="badge badge--danger">Failed</span>
+        </div>
+      </div>
+      <div class="demo-frame" data-label="Status tags" style="margin-top:var(--space-5)">
+        <div class="row">
+          <span class="status-tag"><span class="dot dot--live"></span> Campaign live</span>
+          <span class="status-tag"><span class="dot dot--blue"></span> Drafting</span>
+          <span class="status-tag"><span class="dot dot--warn"></span> Awaiting approval</span>
+          <span class="status-tag"><span class="dot"></span> Idle</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARDS -->
+    <div class="sub-block">
+      <h3 class="sub-title">Cards</h3>
+      <p class="sub-desc">Three flavours: feature, testimonial, pricing. All share the same 20-pixel radius and 1-pixel border.</p>
+
+      <h4 class="mini-label">Feature</h4>
+      <div class="grid-3">
+        <div class="card card--feature">
+          <span class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          </span>
+          <h3>Studies your market</h3>
+          <p>Moz reads your competitors, your reviews, and the conversations your customers are actually having.</p>
+        </div>
+        <div class="card card--feature">
+          <span class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+          </span>
+          <h3>Understands the customer</h3>
+          <p>Connect your support inbox and Moz learns the questions, objections, and language that move people.</p>
+        </div>
+        <div class="card card--feature">
+          <span class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z"></path><path d="M12 15l-3-3a22 22 0 012-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z"></path><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path></svg>
+          </span>
+          <h3>Ships content</h3>
+          <p>Drafts, schedules, and publishes — posts, ads, emails, and pages — across every channel you've connected.</p>
+        </div>
+      </div>
+
+      <h4 class="mini-label" style="margin-top:var(--space-8)">Testimonial</h4>
+      <div class="grid-2">
+        <div class="card card--testimonial">
+          <blockquote>"Moz wrote, scheduled and reported on our entire Q1 campaign. I just <em>read</em> the recap."</blockquote>
+          <div class="who">
+            <span class="avatar">AR</span>
+            <div>
+              <div class="name">Ada Rojas</div>
+              <div class="role">Head of Growth, Lattice</div>
+            </div>
+          </div>
+        </div>
+        <div class="card card--testimonial">
+          <blockquote>"We replaced an agency, a copywriter, and three contractors with Moz. The output is <em>better</em>."</blockquote>
+          <div class="who">
+            <span class="avatar">JT</span>
+            <div>
+              <div class="name">Jamie Toh</div>
+              <div class="role">Founder, Foundry Tools</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h4 class="mini-label" style="margin-top:var(--space-8)">Pricing</h4>
+      <div class="grid-3">
+        <div class="card card--pricing">
+          <h3>Starter</h3>
+          <div class="price-row"><span class="price">$0</span><span class="price-sub">/ forever</span></div>
+          <p class="price-blurb">Try Moz on a single channel.</p>
+          <ul>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> 1 connected channel</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> 10 posts / month</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Basic analytics</li>
+          </ul>
+          <button class="btn btn--ghost">Start free</button>
+        </div>
+        <div class="card card--pricing is-featured">
+          <span class="badge badge--blue" style="align-self:flex-start">Most popular</span>
+          <h3>Growth</h3>
+          <div class="price-row"><span class="price">$89</span><span class="price-sub">/ month</span></div>
+          <p class="price-blurb">For teams shipping weekly.</p>
+          <ul>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Unlimited channels</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> 200 posts / month</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Auto-launch &amp; iterate</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> A/B testing</li>
+          </ul>
+          <button class="btn btn--blue">Start free trial</button>
+        </div>
+        <div class="card card--pricing">
+          <h3>Scale</h3>
+          <div class="price-row"><span class="price">Talk</span></div>
+          <p class="price-blurb">For multi-brand operations.</p>
+          <ul>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Unlimited everything</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Dedicated brand model</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> SOC 2 &amp; SSO</li>
+            <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Solutions engineer</li>
+          </ul>
+          <button class="btn btn--ghost">Book a call</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ICONS -->
+    <div class="sub-block">
+      <h3 class="sub-title">Iconography</h3>
+      <p class="sub-desc">A consistent outline set — 24×24 viewBox, 2-pixel stroke, round caps and joins. Inherits <code>currentColor</code>.</p>
+
+      <div class="icon-grid">
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg><span class="iname">search</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"></path></svg><span class="iname">send</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg><span class="iname">chat</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg><span class="iname">pulse</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg><span class="iname">analytics</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg><span class="iname">trend</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg><span class="iname">target</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z"></path><path d="M12 15l-3-3a22 22 0 012-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z"></path></svg><span class="iname">launch</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg><span class="iname">message</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><polyline points="3 8 12 13 21 8"></polyline></svg><span class="iname">email</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg><span class="iname">page</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg><span class="iname">settings</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span class="iname">time</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path><line x1="9" y1="10" x2="15" y2="10"></line></svg><span class="iname">thread</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg><span class="iname">check</span></div>
+        <div class="icon-cell"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg><span class="iname">arrow</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     04 — PATTERNS (applied)
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="patterns">
+  <div class="page">
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">04 / Patterns</span>
+        <h2 class="section-title">The system, applied.</h2>
+      </div>
+      <p class="section-subtitle">Sections you'll find on every Moz surface. Built only from the components above.</p>
+    </div>
+
+    <!-- Applied hero -->
+    <div class="applied-hero">
+      <div>
+        <span class="badge badge--blue" style="margin-bottom:var(--space-5)"><span class="dot dot--blue"></span> Now in private beta</span>
+        <h2>The marketing team that <em>never sleeps</em>.</h2>
+        <p>Moz studies your market, learns your customer, and ships content across every channel — then iterates on what's working. You wake up to a campaign that's already running.</p>
+        <ul>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Researches your market &amp; competitors</li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Writes posts, ads, emails — in your voice</li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Iterates daily on what converts</li>
+        </ul>
+        <div class="row">
+          <a class="btn btn--lg" href="#">Start free trial</a>
+          <a class="btn btn--ghost btn--lg" href="#">See it run →</a>
+        </div>
+      </div>
+      <div class="applied-hero-art">
+        <div class="campaign-card">
+          <div class="campaign-card-head">
+            <span class="eyebrow">Today's broadcast</span>
+            <span class="status-tag"><span class="dot dot--live"></span>Live</span>
+          </div>
+          <ul class="campaign-list">
+            <li>
+              <span class="campaign-status done"></span>
+              <span class="campaign-title">SSO launch — blog post drafted</span>
+              <span class="campaign-meta">1,240 views</span>
+            </li>
+            <li>
+              <span class="campaign-status done"></span>
+              <span class="campaign-title">LinkedIn launch tweet</span>
+              <span class="campaign-meta">86 shares</span>
+            </li>
+            <li>
+              <span class="campaign-status live"></span>
+              <span class="campaign-title">Enterprise email — 1,200 leads</span>
+              <span class="campaign-meta">sending</span>
+            </li>
+            <li>
+              <span class="campaign-status running"></span>
+              <span class="campaign-title">Ad A/B test — 4 variants</span>
+              <span class="campaign-meta">2 hrs left</span>
+            </li>
+            <li>
+              <span class="campaign-status queued"></span>
+              <span class="campaign-title">Follow-up sequence — 3 emails</span>
+              <span class="campaign-meta">queued</span>
+            </li>
+          </ul>
+          <div class="campaign-foot">
+            <span><strong>17</strong> shipped today</span>
+            <span><strong>+38%</strong> vs. last week</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logo strip -->
+    <div class="logo-strip">
+      <span class="label">Trusted by teams at</span>
+      <span class="fake-logo">▲ Northwind</span>
+      <span class="fake-logo">◇ Lattice</span>
+      <span class="fake-logo">✶ Pickaxe</span>
+      <span class="fake-logo">◐ Foundry</span>
+      <span class="fake-logo">□ Caldera</span>
+      <span class="fake-logo">● Hellocopy</span>
+    </div>
+
+    <!-- How it works -->
+    <div class="sub-block" style="margin-top:var(--space-11)">
+      <div class="sub-head">
+        <h3 class="sub-title">How Moz works</h3>
+        <p class="sub-desc">A continuous loop, not a one-shot generator.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">01 / Study</span>
+          <div class="step-visual">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          </div>
+          <h3>Reads your market</h3>
+          <p>Competitors, reviews, search trends, and the conversations your customers are having right now.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">02 / Understand</span>
+          <div class="step-visual">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+          </div>
+          <h3>Learns your customer</h3>
+          <p>Connects to support, sales, and product to learn what objections, language, and stories move people.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">03 / Ship</span>
+          <div class="step-visual">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z"></path><path d="M12 15l-3-3a22 22 0 012-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z"></path></svg>
+          </div>
+          <h3>Launches content</h3>
+          <p>Drafts, schedules, and publishes across every channel you've connected. No copy-paste.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">04 / Iterate</span>
+          <div class="step-visual">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+          </div>
+          <h3>Doubles down</h3>
+          <p>Reads what's working hourly, and shifts budget and tone toward what converts.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta" style="margin-top:var(--space-11)">
+      <h2>Stop writing. Start <em>growing</em>.</h2>
+      <p>Plug Moz into your stack and watch your marketing run itself. The first 14 days are free — no credit card.</p>
+      <div class="cta-actions">
+        <a class="btn btn--lg" href="#">Start free trial</a>
+        <a class="btn btn--ghost btn--lg" href="#">Book a demo</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="page">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo-lockup">
+          <span class="logo-mark logo-mark--md"><svg viewBox="0 0 40 32"><use href="#moz-mark"></use></svg></span>
+          <span class="wordmark">Moz</span>
+        </div>
+        <p>The AI agent that markets your business — studying the market, understanding your customer, and shipping content while you sleep.</p>
+        <div class="footer-social">
+          <a href="#" aria-label="Twitter">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+          </a>
+          <a href="#" aria-label="LinkedIn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h14zM8 17v-7H6v7h2zM7 8.5a1.2 1.2 0 100-2.4 1.2 1.2 0 000 2.4zM18 17v-4.2c0-1.7-.9-2.8-2.5-2.8-1.1 0-1.7.6-2 1.1V10h-2v7h2v-3.7c0-.9.4-1.5 1.2-1.5.8 0 1.3.5 1.3 1.5V17h2z"></path></svg>
+          </a>
+          <a href="#" aria-label="GitHub">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0a12 12 0 00-3.79 23.4c.6.1.82-.26.82-.58v-2.05c-3.34.72-4.04-1.6-4.04-1.6-.55-1.39-1.34-1.76-1.34-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.66-.3-5.46-1.33-5.46-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.17 0 0 1-.32 3.3 1.23a11.5 11.5 0 016 0c2.3-1.55 3.3-1.23 3.3-1.23.66 1.65.25 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.62-5.47 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0012 0z"></path></svg>
+          </a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#">How it works</a></li>
+          <li><a href="#">Integrations</a></li>
+          <li><a href="#">Pricing</a></li>
+          <li><a href="#">Changelog</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Customers</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Press</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Help center</a></li>
+          <li><a href="#">Brand kit</a></li>
+          <li><a href="#brand">Design system</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Terms</a></li>
+          <li><a href="#">Security</a></li>
+          <li><a href="#">DPA</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Moz, Inc. All rights reserved.</span>
+      <span>Made with care in San Francisco.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ─── Combobox: open/close panel ───────────────────────────
+  (function () {
+    const boxes = document.querySelectorAll('[data-combobox]');
+    boxes.forEach(box => {
+      const trigger = box.querySelector('.combobox-trigger');
+      if (!trigger) return;
+      trigger.addEventListener('click', e => {
+        e.stopPropagation();
+        if (box.dataset.stayOpen === 'true') return; // demo lock-open
+        const wasOpen = box.classList.contains('is-open');
+        document.querySelectorAll('[data-combobox]:not([data-stay-open]).is-open')
+          .forEach(b => b.classList.remove('is-open'));
+        if (!wasOpen) box.classList.add('is-open');
+      });
+      box.querySelectorAll('.combobox-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+          if (box.dataset.stayOpen === 'true') return;
+          box.classList.remove('is-open');
+        });
+      });
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('[data-combobox]')) {
+        document.querySelectorAll('[data-combobox]:not([data-stay-open]).is-open')
+          .forEach(b => b.classList.remove('is-open'));
+      }
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('[data-combobox]:not([data-stay-open]).is-open')
+          .forEach(b => b.classList.remove('is-open'));
+      }
+      // ⌘K / Ctrl-K to focus the Search docs input
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        const search = document.querySelector('input[type="search"]');
+        if (search) {
+          e.preventDefault();
+          search.focus();
+          search.select();
+        }
+      }
+    });
+  })();
+
+  // ─── Phone number: digits / spaces / dashes / parens only ───
+  (function () {
+    document.querySelectorAll('input[type="tel"]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const cleaned = inp.value.replace(/[^\d\s\-\(\)\+]/g, '');
+        if (cleaned !== inp.value) inp.value = cleaned;
+      });
+    });
+  })();
+
+  // ─── Currency input: digits, comma, dot only ────────────────
+  (function () {
+    document.querySelectorAll('input[inputmode="decimal"]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const cleaned = inp.value.replace(/[^\d\.,]/g, '');
+        if (cleaned !== inp.value) inp.value = cleaned;
+      });
+    });
+  })();
+
+  // ─── OTP: digits only, auto-advance on input, backspace navigates back
+  (function () {
+    document.querySelectorAll('.otp').forEach(group => {
+      const cells = group.querySelectorAll('.otp-cell');
+      cells.forEach((cell, i) => {
+        cell.addEventListener('input', e => {
+          cell.value = cell.value.replace(/\D/g, '').slice(0, 1);
+          cell.classList.toggle('is-focused', false);
+          if (cell.value && cells[i + 1]) {
+            cells[i + 1].focus();
+            cells[i + 1].select();
+          }
+        });
+        cell.addEventListener('keydown', e => {
+          if (e.key === 'Backspace' && !cell.value && cells[i - 1]) {
+            cells[i - 1].focus();
+            cells[i - 1].select();
+          }
+          if (e.key === 'ArrowLeft' && cells[i - 1])  cells[i - 1].focus();
+          if (e.key === 'ArrowRight' && cells[i + 1]) cells[i + 1].focus();
+        });
+        cell.addEventListener('paste', e => {
+          e.preventDefault();
+          const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').split('');
+          cells.forEach((c, idx) => {
+            if (digits[idx]) c.value = digits[idx];
+          });
+          const next = Math.min(digits.length, cells.length - 1);
+          cells[next].focus();
+        });
+        cell.addEventListener('focus', () => {
+          cells.forEach(c => c.classList.remove('is-focused'));
+        });
+      });
+    });
+  })();
+
+  // ─── Choice cards: toggle selection ─────────────────────────
+  (function () {
+    document.querySelectorAll('.choice-stack').forEach(stack => {
+      const choices = stack.querySelectorAll('.choice');
+      const isMulti = stack.querySelector('.choice--multi');
+      choices.forEach(c => {
+        c.addEventListener('click', e => {
+          if (e.target.closest('.btn')) return;
+          if (isMulti) {
+            c.classList.toggle('is-selected');
+          } else {
+            choices.forEach(o => o.classList.remove('is-selected'));
+            c.classList.add('is-selected');
+          }
+        });
+      });
+    });
+  })();
+
+  // ─── Email validation (Billing email in anatomy) ────────────
+  (function () {
+    document.querySelectorAll('input[type="email"]').forEach(inp => {
+      inp.addEventListener('blur', () => {
+        const v = inp.value.trim();
+        const ok = !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+        inp.classList.toggle('is-error', !ok);
+      });
+    });
+  })();
+
+  // ─── Character counter live update ──────────────────────────
+  (function () {
+    document.querySelectorAll('[data-counter]').forEach(label => {
+      const input = document.getElementById(label.dataset.counter);
+      if (!input) return;
+      const max = parseInt(label.dataset.max || '80', 10);
+      const out = label.querySelector('.counter-out');
+      const update = () => { if (out) out.textContent = input.value.length + ' / ' + max; };
+      input.addEventListener('input', update);
+      update();
+    });
+  })();
+
+  // ─── Search docs: autocomplete dropdown ─────────────────────
+  (function () {
+    const search = document.querySelector('input[type="search"]');
+    if (!search) return;
+    const dropdown = document.createElement('div');
+    dropdown.className = 'autocomplete-panel';
+    const ITEMS = [
+      { title: 'Connecting LinkedIn', cat: 'Setup' },
+      { title: 'Connecting your blog', cat: 'Setup' },
+      { title: 'Connecting Gmail / Outlook', cat: 'Setup' },
+      { title: 'Brand voice training', cat: 'Brand' },
+      { title: 'Tone of voice examples', cat: 'Brand' },
+      { title: 'Setting tone & guardrails', cat: 'Brand' },
+      { title: 'Campaign reporting', cat: 'Analytics' },
+      { title: 'Channel A/B testing', cat: 'Analytics' },
+      { title: 'Reading the funnel report', cat: 'Analytics' },
+      { title: 'Rotating your API key', cat: 'Security' },
+      { title: 'Setting up SSO', cat: 'Security' },
+      { title: 'Two-factor authentication', cat: 'Security' },
+    ];
+    const wrap = search.closest('.input--with-icon');
+    if (!wrap) return;
+    wrap.style.position = 'relative';
+    wrap.appendChild(dropdown);
+
+    function render(q) {
+      const ql = q.toLowerCase().trim();
+      const matches = ql ? ITEMS.filter(i => i.title.toLowerCase().includes(ql)) : ITEMS.slice(0, 6);
+      if (matches.length === 0) {
+        dropdown.innerHTML = '<div class="autocomplete-empty">No results for &ldquo;' + q + '&rdquo;</div>';
+      } else {
+        dropdown.innerHTML = matches.map((m, i) => `
+          <button type="button" class="autocomplete-row${i === 0 ? ' is-focused' : ''}">
+            <span class="autocomplete-title">${m.title}</span>
+            <span class="autocomplete-cat">${m.cat}</span>
+          </button>
+        `).join('');
+      }
+    }
+    search.addEventListener('focus', () => {
+      render(search.value);
+      dropdown.classList.add('is-open');
+    });
+    search.addEventListener('input', () => {
+      render(search.value);
+      dropdown.classList.add('is-open');
+    });
+    search.addEventListener('blur', () => {
+      setTimeout(() => dropdown.classList.remove('is-open'), 120);
+    });
+  })();
+</script>
+
+
+</body></html>

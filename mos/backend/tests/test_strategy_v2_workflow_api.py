@@ -2099,6 +2099,105 @@ def test_workflow_research_archive_download_includes_workflow_and_canon_docs(
     assert archive.read("04-deep-research.md").decode("utf-8") == "# Canon document\n\nBody\n"
 
 
+def test_workflow_research_archive_download_foundational_scope_filters_foundation_docs(
+    api_client,
+    db_session,
+    auth_context,
+):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="FoundationalArchive",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    workflow_run = WorkflowRun(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-foundational-archive-workflow",
+        temporal_run_id="strategy-v2-foundational-archive-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    docs = [
+        ("v2-01", "Stage 0", "# Stage 0\n\nBody"),
+        ("v2-02.foundation.01", "Competitor Research", "# Foundation 01\n\nBody"),
+        ("v2-02.foundation.03", "Deep Research Meta-Prompt", "# Foundation 03\n\nBody"),
+    ]
+    for step_key, title, content in docs:
+        artifact = Artifact(
+            org_id=org_uuid,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            campaign_id=None,
+            type=ArtifactTypeEnum.strategy_v2_step_payload,
+            data={"payload": {"content": content}},
+        )
+        db_session.add(artifact)
+        db_session.commit()
+        db_session.refresh(artifact)
+        db_session.add(
+            ResearchArtifact(
+                org_id=org_uuid,
+                workflow_run_id=workflow_run.id,
+                step_key=step_key,
+                title=title,
+                doc_id=str(artifact.id),
+                doc_url=f"artifact://{artifact.id}",
+                prompt_sha256=None,
+                summary=f"{title} complete",
+            )
+        )
+    db_session.commit()
+
+    response = api_client.get(f"/workflows/{workflow_run.id}/research/download?scope=foundational")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/zip")
+    assert "foundational-research-documents" in response.headers["content-disposition"]
+
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    assert set(archive.namelist()) == {
+        "v2-02.foundation.01-competitor-research.md",
+        "v2-02.foundation.03-deep-research-meta-prompt.md",
+    }
+    assert archive.read("v2-02.foundation.01-competitor-research.md").decode("utf-8") == "# Foundation 01\n\nBody"
+
+
+def test_workflow_research_archive_download_rejects_unknown_scope(
+    api_client,
+    db_session,
+    auth_context,
+):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="UnknownArchiveScope",
+        strategy_v2_enabled=True,
+    )
+    workflow_run = WorkflowRun(
+        org_id=UUID(auth_context.org_id),
+        client_id=UUID(client_id),
+        product_id=UUID(product_id),
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-unknown-archive-scope-workflow",
+        temporal_run_id="strategy-v2-unknown-archive-scope-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    response = api_client.get(f"/workflows/{workflow_run.id}/research/download?scope=stage0")
+    assert response.status_code == 400
+    assert response.json()["detail"] == "scope must be one of: all, foundational"
+
+
 def test_strategy_v2_state_from_research_artifacts(api_client, db_session, auth_context):
     client_id, product_id = _create_client_and_product(
         api_client=api_client,

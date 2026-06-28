@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-21T00:00:00-05:00",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "docs/plans/2026-05-21-modal-readability-plan.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "User supplied screenshot, target issue, and requested design-system review. Local code inspection exposed the specific root cause and acceptance criteria. No extra clarification is needed before a reviewable plan.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/goal.md",
+      "summary": "Measurable target for modal readability."
+    },
+    "problem_log": {
+      "path": "planning/problem-log.md",
+      "summary": "Observable readability failure and inconsistent call-site spacing."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/root-cause.md",
+      "summary": "Modal header rhythm belongs in primitives, not call sites."
+    },
+    "current_machine": {
+      "path": "planning/current-machine.md",
+      "summary": "Current modal primitives leave spacing to callers."
+    },
+    "designed_machine": {
+      "path": "planning/designed-machine.md",
+      "summary": "Shared modal defaults provide readable anatomy."
+    },
+    "worst_day_test": {
+      "path": "planning/worst-day.md",
+      "summary": "New modal with only title and description must remain readable."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/metrics.md",
+      "summary": "Primitive defaults, reduced manual margins, visual proof, and passing checks."
+    },
+    "owner_date_review": {
+      "path": "planning/owner-review.md",
+      "summary": "Codex owns implementation; review after verification."
+    },
+    "stop_condition": {
+      "path": "planning/stop-condition.md",
+      "summary": "Wait for Ship the plan after review."
+    }
+  },
+  "owner": "Codex implementation agent",
+  "review_date": "2026-05-21",
+  "stop_condition": "Plan is final for review after plangatecheck passes; implementation starts only after the user says Ship the plan."
+}

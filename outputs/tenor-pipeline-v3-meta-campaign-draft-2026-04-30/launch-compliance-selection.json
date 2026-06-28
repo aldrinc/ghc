@@ -1,0 +1,207 @@
+{
+  "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+  "reviewedAt": "2026-04-30T04:25:00.478Z",
+  "reviewBasis": "Manual contact-sheet review for no product-object and no mechanism-reveal launch constraint.",
+  "generationKey": "tenor-pipeline-v3-meta-20260430",
+  "includedCount": 15,
+  "excludedCount": 15,
+  "included": [
+    {
+      "adId": "AV-A1",
+      "assetId": "11a360ce-56e0-4fdc-b174-49d806b86aac",
+      "publicId": "c6e0646a-0ba3-42d1-aa90-0f21a669abba",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a1-11a360ce-56e0-4fdc-b174-49d806b86aac.jpg"
+    },
+    {
+      "adId": "AV-A2",
+      "assetId": "feec87db-763e-4713-ab2c-e0d50c412330",
+      "publicId": "ab38e105-1e75-4e97-98b1-b7c330b9cb73",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a2-feec87db-763e-4713-ab2c-e0d50c412330.jpg"
+    },
+    {
+      "adId": "AV-A4",
+      "assetId": "0b299b87-bbb2-42ce-8d89-c59b786a7db8",
+      "publicId": "09174327-7223-4188-a42a-8ee588abdb15",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a4-0b299b87-bbb2-42ce-8d89-c59b786a7db8.jpg"
+    },
+    {
+      "adId": "AV-B4",
+      "assetId": "0c8410d4-46d0-4e99-b297-e912a7de9c10",
+      "publicId": "7a71a5db-675b-4487-93e5-762cff8a4776",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b4-0c8410d4-46d0-4e99-b297-e912a7de9c10.jpg"
+    },
+    {
+      "adId": "AV-C1",
+      "assetId": "ee72ed2f-d294-4ce8-8a51-8c4f51bb0805",
+      "publicId": "55ad63fa-abdd-4ff1-b8f6-5ca26baf5c25",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c1-ee72ed2f-d294-4ce8-8a51-8c4f51bb0805.jpg"
+    },
+    {
+      "adId": "AV-C2",
+      "assetId": "9f7e7454-f7ce-48f7-af36-1ecd74e917c4",
+      "publicId": "f8ef2b75-3da4-4e48-b6c4-214ee95ff7be",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c2-9f7e7454-f7ce-48f7-af36-1ecd74e917c4.jpg"
+    },
+    {
+      "adId": "L2",
+      "assetId": "3c90769c-ac9a-4a38-8ba2-66ea0d694e11",
+      "publicId": "35774dca-0e6e-4ccd-b982-7c00e7640a59",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l2-3c90769c-ac9a-4a38-8ba2-66ea0d694e11.jpg"
+    },
+    {
+      "adId": "L3",
+      "assetId": "f7b974f8-0d85-4572-95ef-940896b0777a",
+      "publicId": "c734ba2d-74d4-40a7-900e-5c3f6a5bb95a",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l3-f7b974f8-0d85-4572-95ef-940896b0777a.jpg"
+    },
+    {
+      "adId": "L7",
+      "assetId": "77376256-392b-4c93-a40e-1627bfdef0ee",
+      "publicId": "7aef5cf1-9fb4-4cb6-b53f-af28a16cf77a",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l7-77376256-392b-4c93-a40e-1627bfdef0ee.jpg"
+    },
+    {
+      "adId": "L8",
+      "assetId": "ff4f3189-6a46-4eb0-a18e-27f761aef4c2",
+      "publicId": "6780b338-ad9c-4731-bb58-10fbf07adacc",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l8-ff4f3189-6a46-4eb0-a18e-27f761aef4c2.jpg"
+    },
+    {
+      "adId": "L9",
+      "assetId": "14997762-da57-49ee-8027-13f1078fe212",
+      "publicId": "06374785-ad6f-495d-b930-101c4ed3c5fc",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l9-14997762-da57-49ee-8027-13f1078fe212.jpg"
+    },
+    {
+      "adId": "L10",
+      "assetId": "9c0d289b-df7c-4671-bf75-45f56bd8c82b",
+      "publicId": "2b9163dc-a0d8-4917-adcd-918eea4bcbfe",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l10-9c0d289b-df7c-4671-bf75-45f56bd8c82b.jpg"
+    },
+    {
+      "adId": "L11",
+      "assetId": "c1b12aba-2a76-4992-aad2-77959a369b72",
+      "publicId": "9aba7518-a53e-49c0-96e7-bde9347575ae",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l11-c1b12aba-2a76-4992-aad2-77959a369b72.jpg"
+    },
+    {
+      "adId": "PDP2",
+      "assetId": "0565daa9-1712-4f0e-8f95-84f448d1a8fc",
+      "publicId": "4c06c77b-8c59-41ba-b7e5-4850c84e9787",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp2-0565daa9-1712-4f0e-8f95-84f448d1a8fc.jpg"
+    },
+    {
+      "adId": "PDP6",
+      "assetId": "aa7e9828-df76-4866-a87d-1a076d0494d9",
+      "publicId": "b956c62f-07dc-49fb-85b1-2d2d7bb22969",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp6-aa7e9828-df76-4866-a87d-1a076d0494d9.jpg"
+    }
+  ],
+  "excluded": [
+    {
+      "adId": "AV-A3",
+      "assetId": "6caaf28e-644b-44f9-b043-6a77fc1681bf",
+      "publicId": "4c5f28c3-80aa-4a06-92ef-cb8d6a283116",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a3-6caaf28e-644b-44f9-b043-6a77fc1681bf.jpg",
+      "reason": "On-image mechanism/pathway concept and irrelevant food-object visual."
+    },
+    {
+      "adId": "AV-B1",
+      "assetId": "68e67a56-31e1-4b34-a185-24867fdbf265",
+      "publicId": "e6834997-c91a-4c3d-b921-08bfd78fa609",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b1-68e67a56-31e1-4b34-a185-24867fdbf265.jpg",
+      "reason": "On-image pathway/T-booster mechanism language."
+    },
+    {
+      "adId": "AV-B2",
+      "assetId": "efeff0d8-4b2e-4eb2-83cc-1c0935348639",
+      "publicId": "0da61863-d4bb-4d9a-933e-b745fe893b11",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b2-efeff0d8-4b2e-4eb2-83cc-1c0935348639.jpg",
+      "reason": "On-image production/mechanism language."
+    },
+    {
+      "adId": "AV-B3",
+      "assetId": "3e529cc4-5975-4ddc-b905-5026f107e9d6",
+      "publicId": "1d562868-f3fa-48a7-96d7-a63ed0182703",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b3-3e529cc4-5975-4ddc-b905-5026f107e9d6.jpg",
+      "reason": "On-image testosterone-support mechanism framing."
+    },
+    {
+      "adId": "AV-C3",
+      "assetId": "b23b6840-d51a-4f90-9baa-29158a8853d3",
+      "publicId": "cd3b314e-e6ea-4cc3-93a8-4cfc8b7523ae",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c3-b23b6840-d51a-4f90-9baa-29158a8853d3.jpg",
+      "reason": "Shows bottle/object and incomplete-booster mechanism framing."
+    },
+    {
+      "adId": "AV-C4",
+      "assetId": "f67f24bb-b915-4c47-a9af-ee3935220aa5",
+      "publicId": "fb7cc794-04cd-439a-9401-6736d5e22d13",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c4-f67f24bb-b915-4c47-a9af-ee3935220aa5.jpg",
+      "reason": "On-image three-systems/protocol mechanism language."
+    },
+    {
+      "adId": "L1",
+      "assetId": "4e8c716c-a303-4907-9d9e-558effa0b61d",
+      "publicId": "cc9530cd-af3b-4be4-a9ce-4f472056c12a",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l1-4e8c716c-a303-4907-9d9e-558effa0b61d.jpg",
+      "reason": "On-image boosting/production mechanism framing and product naming."
+    },
+    {
+      "adId": "L4",
+      "assetId": "cdc714a0-90d2-4324-82b6-975125f3659d",
+      "publicId": "964b22b7-4a65-449c-a087-ede421689361",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l4-cdc714a0-90d2-4324-82b6-975125f3659d.jpg",
+      "reason": "On-image capsules/protocol language."
+    },
+    {
+      "adId": "L5",
+      "assetId": "896cfb58-2d82-4ae3-88b0-0ea94eacb6ca",
+      "publicId": "435b6230-8af0-4c62-98a0-87f80bf10ffb",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l5-896cfb58-2d82-4ae3-88b0-0ea94eacb6ca.jpg",
+      "reason": "On-image protocol/performance mechanism framing."
+    },
+    {
+      "adId": "L6",
+      "assetId": "1cd420bb-4419-44eb-8ad7-dec45f49aeb5",
+      "publicId": "b3720f27-a776-4098-b602-35ba622ad26b",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l6-1cd420bb-4419-44eb-8ad7-dec45f49aeb5.jpg",
+      "reason": "On-image biological-pathway mechanism language."
+    },
+    {
+      "adId": "L12",
+      "assetId": "9fed8f51-32e5-44d8-9cf0-c70b559f57c3",
+      "publicId": "709d3e33-d608-4ec4-9ac9-6f06d046b008",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l12-9fed8f51-32e5-44d8-9cf0-c70b559f57c3.jpg",
+      "reason": "Shows product/capsule-style object and protocol/product framing."
+    },
+    {
+      "adId": "PDP1",
+      "assetId": "64f570c3-93b4-4283-b059-3640137f18cd",
+      "publicId": "18c16c82-56d6-4b2c-af52-0a1b6b7782cd",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp1-64f570c3-93b4-4283-b059-3640137f18cd.jpg",
+      "reason": "On-image protocol/product framing."
+    },
+    {
+      "adId": "PDP3",
+      "assetId": "e06c0f25-bdfd-4be2-875a-510e28908c75",
+      "publicId": "f15a8475-d5ad-46f4-938a-e1a38c8c137c",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp3-e06c0f25-bdfd-4be2-875a-510e28908c75.jpg",
+      "reason": "On-image supplement/proprietary-blend mechanism/product framing."
+    },
+    {
+      "adId": "PDP4",
+      "assetId": "2bccdb26-a6ae-495b-b76a-9954c6d71d48",
+      "publicId": "f5c248dc-af63-4759-8f1b-6d0a541ff30e",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp4-2bccdb26-a6ae-495b-b76a-9954c6d71d48.jpg",
+      "reason": "Shows product-style bottles and dose/product framing."
+    },
+    {
+      "adId": "PDP5",
+      "assetId": "4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9",
+      "publicId": "071df0cd-263b-4f8d-baaa-f65771a0fab3",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp5-4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9.jpg",
+      "reason": "On-image biological-pathways mechanism language."
+    }
+  ]
+}

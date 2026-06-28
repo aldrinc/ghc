@@ -1,0 +1,42 @@
+{
+  "asset_briefs": [
+    {
+      "id": "brief_editorial_wound_scene",
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+      "experimentId": "walk-away-trt-congruence-review",
+      "variantId": "presales",
+      "funnelId": null,
+      "deliveryMode": "external_urls",
+      "destinationType": "pre-sales",
+      "destinationLabel": "Walk Away From TRT presales",
+      "variantName": "Walk Away From TRT",
+      "creativeConcept": "Destination-congruent swipe-image ad creative for the Walk Away From TRT advertorial.",
+      "requirements": [
+        {
+          "channel": "meta",
+          "format": "image",
+          "funnelStage": "top-of-funnel",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Walk Away From TRT presales",
+          "angle": "Destination-congruent creative for the Walk Away From TRT advertorial.",
+          "hook": "Problem-Aware"
+        },
+        {
+          "channel": "meta",
+          "format": "image",
+          "funnelStage": "top-of-funnel",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Walk Away From TRT presales",
+          "angle": "Destination-congruent creative for the Walk Away From TRT advertorial.",
+          "hook": "Solution-Aware"
+        }
+      ],
+      "constraints": [],
+      "toneGuidelines": [],
+      "visualGuidelines": []
+    }
+  ],
+  "source": "tenor-walk-away-trt-review-setup",
+  "createdFor": "first review sample generation"
+}

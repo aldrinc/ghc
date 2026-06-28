@@ -1,0 +1,28 @@
+{
+  "rendered_at": "2026-05-21T18:30:17.802237+00:00",
+  "prompt_source_path": "/Users/aldrinclement/Documents/programming/marketi/V2 Fixes/Foundational Docs/clean_prompts/01_competitor_research_v2.md",
+  "prompt_template_sha256": "d8819beae6d365a448cb7207f5ce6384ac72246e9072c12da0ab7c8d8628b428",
+  "guarded_prompt_sha256": "d8f4667d34fa8544d17d1e4d1a05e4d1be65c302531e9a63dd73a20ac99a391b",
+  "stage0_path": "/Users/aldrinclement/Documents/programming/marketi/.local/tenor-strategy-run-docs-prod-20260426/docs/00-stage0.json",
+  "activity_log_path": "/Users/aldrinclement/Documents/programming/marketi/.local/tenor-strategy-run-docs-prod-20260426/metadata/activity-logs.json",
+  "business_context": "Tenor Daily Protocol: Helps support male testosterone",
+  "category_niche": "supplement",
+  "model_under_test": "deepseek-v4-pro",
+  "reference_model_from_activity_log": "gpt-5.2-2025-12-11",
+  "reference_activity_elapsed_seconds": 520.16,
+  "reference_gpt_output_path": "/Users/aldrinclement/Documents/programming/marketi/.local/tenor-strategy-run-docs-prod-20260426/docs/03-v2-02.foundation.01-raw.md",
+  "no_output_token_cap": true,
+  "deerflow_config_path": "/Users/aldrinclement/Documents/programming/marketi/.local/deer-flow/config.yaml",
+  "tools_required": [
+    "web_search",
+    "web_fetch",
+    "calculator"
+  ],
+  "known_delta": "Production export does not include the raw onboarding_payload DB row. onboarding_payload was reconstructed only from Stage 0, activity logs, workflow input, and Step 03 echo text.",
+  "variables": {
+    "BUSINESS_CONTEXT": "Tenor Daily Protocol: Helps support male testosterone",
+    "BUSINESS_CONTEXT_JSON": "{\"stage0\": {\"price\": \"$59\", \"stage\": 0, \"description\": \"Helps support male testosterone\", \"product_name\": \"Tenor Daily Protocol\", \"schema_version\": \"2.0.0\", \"competitor_urls\": [\"https://mengotomars.com/products/30-day-supply-starter-kit\"], \"product_customizable\": true}, \"onboarding_payload\": {\"product_name\": \"Tenor Daily Protocol\", \"description\": \"Helps support male testosterone\", \"price\": \"$59\", \"competitor_urls\": [\"https://mengotomars.com/products/30-day-supply-starter-kit\"], \"product_customizable\": true, \"product_category\": \"supplement\", \"business_model\": \"ecommerce\", \"target_regions\": [\"United States\", \"Canada\"], \"funnel_position\": \"Cold\", \"target_platforms\": [\"Meta\"], \"existing_proof_assets\": [\"N/A\"], \"brand_voice\": \"conversational\", \"brand_story\": \"natural male testosterone enhancement for older men facing testosterone decline\"}}",
+    "CATEGORY_NICHE": "supplement",
+    "ADS_CONTEXT": ""
+  }
+}

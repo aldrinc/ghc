@@ -1,0 +1,44 @@
+{
+  "url": "http://localhost:5275/workspaces/execution/social-agents",
+  "width": 1200,
+  "height": 1174,
+  "scrollWidth": 1200,
+  "hasHorizontalOverflow": false,
+  "headings": [
+    "Marketing Agent",
+    "Set mission",
+    "Success signal",
+    "TikTok carousel"
+  ],
+  "visibleButtons": [
+    "HHiggsfieldWorkspace",
+    "Overview",
+    "Strategy",
+    "Brand",
+    "Sites",
+    "Commerce",
+    "Products",
+    "Documents",
+    "Ads & Brands",
+    "Funnels",
+    "Campaigns",
+    "Analytics",
+    "Postiz",
+    "Social Agents",
+    "Assistant Chat",
+    "Creative Library",
+    "Meta Ads",
+    "Aldrin Clementaldrin.clement@gmail.com",
+    "Toggle Sidebar",
+    "Approvals0",
+    "Channels",
+    "SetupNeeds mission",
+    "ReviewTest needed",
+    "Save signal",
+    "Continue"
+  ],
+  "primaryButtons": [
+    "Continue"
+  ],
+  "forbiddenCopyPresent": []
+}

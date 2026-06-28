@@ -1,0 +1,282 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-20-mos-design-system-migration-plan",
+  "created_at": "2026-05-20T20:29:24.820213+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-20-mos-design-system-migration-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Capture source design-system reference, borrowed-name inventory, and existing user work before edits.",
+      "source_line": 129,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-design-system-migration/source/source_manifest.json",
+        "proof_pack/mos-design-system-migration/source/raw/Moz Design System.html",
+        "proof_pack/mos-design-system-migration/brand-sensitive-files.md",
+        "proof_pack/mos-design-system-migration/borrowed-name-inventory.md"
+      ],
+      "acceptance": [
+        "Source manifest verifies.",
+        "Git dirty state is recorded before edits.",
+        "Brand-sensitive paths and blocks are listed before implementation edits.",
+        "Borrowed names are inventoried before implementation edits."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify proof_pack/mos-design-system-migration/source/source_manifest.json",
+        "git status --short"
+      ],
+      "proof_required": [
+        "source_manifest",
+        "git_status_log",
+        "brand_sensitive_file_list",
+        "borrowed_name_inventory"
+      ],
+      "artifacts": [
+        "proof_pack/mos-design-system-migration/source/source_manifest.json",
+        "proof_pack/mos-design-system-migration/source/raw/Moz Design System.html",
+        "proof_pack/mos-design-system-migration/brand-sensitive-files.md",
+        "proof_pack/mos-design-system-migration/borrowed-name-inventory.md",
+        "proof_pack/mos-design-system-migration/git-status-after.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "Install the new token layer and Tailwind mapping under MOS-owned or neutral names.",
+      "source_line": 153,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/globals.css",
+        "mos/frontend/tailwind.config.ts",
+        "proof_pack/mos-design-system-migration/token-map.md",
+        "proof_pack/mos-design-system-migration/token-naming-contract.md",
+        "proof_pack/mos-design-system-migration/alias-exceptions.md"
+      ],
+      "acceptance": [
+        "New typography, color, spacing, radius, shadow, and motion tokens exist.",
+        "Tailwind exposes the token scale through MOS-owned or neutral names.",
+        "Old `manus` tokens and Tailwind namespace are removed from production source.",
+        "Source-demo `moz` token names are not introduced as permanent app tokens unless explicitly approved.",
+        "Call sites are refactored instead of protected through broad compatibility aliases.",
+        "Any temporary alias has a written reason, caller list, and deletion condition.",
+        "Dark mode is preserved unless a real new dark-mode spec is supplied."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run --silent check:design-system",
+        "cd mos/frontend && npm run --silent build"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "build_log",
+        "token_map",
+        "token_naming_contract",
+        "alias_exception_review"
+      ],
+      "artifacts": [
+        "proof_pack/mos-design-system-migration/token-map.md",
+        "proof_pack/mos-design-system-migration/token-naming-contract.md",
+        "proof_pack/mos-design-system-migration/alias-exceptions.md",
+        "proof_pack/mos-design-system-migration/logs/build.log",
+        "proof_pack/mos-design-system-migration/logs/design-system-scan.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "objective": "Update base typography, layout primitives, focus, selection, and motion behavior.",
+      "source_line": 181,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/styles/globals.css",
+        "mos/frontend/src/styles/design-system.css",
+        "mos/frontend/tailwind.config.ts"
+      ],
+      "acceptance": [
+        "Headings and body type match the source design-system hierarchy.",
+        "Page and section spacing use tokenized layout primitives.",
+        "Focus-visible and reduced-motion behavior remain accessible.",
+        "Shared CSS class names use MOS-owned or neutral vocabulary."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run --silent check:semantic-ui",
+        "cd mos/frontend && npm run --silent build"
+      ],
+      "proof_required": [
+        "semantic_ui_log",
+        "build_log",
+        "desktop_mobile_screenshots"
+      ],
+      "artifacts": [
+        "proof_pack/mos-design-system-migration/logs/semantic-ui.log",
+        "proof_pack/mos-design-system-migration/logs/build.log",
+        "proof_pack/mos-design-system-migration/implementation-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "Migrate core UI primitives to the new system.",
+      "source_line": 207,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/button.tsx",
+        "mos/frontend/src/components/ui/input.tsx",
+        "mos/frontend/src/components/ui/textarea.tsx",
+        "mos/frontend/src/components/ui/select.tsx",
+        "mos/frontend/src/components/ui/badge.tsx",
+        "mos/frontend/src/components/ui/table.tsx",
+        "mos/frontend/src/components/ui/tabs.tsx",
+        "mos/frontend/src/components/ui/menu.tsx",
+        "mos/frontend/src/components/ui/popover.tsx",
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/tooltip.tsx",
+        "mos/frontend/src/components/ui/toast.tsx",
+        "mos/frontend/src/components/ui/progress.tsx",
+        "mos/frontend/src/components/ui/skeleton.tsx",
+        "mos/frontend/src/styles/design-system.css"
+      ],
+      "acceptance": [
+        "Primitives expose variants instead of page-local one-off styles.",
+        "Existing props remain backward-compatible unless all call sites are updated.",
+        "Borrowed variant names/classes are renamed to MOS-owned or semantic names.",
+        "No new dependency is added without a clear net complexity win."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run --silent test:unit",
+        "cd mos/frontend && npm run --silent build"
+      ],
+      "proof_required": [
+        "unit_test_log",
+        "build_log",
+        "primitive_diff_summary"
+      ],
+      "artifacts": [
+        "proof_pack/mos-design-system-migration/logs/unit-tests.log",
+        "proof_pack/mos-design-system-migration/logs/build.log",
+        "proof_pack/mos-design-system-migration/implementation-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "objective": "Migrate high-frequency product surfaces to shared primitives and semantic tokens.",
+      "source_line": 257,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/app",
+        "mos/frontend/src/pages",
+        "mos/frontend/src/components",
+        "mos/frontend/src/styles/markdown.css"
+      ],
+      "acceptance": [
+        "Screens stop repeating one-off card, status, empty, loading, and action-bar styling.",
+        "Screens no longer reference old borrowed namespaces/classes.",
+        "Representative product routes render coherently on desktop and mobile.",
+        "Marketing pages, standalone funnels, and customer brand output are not redesigned."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run --silent test:unit",
+        "cd mos/frontend && npm run --silent check:semantic-ui",
+        "cd mos/frontend && npm run --silent build"
+      ],
+      "proof_required": [
+        "unit_test_log",
+        "semantic_ui_log",
+        "build_log",
+        "route_screenshots"
+      ],
+      "artifacts": [
+        "proof_pack/mos-design-system-migration/logs/unit-tests.log",
+        "proof_pack/mos-design-system-migration/logs/semantic-ui.log",
+        "proof_pack/mos-design-system-migration/logs/build.log",
+        "proof_pack/mos-design-system-migration/implementation-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "objective": "Protect brand identity files and remove borrowed design-system names.",
+      "source_line": 292,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-design-system-migration/brand-freeze-review.md",
+        "proof_pack/mos-design-system-migration/brand-sensitive-diff.log",
+        "proof_pack/mos-design-system-migration/borrowed-name-scan.log",
+        "proof_pack/mos-design-system-migration/alias-exceptions.md"
+      ],
+      "acceptance": [
+        "Logo marks, wordmarks, naming, brand-kit assets, and customer/funnel brand output remain unchanged.",
+        "Any brand-adjacent layout changes are isolated and documented.",
+        "Protected files show no unapproved identity diff.",
+        "Production source has no `manus` references.",
+        "Production source has no copied `moz` source-token names unless explicitly approved as final product naming.",
+        "Alias exceptions file is empty or contains only justified temporary entries."
+      ],
+      "verify_commands": [
+        "git diff -- mos/frontend/src/funnels/templates/shared/designSystemBrandLogo.ts mos/frontend/src/pages/auth/SignInPage.tsx mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx",
+        "cd mos/frontend && npm run --silent check:design-system"
+      ],
+      "proof_required": [
+        "brand_freeze_review",
+        "protected_diff_log",
+        "borrowed_name_scan",
+        "alias_exception_review"
+      ],
+      "artifacts": [
+        "proof_pack/mos-design-system-migration/brand-freeze-review.md",
+        "proof_pack/mos-design-system-migration/brand-sensitive-diff.log",
+        "proof_pack/mos-design-system-migration/borrowed-name-scan.log",
+        "proof_pack/mos-design-system-migration/alias-exceptions.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "Produce implementation proof pack and final verification.",
+      "source_line": 311,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-design-system-migration/plan.contract.json",
+        "proof_pack/mos-design-system-migration/planctl-repair.json",
+        "proof_pack/mos-design-system-migration/lane-proof.json",
+        "proof_pack/mos-design-system-migration/index.html"
+      ],
+      "acceptance": [
+        "Source manifest verifies.",
+        "Plan contract verifies after implementation.",
+        "Lane proof and proof dashboard exist.",
+        "Tests/build/smoke checks pass or blockers are documented with exact causes."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify proof_pack/mos-design-system-migration/source/source_manifest.json",
+        "/Users/aldrinclement/.codex/bin/plangatecheck proof_pack/mos-design-system-migration/plan-gate-proof.json",
+        "/Users/aldrinclement/.codex/bin/lanecheck proof_pack/mos-design-system-migration/lane-proof.json",
+        "test -f proof_pack/mos-design-system-migration/index.html"
+      ],
+      "proof_required": [
+        "source_manifest_verify",
+        "plangatecheck_log",
+        "planctl_verify_log",
+        "proof_dashboard"
+      ],
+      "artifacts": [
+        "proof_pack/mos-design-system-migration/plan.contract.json",
+        "proof_pack/mos-design-system-migration/planctl-repair.json",
+        "proof_pack/mos-design-system-migration/lane-proof.json",
+        "proof_pack/mos-design-system-migration/index.html",
+        "proof_pack/mos-design-system-migration/logs/source-manifest-verify.log",
+        "proof_pack/mos-design-system-migration/logs/plangatecheck.log",
+        "proof_pack/mos-design-system-migration/logs/lanecheck.log"
+      ],
+      "notes": "Implementation proof pack generated; final dashboard is refreshed after planctl verification."
+    }
+  ],
+  "plan_gate_required": true,
+  "plan_gate_proof": "proof_pack/mos-design-system-migration/plan-gate-proof.json",
+  "lane_evidence_required": true,
+  "lane_proof": "proof_pack/mos-design-system-migration/lane-proof.json",
+  "parallelism_mode": "native_subagents"
+}

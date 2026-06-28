@@ -1,0 +1,524 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "deerflow-sidecar-plan",
+  "created_at": "2026-05-21T17:51:45.399879+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/deerflow-sidecar-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/deerflow-sidecar-2026-05-21",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "DeerFlow source is present under `.local/deer-flow`.",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P02",
+      "objective": "Native DeerFlow config and run path are inspected.",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P03",
+      "objective": "A local-only sidecar config or wrapper exists outside tracked code.",
+      "source_line": 11,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P04",
+      "objective": "A small Step 01 smoke run executes, or the blocker is captured with exact logs.",
+      "source_line": 12,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P05",
+      "objective": "Proof artifacts record command output, config shape, and run status.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P06",
+      "objective": "Clone or refresh DeerFlow into `.local/deer-flow`.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P07",
+      "objective": "Inspect model, search, crawler, and sandbox configuration.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P08",
+      "objective": "Configure DeepSeek V4 Pro, Serper, and Jina for local execution only.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P09",
+      "objective": "Run a minimal Step 01 sidecar smoke test.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    },
+    {
+      "id": "P10",
+      "objective": "Verify the proof pack and summarize readiness.",
+      "source_line": 21,
+      "status": "done",
+      "expected_files": [
+        ".local/deer-flow",
+        ".local/deer-flow/config.yaml",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json"
+      ],
+      "acceptance": [
+        "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+        "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+        "make doctor reports Ready with expected local-only warnings.",
+        "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+        "Source manifest verification passes.",
+        "provcheck passes for generated Markdown, with warnings recorded."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/deerflow-sidecar-2026-05-21/git-clone.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-check.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md",
+        "proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json",
+        "proof_pack/deerflow-sidecar-2026-05-21/index.html",
+        "proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log"
+      ],
+      "notes": "Done. First write_file smoke exposed a DeepSeek/DeerFlow large tool-call hang; final-only wrapper smoke completed and persisted output outside the model tool call."
+    }
+  ],
+  "global_verify_commands": [
+    "cd .local/deer-flow && make doctor",
+    "/Users/aldrinclement/.codex/bin/capturectl verify proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json",
+    "/Users/aldrinclement/.codex/bin/provcheck proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md",
+    "/Users/aldrinclement/.codex/bin/planctl verify proof_pack/deerflow-sidecar-2026-05-21/plan.contract.json"
+  ],
+  "global_acceptance": [
+    "DeerFlow is cloned under .local/deer-flow at a recorded commit.",
+    "Config uses DeepSeek V4 Pro with no explicit max_tokens cap, Serper web_search, Jina web_fetch, local sandbox, and token usage enabled.",
+    "make doctor reports Ready with expected local-only warnings.",
+    "A bounded Step 01 smoke executes through DeerFlow and records event logs.",
+    "Source manifest verification passes.",
+    "provcheck passes for generated Markdown, with warnings recorded."
+  ]
+}

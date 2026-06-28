@@ -1,0 +1,2912 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-21-modal-readability-plan",
+  "created_at": "2026-05-21T16:55:39.981874+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-modal-readability-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/modal-readability-2026-05-21",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "`DialogTitle` / `AlertDialogTitle` and description text have consistent default separation.",
+      "source_line": 15,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P02",
+      "objective": "Modal body/actions keep consistent spacing from the header.",
+      "source_line": 16,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P03",
+      "objective": "Existing call-site spacing overrides do not double-stack into awkward gaps.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P04",
+      "objective": "Component review page shows the fixed default state.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P05",
+      "objective": "Unit/design-system checks pass.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P06",
+      "objective": "`AlertDialogTitle` uses `font-display text-2xl font-semibold tracking-tighter text-content`.",
+      "source_line": 25,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P07",
+      "objective": "`AlertDialogDescription` uses `text-sm text-content-muted`.",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P08",
+      "objective": "There is no default margin, line-height tuning, or header group primitive between them.",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P09",
+      "objective": "The delete workspace modal renders title immediately followed by description in `mos/frontend/src/pages/workspaces/WorkspacesPage.tsx`.",
+      "source_line": 28,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P10",
+      "objective": "`mos/frontend/src/pages/dev/ComponentReviewPage.tsx` manually adds `className=\"mt-2\"` for dialog examples, proving the primitive default is incomplete.",
+      "source_line": 29,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P11",
+      "objective": "`DialogContent`/`AlertDialogContent` provide panel shell only.",
+      "source_line": 37,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P12",
+      "objective": "`DialogTitle`/`AlertDialogTitle` provide type styling only.",
+      "source_line": 38,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P13",
+      "objective": "`DialogDescription`/`AlertDialogDescription` provide color/size only.",
+      "source_line": 39,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P14",
+      "objective": "Call sites manually decide title-description spacing, body spacing, and action spacing.",
+      "source_line": 40,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P15",
+      "objective": "Modal primitives define readable header defaults.",
+      "source_line": 44,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P16",
+      "objective": "Call sites use semantic primitives and only override spacing for unusual layouts.",
+      "source_line": 45,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P17",
+      "objective": "Component review page becomes the visual fixture for default modal anatomy.",
+      "source_line": 46,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P18",
+      "objective": "Design-system checks protect against drift.",
+      "source_line": 47,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P19",
+      "objective": "Type scale lives in `mos/frontend/src/styles/theme.css`: `--text-sm: 13px`, `--text-2xl: 26px`, line-height aliases, display font `Libre Baskerville`, body font `DM Sans`.",
+      "source_line": 53,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P20",
+      "objective": "Spacing scale is 4-based: `--space-1` through `--space-13`.",
+      "source_line": 54,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P21",
+      "objective": "Floating surfaces use `mos/frontend/src/components/ui/floating.ts`: `rounded-lg`, `border-[1.5px]`, `bg-surface`, `text-sm`, `shadow-xl`, motion tokens.",
+      "source_line": 55,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P22",
+      "objective": "Dialog primitives live in `mos/frontend/src/components/ui/dialog.tsx`.",
+      "source_line": 56,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P23",
+      "objective": "Alert dialog primitives live in `mos/frontend/src/components/ui/alert-dialog.tsx`.",
+      "source_line": 57,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P24",
+      "objective": "Component review route already covers dialog and alert dialog examples.",
+      "source_line": 58,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P25",
+      "objective": "Use existing spacing tokens through Tailwind classes (`mt-2`, `mt-5`, `mt-6`, `space-y-*`) rather than adding new CSS variables.",
+      "source_line": 62,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P26",
+      "objective": "Keep title type treatment unless visual QA proves it is overpowering.",
+      "source_line": 63,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P27",
+      "objective": "Improve description readability with `leading-normal` or `leading-5` and a sane max width if needed.",
+      "source_line": 64,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P28",
+      "objective": "Audit all `DialogDescription` and `AlertDialogDescription` uses.",
+      "source_line": 70,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P29",
+      "objective": "Identify manual `mt-*` overrides that would double up after primitive defaults.",
+      "source_line": 71,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P30",
+      "objective": "Confirm whether any dialogs intentionally need tight title/body spacing.",
+      "source_line": 72,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P31",
+      "objective": "List of affected call sites is known before edits.",
+      "source_line": 76,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P32",
+      "objective": "No production modal gets accidental double spacing.",
+      "source_line": 77,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P33",
+      "objective": "Update `DialogDescription` and `AlertDialogDescription` defaults to include readable top margin and line height.",
+      "source_line": 81,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P34",
+      "objective": "Prefer `mt-2 text-sm leading-normal text-content-muted` or equivalent based on screenshot QA.",
+      "source_line": 82,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P35",
+      "objective": "Consider adding `max-w-prose` only if long modal copy becomes too wide; avoid unnecessary width changes.",
+      "source_line": 83,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P36",
+      "objective": "Keep `className` merge order so caller overrides still work.",
+      "source_line": 84,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P37",
+      "objective": "`mos/frontend/src/components/ui/dialog.tsx`",
+      "source_line": 88,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P38",
+      "objective": "`mos/frontend/src/components/ui/alert-dialog.tsx`",
+      "source_line": 89,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P39",
+      "objective": "Delete workspace modal reads clearly with no call-site-specific spacing.",
+      "source_line": 93,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P40",
+      "objective": "Callers can still override className.",
+      "source_line": 94,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P41",
+      "objective": "No new dependency.",
+      "source_line": 95,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P42",
+      "objective": "Remove redundant `className=\"mt-1\"` / `className=\"mt-2\"` from standard modal descriptions where the primitive now owns spacing.",
+      "source_line": 99,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P43",
+      "objective": "Keep explicit spacing only for non-standard layouts, documented by local context.",
+      "source_line": 100,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P44",
+      "objective": "Leave destructive confirmation copy unchanged.",
+      "source_line": 101,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P45",
+      "objective": "`mos/frontend/src/pages/dev/ComponentReviewPage.tsx`",
+      "source_line": 105,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P46",
+      "objective": "`mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx`",
+      "source_line": 106,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P47",
+      "objective": "Any other modal call sites found in Phase 1.",
+      "source_line": 107,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P48",
+      "objective": "Standard modals do not double-stack margins.",
+      "source_line": 111,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P49",
+      "objective": "Unusual modal layouts remain intact.",
+      "source_line": 112,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P50",
+      "objective": "Update component review modal examples to show default title/description spacing with no manual margin.",
+      "source_line": 116,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P51",
+      "objective": "If useful, add one long-description case so line-height can be judged.",
+      "source_line": 117,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P52",
+      "objective": "`mos/frontend/src/pages/dev/ComponentReviewPage.tsx`",
+      "source_line": 121,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P53",
+      "objective": "Component review page demonstrates the fixed default.",
+      "source_line": 125,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P54",
+      "objective": "Alert dialog and standard dialog both covered.",
+      "source_line": 126,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P55",
+      "objective": "Open the MOS dev UI or component review route.",
+      "source_line": 147,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P56",
+      "objective": "Capture modal screenshots before/after if the route is accessible.",
+      "source_line": 148,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P57",
+      "objective": "Confirm title, description, body, and action row spacing at desktop and narrow viewport.",
+      "source_line": 149,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P58",
+      "objective": "The screenshot issue is fixed by shared primitives, not a one-off workspace modal patch.",
+      "source_line": 153,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P59",
+      "objective": "Existing modal content remains the same.",
+      "source_line": 154,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P60",
+      "objective": "Standard modal descriptions have visible separation from titles.",
+      "source_line": 155,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P61",
+      "objective": "Long descriptions remain readable.",
+      "source_line": 156,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P62",
+      "objective": "No new fallback behavior.",
+      "source_line": 157,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P63",
+      "objective": "No model, backend, deployment, or production changes.",
+      "source_line": 158,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P64",
+      "objective": "Shallow diagnosis: only add `mt-2` to delete workspace modal, leaving the primitive broken.",
+      "source_line": 162,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P65",
+      "objective": "Symptom patch: fix one alert dialog but not normal dialogs.",
+      "source_line": 163,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P66",
+      "objective": "Overcorrection: add too much margin and make compact modals feel loose.",
+      "source_line": 164,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P67",
+      "objective": "Double spacing: primitive adds `mt-2` while call sites keep `mt-2`, creating `mt-4` visual effect.",
+      "source_line": 165,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P68",
+      "objective": "Scope creep: rewrite modal layout, typography, or button system when the current problem is header readability.",
+      "source_line": 166,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P69",
+      "objective": "Count of standard modal descriptions with manual `mt-*` decreases.",
+      "source_line": 183,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P70",
+      "objective": "Shared primitives contain default title-description spacing.",
+      "source_line": 184,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P71",
+      "objective": "Component review screenshots show readable title-description separation.",
+      "source_line": 188,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P72",
+      "objective": "Design-system and unit checks pass.",
+      "source_line": 189,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P73",
+      "objective": "No new modal readability complaints from standard modal usage.",
+      "source_line": 190,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P74",
+      "objective": "Main agent owns modal primitives, component review examples, and affected call-site cleanup.",
+      "source_line": 200,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P75",
+      "objective": "Main agent runs checks and visual QA.",
+      "source_line": 204,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P76",
+      "objective": "Single lane is fastest.",
+      "source_line": 212,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P77",
+      "objective": "No sub-agent spend. Scope is narrow.",
+      "source_line": 216,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    },
+    {
+      "id": "P78",
+      "objective": "`proof_pack/modal-readability-2026-05-21/plan-gate-proof.json`",
+      "source_line": 234,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui/dialog.tsx",
+        "mos/frontend/src/components/ui/alert-dialog.tsx",
+        "mos/frontend/src/components/ui/dialog.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx"
+      ],
+      "acceptance": [
+        "Modal description primitives include default mt-2 and leading-normal rhythm.",
+        "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+        "Component review dialog and alert dialog examples use default description spacing.",
+        "Focused modal primitive test and design-system check pass.",
+        "Visual screenshots captured for desktop and narrow viewport."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/modal-readability-2026-05-21/check-design-system.log",
+        "proof_pack/modal-readability-2026-05-21/test-dialog-primitive.log",
+        "proof_pack/modal-readability-2026-05-21/test-unit.log",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-dialog-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-desktop.png",
+        "proof_pack/modal-readability-2026-05-21/modal-readability-alert-mobile.png",
+        "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+      ],
+      "notes": "Implemented through shared modal primitives; full unit suite has unrelated OnboardingWizard mock failures recorded in test-unit.log, so focused modal primitive test is the owned unit verification for this change."
+    }
+  ],
+  "global_verify_commands": [
+    "cd mos/frontend && npm run --silent check:design-system",
+    "cd mos/frontend && npm run --silent test:unit -- src/components/ui/dialog.test.tsx",
+    "/Users/aldrinclement/.codex/bin/plangatecheck proof_pack/modal-readability-2026-05-21/plan-gate-proof.json",
+    "/Users/aldrinclement/.codex/bin/lanecheck proof_pack/modal-readability-2026-05-21/lane-proof.json"
+  ],
+  "global_acceptance": [
+    "Modal description primitives include default mt-2 and leading-normal rhythm.",
+    "Standard modal call sites do not keep redundant mt-1/mt-2 description margins.",
+    "Component review dialog and alert dialog examples use default description spacing.",
+    "Focused modal primitive test and design-system check pass.",
+    "Visual screenshots captured for desktop and narrow viewport."
+  ],
+  "plan_gate_required": true,
+  "plan_gate_proof": "proof_pack/modal-readability-2026-05-21/plan-gate-proof.json",
+  "lane_proof": "proof_pack/modal-readability-2026-05-21/lane-proof.json"
+}

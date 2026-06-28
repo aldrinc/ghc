@@ -1,0 +1,135 @@
+{
+  "createdAt": "2026-05-01T22:35:53.516Z",
+  "reason": "Exact rerun of failed source templates care_bag.jpg and green.jpg with same structured destination context.",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-rerun-carebag-green-2026-05-01",
+  "reviewDir": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-carebag-green-rerun-review-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-rerun-carebag-green-2026-05-01/generated",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "destinationContext": {
+    "headline": "Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First",
+    "subheadline": "Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.",
+    "primaryProblem": "Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.",
+    "promise": "A daily protocol to consider before making a long-term TRT decision.",
+    "mechanismDisclosureLevel": "Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.",
+    "proofType": "Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.",
+    "ctaUrgency": "Article-read CTA before committing to needles or a long-term TRT relationship.",
+    "compliancePosture": "Matches the downstream advertorial posture and funnel stage.",
+    "assetStage": "Ad to advertorial/listicle, before the sales page.",
+    "visualEmphasis": "Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly."
+  },
+  "outputs": [
+    {
+      "key": "02-care-bag-rerun",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+        "sourceSwipeTitle": "care_bag.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.\nPrimary problem: Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.\nPromise: A daily protocol to consider before making a long-term TRT decision.\nMechanism disclosure level: Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.\nProof type: Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read CTA before committing to needles or a long-term TRT relationship.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-advertorial-structured-congruence-carebag-green-rerun-02-care-bag-rerun-1777674831293.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "947c016e-c74d-4c1d-925a-8e00eb53c781",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-7f0312e1-57fe-484b-a87e-0351051054c7"
+      },
+      "result": {
+        "workflowRunId": "947c016e-c74d-4c1d-925a-8e00eb53c781",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-7f0312e1-57fe-484b-a87e-0351051054c7",
+        "assetId": "4cd8f63f-c907-4bfc-ac33-f063082ff454",
+        "publicId": "9bb83509-d78d-4c35-9d21-dd9a4f06a3b4",
+        "publicUrl": "https://api.moshq.app/public/assets/9bb83509-d78d-4c35-9d21-dd9a4f06a3b4",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-rerun-carebag-green-2026-05-01/generated/02-care-bag-rerun.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-carebag-green-rerun-review-2026-05-01/generated/02-care-bag-rerun.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:fe0b4c31ba74cf75e824aa6cb75d11c768e56c4a0ad9a8e2",
+          "asset_ids": [
+            "4cd8f63f-c907-4bfc-ac33-f063082ff454"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-rerun-carebag-green-2026-05-01/workflow-02-care-bag-rerun.json"
+      }
+    },
+    {
+      "key": "03-green-rerun",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+        "sourceSwipeTitle": "green.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.\nPrimary problem: Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.\nPromise: A daily protocol to consider before making a long-term TRT decision.\nMechanism disclosure level: Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.\nProof type: Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read CTA before committing to needles or a long-term TRT relationship.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-advertorial-structured-congruence-carebag-green-rerun-03-green-rerun-1777674898089.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "23cfb0c0-4943-4bd0-b700-4cebae2b85f6",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-b8f954c6-670f-4d97-abea-bd9ec8770382"
+      },
+      "result": {
+        "workflowRunId": "23cfb0c0-4943-4bd0-b700-4cebae2b85f6",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-b8f954c6-670f-4d97-abea-bd9ec8770382",
+        "assetId": "b4389f1a-8440-4c96-8090-28ce0b9f0f1f",
+        "publicId": "c6e8b0b7-c5a4-4d7d-b030-77acb1a6dbd7",
+        "publicUrl": "https://api.moshq.app/public/assets/c6e8b0b7-c5a4-4d7d-b030-77acb1a6dbd7",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-rerun-carebag-green-2026-05-01/generated/03-green-rerun.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-carebag-green-rerun-review-2026-05-01/generated/03-green-rerun.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:db0a0b8b1a12eefc657e5b0a697f336854a8d555956b5e43",
+          "asset_ids": [
+            "b4389f1a-8440-4c96-8090-28ce0b9f0f1f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-rerun-carebag-green-2026-05-01/workflow-03-green-rerun.json"
+      }
+    }
+  ]
+}

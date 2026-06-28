@@ -1,0 +1,315 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-22-social-agents-agent-command-center-options",
+  "created_at": "2026-05-22T19:58:38.355362+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/docs/plans",
+  "proof_dir": "proof_pack/2026-05-22-social-agents-agent-command-center-options",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Diagnose the current Social Agents UX around the customer job, not only visual polish.",
+      "source_line": 23,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-observation.json"
+      ],
+      "acceptance": [
+        "The plan identifies the current UI as backend-shaped rather than customer-job-shaped.",
+        "The plan records the underused right section as a design constraint.",
+        "Live browser observation is captured as proof."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/plangatecheck /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate-proof.json"
+      ],
+      "proof_required": [
+        "plan_artifact",
+        "browser_observation"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-observation.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-screenshot.png"
+      ],
+      "notes": "Live page text showed Program, Source, Experiment, Carousel, Media, and Handoff as primary labels."
+    },
+    {
+      "id": "P02",
+      "objective": "Provide multiple UI/UX refactor options and a clear recommendation.",
+      "source_line": 67,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "acceptance": [
+        "At least three options are outlined.",
+        "The recommended option is explicit.",
+        "Pros, cons, and best-use context are included."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.contract.json"
+      ],
+      "proof_required": [
+        "plan_artifact"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "notes": "Plan compares Pure Setup Wizard, Agent Command Center, Brief-First Agent Interview, and Production Board."
+    },
+    {
+      "id": "P03",
+      "objective": "Define the recommended Agent Command Center IA and right-side Agent Dossier.",
+      "source_line": 100,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "acceptance": [
+        "The main panel has one active job at a time.",
+        "The right rail is persistent context, not another form.",
+        "The right rail includes mission, channels, authority, success signal, current work, blocker, and learning context."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/plangatecheck /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate-proof.json"
+      ],
+      "proof_required": [
+        "plan_artifact"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "notes": "The full right section is specified as a sticky Agent Dossier on desktop and drawer on mobile."
+    },
+    {
+      "id": "P04",
+      "objective": "Translate backend concepts into customer-facing agent-management language.",
+      "source_line": 56,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "acceptance": [
+        "Growth Program maps to Agent Mission.",
+        "Conversion Source maps to Success Signal.",
+        "Content Variant maps to Creative Draft.",
+        "Postiz Handoff Proposal maps to Approval / Publish Request.",
+        "Agent Action Proposal maps to Approval Inbox."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.contract.json"
+      ],
+      "proof_required": [
+        "plan_artifact"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "notes": "Backend labels stay internal; primary UI labels move to customer-facing agent concepts."
+    },
+    {
+      "id": "P05",
+      "objective": "Specify single-purpose wizard screens, implementation phases, acceptance checks, and verification.",
+      "source_line": 170,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "acceptance": [
+        "Wizard screens are Mission, Channels, Success Signal, Guardrails, and combined Review.",
+        "Implementation phases preserve existing API payloads.",
+        "Acceptance checks include one primary CTA per state and Postiz proposal-only behavior."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.contract.json"
+      ],
+      "proof_required": [
+        "plan_artifact"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "notes": "Implementation plan is scoped to UI/refactor work and explicitly avoids model/backend/publishing behavior changes."
+    },
+    {
+      "id": "P06",
+      "objective": "Record planning proof and render a reviewable proof dashboard.",
+      "source_line": 301,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/index.html"
+      ],
+      "acceptance": [
+        "plangatecheck passes.",
+        "lanecheck passes.",
+        "planctl verify passes.",
+        "proofdash renders index.html."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/plangatecheck /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate-proof.json",
+        "/Users/aldrinclement/.codex/bin/lanecheck /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/lane-proof.json",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.contract.json"
+      ],
+      "proof_required": [
+        "plan_gate",
+        "lane_proof",
+        "proof_dashboard"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plangatecheck.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/lanecheck.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/planctl-verify.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/index.html"
+      ],
+      "notes": "Proof gate covers Daliogoals artifacts, lane record, plan contract, live browser evidence, and dashboard."
+    },
+    {
+      "id": "P07",
+      "objective": "Create a brand-matched standalone HTML visual mock for the recommended Agent Command Center design.",
+      "source_line": 247,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-command-center-mock.html",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/copy-reduction-audit.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-desktop-screenshot.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-mobile-screenshot.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-browser-observation.json"
+      ],
+      "acceptance": [
+        "Mock uses MOS tokens for typography, surfaces, borders, badges, and buttons.",
+        "Mock includes Setup and combined Review/Approve states.",
+        "Review and approval are not split into separate mock screens.",
+        "Mock shows a persistent right-side Agent Dossier on desktop.",
+        "Each visible mock state has one primary black CTA.",
+        "The Agent Dossier is reduced to compact status rows and one blocker callout.",
+        "Internal action copy like Create proposal is removed from the visible customer UI.",
+        "Postiz system-of-record explanation is represented as a compact Postiz badge.",
+        "Mock is self-contained and marked as visual-only sample data.",
+        "Desktop and mobile browser checks show no horizontal overflow."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi && python3 -m http.server 5289 --bind 127.0.0.1 --directory docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options",
+        "Browser validation against http://127.0.0.1:5289/social-agents-command-center-mock.html",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.contract.json"
+      ],
+      "proof_required": [
+        "html_artifact",
+        "desktop_screenshot",
+        "mobile_screenshot",
+        "browser_observation"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-command-center-mock.html",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/copy-reduction-audit.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-desktop-screenshot.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-mobile-screenshot.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-browser-observation.json"
+      ],
+      "notes": "The HTML mock uses the current app shell visual language and is served through localhost for verification."
+    },
+    {
+      "id": "P08",
+      "objective": "Implement the simplified Social Agents UI refactor in the actual MOS app.",
+      "source_line": 330,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-browser-observation.json"
+      ],
+      "acceptance": [
+        "Actual app renders Setup and Review as the only primary Social Agents screens.",
+        "Each visible verified state has one primary black CTA.",
+        "The old backend-shaped wizard labels are absent from the primary UI.",
+        "Review and approval are handled in the same Review screen.",
+        "Agent dossier is compact and uses status rows plus one blocker callout.",
+        "Postiz handoff mutation payload remains proposal-only and preserves providerSettingsByIdentifier plus metadata.createdFrom.",
+        "Desktop and mobile browser checks show no horizontal overflow."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.contract.json"
+      ],
+      "proof_required": [
+        "unit_test_log",
+        "build_log",
+        "design_check_logs",
+        "desktop_screenshot",
+        "mobile_screenshot",
+        "browser_observation"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-browser-observation.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-mobile-observation.json"
+      ],
+      "notes": "Implementation keeps API hooks and mutation payloads in place while replacing the six-step backend wizard with a Setup/Review UI and compact Agent Dossier."
+    },
+    {
+      "id": "P09",
+      "objective": "Delegate responsive Social Agents UI review to Kimi K2.6 through the oh-my-pi harness and apply the resulting app refinements.",
+      "source_line": 330,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/.local/omp-kimi-agent/models.yml",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-smoke.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-ui-review.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-responsive-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-desktop-1440.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-shell-1180.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-tablet-900.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-mobile-390.png"
+      ],
+      "acceptance": [
+        "Kimi K2.6 is available through omp using the DeepInfra provider registry without storing the API key in the registry file.",
+        "The Kimi OMP review log contains concrete ship blockers, required patches, and acceptance checks.",
+        "Actual app Review screen has one visible primary CTA after patching.",
+        "Actual app Review screen has no horizontal overflow at desktop, shell-width, tablet, and mobile viewport checks.",
+        "Responsive patches are applied to the actual MOS app, not only the standalone HTML mock."
+      ],
+      "verify_commands": [
+        "test -s /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-smoke.log",
+        "grep -q 'SHIP BLOCKERS' /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-ui-review.log",
+        "node -e \"const fs=require('fs');const p='/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-responsive-browser-check.json';const r=JSON.parse(fs.readFileSync(p,'utf8'));if(!r.length||r.some(x=>x.hasHorizontalOverflow||x.primaryCount!==1||!x.hasReviewHeading))process.exit(1);\"",
+        "test -s /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-desktop-1440.png",
+        "test -s /Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-mobile-390.png"
+      ],
+      "proof_required": [
+        "kimi_omp_log",
+        "responsive_browser_json",
+        "responsive_screenshots"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/.local/omp-kimi-agent/models.yml",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-smoke.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-ui-review.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-responsive-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-desktop-1440.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-shell-1180.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-tablet-900.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-mobile-390.png"
+      ],
+      "notes": "The long full-file Kimi prompt was rejected/empty through DeepInfra, so the final successful OMP run used a focused UI-structure prompt and returned concrete blockers. The app patch adapts the guidance without adding fixed rail widths."
+    }
+  ]
+}

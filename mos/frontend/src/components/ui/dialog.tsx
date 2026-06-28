@@ -16,7 +16,7 @@ export const DialogContent = forwardRef<HTMLDivElement, Dialog.Popup.Props>(func
       <Dialog.Viewport className="fixed inset-0 z-dialog grid place-items-center px-4 py-6">
         <Dialog.Popup
           ref={ref}
-          className={cn(floatingPanel("w-full max-w-lg p-6"), className)}
+          className={cn(floatingPanel("w-full max-w-lg p-7"), className)}
           {...props}
         />
       </Dialog.Viewport>
@@ -25,11 +25,11 @@ export const DialogContent = forwardRef<HTMLDivElement, Dialog.Popup.Props>(func
 });
 
 export const DialogTitle = ({ className, ...props }: Dialog.Title.Props) => (
-  <Dialog.Title {...props} className={cn("text-lg font-semibold text-content", className)} />
+  <Dialog.Title {...props} className={cn("font-display text-2xl font-semibold tracking-tighter text-content", className)} />
 );
 
 export const DialogDescription = ({ className, ...props }: Dialog.Description.Props) => (
-  <Dialog.Description {...props} className={cn("text-sm text-content-muted", className)} />
+  <Dialog.Description {...props} className={cn("mt-2 text-sm leading-normal text-content-muted", className)} />
 );
 
 export const DialogClose = Dialog.Close;

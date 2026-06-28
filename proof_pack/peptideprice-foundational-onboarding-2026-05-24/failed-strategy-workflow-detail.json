@@ -1,0 +1,149 @@
+{
+  "run": {
+    "campaign_id": null,
+    "org_id": "3662f19a-cf78-463c-809f-080461f4c2e9",
+    "kind": "strategy_v2",
+    "started_at": "2026-05-24T15:53:34.666612-05:00",
+    "client_id": "9dcf9467-bc72-4be1-a2f5-1f7386171e45",
+    "product_id": "73872550-4ff7-4cc5-b6de-1b7561ec5b79",
+    "id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+    "temporal_workflow_id": "strategy-v2-3662f19a-cf78-463c-809f-080461f4c2e9-9dcf9467-bc72-4be1-a2f5-1f7386171e45-73872550-4ff7-4cc5-b6de-1b7561ec5b79-019e5bc3-babe-7ee4-8389-953602e0d2e5",
+    "temporal_run_id": "019e5bc3-bb28-7831-b4dc-97b390d63649",
+    "status": "failed",
+    "finished_at": "2026-05-24T15:54:04.947093-05:00"
+  },
+  "logs": [
+    {
+      "id": "f3078a0f-9a6c-409d-917f-cdbefeb259db",
+      "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+      "payload_out": null,
+      "created_at": "2026-05-24T15:54:04.935476-05:00",
+      "step": "strategy_v2",
+      "payload_in": null,
+      "status": "failed",
+      "error": "Activity task failed"
+    },
+    {
+      "id": "bb2177e5-f342-471f-809e-7e7260181790",
+      "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+      "payload_out": null,
+      "created_at": "2026-05-24T15:54:04.869092-05:00",
+      "step": "v2-02.foundation.01",
+      "payload_in": {
+        "model": "deepseek-v4-pro",
+        "use_web_search": true
+      },
+      "status": "started",
+      "error": null
+    },
+    {
+      "id": "922d58ad-0739-442a-953b-028d28dd530c",
+      "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+      "payload_out": null,
+      "created_at": "2026-05-24T15:54:04.863108-05:00",
+      "step": "v2-02.foundation",
+      "payload_in": {
+        "model": "gpt-5.5"
+      },
+      "status": "started",
+      "error": null
+    },
+    {
+      "id": "52fa55ea-ca9f-4ebd-9797-59394bfc5d29",
+      "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+      "payload_out": null,
+      "created_at": "2026-05-24T15:53:34.715207-05:00",
+      "step": "v2-02.foundation.01",
+      "payload_in": {
+        "model": "deepseek-v4-pro",
+        "use_web_search": true
+      },
+      "status": "started",
+      "error": null
+    },
+    {
+      "id": "b08b6f09-0d87-4db8-9e66-1ae8d81ed736",
+      "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+      "payload_out": null,
+      "created_at": "2026-05-24T15:53:34.712639-05:00",
+      "step": "v2-02.foundation",
+      "payload_in": {
+        "model": "gpt-5.5"
+      },
+      "status": "started",
+      "error": null
+    },
+    {
+      "id": "15976222-f80e-4bfa-888a-2335f657152a",
+      "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+      "payload_out": {
+        "model": "deterministic",
+        "artifact_id": "eda3716b-1bcb-433c-941b-22ee47d02354",
+        "agent_run_id": "865b8956-bc49-41d8-bd97-47e0e9f3318a",
+        "prompt_version": "strategy_v2.stage0.v1",
+        "schema_version": "2.0.0"
+      },
+      "created_at": "2026-05-24T15:53:34.701177-05:00",
+      "step": "v2-01",
+      "payload_in": null,
+      "status": "completed",
+      "error": null
+    },
+    {
+      "id": "5a0a8179-5934-423a-baef-831dd7f71799",
+      "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2",
+      "payload_out": null,
+      "created_at": "2026-05-24T15:53:34.670595-05:00",
+      "step": "strategy_v2",
+      "payload_in": {
+        "client_id": "9dcf9467-bc72-4be1-a2f5-1f7386171e45",
+        "product_id": "73872550-4ff7-4cc5-b6de-1b7561ec5b79",
+        "campaign_id": null
+      },
+      "status": "started",
+      "error": null
+    }
+  ],
+  "client_canon": null,
+  "metric_schema": null,
+  "strategy_sheet": null,
+  "experiment_specs": [],
+  "asset_briefs": [],
+  "precanon_research": null,
+  "research_artifacts": [
+    {
+      "step_key": "v2-01",
+      "title": "Strategy V2 Stage 0 Build",
+      "doc_url": "artifact://eda3716b-1bcb-433c-941b-22ee47d02354",
+      "doc_id": "eda3716b-1bcb-433c-941b-22ee47d02354",
+      "summary": "Stage 0 product brief contract generated and validated."
+    }
+  ],
+  "research_highlights": null,
+  "temporal_status": "FAILED",
+  "pending_activity_progress": [],
+  "strategy_v2_state": {
+    "artifact_refs": {
+      "stage0_artifact_id": "7d65ba1d-2a04-4f0e-b561-ecfa8a35f47f",
+      "step_payload_artifact_ids": {
+        "v2-01": "eda3716b-1bcb-433c-941b-22ee47d02354"
+      },
+      "step_payload_v2_01_artifact_id": "eda3716b-1bcb-433c-941b-22ee47d02354",
+      "v2-01": "eda3716b-1bcb-433c-941b-22ee47d02354"
+    },
+    "current_stage": "failed",
+    "pending_decision_payload": null,
+    "pending_signal_type": null,
+    "required_signal_type": null,
+    "scored_candidate_summaries": {},
+    "stop_requested": false,
+    "workflow_run_id": "6f90ee8b-c68c-416d-98ad-7c82a9059fa2"
+  },
+  "strategy_v2_stage3": null,
+  "strategy_v2_offer": null,
+  "strategy_v2_copy": null,
+  "strategy_v2_copy_canonical": null,
+  "strategy_v2_copy_context": null,
+  "strategy_v2_awareness_angle_matrix": null,
+  "strategy_v2_launches": []
+}

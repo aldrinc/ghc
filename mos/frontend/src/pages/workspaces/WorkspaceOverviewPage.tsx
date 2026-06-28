@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, AlertTriangle, Rocket, Globe, LayoutTemplate, Do
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
+import { useClientFoundationReadiness } from "@/api/clients";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
 import { useWorkflows, useWorkflowDetail } from "@/api/workflows";
@@ -86,6 +87,11 @@ export function WorkspaceOverviewPage() {
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
   const { product } = useProductContext();
+  const { data: foundationReadiness } = useClientFoundationReadiness(
+    workspace?.id,
+    product?.id,
+    { enabled: Boolean(workspace?.id && product?.id), refetchIntervalMs: 15000 },
+  );
   const {
     data: workflows = [],
     isLoading: workflowsLoading,
@@ -123,6 +129,16 @@ export function WorkspaceOverviewPage() {
   const latestRun = workflowDetail?.run ?? latestWorkflow;
   const latestLog = workflowDetail?.logs?.[0];
   const isRunning = latestRun?.status === "running";
+
+  useEffect(() => {
+    if (!foundationReadiness) return;
+    if (
+      foundationReadiness.should_gate_overview &&
+      foundationReadiness.status !== "foundation_ready"
+    ) {
+      navigate("/workspaces/foundation-status", { replace: true });
+    }
+  }, [foundationReadiness, navigate]);
 
   /* strategy v2 specific data */
   const strategyV2State = workflowDetail?.strategy_v2_state;
@@ -443,8 +459,8 @@ export function WorkspaceOverviewPage() {
             Setting up your workspace
           </h2>
           <p className="mt-1 text-sm text-content-muted">
-            Running market research and building your brand profile. When it
-            finishes, we'll automatically start your strategy review.
+            Building foundational docs, market context, and workspace memory.
+            We'll take you to the dashboard when it's ready.
           </p>
         </div>
 
@@ -460,8 +476,8 @@ export function WorkspaceOverviewPage() {
         </div>
 
         <Callout variant="info" size="sm">
-          You can leave this page &mdash; we'll keep working in the background.
-          When we need your input, you'll see it here.
+          You can leave this page &mdash; we'll keep working in the background
+          and email you when setup finishes.
         </Callout>
       </div>
     );

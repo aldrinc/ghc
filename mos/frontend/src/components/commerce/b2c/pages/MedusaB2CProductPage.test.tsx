@@ -13,7 +13,7 @@ const { themeState } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/funnels/puckConfig", () => ({
+vi.mock("@/funnels/funnelRuntime", () => ({
   useFunnelRuntime: () => ({
     productSlug: "starter-product",
     funnelSlug: "starter-site",

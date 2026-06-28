@@ -1,0 +1,78 @@
+[
+  {
+    "label": "desktop-1440",
+    "screenshotPath": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-desktop-1440.png",
+    "bodyScrollWidth": 1301,
+    "hasHorizontalOverflow": false,
+    "hasReviewHeading": true,
+    "overflowing": [],
+    "pageScrollWidth": 1301,
+    "primaryCount": 1,
+    "primaryTexts": [
+      "Add assets"
+    ],
+    "reviewCardWidth": 1301,
+    "url": "http://localhost:5275/workspaces/execution/social-agents",
+    "viewport": {
+      "height": 876,
+      "width": 1315
+    }
+  },
+  {
+    "label": "shell-1180",
+    "screenshotPath": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-shell-1180.png",
+    "bodyScrollWidth": 1063,
+    "hasHorizontalOverflow": false,
+    "hasReviewHeading": true,
+    "overflowing": [],
+    "pageScrollWidth": 1063,
+    "primaryCount": 1,
+    "primaryTexts": [
+      "Add assets"
+    ],
+    "reviewCardWidth": 1063,
+    "url": "http://localhost:5275/workspaces/execution/social-agents",
+    "viewport": {
+      "height": 822,
+      "width": 1077
+    }
+  },
+  {
+    "label": "tablet-900",
+    "screenshotPath": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-tablet-900.png",
+    "bodyScrollWidth": 808,
+    "hasHorizontalOverflow": false,
+    "hasReviewHeading": true,
+    "overflowing": [],
+    "pageScrollWidth": 808,
+    "primaryCount": 1,
+    "primaryTexts": [
+      "Add assets"
+    ],
+    "reviewCardWidth": 808,
+    "url": "http://localhost:5275/workspaces/execution/social-agents",
+    "viewport": {
+      "height": 822,
+      "width": 822
+    }
+  },
+  {
+    "label": "mobile-390",
+    "screenshotPath": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-mobile-390.png",
+    "bodyScrollWidth": 342,
+    "hasHorizontalOverflow": false,
+    "hasReviewHeading": true,
+    "overflowing": [],
+    "pageScrollWidth": 342,
+    "primaryCount": 1,
+    "primaryTexts": [
+      "Add assets"
+    ],
+    "reviewCardWidth": 342,
+    "url": "http://localhost:5275/workspaces/execution/social-agents",
+    "viewport": {
+      "height": 770,
+      "width": 356
+    }
+  }
+]

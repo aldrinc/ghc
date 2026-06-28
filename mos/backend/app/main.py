@@ -21,6 +21,7 @@ from app.routers import (
     assets,
     claude,
     gemini,
+    ragflow,
     campaigns,
     compliance,
     brands,
@@ -53,6 +54,8 @@ from app.routers import (
     site_product_bindings,
     site_imports,
     postiz,
+    connected_social,
+    growth_programs,
     analytics,
 )
 
@@ -184,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(stripe_webhooks.router)
     app.include_router(claude.router)
     app.include_router(gemini.router)
+    app.include_router(ragflow.router)
     app.include_router(deploy.router)
     app.include_router(storefront_templates.router)
     app.include_router(gethookd.router)
@@ -196,6 +200,8 @@ def create_app() -> FastAPI:
     app.include_router(site_product_bindings.products_router)
     app.include_router(site_imports.router)
     app.include_router(postiz.router)
+    app.include_router(connected_social.router)
+    app.include_router(growth_programs.router)
     app.include_router(analytics.router)
 
     return app

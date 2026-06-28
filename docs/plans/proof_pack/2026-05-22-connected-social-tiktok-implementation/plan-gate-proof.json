@@ -1,0 +1,49 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "retrofit",
+  "created_at": "2026-05-22T15:14:00Z",
+  "daliogoals_skill_loaded": true,
+  "questions_asked": [],
+  "question_sufficiency_rationale": "This implementation followed two already-reviewed PRDs and a concrete user instruction to proceed. The remaining decisions were low-risk backend foundation choices with explicit no-live-write, no-model-change, and no-production-change constraints.",
+  "owner": "Codex / Aldrin",
+  "review_date": "2026-05-22",
+  "stop_condition": "Contract, tests, lane proof, source manifests, and proof dashboard pass.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "plan-gate.md",
+      "summary": "Goal is a first backend foundation for Connected Social Agents and TikTok Carousel Growth Agent."
+    },
+    "problem_log": {
+      "path": "plan-gate.md",
+      "summary": "Problem log captures missing action proposals, connected social storage, TikTok growth-loop models, Postiz reconciliation, and runtime profiles."
+    },
+    "root_cause_diagnosis": {
+      "path": "plan-gate.md",
+      "summary": "Root cause is the lack of an approval-gated growth-loop abstraction for social agents."
+    },
+    "current_machine": {
+      "path": "plan-gate.md",
+      "summary": "Current machine keeps external accounts, publishing, analytics, and agent actions disconnected."
+    },
+    "designed_machine": {
+      "path": "plan-gate.md",
+      "summary": "Designed machine adds connected provider records, snapshots, proposals, growth programs, Postiz analytics helpers, and Hermes profiles."
+    },
+    "worst_day_test": {
+      "path": "plan-gate.md",
+      "summary": "Worst-day test covers missing tokens, premature external writes, Postiz ID drift, absent metrics, and model/provider drift."
+    },
+    "leading_lagging_metrics": {
+      "path": "plan-gate.md",
+      "summary": "Metrics cover connected assets, proposals, approvals, publications, performance snapshots, conversions, attribution, and execution failures."
+    },
+    "owner_date_review": {
+      "path": "plan-gate.md",
+      "summary": "Owner/date/review point are captured for the next live-connection implementation pass."
+    },
+    "stop_condition": {
+      "path": "plan-gate.md",
+      "summary": "Stop condition requires contract, tests, lane proof, source manifests, and dashboard to pass."
+    }
+  }
+}

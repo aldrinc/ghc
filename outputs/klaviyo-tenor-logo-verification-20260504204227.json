@@ -1,0 +1,161 @@
+{
+  "created_at": "2026-05-04T20:42:27.156Z",
+  "saved": [
+    {
+      "scope": "saved-template",
+      "action_id": null,
+      "template_id": "RhsKJf",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 01 - It's not just you",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 3616
+    },
+    {
+      "scope": "saved-template",
+      "action_id": null,
+      "template_id": "YtahLb",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 02 - Three things that fall together",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4360
+    },
+    {
+      "scope": "saved-template",
+      "action_id": null,
+      "template_id": "SsRAC7",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 03 - 21 ingredients, zero secrets",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 3955
+    },
+    {
+      "scope": "saved-template",
+      "action_id": null,
+      "template_id": "W3HmD5",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 04 - The Triad most men don't know exists",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4330
+    },
+    {
+      "scope": "saved-template",
+      "action_id": null,
+      "template_id": "RPQxZu",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 05 - The protocol, the guarantee, and the math",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4362
+    },
+    {
+      "scope": "saved-template",
+      "action_id": null,
+      "template_id": "SZfnTk",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Conditional 06 - The question most men don't ask until later",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4522
+    },
+    {
+      "scope": "saved-template",
+      "action_id": null,
+      "template_id": "RKdhE6",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Conditional 07 - A question",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4237
+    }
+  ],
+  "flow": [
+    {
+      "scope": "draft-flow-template",
+      "action_id": "105690567",
+      "template_id": "WfD7Yw",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 01 - It's not just you",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 3616,
+      "subject": "It's not just you",
+      "status": "draft"
+    },
+    {
+      "scope": "draft-flow-template",
+      "action_id": "105690569",
+      "template_id": "S4WNrD",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 02 - Three things that fall together",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4360,
+      "subject": "Three things that fall together",
+      "status": "draft"
+    },
+    {
+      "scope": "draft-flow-template",
+      "action_id": "105690571",
+      "template_id": "WJA9Z5",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 03 - 21 ingredients, zero secrets",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 3955,
+      "subject": "21 ingredients, zero secrets",
+      "status": "draft"
+    },
+    {
+      "scope": "draft-flow-template",
+      "action_id": "105690573",
+      "template_id": "RgFf8e",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 04 - The Triad most men don't know exists",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4330,
+      "subject": "The Triad most men don't know exists",
+      "status": "draft"
+    },
+    {
+      "scope": "draft-flow-template",
+      "action_id": "105690576",
+      "template_id": "SYtShj",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 05 - The protocol, the guarantee, and the math",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "retired_term_hits": [],
+      "html_bytes": 4362,
+      "subject": "The protocol, the guarantee, and the math",
+      "status": "draft"
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+{
+  "lines": 150,
+  "counts": {
+    "values": 12,
+    "messages-tuple": 138
+  },
+  "tools": [
+    {
+      "line": 21,
+      "calls": [
+        {
+          "name": "read_file",
+          "args": {},
+          "id": "call_00_Do1iPaoWrJp0rIoixxxB6994"
+        }
+      ]
+    },
+    {
+      "line": 22,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 23,
+      "calls": [
+        {
+          "name": "web_search",
+          "args": {},
+          "id": "call_01_3RcyOpIgOwczGOH36dnl4902"
+        }
+      ]
+    },
+    {
+      "line": 24,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 25,
+      "calls": [
+        {
+          "name": "web_search",
+          "args": {},
+          "id": "call_02_e0TJyiahbtqK38ukcnuX3313"
+        }
+      ]
+    },
+    {
+      "line": 26,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 30,
+      "tool": "read_file",
+      "content": "## IMPORTANT EXECUTION NOTE (constraints)\nYour spec requires: **(a) all scoring via calculator tool** and **(b) rankings computed via tool call**. During this run, the web tool hit a hard call-limit before I could execute the required calculator computations and sorting. Therefore:\n- I provide **evidence-backed competitor discovery + validation + raw dimension evidence** (traffic, review counts, longevity signals, content signals) with citations.\n- I **do not output computed Traction Scores or a"
+    },
+    {
+      "line": 31,
+      "tool": "web_search",
+      "content": "{\n  \"query\": \"best testosterone support supplements 2025 2026 similar to mengotomars\",\n  \"total_results\": 5,\n  \"results\": [\n    {\n      \"title\": \"Best Testosterone Booster | Expert recommendations in 2026\",\n      \"url\": \"https://www.innerbody.com/best-testosterone-booster\",\n      \"content\": \"In our opinion, the best testosterone booster currently on the market is Testosterone Support by Innerbody Labs. It offers some of the best- ...\"\n    },\n    {\n      \"title\": \"The Best Testosterone Boosters f"
+    },
+    {
+      "line": 32,
+      "tool": "web_search",
+      "content": "{\n  \"query\": \"men's testosterone booster supplement brands competitors market\",\n  \"total_results\": 5,\n  \"results\": [\n    {\n      \"title\": \"Testosterone Imposters: An Analysis of Popular Online ... - PMC\",\n      \"url\": \"https://pmc.ncbi.nlm.nih.gov/articles/PMC6407704/\",\n      \"content\": \"by A Balasubramanian · 2019 · Cited by 52 — Martin's Extra Strength Herbal Blend Testosterone Booster (Extra Strength), 3) Iron Brothers Supplements Testosterone Booster (Iron Brothers), 4) Prometheus ...\"\n    }"
+    },
+    {
+      "line": 64,
+      "calls": [
+        {
+          "name": "web_fetch",
+          "args": {},
+          "id": "call_00_bjnFWLzIVWR91lO0NjJG5972"
+        }
+      ]
+    },
+    {
+      "line": 65,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 66,
+      "calls": [
+        {
+          "name": "web_search",
+          "args": {},
+          "id": "call_01_Z3q1m8rgToAEChz3A5gC4316"
+        }
+      ]
+    },
+    {
+      "line": 67,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 71,
+      "tool": "web_search",
+      "content": "{\n  \"query\": \"testosterone support supplement direct-to-consumer brands TestoFuel Prime Male Hunter Test Testogen 2025 2026\",\n  \"total_results\": 5,\n  \"results\": [\n    {\n      \"title\": \"What is the Testosterone Booster Supplements Market Size in 2026?\",\n      \"url\": \"https://www.precedenceresearch.com/testosterone-booster-supplements-market\",\n      \"content\": \"The global testosterone booster supplements market size was evaluated at USD 3.82 billion in 2025 and is predicted to hit around USD 10.32"
+    },
+    {
+      "line": 72,
+      "tool": "web_fetch",
+      "content": "Error: Request to Jina API failed: ReadTimeout: "
+    },
+    {
+      "line": 91,
+      "calls": [
+        {
+          "name": "web_fetch",
+          "args": {},
+          "id": "call_00_JR5Sx1UzgCBfNhcYh9m53667"
+        }
+      ]
+    },
+    {
+      "line": 92,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 93,
+      "calls": [
+        {
+          "name": "web_fetch",
+          "args": {},
+          "id": "call_01_Vd8LGrL1WxKsy00mGJNC8326"
+        }
+      ]
+    },
+    {
+      "line": 94,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 95,
+      "calls": [
+        {
+          "name": "web_fetch",
+          "args": {},
+          "id": "call_02_lu48MGX55bWkJjoRcrld5713"
+        }
+      ]
+    },
+    {
+      "line": 96,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    },
+    {
+      "line": 100,
+      "tool": "web_fetch",
+      "content": "Error: Jina API returned status 503: upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+    },
+    {
+      "line": 101,
+      "tool": "web_fetch",
+      "content": "# The Best Testosterone Boosters of 2026: Tested | Fortune\n\nThere are many reasons to take testosterone boosters, especially if you have a busy professional life. For one, they can help you maintain [cognitive sharpness](https://pmc.ncbi.nlm.nih.gov/articles/PMC5079177/) and [boost resilience](https://pmc.ncbi.nlm.nih.gov/articles/PMC4330791/). They can also [optimize decision-making](https://academic.oup.com/jes/article/3/8/1465/5511564?login=false) in high-pressure environments—a crucial skill"
+    },
+    {
+      "line": 102,
+      "tool": "web_fetch",
+      "content": "# The Best Testosterone Booster in 2026\n\n![The five best testosterone boosters lined up against a blue background.](https://innerbody.imgix.net/best-testosterone-booster-upper-image-with-large-group.jpg?auto=format,compress&fit=max&w=826&q=75)\n\nPhoto by Innerbody Research\n\nTestosterone deficiency is a serious condition. It can cause weight gain, depression, loss of bone density, and reduced libido, among other worrying symptoms. But even if testosterone levels are within a normal range, men stil"
+    },
+    {
+      "line": 149,
+      "calls": [
+        {
+          "name": "write_file",
+          "args": {},
+          "id": "call_00_wsJq9x7LrwrFLLd8eUTj8908"
+        }
+      ]
+    },
+    {
+      "line": 150,
+      "calls": [
+        {
+          "name": "",
+          "args": {},
+          "id": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+# Context.dev
+
+## Docs
+
+- [Identify brand from transaction data](https://docs.context.dev/api-reference/brand-intelligence/identify-brand-from-transaction-data.md): Endpoint specially designed for platforms that want to identify transaction data by the transaction title.
+- [Retrieve brand data by company name](https://docs.context.dev/api-reference/brand-intelligence/retrieve-brand-data-by-company-name.md): Retrieve brand information using a company name.
+- [Retrieve brand data by domain](https://docs.context.dev/api-reference/brand-intelligence/retrieve-brand-data-by-domain.md): Retrieve logos, backdrops, colors, industry, description, and more from any domain
+- [Retrieve brand data by email address](https://docs.context.dev/api-reference/brand-intelligence/retrieve-brand-data-by-email-address.md): Retrieve brand information using an email address while detecting disposable and free email addresses. Disposable and free email addresses (like gmail.com, yahoo.com) will throw a 422 error.
+- [Retrieve brand data by stock ticker](https://docs.context.dev/api-reference/brand-intelligence/retrieve-brand-data-by-stock-ticker.md): Retrieve brand information using a stock ticker symbol.
+- [Retrieve simplified brand data by domain](https://docs.context.dev/api-reference/brand-intelligence/retrieve-simplified-brand-data-by-domain.md): Returns a simplified version of brand data containing only essential information: domain, title, colors, logos, and backdrops. Optimized for faster responses and reduced data transfer.
+- [Prefetch brand data by email](https://docs.context.dev/api-reference/utility/prefetch-brand-data-by-email.md): Signal that you may fetch brand data for a particular domain soon to improve latency. This endpoint accepts an email address, extracts the domain from it, validates that it's not a disposable or free email provider, and queues the domain for prefetching.
+- [Prefetch brand data for a domain](https://docs.context.dev/api-reference/utility/prefetch-brand-data-for-a-domain.md): Signal that you may fetch brand data for a particular domain soon to improve latency.
+- [Classify NAICS industries](https://docs.context.dev/api-reference/web-extraction/classify-naics-industries.md): Classify any brand into 2022 NAICS industry codes from its domain or name.
+- [Classify SIC industries](https://docs.context.dev/api-reference/web-extraction/classify-sic-industries.md): Classify any brand into Standard Industrial Classification (SIC) codes from its domain or name. Choose between the original SIC system (`original_sic`) or the latest SIC list maintained by the SEC (`latest_sec`).
+- [Extract a single product from a URL](https://docs.context.dev/api-reference/web-extraction/extract-a-single-product-from-a-url.md): Given a single URL, determines if it is a product page and extracts the product information.
+- [Extract products from a brand's website](https://docs.context.dev/api-reference/web-extraction/extract-products-from-a-brands-website.md): Extract product information from a brand's website. We will analyze the website and return a list of products with details such as name, description, image, pricing, features, and more.
+- [Query website data using AI](https://docs.context.dev/api-reference/web-extraction/query-website-data-using-ai.md): Use AI to extract specific data points from a brand's website. The AI will crawl the website and extract the requested information based on the provided data points.
+- [Scrape Fonts](https://docs.context.dev/api-reference/web-extraction/scrape-fonts.md): Scrape font information from a website including font families, usage statistics, fallbacks, and element/word counts.
+- [Scrape Styleguide](https://docs.context.dev/api-reference/web-extraction/scrape-styleguide.md): Extract a comprehensive design system from a website including colors, typography, spacing, shadows, and UI components.
+- [Crawl Sitemap](https://docs.context.dev/api-reference/web-scraping/crawl-sitemap.md): Crawl an entire website's sitemap and return all discovered page URLs.
+- [Crawl Website & Scrape Markdown](https://docs.context.dev/api-reference/web-scraping/crawl-website-&-scrape-markdown.md): Performs a crawl starting from a given URL, extracts page content as Markdown, and returns results for all crawled pages.
+- [Scrape HTML](https://docs.context.dev/api-reference/web-scraping/scrape-html.md): Scrapes the given URL and returns the raw HTML content of the page.
+- [Scrape Images](https://docs.context.dev/api-reference/web-scraping/scrape-images.md): Extract image assets from a web page, including standard URLs, inline SVGs, data URIs, responsive image sources, metadata, CSS backgrounds, video posters, and embeds. The base request costs 1 credit. When enrichment is enabled, the entire call costs 5 credits.
+- [Scrape Markdown](https://docs.context.dev/api-reference/web-scraping/scrape-markdown.md): Scrapes the given URL into LLM usable Markdown.
+- [Scrape Screenshot](https://docs.context.dev/api-reference/web-scraping/scrape-screenshot.md): Capture a screenshot of a website.
+- [Web Search](https://docs.context.dev/api-reference/web-scraping/web-search.md): Search the web and optionally scrape each result to Markdown in one round-trip.
+- [Authentication & API Keys](https://docs.context.dev/guides/get-started/authentication.md): Learn how to authenticate with Context.dev and manage your API keys securely
+- [Core Concepts](https://docs.context.dev/guides/get-started/core-concepts.md): Understand the foundational concepts behind Context.dev's APIs
+- [Fair Use](https://docs.context.dev/guides/get-started/fair-use.md): Guidance on fair use of brand data and responsible practices.
+- [Introduction](https://docs.context.dev/guides/get-started/introduction.md)
+- [Quickstart](https://docs.context.dev/guides/get-started/quickstart.md): Start building with Context.dev in 2 easy steps
+- [Troubleshooting](https://docs.context.dev/guides/get-started/troubleshooting.md): Common issues and solutions when using the Context.dev API
+- [AI Products Extraction](https://docs.context.dev/guides/use-cases/ai-products-extraction.md): Extract structured product data from any company's website using AI
+- [Automating Brand Kits](https://docs.context.dev/guides/use-cases/automating-brand-kits.md): Help users create on-brand designs instantly by auto-generating brand kits with logos, colors, fonts, and design tokens
+- [EIC (Easy Industry Classification)](https://docs.context.dev/guides/use-cases/industry-classification/eic.md): Context.dev's industry taxonomy: 24 top-level industries, 220 subindustries
+- [Introduction](https://docs.context.dev/guides/use-cases/industry-classification/introduction.md): How Context.dev classifies brands by industry — choose between EIC, NAICS, and SIC
+- [NAICS](https://docs.context.dev/guides/use-cases/industry-classification/naics.md): Classify brands using the 2022 NAICS taxonomy via the /web/naics endpoint
+- [SIC](https://docs.context.dev/guides/use-cases/industry-classification/sic.md): Classify brands using the Standard Industrial Classification (SIC) taxonomy via the /web/sic endpoint
+- [Lead Enrichment & CRM Integration](https://docs.context.dev/guides/use-cases/lead-enrichment.md): Automatically enrich leads with brand data, logos, and company information
+- [Pre-filled Onboarding Flows](https://docs.context.dev/guides/use-cases/onboarding-flows.md): Increase conversions and decrease user onboarding time by pre-filling company information during signup flow
+- [Powering Generative AI](https://docs.context.dev/guides/use-cases/powering-generative-ai.md): Keep AI-generated content on-brand by injecting real brand data into your generative AI workflows
+- [Transaction Categorization & Enrichment](https://docs.context.dev/guides/use-cases/transaction-categorization.md): Transform raw credit card and bank transactions into rich, branded experiences with company logos, names, and details
+- [Context.dev - Structured Web Data for AI](https://docs.context.dev/index.md): The infrastructure layer that turns the raw internet into structured knowledge. Brand data, web scraping, entity resolution, and AI-powered extraction from any domain.
+- [Overview](https://docs.context.dev/integrations/introduction.md): Explore ways to integrate Context.dev APIs with No-code tools
+- [Make Integration](https://docs.context.dev/integrations/make.md): Automate brand data workflows with Make (formerly Integromat)'s visual automation platform
+- [n8n Integration](https://docs.context.dev/integrations/n8n.md): Build self-hosted automation workflows with Context.dev and n8n
+- [Brand Client Slides](https://docs.context.dev/integrations/no-code/client-presentation-branding.md): Use Make.com to create branded client presentations automatically.
+- [MCP](https://docs.context.dev/integrations/no-code/mcp.md): Use Context.dev's Model Context Protocol (MCP) server to retrieve structured web data, brand assets, and company information from your favorite AI tools.
+- [Google Sheets](https://docs.context.dev/logolink/google-sheets.md): Display company logos in Google Sheets with Logo Link
+- [Implementation](https://docs.context.dev/logolink/implementation.md): Retrieve a company logo by domain
+- [Overview](https://docs.context.dev/logolink/index.md)
+- [Microsoft Excel](https://docs.context.dev/logolink/microsoft-excel.md): Display company logos in Excel with Logo Link
+- [Usage Restrictions](https://docs.context.dev/logolink/usage-restrictions.md)
+- [SDKs](https://docs.context.dev/sdks/index.md): Official Context.dev client libraries and links
+
+## OpenAPI Specs
+
+- [openapi.documented](https://app.stainless.com/api/spec/documented/context.dev/openapi.documented.yml)

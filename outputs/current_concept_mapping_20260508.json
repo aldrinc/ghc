@@ -1,0 +1,652 @@
+{
+  "adsets": [
+    {
+      "id": "120245546810650293",
+      "name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED"
+    },
+    {
+      "id": "120245546809780293",
+      "name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED"
+    },
+    {
+      "id": "120245546808650293",
+      "name": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED"
+    },
+    {
+      "id": "120245546807710293",
+      "name": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED"
+    },
+    {
+      "id": "120245546806580293",
+      "name": "Concept 1 - GLP Hidden Drive Drain",
+      "status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED"
+    }
+  ],
+  "rows": [
+    {
+      "adId": "120245565712310293",
+      "name": "ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "tenor-19-C018-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565686290293",
+      "name": "ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-23-C025-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565679490293",
+      "name": "ProblemAware GLP curated-01-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-01-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565783080293",
+      "name": "ProblemAware GLP tenor-04-C006-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-04-C006-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565751690293",
+      "name": "ProblemAware GLP tenor-10-C005-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-10-C005-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565589240293",
+      "name": "ProblemAware GLP curated-25-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-25-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565474940293",
+      "name": "ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-13-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565675360293",
+      "name": "ProblemAware GLP curated-02-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-02-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565660530293",
+      "name": "ProblemAware GLP curated-04-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-04-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565717600293",
+      "name": "ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "tenor-18-C017-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565758330293",
+      "name": "ProblemAware GLP tenor-09-C007-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-09-C007-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565765270293",
+      "name": "ProblemAware GLP tenor-08-C009-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-08-C009-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565450770293",
+      "name": "ProblemAware GLP curated-23-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-23-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565787480293",
+      "name": "ProblemAware GLP tenor-03-C004-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-03-C004-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565375630293",
+      "name": "ProblemAware QUIZ curated-30-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-30-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565598110293",
+      "name": "ProblemAware GLP curated-24-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-24-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565616550293",
+      "name": "ProblemAware GLP curated-07-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-07-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565575660293",
+      "name": "ProblemAware GLP curated-27-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-27-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565794240293",
+      "name": "ProblemAware GLP tenor-02-C002-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-02-C002-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565770990293",
+      "name": "ProblemAware GLP tenor-06-C008-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-06-C008-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565489550293",
+      "name": "ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-14-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565433800293",
+      "name": "ProblemAware GLP curated-29-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-29-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565360230293",
+      "name": "ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-09-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565353430293",
+      "name": "ProblemAware GLP curated-22-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-22-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565777310293",
+      "name": "ProblemAware GLP tenor-05-C011-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-05-C011-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565745320293",
+      "name": "ProblemAware GLP tenor-11-C010-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-11-C010-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565728830293",
+      "name": "ProblemAware QUIZ tenor-16-C020-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-16-C020-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565737940293",
+      "name": "ProblemAware QUIZ tenor-15-C019-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-15-C019-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565647410293",
+      "name": "ProblemAware GLP curated-06-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-06-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565724660293",
+      "name": "ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-17-C016-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565641800293",
+      "name": "ProblemAware GLP curated-09-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-09-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565708740293",
+      "name": "ProblemAware QUIZ tenor-20-C021-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "tenor-20-C021-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565697080293",
+      "name": "ProblemAware QUIZ tenor-22-C024-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "tenor-22-C024-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565701550293",
+      "name": "ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-21-C023-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565668440293",
+      "name": "ProblemAware GLP curated-03-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-03-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565654400293",
+      "name": "ProblemAware GLP curated-05-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-05-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565520720293",
+      "name": "ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-06-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565609280293",
+      "name": "ProblemAware GLP curated-18-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-18-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565629900293",
+      "name": "ProblemAware GLP curated-14-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-14-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565603120293",
+      "name": "ProblemAware GLP curated-19-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-19-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565583300293",
+      "name": "ProblemAware GLP curated-26-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-26-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565444020293",
+      "name": "ProblemAware QUIZ curated-20-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-20-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565537520293",
+      "name": "ProblemAware QUIZ curated-04-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-04-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565567510293",
+      "name": "ProblemAware GLP curated-28-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-28-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565559840293",
+      "name": "ProblemAware GLP curated-30-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-30-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565554300293",
+      "name": "ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-01-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565546590293",
+      "name": "ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-03-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565391920293",
+      "name": "ProblemAware QUIZ curated-28-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-28-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565503270293",
+      "name": "ProblemAware QUIZ curated-10-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-10-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565511890293",
+      "name": "ProblemAware QUIZ curated-08-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-08-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565529250293",
+      "name": "ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-05-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565495300293",
+      "name": "ProblemAware QUIZ curated-15-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-15-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565482270293",
+      "name": "ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-19-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565466100293",
+      "name": "ProblemAware QUIZ curated-11-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-11-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565457710293",
+      "name": "ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-12-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565356280293",
+      "name": "ProblemAware QUIZ curated-07-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-07-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565411660293",
+      "name": "ProblemAware QUIZ curated-23-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-23-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565417630293",
+      "name": "ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-16-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565370170293",
+      "name": "ProblemAware QUIZ curated-25-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-25-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565398730293",
+      "name": "ProblemAware QUIZ curated-29-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-29-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565383840293",
+      "name": "ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-27-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245565364870293",
+      "name": "ProblemAware GLP curated-11-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-11-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548839200293",
+      "name": "ProblemAware GLP tenor-13-C013-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "tenor-13-C013-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548847040293",
+      "name": "ProblemAware GLP tenor-12-C012-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-12-C012-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548603810293",
+      "name": "ProblemAware GLP curated-12-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-12-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548546910293",
+      "name": "ProblemAware GLP curated-21-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-21-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548941330293",
+      "name": "ProblemAware GLP tenor-01-C001-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-01-C001-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548889430293",
+      "name": "ProblemAware GLP tenor-07-C003-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-07-C003-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548830990293",
+      "name": "ProblemAware QUIZ tenor-14-C022-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-14-C022-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245547710850293",
+      "name": "ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-26-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548619770293",
+      "name": "ProblemAware GLP curated-08-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-08-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548634220293",
+      "name": "ProblemAware GLP curated-10-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-10-glp",
+      "adsetId": "120245546806580293",
+      "adsetName": "Concept 1 - GLP Hidden Drive Drain",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548559220293",
+      "name": "ProblemAware GLP curated-20-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-20-glp",
+      "adsetId": "120245546807710293",
+      "adsetName": "Concept 2 - GLP Muscle + Metabolism Protection",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245548379050293",
+      "name": "ProblemAware GLP curated-15-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-15-glp",
+      "adsetId": "120245546808650293",
+      "adsetName": "Concept 3 - GLP Doctor-Missed Side Effect",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245547857090293",
+      "name": "ProblemAware QUIZ curated-18-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-18-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245547775070293",
+      "name": "ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-22-quiz",
+      "adsetId": "120245546810650293",
+      "adsetName": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    },
+    {
+      "adId": "120245547787990293",
+      "name": "ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-21-quiz",
+      "adsetId": "120245546809780293",
+      "adsetName": "Concept 4 - Quiz Daily Decline / System Problem",
+      "effectiveStatus": "CAMPAIGN_PAUSED"
+    }
+  ]
+}

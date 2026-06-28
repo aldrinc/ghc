@@ -8,9 +8,9 @@ type PageHeaderProps = PropsWithChildren<{
 }>;
 
 export function PageHeader({ title, description, actions, children, compact = false }: PageHeaderProps) {
-  const containerClass = compact ? "flex flex-col gap-1 border-b border-border pb-3" : "flex flex-col gap-2 border-b border-border pb-4";
-  const titleClass = compact ? "text-lg font-semibold text-content" : "text-xl font-semibold text-content";
-  const descriptionClass = compact ? "text-xs text-content-muted" : "text-sm text-content-muted";
+  const containerClass = compact ? "flex flex-col gap-2 border-b border-border pb-3" : "flex flex-col gap-3 border-b border-border pb-5";
+  const titleClass = compact ? "font-display text-lg font-normal text-content" : "font-display text-2xl font-normal text-content";
+  const descriptionClass = compact ? "text-xs leading-relaxed text-content-muted" : "text-md leading-relaxed text-content-muted";
   return (
     <div className={containerClass}>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">

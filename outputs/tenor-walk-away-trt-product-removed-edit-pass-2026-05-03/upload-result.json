@@ -1,0 +1,246 @@
+{
+  "batchId": "tenor-walk-away-trt-product-removed-edit-20260503",
+  "assetCount": 30,
+  "rows": [
+    {
+      "key": "01-boss-babe",
+      "oldAssetId": "80e162c3-13a2-4584-a6ce-020daf04e55e",
+      "assetId": "94340798-9c5b-497a-985d-12b944824913",
+      "publicId": "37c7dac0-6dfe-4376-820b-85a62e078110",
+      "storageKey": "dev/orig/ad/adc13a2ba3d9ec2aae72b302050a141c30c3e2b53dcfc5d1b97849edaaaaeeb7.jpg",
+      "edited": false
+    },
+    {
+      "key": "02-spanish-doctor-cta",
+      "oldAssetId": "417d5bae-bd93-49e1-b0cf-6e3aaa804ae4",
+      "assetId": "4266bff1-2f9b-4c2b-96f0-ea26cbb66bd6",
+      "publicId": "62e9b3a5-6e20-4f96-80ca-104b44302082",
+      "storageKey": "dev/orig/ec/ec15d8870248228cad080874b1acd75a192d30cd4fd62ee4632e048b3592f4c6.jpg",
+      "edited": false
+    },
+    {
+      "key": "03-old-school",
+      "oldAssetId": "9b823e1d-bf70-4232-9024-a053bde91178",
+      "assetId": "1f8e4b4b-b8a8-43bb-8136-de6a25e517d4",
+      "publicId": "0cf7c52a-7054-4b5d-931e-7824cfa19f8d",
+      "storageKey": "dev/orig/38/382ec48ed9e2795a7327182afc405da3d56c345d860c54fa5ab3db3cfe95aad5.jpg",
+      "edited": false
+    },
+    {
+      "key": "04-static-3",
+      "oldAssetId": "881ed8fe-61a7-4bfc-afee-c483144774be",
+      "assetId": "bb136e6d-4ed0-45cd-862f-eec8cc61249b",
+      "publicId": "a7dcb2d7-074c-4b0c-bf94-e64c45a01ec7",
+      "storageKey": "dev/orig/24/2406bf35dfee57793f1b2b9977d4aff66697ac5526332f90017745c1ae02673e.jpg",
+      "edited": true
+    },
+    {
+      "key": "05-seven",
+      "oldAssetId": "d9470a01-b151-44e9-bb8f-2ab11d961c07",
+      "assetId": "7f4136d9-f0a4-4a1c-bf42-cd5f786bc056",
+      "publicId": "a9e7f6f7-a932-42b7-b94a-b89ffc027d4a",
+      "storageKey": "dev/orig/4d/4d881a47ca0600e62fbe06ed476ed8d097137578160155e4de66e873ca175f55.jpg",
+      "edited": true
+    },
+    {
+      "key": "06-derm-fag",
+      "oldAssetId": "73c763df-a256-45f5-938d-e45d2e804990",
+      "assetId": "61616a01-09a0-4062-b74a-1137d98365b5",
+      "publicId": "9059da73-e923-47df-b1e4-413be5e30794",
+      "storageKey": "dev/orig/8e/8e258ae97d906d039237d816e5506669b2fa6cc9803be79358fc3e44c9ae9b48.jpg",
+      "edited": false
+    },
+    {
+      "key": "07-six",
+      "oldAssetId": "7188ade4-1645-4cd1-b2bd-020f03400f14",
+      "assetId": "6f4634cd-7332-4eb9-9c42-f548cd8f4338",
+      "publicId": "4254d3f6-4811-4b8b-9493-141c51414aec",
+      "storageKey": "dev/orig/f9/f9d8e9fc4516f7c1ecd7652ba24116be4639acd3397fc918ac7dbd29c0411443.jpg",
+      "edited": true
+    },
+    {
+      "key": "08-fatigue",
+      "oldAssetId": "a19147bb-b798-4c93-b31d-90c2ba6c560e",
+      "assetId": "d4090b53-97d8-4362-9c9c-6a4071860182",
+      "publicId": "be370306-2e14-41ee-adc7-f51736e63d21",
+      "storageKey": "dev/orig/38/3830237dedb670780ffacafe936abd555755e2f3c6190e668513135ed289f9d1.jpg",
+      "edited": false
+    },
+    {
+      "key": "09-static-4",
+      "oldAssetId": "096fe195-3a27-45f1-a28e-3e258f613276",
+      "assetId": "80c3bfca-7d14-4c64-abf1-e1f611231ccf",
+      "publicId": "1e9f0370-0d1d-4468-bee3-1a7a8004c46c",
+      "storageKey": "dev/orig/25/25da750cc5b4fdd11a424aec4609dd9c3cfa8daf58b0ab8668662eec881c76b4.jpg",
+      "edited": true
+    },
+    {
+      "key": "10-care-bag",
+      "oldAssetId": "76c8690a-ed90-4be3-810d-dfe22fc2dcf2",
+      "assetId": "1b697cd5-6d09-45fa-965e-0aed36b17caf",
+      "publicId": "d2e570d6-f180-4c43-ab3f-cff99324ce6f",
+      "storageKey": "dev/orig/2d/2dfba1c80d73a8648f5878bbcb8a519488c7632522861a8a6f71295e0a03a5c8.jpg",
+      "edited": true
+    },
+    {
+      "key": "11-eight",
+      "oldAssetId": "c614cf97-458d-4688-8b74-3ad300595e54",
+      "assetId": "ee9a8100-13b5-4555-beb3-99316f76bb48",
+      "publicId": "80f271ac-1b03-4e8a-adff-5c436a178ea7",
+      "storageKey": "dev/orig/b8/b83db3cc06d412770c8855360670ce943a90c7d1cbe6928982070dcce3005cd9.jpg",
+      "edited": true
+    },
+    {
+      "key": "12-static-1",
+      "oldAssetId": "bec14033-f8a4-4f4b-94fa-12c94046e46b",
+      "assetId": "fec3cbdc-2341-4c00-976c-a5758ad41403",
+      "publicId": "84e08891-191d-4189-98dd-b5c96e909771",
+      "storageKey": "dev/orig/12/1241c09ce4b356e724c51d753faae94c3bdf609426437e51c2463992c60c3316.jpg",
+      "edited": true
+    },
+    {
+      "key": "13-static-2",
+      "oldAssetId": "1d271033-16a7-4285-884c-c77748bb27c1",
+      "assetId": "df9d4771-0942-4ef4-9d09-f4c795455e01",
+      "publicId": "18f59f6f-6e2d-48b5-9c13-08db8a85754a",
+      "storageKey": "dev/orig/cc/cc255760ff13dddf73f831b322a8fd40f231dc8eac22ec30d45e4ed97e96597a.jpg",
+      "edited": true
+    },
+    {
+      "key": "14-eleven",
+      "oldAssetId": "e9858314-b995-4d04-aa6e-1160f532f944",
+      "assetId": "28e33d05-5c8a-4f32-bd05-d835f2351c43",
+      "publicId": "4faf62a5-ec07-4ed4-9f85-25324d80a857",
+      "storageKey": "dev/orig/5a/5ab9d5fe2e69bfb9530da02b3b451a8b87b63f77c27865e6251286dc52dccb16.jpg",
+      "edited": true
+    },
+    {
+      "key": "15-drawing",
+      "oldAssetId": "196460ee-1e45-47e5-9d91-34f4e6bdc284",
+      "assetId": "cc2bc22b-ba3f-4ced-bdeb-67df23f89df6",
+      "publicId": "91de0a74-0df8-4497-95f1-b663297baf34",
+      "storageKey": "dev/orig/69/69a2650a82c7886a35a0b3b9b44d45b478eb7cb82d875f29b9c94d49200f5935.jpg",
+      "edited": false
+    },
+    {
+      "key": "16-brush",
+      "oldAssetId": "48c9e014-7c96-48e1-878f-b1bdf5feb256",
+      "assetId": "0ae4e398-0026-49bb-a7e6-b8b5c2de4410",
+      "publicId": "9553ce37-785a-45e3-86f9-5f7352f1b3e8",
+      "storageKey": "dev/orig/c0/c012a1d6130de24daca3ed8f98b90ef21bd86a8350449e9ebe3385faf5957b2c.jpg",
+      "edited": true
+    },
+    {
+      "key": "17-researchers",
+      "oldAssetId": "ee2be5ab-fb9d-4d86-ae46-9ed72aca5eb5",
+      "assetId": "cdc36e45-d6a5-420e-82c3-7753e4561ad6",
+      "publicId": "a9123c4c-9949-47cc-9e42-0f6b307336d9",
+      "storageKey": "dev/orig/70/70cdd849a87bb5f53171bc9a04a934f0b4c7378bef54bf3875f48aac7451e786.jpg",
+      "edited": false
+    },
+    {
+      "key": "18-target-1",
+      "oldAssetId": "5cfb9670-d37b-408d-a2a0-075f64b5b2cc",
+      "assetId": "04a9a769-4197-4355-8c09-aadf21254539",
+      "publicId": "fa912bf9-232b-4b27-89c8-4e356550626f",
+      "storageKey": "dev/orig/98/98476ec52e6f3f19ee56e69322cb1da6708ba341067950c362190b4ac688d50a.jpg",
+      "edited": true
+    },
+    {
+      "key": "19-big-text",
+      "oldAssetId": "0640ba24-14b0-435e-8681-b22bc4e67b20",
+      "assetId": "9c7bd3a5-d5d0-4541-8835-2979de3737f7",
+      "publicId": "81529e7b-1b9e-48eb-9c93-0c831a8e9318",
+      "storageKey": "dev/orig/d2/d2c4b7c535c59d52161c67a415f8ebfba6cf2d07e0d644ea5c661e60e805106f.jpg",
+      "edited": false
+    },
+    {
+      "key": "20-nine",
+      "oldAssetId": "4daf46bc-625c-4401-ba93-9c50fac0c3b1",
+      "assetId": "64682b5d-cbe6-4bf8-b04e-0edede6c182d",
+      "publicId": "8628ce00-88c1-4c9f-9e30-9a707c99a48a",
+      "storageKey": "dev/orig/38/38c780f5aba1b31738eb93a80f4202c4288514d4ad2b376fafac282832115370.jpg",
+      "edited": true
+    },
+    {
+      "key": "21-ten",
+      "oldAssetId": "c6dbf060-7bae-406c-8c59-ee3cd9f1bbbd",
+      "assetId": "e64053e3-fa46-4d33-9711-1a9093c86bde",
+      "publicId": "fdc54dec-970d-4ee8-a8bd-aed74aecbdfc",
+      "storageKey": "dev/orig/0a/0a162cf4be512f531d5dc2e9a6b5d00cefad52f7f2ef24da7161ebe734cf68eb.jpg",
+      "edited": true
+    },
+    {
+      "key": "22-twelve",
+      "oldAssetId": "14b932f7-f61a-4917-a8f4-dbc915451f4b",
+      "assetId": "f0dc95e1-fe15-4577-bad8-d0b1c0430886",
+      "publicId": "9a5d5f7a-8b29-4056-9aed-0f1b5015bc8a",
+      "storageKey": "dev/orig/24/24d8ece0de53e6be9eb1cb86f9eaa5241aca7d9a3b6353d9eb9da43c8333d011.jpg",
+      "edited": true
+    },
+    {
+      "key": "23-raise-a-winner",
+      "oldAssetId": "939e3bd8-f4ca-4d83-9d32-19dcf13e3a66",
+      "assetId": "53c740c8-b81f-48b0-9f46-19d34dce590e",
+      "publicId": "3d3d4308-26af-4591-a391-667039d89294",
+      "storageKey": "dev/orig/23/234972b39deee27eafe9d73fe08b55b09a8a9eb4d6d624b096b646defcb100e8.jpg",
+      "edited": true
+    },
+    {
+      "key": "24-green",
+      "oldAssetId": "e9878d46-524e-4124-a986-749772b97e13",
+      "assetId": "470400ed-7263-4f49-947e-87719fa2a82c",
+      "publicId": "7ebfc240-888b-4999-8939-e6a6bb21cb7c",
+      "storageKey": "dev/orig/b0/b01536e74007433757504b25fa8182fc39fc9e69735641e927bd54621188cf76.jpg",
+      "edited": false
+    },
+    {
+      "key": "25-grocery",
+      "oldAssetId": "722076eb-cf2c-46f5-8d8b-893a74768591",
+      "assetId": "1c7403a9-19f8-45d9-a72c-4a59e8e3c982",
+      "publicId": "f6339314-5907-4d0f-a858-1cd65b61fcce",
+      "storageKey": "dev/orig/94/94821526a690576ca22599cba36a4681c1090009ef9de705b34ead542ff1dcc7.jpg",
+      "edited": false
+    },
+    {
+      "key": "26-women-health",
+      "oldAssetId": "9688e568-dc42-4d26-a8b0-72de56137e2f",
+      "assetId": "56ed80c3-040f-466b-ab48-b7f32d5721ab",
+      "publicId": "a08cfb4f-c1c2-4172-a345-c087b3c93e4b",
+      "storageKey": "dev/orig/85/8522c40ee22f35b62d0c452893661468cd924a4bae04c78709b4012114bc577b.jpg",
+      "edited": false
+    },
+    {
+      "key": "27-health-cute-advertorial",
+      "oldAssetId": "de62234d-a6a5-4c4c-ae60-027a95f09513",
+      "assetId": "92adea0c-4854-490c-98f4-7c1752d8e2bd",
+      "publicId": "877f2939-b68a-46c6-bf51-869888510e43",
+      "storageKey": "dev/orig/00/00ce351ddfc103be65d59727a3a57891beb8e14927512f44a035b225120c31f4.jpg",
+      "edited": true
+    },
+    {
+      "key": "28-five",
+      "oldAssetId": "e5d45b20-6354-49ae-9446-1990cbe6e9b5",
+      "assetId": "476e1cf8-c6e2-449e-966c-87ce6fe3acce",
+      "publicId": "a1c6accb-f020-4717-b000-5040241ed883",
+      "storageKey": "dev/orig/f0/f025baf6df033308517afef548d8bdbf7e7032235109761919c994c93cc7cc34.jpg",
+      "edited": true
+    },
+    {
+      "key": "29-fb-message-ad",
+      "oldAssetId": "4a98e6c6-e9cb-4c3e-ac5c-277302d670dc",
+      "assetId": "ce62fdae-4560-431a-9f8e-bf5ccc3d749a",
+      "publicId": "47a1b0a4-f83d-492c-9c0c-79044726de1c",
+      "storageKey": "dev/orig/f8/f83921e00edcd93c4b28094ad6ecf37bf8a03fd3bb1b4c8b55d191bafe79e828.jpg",
+      "edited": false
+    },
+    {
+      "key": "30-researchers-alt",
+      "oldAssetId": "ae5e2163-3be3-4e4b-842b-9518d9400036",
+      "assetId": "868525dd-7412-42b0-a75d-7d9cb83163bb",
+      "publicId": "f9952984-f09d-4204-881d-b1b0ad0d7646",
+      "storageKey": "dev/orig/a3/a394061a60111a7eed77b91a3a87fcc346bc330ef77621aa5d81dcececceb3d8.jpg",
+      "edited": false
+    }
+  ]
+}

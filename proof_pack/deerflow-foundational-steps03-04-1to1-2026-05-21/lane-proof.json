@@ -1,0 +1,97 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Native sub-agents were not needed. Execution was sequential because Step 04 depended on Step 03's generated prompt; local parallel tools handled inspection and proof capture.",
+  "lanes": [
+    {
+      "lane_id": "execution",
+      "objective": "Run DSV4 Step 03 and Step 04 through DeerFlow.",
+      "role": "main_thread",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-21T19:56:00Z",
+      "ended_at": "2026-05-21T20:12:00Z",
+      "read_scope": [
+        "V2 Fixes/Foundational Docs/clean_prompts",
+        ".local/tenor-strategy-run-docs-prod-20260426"
+      ],
+      "write_scope": [
+        "outputs/dsv4-step03-raw.md",
+        "outputs/dsv4-step03-summary.md",
+        "outputs/dsv4-step03-content.md",
+        "outputs/dsv4-step03-run.meta.json",
+        "outputs/dsv4-step03-step4-prompt.md",
+        "runs",
+        "runs-continuation"
+      ],
+      "artifacts": [
+        "outputs/dsv4-step03-raw.md",
+        "outputs/dsv4-step03-step4-prompt.md",
+        "runs/dsv4-foundational-03-04-1to1/step-04/run-meta.json",
+        "runs-continuation/dsv4-foundational-03-04-1to1/step-04/run-meta.json"
+      ],
+      "summary": "Step 03 passed. Step 04 ran and failed final tagged output; continuation also failed."
+    },
+    {
+      "lane_id": "analysis",
+      "objective": "Compare DSV4 outputs against GPT artifacts and compute cost.",
+      "role": "local analyzer",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-21T20:12:00Z",
+      "ended_at": "2026-05-21T20:18:00Z",
+      "read_scope": [
+        "outputs",
+        "runs",
+        ".local/tenor-strategy-run-docs-prod-20260426/artifacts"
+      ],
+      "write_scope": [
+        "outputs/dsv4-foundational-03-04-validation.json",
+        "outputs/dsv4-vs-gpt-foundational-03-04-comparison.md"
+      ],
+      "artifacts": [
+        "outputs/dsv4-foundational-03-04-validation.json",
+        "outputs/dsv4-vs-gpt-foundational-03-04-comparison.md"
+      ],
+      "summary": "Comparison records Step 03 pass, Step 04 fail, total promo cost about $0.1262, and no Step 06 run."
+    },
+    {
+      "lane_id": "proof",
+      "objective": "Capture source manifest, provenance, and contract verification.",
+      "role": "local proof tooling",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-21T20:18:00Z",
+      "ended_at": "2026-05-21T20:20:00Z",
+      "read_scope": [
+        "outputs",
+        "runs",
+        "sources"
+      ],
+      "write_scope": [
+        "sources/run-evidence",
+        "plan.contract.json",
+        "planctl-verify.log"
+      ],
+      "artifacts": [
+        "sources/run-evidence/source_manifest.json",
+        "capturectl-verify.log",
+        "provcheck-comparison.log",
+        "planctl-verify.log"
+      ],
+      "summary": "Source manifest, provenance, and plan contract passed."
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "Codex execution agent",
+    "summary": "03/04 benchmark is complete with Step 04 failure captured and no Step 06 run."
+  },
+  "token_time_proxy": {
+    "step03_total_tokens": 19254,
+    "step04_failed_total_tokens": 1759126,
+    "continuation_total_tokens": 16379,
+    "serper_searches": 69,
+    "step06_run": false
+  }
+}

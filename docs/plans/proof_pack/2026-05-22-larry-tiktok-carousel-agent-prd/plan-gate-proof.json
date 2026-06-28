@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-22T00:00:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user requested a reviewable senior-engineer design, not implementation. The provided Larry package, existing repo Postiz implementation, and standing mOS constraints were enough to produce a draft with explicit open decisions rather than blocking on questions.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/goal.md",
+      "summary": "Goal for Larry-style TikTok carousel and conversion-loop support."
+    },
+    "problem_log": {
+      "path": "planning/problem-log.md",
+      "summary": "Observable gaps between Larry package and mOS product architecture."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/root-cause.md",
+      "summary": "Need to separate creative production, provider publication, and conversion feedback."
+    },
+    "current_machine": {
+      "path": "planning/current-machine.md",
+      "summary": "Current mOS Postiz/Hermes/assets state."
+    },
+    "designed_machine": {
+      "path": "planning/designed-machine.md",
+      "summary": "Target content growth program loop."
+    },
+    "worst_day_test": {
+      "path": "planning/worst-day.md",
+      "summary": "Failure modes and safe behavior."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/metrics.md",
+      "summary": "Leading and lagging metrics without fabricated targets."
+    },
+    "owner_date_review": {
+      "path": "planning/owner-review.md",
+      "summary": "Owner, date, and review point."
+    },
+    "stop_condition": {
+      "path": "planning/stop-condition.md",
+      "summary": "Design completion criteria."
+    }
+  },
+  "owner": "Aldrin / mOS",
+  "review_date": "2026-05-22",
+  "stop_condition": "PRD and proof artifacts exist, source capture verifies, plangatecheck passes, and implementation has not started."
+}

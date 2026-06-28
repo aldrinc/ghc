@@ -1,0 +1,71 @@
+{
+  "url": "http://localhost:5275/workspaces/new",
+  "states": [
+    {
+      "label": "workspace",
+      "progress": 12,
+      "heading": "What should we call this workspace?",
+      "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+      "titleFontSize": "32px",
+      "titleLineHeight": "35.84px",
+      "titleFontWeight": "650"
+    },
+    {
+      "label": "business-type",
+      "progress": 24,
+      "heading": "Is this a new or already live business?",
+      "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+      "titleFontSize": "32px",
+      "titleLineHeight": "35.84px",
+      "titleFontWeight": "650"
+    },
+    {
+      "label": "business-type-selected-existing",
+      "progress": 24,
+      "heading": "Is this a new or already live business?",
+      "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+      "titleFontSize": "32px",
+      "titleLineHeight": "35.84px",
+      "titleFontWeight": "650"
+    },
+    {
+      "label": "existing-url",
+      "progress": 48,
+      "heading": "What is the business website?",
+      "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+      "titleFontSize": "32px",
+      "titleLineHeight": "35.84px",
+      "titleFontWeight": "650"
+    },
+    {
+      "label": "existing-competitors",
+      "progress": 72,
+      "heading": "Any competitors your agent should know about?",
+      "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+      "titleFontSize": "32px",
+      "titleLineHeight": "35.84px",
+      "titleFontWeight": "650"
+    }
+  ],
+  "styles": {
+    "label": {
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "15px",
+      "fontWeight": "600"
+    },
+    "description": {
+      "color": "color(srgb 0.294118 0.321569 0.376471)",
+      "fontSize": "13px",
+      "lineHeight": "20.15px"
+    },
+    "textarea": {
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "borderColor": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "placeholderOpacity": "1"
+    },
+    "stepOpacity": "1"
+  },
+  "monotonicAroundBranchChoice": true,
+  "headingUsesSans": true,
+  "fieldTextReadable": true
+}

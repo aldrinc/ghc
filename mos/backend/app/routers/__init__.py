@@ -17,6 +17,7 @@ from app.routers import (
 from app.routers import (
     claude,
     gemini,
+    ragflow,
     compliance,
     deep_research,
     explore,
@@ -61,6 +62,7 @@ __all__ = [
     "deploy",
     "claude",
     "gemini",
+    "ragflow",
     "compliance",
     "deep_research",
     "explore",

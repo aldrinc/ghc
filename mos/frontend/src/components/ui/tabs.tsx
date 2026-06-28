@@ -12,7 +12,7 @@ export const TabsList = forwardRef<HTMLDivElement, BaseTabs.List.Props>(function
     <BaseTabs.List
       ref={ref}
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 p-1",
+        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-[12px] border-[1.5px] border-border bg-surface-2 p-1",
         className
       )}
       {...props}
@@ -28,7 +28,7 @@ export const TabsTrigger = forwardRef<HTMLButtonElement, BaseTabs.Tab.Props>(fun
     <BaseTabs.Tab
       ref={ref}
       className={cn(
-        "inline-flex min-w-[100px] items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-content-muted transition data-[selected]:bg-surface data-[selected]:shadow-sm data-[selected]:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2",
+        "inline-flex min-w-0 flex-1 items-center justify-center rounded-[8px] px-4 py-2 text-sm font-semibold tracking-normal text-content-muted transition-[background,color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)] data-[selected]:bg-surface data-[selected]:shadow-sm data-[selected]:text-content focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-[0_0_0_4px_var(--ring)] sm:min-w-[104px] sm:flex-none",
         className
       )}
       {...props}

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Proof Dashboard</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172026; background: #f7f8fa; }
+    header { padding: 24px 28px; background: #172026; color: white; }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    h2 { margin: 26px 0 10px; font-size: 17px; }
+    main { padding: 22px 28px 36px; max-width: 1180px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .card { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 14px; }
+    .label { color: #5b6875; font-size: 12px; text-transform: uppercase; }
+    .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pass { background: #d9f4e4; color: #146c3c; }
+    .fail { background: #ffe1df; color: #9c231e; }
+    .warn { background: #fff1c7; color: #7b5600; }
+    .neutral { background: #e9edf2; color: #4b5663; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d9dee5; border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e7ebef; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #eef2f6; font-size: 12px; color: #394653; }
+    tr:last-child td { border-bottom: 0; }
+    code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Codex Proof Dashboard</h1>
+    <div>Ferndesk design system onboarding</div>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="card"><div class="label">Plan Contract</div><div class="value"><span class="pill pass">pass</span></div></div>
+      <div class="card"><div class="label">Source Manifest</div><div class="value"><span class="pill pass">pass</span></div></div>
+      <div class="card"><div class="label">Provenance</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Planning Gate</div><div class="value"><span class="pill pass">full</span></div></div>
+      <div class="card"><div class="label">Plan Questions</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Parallelism</div><div class="value"><span class="pill pass">native_subagents</span></div></div>
+      <div class="card"><div class="label">Lanes</div><div class="value">3</div></div>
+      <div class="card"><div class="label">Proof Files</div><div class="value">57</div></div>
+    </section>
+
+    <h2>Plan Items</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Status</th><th>Objective</th><th>Expected Files</th><th>Artifacts</th></tr></thead>
+      <tbody><tr><td>P00</td><td><span class='pill pass'>done</span></td><td>Capture and verify the user-provided FernDesk reference video before synthesis.</td><td>proof_pack/design-system-ferndesk-2026-05-20/source/source_manifest.json, proof_pack/design-system-ferndesk-2026-05-20/source/video-contact-sheet.jpg, proof_pack/design-system-ferndesk-2026-05-20/source/video-color-samples.json</td><td>proof_pack/design-system-ferndesk-2026-05-20/source/source_manifest.json, proof_pack/design-system-ferndesk-2026-05-20/source/video-contact-sheet.jpg, proof_pack/design-system-ferndesk-2026-05-20/source/video-color-samples.json</td></tr>
+<tr><td>P01</td><td><span class='pill pass'>done</span></td><td>Validate Dalio planning gate artifacts for this non-trivial implementation plan.</td><td>proof_pack/design-system-ferndesk-2026-05-20/plan-gate-proof.json, proof_pack/design-system-ferndesk-2026-05-20/planning/goal.md, proof_pack/design-system-ferndesk-2026-05-20/planning/problem-log.md, proof_pack/design-system-ferndesk-2026-05-20/planning/root-cause.md</td><td>proof_pack/design-system-ferndesk-2026-05-20/plan-gate-proof.json, proof_pack/design-system-ferndesk-2026-05-20/planning</td></tr>
+<tr><td>P02</td><td><span class='pill pass'>done</span></td><td>Implement design-system foundation for the FernDesk-style first-run experience.</td><td>mos/frontend/src/styles/theme.css, mos/frontend/src/styles/design-system.css, mos/frontend/src/components/onboarding/FirstRunShell.tsx, mos/frontend/src/components/onboarding/ContextPreviewPanel.tsx, mos/frontend/src/components/onboarding/OnboardingProgressRail.tsx, mos/frontend/src/components/onboarding/ChoiceList.tsx, mos/frontend/src/components/onboarding/SetupChecklist.tsx, mos/frontend/src/components/onboarding/IntegrationPillGrid.tsx, mos/frontend/src/components/onboarding/AgentWorkLog.tsx, mos/frontend/src/components/onboarding/ReviewChangesPanel.tsx, mos/frontend/src/components/onboarding/PublishProgressDialog.tsx, mos/frontend/src/components/onboarding/index.ts, mos/frontend/src/components/onboarding/FirstRunShell.test.tsx, mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx</td><td>mos/frontend/src/styles/theme.css, mos/frontend/src/styles/design-system.css, mos/frontend/src/components/onboarding, mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx, proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log, proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log, proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log</td></tr>
+<tr><td>P03</td><td><span class='pill pass'>done</span></td><td>Rebuild workspace onboarding on top of the new first-run design components.</td><td>mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/components/onboarding, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png</td><td>mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx, mos/frontend/src/components/clients/OnboardingWizard.tsx, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png, proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log, proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log</td></tr>
+<tr><td>P04</td><td><span class='pill pass'>done</span></td><td>Run final validation and produce proof dashboard after implementation.</td><td>proof_pack/design-system-ferndesk-2026-05-20/index.html, proof_pack/design-system-ferndesk-2026-05-20/lane-proof.json, proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log, proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log, proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png</td><td>proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log, proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log, proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png, proof_pack/design-system-ferndesk-2026-05-20/index.html</td></tr></tbody>
+    </table>
+
+    <h2>Plan Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Plan Warnings</h2>
+    <div class="card"><ul><li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:147: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:176: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:221: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:2926: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:3043: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:147: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:176: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:221: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:2926: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx:3043: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:955: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1020: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1096: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1121: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1134: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1146: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1160: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1192: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1205: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1215: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1232: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1251: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1286: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1417: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1486: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1511: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1540: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1555: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1573: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1591: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1616: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1635: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1654: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1674: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1693: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1735: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:955: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1020: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1096: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1121: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1134: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1146: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1160: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1192: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1205: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1215: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1232: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1251: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1286: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1417: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1486: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1511: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1540: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1555: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1573: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1591: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1616: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1635: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1654: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1674: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1693: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1735: brittle marker `placeholder`</li></ul></div>
+
+    <h2>Provenance Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Blocked Source Items</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Planning Gate Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> full</div>
+      <div><strong>Skill loaded:</strong> True</div>
+      <div><strong>Questions:</strong> 0</div>
+      <div><strong>Question rationale:</strong> The user supplied the reference video and explicit sequencing: update the design system first, then update onboarding to match the FernDesk-style experience. Repo inspection supplied current implementation context. No implementation starts until the user approves with Ship the plan.</div>
+      <div><strong>Owner:</strong> main</div>
+      <div><strong>Review:</strong> 2026-05-20</div>
+      <div><strong>Stop:</strong> Plan is final only after source manifest verification and plangatecheck pass.</div>
+    </div>
+    <table>
+      <thead><tr><th>Artifact</th><th>Path</th><th>Summary</th></tr></thead>
+      <tbody><tr><td>goal_artifact</td><td>planning/goal.md</td><td>Measurable target for design-system and onboarding plan.</td></tr>
+<tr><td>problem_log</td><td>planning/problem-log.md</td><td>Observable blockers in current onboarding and design-system coverage.</td></tr>
+<tr><td>root_cause_diagnosis</td><td>planning/root-cause.md</td><td>Backend payload requirements leak into UI because first-run experience primitives are missing.</td></tr>
+<tr><td>current_machine</td><td>planning/current-machine.md</td><td>Current design system, onboarding, and feedback workflow.</td></tr>
+<tr><td>designed_machine</td><td>planning/designed-machine.md</td><td>Target design-system-first machine and onboarding sequence.</td></tr>
+<tr><td>worst_day_test</td><td>planning/worst-day.md</td><td>Plan behavior when inputs and patience are limited.</td></tr>
+<tr><td>leading_lagging_metrics</td><td>planning/metrics.md</td><td>Action and outcome metrics for implementation.</td></tr>
+<tr><td>owner_date_review</td><td>planning/owner-review.md</td><td>Owner, date, review point, and validation owner.</td></tr>
+<tr><td>stop_condition</td><td>planning/stop-condition.md</td><td>Planning completion conditions.</td></tr></tbody>
+    </table>
+
+    <h2>Parallel Lane Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> native_subagents</div>
+      <div><strong>Reason:</strong> Ship loop used independent read-only audit and verification lanes while the main thread repaired and integrated the implementation.</div>
+      <div><strong>Fan-in:</strong> pass</div>
+      <ul><li><code>provenance</code>: concrete</li>
+<li><code>source</code>: Lane count and proof artifacts recorded in this file.</li>
+<li><code>lane_count</code>: 3</li>
+<li><code>native_subagents</code>: 2</li>
+<li><code>local_parallel_tool_batches</code>: 9</li>
+<li><code>proof_artifacts</code>: 9</li></ul>
+    </div>
+    <table>
+      <thead><tr><th>Lane</th><th>Role</th><th>Mode</th><th>Status</th><th>Write Scope</th><th>Artifacts</th><th>Summary</th></tr></thead>
+      <tbody><tr><td>explorer-volta</td><td>explorer</td><td>native_subagent</td><td><span class='pill pass'>pass</span></td><td></td><td>lane-notes/explorer-volta.md</td><td>Found missing Phase 2 flow, unused first-run primitives, missing design-system first-run previews, and missing tests.</td></tr>
+<tr><td>verifier-boole</td><td>verifier</td><td>native_subagent</td><td><span class='pill pass'>pass</span></td><td>proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-semantic-ui-20260520-142140.log, proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-first-run-shell-vitest-20260520-142144.log, proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-build-20260520-142150.log</td><td>lane-notes/verifier-boole.md, logs/verification-lane-semantic-ui-20260520-142140.log, logs/verification-lane-first-run-shell-vitest-20260520-142144.log, logs/verification-lane-build-20260520-142150.log</td><td>Confirmed semantic/build passed but targeted test, planctl, and lanecheck failed on missing artifacts before repair.</td></tr>
+<tr><td>main-repair</td><td>main_thread</td><td>main_thread</td><td><span class='pill pass'>pass</span></td><td>mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/components/clients/OnboardingWizard.test.tsx, mos/frontend/src/components/onboarding/FirstRunShell.test.tsx, mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx, mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx, proof_pack/design-system-ferndesk-2026-05-20/lane-proof.json, proof_pack/design-system-ferndesk-2026-05-20/lane-notes/main-repair.md, proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log, proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log, proof_pack/design-system-ferndesk-2026-05-20/logs/frontend-vitest-full.log, proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png, proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png</td><td>lane-notes/main-repair.md, logs/semantic-ui.log, logs/onboarding-components-vitest.log, logs/frontend-vitest-full.log, logs/vite-build.log, screenshots/workspace-onboarding-desktop.png, screenshots/workspace-onboarding-mobile.png</td><td>Repaired flow, simplified /workspaces/new into one page, hid setup context behind a debug toggle, removed sticky overlap, updated tests, screenshots, and final proof artifacts.</td></tr></tbody>
+    </table>
+
+    <h2>Proof Files</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Type</th><th>Path</th></tr></thead>
+      <tbody><tr><td>explorer-volta.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-notes/explorer-volta.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-notes/explorer-volta.md</a></td></tr>
+<tr><td>main-repair.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-notes/main-repair.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-notes/main-repair.md</a></td></tr>
+<tr><td>verifier-boole.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-notes/verifier-boole.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-notes/verifier-boole.md</a></td></tr>
+<tr><td>lane-proof.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-proof.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/lane-proof.json</a></td></tr>
+<tr><td>capturectl-verify.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/capturectl-verify.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/capturectl-verify.log</a></td></tr>
+<tr><td>frontend-vitest-full.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/frontend-vitest-full.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/frontend-vitest-full.log</a></td></tr>
+<tr><td>lanecheck.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/lanecheck.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/lanecheck.log</a></td></tr>
+<tr><td>onboarding-components-vitest.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log</a></td></tr>
+<tr><td>planctl-verify.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/planctl-verify.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/planctl-verify.log</a></td></tr>
+<tr><td>plangatecheck.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/plangatecheck.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/plangatecheck.log</a></td></tr>
+<tr><td>provcheck-lane-proof.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/provcheck-lane-proof.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/provcheck-lane-proof.log</a></td></tr>
+<tr><td>semantic-ui.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log</a></td></tr>
+<tr><td>verification-lane-build-20260520-142150.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-build-20260520-142150.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-build-20260520-142150.log</a></td></tr>
+<tr><td>verification-lane-first-run-shell-vitest-20260520-142144.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-first-run-shell-vitest-20260520-142144.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-first-run-shell-vitest-20260520-142144.log</a></td></tr>
+<tr><td>verification-lane-semantic-ui-20260520-142140.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-semantic-ui-20260520-142140.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-semantic-ui-20260520-142140.log</a></td></tr>
+<tr><td>vite-build.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log</a></td></tr>
+<tr><td>plan-gate-proof.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/plan-gate-proof.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/plan-gate-proof.json</a></td></tr>
+<tr><td>plan.contract.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/plan.contract.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/plan.contract.json</a></td></tr>
+<tr><td>planctl-repair-prompt.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planctl-repair-prompt.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planctl-repair-prompt.md</a></td></tr>
+<tr><td>planctl-repair.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planctl-repair.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planctl-repair.json</a></td></tr>
+<tr><td>current-machine.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/current-machine.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/current-machine.md</a></td></tr>
+<tr><td>designed-machine.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/designed-machine.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/designed-machine.md</a></td></tr>
+<tr><td>goal.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/goal.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/goal.md</a></td></tr>
+<tr><td>metrics.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/metrics.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/metrics.md</a></td></tr>
+<tr><td>owner-review.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/owner-review.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/owner-review.md</a></td></tr>
+<tr><td>problem-log.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/problem-log.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/problem-log.md</a></td></tr>
+<tr><td>root-cause.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/root-cause.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/root-cause.md</a></td></tr>
+<tr><td>stop-condition.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/stop-condition.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/stop-condition.md</a></td></tr>
+<tr><td>worst-day.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/worst-day.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/planning/worst-day.md</a></td></tr>
+<tr><td>workspace-onboarding-desktop.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png</a></td></tr>
+<tr><td>workspace-onboarding-mobile.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png</a></td></tr>
+<tr><td>video-color-samples.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/derived/video-color-samples.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/derived/video-color-samples.json</a></td></tr>
+<tr><td>video-contact-sheet.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/derived/video-contact-sheet.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/derived/video-contact-sheet.jpg</a></td></tr>
+<tr><td>ssstwitter.com_1779296969971.mp4</td><td>.mp4</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/raw/ssstwitter.com_1779296969971.mp4'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/raw/ssstwitter.com_1779296969971.mp4</a></td></tr>
+<tr><td>source_manifest.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/source_manifest.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/source_manifest.json</a></td></tr>
+<tr><td>video-color-samples.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-color-samples.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-color-samples.json</a></td></tr>
+<tr><td>video-contact-sheet.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-contact-sheet.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-contact-sheet.jpg</a></td></tr>
+<tr><td>frame-001.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-001.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-001.jpg</a></td></tr>
+<tr><td>frame-002.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-002.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-002.jpg</a></td></tr>
+<tr><td>frame-003.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-003.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-003.jpg</a></td></tr>
+<tr><td>frame-004.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-004.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-004.jpg</a></td></tr>
+<tr><td>frame-005.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-005.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-005.jpg</a></td></tr>
+<tr><td>frame-006.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-006.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-006.jpg</a></td></tr>
+<tr><td>frame-007.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-007.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-007.jpg</a></td></tr>
+<tr><td>frame-008.jpg</td><td>.jpg</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-008.jpg'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/source/video-frames/frame-008.jpg</a></td></tr>
+<tr><td>verify-20260520-131635-Users-aldrinclement-.codex-bin-capturectl-verify-proof_pack-design-system-fernd.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-Users-aldrinclement-.codex-bin-capturectl-verify-proof_pack-design-system-fernd.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-Users-aldrinclement-.codex-bin-capturectl-verify-proof_pack-design-system-fernd.log</a></td></tr>
+<tr><td>verify-20260520-131635-Users-aldrinclement-.codex-bin-plangatecheck-proof_pack-design-system-ferndesk.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-Users-aldrinclement-.codex-bin-plangatecheck-proof_pack-design-system-ferndesk.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-Users-aldrinclement-.codex-bin-plangatecheck-proof_pack-design-system-ferndesk.log</a></td></tr>
+<tr><td>verify-20260520-131635-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log</a></td></tr>
+<tr><td>verify-20260520-131635-cd-mos-frontend-npm-run-check-semantic-ui.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-cd-mos-frontend-npm-run-check-semantic-ui.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131635-cd-mos-frontend-npm-run-check-semantic-ui.log</a></td></tr>
+<tr><td>verify-20260520-131636-cd-mos-frontend-npm-run-build.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131636-cd-mos-frontend-npm-run-build.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131636-cd-mos-frontend-npm-run-build.log</a></td></tr>
+<tr><td>verify-20260520-131647-cd-mos-frontend-npm-run-check-semantic-ui.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131647-cd-mos-frontend-npm-run-check-semantic-ui.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131647-cd-mos-frontend-npm-run-check-semantic-ui.log</a></td></tr>
+<tr><td>verify-20260520-131648-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131648-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131648-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log</a></td></tr>
+<tr><td>verify-20260520-131649-cd-mos-frontend-npm-run-build.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131649-cd-mos-frontend-npm-run-build.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131649-cd-mos-frontend-npm-run-build.log</a></td></tr>
+<tr><td>verify-20260520-131700-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131700-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131700-cd-mos-frontend-.-node_modules-.bin-vitest-run-src-components-onboarding-FirstRu.log</a></td></tr>
+<tr><td>verify-20260520-131700-cd-mos-frontend-npm-run-check-semantic-ui.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131700-cd-mos-frontend-npm-run-check-semantic-ui.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131700-cd-mos-frontend-npm-run-check-semantic-ui.log</a></td></tr>
+<tr><td>verify-20260520-131701-cd-mos-frontend-npm-run-build.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131701-cd-mos-frontend-npm-run-build.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131701-cd-mos-frontend-npm-run-build.log</a></td></tr>
+<tr><td>verify-20260520-131712-Users-aldrinclement-.codex-bin-planctl-verify-proof_pack-design-system-ferndesk.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131712-Users-aldrinclement-.codex-bin-planctl-verify-proof_pack-design-system-ferndesk.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/design-system-ferndesk-2026-05-20/verify-20260520-131712-Users-aldrinclement-.codex-bin-planctl-verify-proof_pack-design-system-ferndesk.log</a></td></tr></tbody>
+    </table>
+  </main>
+</body>
+</html>

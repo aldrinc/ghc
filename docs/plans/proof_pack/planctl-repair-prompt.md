@@ -1,0 +1,193 @@
+# Plan Repair Prompt
+
+Goal: repair the implementation until the plan contract passes.
+
+Plan ID: `2026-05-22-social-agents-ui-refactor-kimi-plan`
+Contract: `/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md`
+Repair JSON: `/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/planctl-repair.json`
+
+Rules:
+- Read the original plan and contract before editing.
+- Fix only the failing or brittle items.
+- Update item status, artifacts, and notes in the contract.
+- Run verification again with `planctl verify <contract> --run`.
+
+Errors:
+- P01: status is not done or blocked: pending
+- P02: status is not done or blocked: pending
+- P03: status is not done or blocked: pending
+- P04: status is not done or blocked: pending
+- P05: status is not done or blocked: pending
+- P06: status is not done or blocked: pending
+- P07: status is not done or blocked: pending
+- P08: status is not done or blocked: pending
+- P09: status is not done or blocked: pending
+- P10: status is not done or blocked: pending
+- P11: status is not done or blocked: pending
+- P12: status is not done or blocked: pending
+- P13: status is not done or blocked: pending
+- P14: status is not done or blocked: pending
+- P15: status is not done or blocked: pending
+- P16: status is not done or blocked: pending
+- P17: status is not done or blocked: pending
+- P18: status is not done or blocked: pending
+- P19: status is not done or blocked: pending
+- P20: status is not done or blocked: pending
+- P21: status is not done or blocked: pending
+- P22: status is not done or blocked: pending
+- P23: status is not done or blocked: pending
+- P24: status is not done or blocked: pending
+- P25: status is not done or blocked: pending
+- P26: status is not done or blocked: pending
+- P27: status is not done or blocked: pending
+- P28: status is not done or blocked: pending
+- P29: status is not done or blocked: pending
+- P30: status is not done or blocked: pending
+- P31: status is not done or blocked: pending
+- P32: status is not done or blocked: pending
+- P33: status is not done or blocked: pending
+- P34: status is not done or blocked: pending
+- P35: status is not done or blocked: pending
+- P36: status is not done or blocked: pending
+- P37: status is not done or blocked: pending
+- P38: status is not done or blocked: pending
+- P39: status is not done or blocked: pending
+- P40: status is not done or blocked: pending
+- P41: status is not done or blocked: pending
+- P42: status is not done or blocked: pending
+- P43: status is not done or blocked: pending
+- P44: status is not done or blocked: pending
+- P45: status is not done or blocked: pending
+- P46: status is not done or blocked: pending
+- P47: status is not done or blocked: pending
+- P48: status is not done or blocked: pending
+- P49: status is not done or blocked: pending
+- P50: status is not done or blocked: pending
+- P51: status is not done or blocked: pending
+- P52: status is not done or blocked: pending
+- P53: status is not done or blocked: pending
+- P54: status is not done or blocked: pending
+- P55: status is not done or blocked: pending
+- P56: status is not done or blocked: pending
+- P57: status is not done or blocked: pending
+- P58: status is not done or blocked: pending
+- P59: status is not done or blocked: pending
+- P60: status is not done or blocked: pending
+- P61: status is not done or blocked: pending
+- P62: status is not done or blocked: pending
+- P63: status is not done or blocked: pending
+- P64: status is not done or blocked: pending
+- P65: status is not done or blocked: pending
+- P66: status is not done or blocked: pending
+- P67: status is not done or blocked: pending
+- P68: status is not done or blocked: pending
+- P69: status is not done or blocked: pending
+- P70: status is not done or blocked: pending
+- P71: status is not done or blocked: pending
+- P72: status is not done or blocked: pending
+- P73: status is not done or blocked: pending
+- P74: status is not done or blocked: pending
+- P75: status is not done or blocked: pending
+- P76: status is not done or blocked: pending
+- P77: status is not done or blocked: pending
+- P78: status is not done or blocked: pending
+- P79: status is not done or blocked: pending
+- P80: status is not done or blocked: pending
+- P81: status is not done or blocked: pending
+- P82: status is not done or blocked: pending
+- P83: status is not done or blocked: pending
+- P84: status is not done or blocked: pending
+- P85: status is not done or blocked: pending
+- P86: status is not done or blocked: pending
+- P87: status is not done or blocked: pending
+- P88: status is not done or blocked: pending
+
+Warnings:
+- P01: no acceptance criteria
+- P02: no acceptance criteria
+- P03: no acceptance criteria
+- P04: no acceptance criteria
+- P05: no acceptance criteria
+- P06: no acceptance criteria
+- P07: no acceptance criteria
+- P08: no acceptance criteria
+- P09: no acceptance criteria
+- P10: no acceptance criteria
+- P11: no acceptance criteria
+- P12: no acceptance criteria
+- P13: no acceptance criteria
+- P14: no acceptance criteria
+- P15: no acceptance criteria
+- P16: no acceptance criteria
+- P17: no acceptance criteria
+- P18: no acceptance criteria
+- P19: no acceptance criteria
+- P20: no acceptance criteria
+- P21: no acceptance criteria
+- P22: no acceptance criteria
+- P23: no acceptance criteria
+- P24: no acceptance criteria
+- P25: no acceptance criteria
+- P26: no acceptance criteria
+- P27: no acceptance criteria
+- P28: no acceptance criteria
+- P29: no acceptance criteria
+- P30: no acceptance criteria
+- P31: no acceptance criteria
+- P32: no acceptance criteria
+- P33: no acceptance criteria
+- P34: no acceptance criteria
+- P35: no acceptance criteria
+- P36: no acceptance criteria
+- P37: no acceptance criteria
+- P38: no acceptance criteria
+- P39: no acceptance criteria
+- P40: no acceptance criteria
+- P41: no acceptance criteria
+- P42: no acceptance criteria
+- P43: no acceptance criteria
+- P44: no acceptance criteria
+- P45: no acceptance criteria
+- P46: no acceptance criteria
+- P47: no acceptance criteria
+- P48: no acceptance criteria
+- P49: no acceptance criteria
+- P50: no acceptance criteria
+- P51: no acceptance criteria
+- P52: no acceptance criteria
+- P53: no acceptance criteria
+- P54: no acceptance criteria
+- P55: no acceptance criteria
+- P56: no acceptance criteria
+- P57: no acceptance criteria
+- P58: no acceptance criteria
+- P59: no acceptance criteria
+- P60: no acceptance criteria
+- P61: no acceptance criteria
+- P62: no acceptance criteria
+- P63: no acceptance criteria
+- P64: no acceptance criteria
+- P65: no acceptance criteria
+- P66: no acceptance criteria
+- P67: no acceptance criteria
+- P68: no acceptance criteria
+- P69: no acceptance criteria
+- P70: no acceptance criteria
+- P71: no acceptance criteria
+- P72: no acceptance criteria
+- P73: no acceptance criteria
+- P74: no acceptance criteria
+- P75: no acceptance criteria
+- P76: no acceptance criteria
+- P77: no acceptance criteria
+- P78: no acceptance criteria
+- P79: no acceptance criteria
+- P80: no acceptance criteria
+- P81: no acceptance criteria
+- P82: no acceptance criteria
+- P83: no acceptance criteria
+- P84: no acceptance criteria
+- P85: no acceptance criteria
+- P86: no acceptance criteria
+- P87: no acceptance criteria
+- P88: no acceptance criteria

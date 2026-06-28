@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "errors": [],
+  "elapsed_seconds": 518.298,
+  "usage": {
+    "input_tokens": 44167,
+    "output_tokens": 16737,
+    "total_tokens": 60904,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1125
+    }
+  },
+  "repair_usage": null,
+  "prompt_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/outputs/dsv4-step03-step4-prompt.md",
+  "events_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/runs/dsv4-foundational-03-04-1to1/step-04/events.jsonl",
+  "evidence_ledger_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-synthesis-smoke-2026-05-21/evidence-ledger.md",
+  "raw_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/dsv4-step04-synthesis-smoke-2026-05-21/raw.md",
+  "summary_chars": 2254,
+  "content_chars": 64211,
+  "quote_count": 69,
+  "source_count": 69
+}

@@ -1,0 +1,776 @@
+{
+  "payload": {
+    "generationKey": "batch:tenor-glp-quiz-problem-aware-expansion-20260505",
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "campaignName": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-05",
+    "campaignObjective": "OUTCOME_SALES",
+    "buyingType": "AUCTION",
+    "specialAdCategories": [],
+    "campaignDailyBudget": 10000,
+    "bucketCount": 5,
+    "bucketDestinationUrls": []
+  },
+  "response": {
+    "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "generationKey": "batch:tenor-glp-quiz-problem-aware-expansion-20260505",
+    "ok": true,
+    "includedCount": 83,
+    "adsetCount": 5,
+    "bucketCount": 5,
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "publishDomain": "shoptenorco.com",
+    "budgetScope": "campaign",
+    "campaignDailyBudget": 10000,
+    "bucketDestinationUrls": [],
+    "blockers": [],
+    "items": [
+      {
+        "assetId": "786a42d5-dcd7-48c2-9520-58c6d835257b",
+        "creativeSpecId": "abbb81ee-f243-450f-a548-b5cfff688249",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "11c078fc-8677-47d9-903c-90bcb3e8033a",
+        "creativeSpecId": "ce95ccc5-f6fc-4fd5-8be0-b145d421d220",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "bedb9879-544b-4d40-aeb0-6d5b95e15962",
+        "creativeSpecId": "1d1f2e75-0a96-47ff-9a4a-b51c69b79cd2",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "401c93d5-c74d-4a20-8ae0-838072ae1a3e",
+        "creativeSpecId": "130570a2-5bc2-45e6-8c84-4d92f2e8b926",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "ab733ea1-6df6-45b4-bbeb-a385ee3db7d5",
+        "creativeSpecId": "45013877-6d9a-4bea-a715-bb75dd51cf22",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "56e9a221-a40b-48e6-9640-1b15aab5d00a",
+        "creativeSpecId": "969a306b-5eaa-45b4-8895-17e2a12c8e05",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "a5a97d80-631e-4490-81ba-ebb8c5b22ebb",
+        "creativeSpecId": "cd3171c7-a26e-46e7-a2a9-c914cf350b59",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "9271cd9e-3995-4b03-ad52-850f229dd61a",
+        "creativeSpecId": "da3d958d-2cb0-4321-bf79-6217a688324f",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "83a16d8c-6ebe-4808-8b47-9f53aaa3415b",
+        "creativeSpecId": "02f037c3-1884-4e04-8cdb-0e309239500d",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "7d11e08a-d14f-43b3-a0e5-ce1657c9aa13",
+        "creativeSpecId": "9fd78739-ee68-41bd-8215-9bdcc9c7c93c",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "024499d2-e411-4786-857a-22392c7bc978",
+        "creativeSpecId": "d1196280-97b3-45f2-ab8a-4ac84e7e06b8",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "c97b03b1-fe97-4ed8-8a91-7978d250da92",
+        "creativeSpecId": "e6b0da55-44c6-4a9e-9575-71f31da0e292",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "5ce924f8-9670-43d7-89c7-6c2dc811176f",
+        "creativeSpecId": "0728060f-b284-40d3-8452-42bb1a264344",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "989c10a4-d79b-49fd-8c07-68566cf9620e",
+        "creativeSpecId": "b03b232d-36dc-4881-b923-f530b9d1fe82",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "c70d0af8-5107-4c28-9776-c4fc1f7e4d4f",
+        "creativeSpecId": "8947ad19-08e5-424d-8b61-2dc6585884bd",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "bc3e2a7d-7967-4a75-a829-ae37015dd7dc",
+        "creativeSpecId": "75464b14-ee97-49d2-beaa-12ed85857147",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "27a8ab45-ff66-40c9-b382-73c6ce8f1620",
+        "creativeSpecId": "4f7b0198-e118-40f7-8066-25b2c6cb4b14",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "db86990d-4338-4561-819f-373a6c2c3a71",
+        "creativeSpecId": "d51f714c-38dd-44d7-a7d2-b7a372d1d272",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "aad35a1b-9121-49f5-b870-82b587380d7a",
+        "creativeSpecId": "3471c0f7-4a3d-4025-8fcb-bfe29ee51019",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "44ee5c90-c451-4005-940d-621fb4f6ccbb",
+        "creativeSpecId": "2e37a45f-a37f-414e-9533-3c4a7a05f495",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "6ebc5d72-585e-4573-be4c-0f121d5420e5",
+        "creativeSpecId": "6d13579a-0afa-4769-b274-b1e99b59b3dc",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "549390cb-54b9-41d3-a5bf-0538509d6d18",
+        "creativeSpecId": "45454ab6-470b-49d9-862e-505a3161c9a3",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "1ec51c6d-7b66-440f-b81a-c579afc0eaf1",
+        "creativeSpecId": "3c8ee8ec-de8a-4951-af9b-f735d35b520c",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "f4852300-2ef4-4c63-9098-6e880f61b108",
+        "creativeSpecId": "6cae3796-c4a9-453c-85cf-1595c3b992c3",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "096c01ad-92d6-4a6f-a34e-674300f44044",
+        "creativeSpecId": "a464132e-5d2d-4e05-b57f-d45bc3ff2370",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "9fcbe2d5-d0bd-44a0-bf41-e721e485617d",
+        "creativeSpecId": "71a18368-431f-4b76-a2b9-87f42cf3e06d",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "c3b9cfc9-4db1-490c-ad4a-0b8e4d115cc6",
+        "creativeSpecId": "50534734-ed7b-42a6-9bb6-7cd23b1525e3",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "d232aeea-9496-412b-bcc3-69598565a312",
+        "creativeSpecId": "d5b30db7-9df9-48f1-b2e6-809b969cb457",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "d0b5b3bb-5275-46fa-872c-9fa74c1f4cba",
+        "creativeSpecId": "c666db2c-f65f-4c09-9583-54ec0bb92cee",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "5e8e527d-1f9a-42d7-b194-f70479bb5a26",
+        "creativeSpecId": "68da5e93-1a9b-4ead-9e59-ceb8278bb7b6",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "9f274484-e8d2-4081-ba0b-c85afd951c1c",
+        "creativeSpecId": "48dc3b83-4e7c-4baf-95fb-b9aa277b5a80",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "0f10edc6-95c9-43cf-ae3c-8203374a6a4e",
+        "creativeSpecId": "d8aa0822-d567-4d4d-af32-2f4331b1252e",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "9a39dfff-8a78-4095-a33e-d996237dbe75",
+        "creativeSpecId": "c18f1c1d-2436-426c-828b-90d6c006b474",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "3a9f04a0-9613-4e8d-b61e-8a07585cc8ac",
+        "creativeSpecId": "08f96950-032d-47e3-ae6e-62396c212151",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "3267b52c-425b-418a-8431-0fc393e5cae2",
+        "creativeSpecId": "35ef9cff-2db0-4ce4-986f-cee576b0e11f",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "e1d9a045-5a97-4d45-961a-83c2e85afaab",
+        "creativeSpecId": "69e604bc-279f-4856-a485-165ab2e25def",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "f9636282-e4af-4146-839b-f90fac6b3efc",
+        "creativeSpecId": "7386130b-fc7b-4d6b-ba7b-aed6411ce490",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "2d4b093c-10f3-4745-a21c-066d0b7b5794",
+        "creativeSpecId": "6c5c9ad3-4b03-4056-a684-b8f06adfec12",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "8bf2eec6-d3e2-475c-b6e7-0ba5d0614ed4",
+        "creativeSpecId": "763b4770-d572-4ca2-b035-da2755ea993a",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "e74550b3-72a6-41b8-8b96-5bd7b56648c0",
+        "creativeSpecId": "c8548d4f-92a0-44b7-b687-8854bb14c4ca",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "b7ad3173-8d49-4e6b-a842-5b46852b7465",
+        "creativeSpecId": "a809b881-effe-4a3b-8ec1-26d57f321892",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "550e041d-4711-45d0-973e-1acb12e7b58c",
+        "creativeSpecId": "896dcb03-cb1e-420a-9fba-f0aa7429b549",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "dd205035-cde0-4275-a513-c60948c17790",
+        "creativeSpecId": "fa7de733-2d9c-418e-bf99-706af701d0dd",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "c1826c1f-a3d7-4676-a880-1579d98b663d",
+        "creativeSpecId": "0ae03061-d76c-465b-b29f-863d7203475c",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "7c9ae16a-194f-4534-9ec9-3934cb208baa",
+        "creativeSpecId": "60cc7197-f784-4708-b8de-0fd9fc7519e3",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "2588fc89-2039-4dfc-a16f-510d3c9afe2c",
+        "creativeSpecId": "1c552686-a2ca-44b8-9144-9b079e6b3e1b",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "8095f7bd-4fae-4626-bd5c-a6e87f16d256",
+        "creativeSpecId": "113b7df6-facb-4ab3-ab28-1c3853156c40",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "09ffc07c-22cf-459d-993e-7f73d0611d4e",
+        "creativeSpecId": "07eea1d0-7a89-41b1-9342-6044e5873073",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "beb1152b-c767-4a72-b2b8-4fc146fce7c7",
+        "creativeSpecId": "6288a8fb-c52d-4cbe-bedd-8f91f176cecb",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "7b4232c4-7027-4511-9c60-c7480776c3d3",
+        "creativeSpecId": "c47c8565-714e-49ec-8ce8-6ac968acb26a",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "1d43edd9-01a5-47fe-975e-e8feb473454c",
+        "creativeSpecId": "7e3e2444-5e0f-4e93-bb21-a631f2fd333b",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "370e971f-efd2-4a31-922f-ac98742c6df2",
+        "creativeSpecId": "8a1afe4d-4e5e-4a0a-9817-9d830417df6c",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "385c3286-1e75-4e40-a04a-1a996d96d868",
+        "creativeSpecId": "2e64bcaf-3431-40b5-8fc7-ce453fe45369",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "aedb13a0-e8a9-45b2-87c6-8ee84c663ff6",
+        "creativeSpecId": "4040f041-1a11-42bd-a3b4-c60992324f8f",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "b7b4cbf0-1588-4f7f-8bec-cccf362f8e32",
+        "creativeSpecId": "78be0e09-f84a-456f-9b9b-1d50434a73bb",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "bf33b73a-68b2-4faf-a90e-5308769ceb1d",
+        "creativeSpecId": "24e55493-bb1c-413c-808d-30a319daaa0f",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "92390f87-9349-41ba-96db-859e67dd89bd",
+        "creativeSpecId": "690e8519-1581-469c-9767-13064bfd4081",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "12732b95-767a-4f31-bcea-96beb3e91ef8",
+        "creativeSpecId": "273906cd-4064-43fe-b83f-86845c0c95fd",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "f7056fef-217a-490e-b8e2-a168cbd62b2b",
+        "creativeSpecId": "e62c959a-851d-4ac6-8494-bbc5288dd121",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "9e270130-9754-4f52-a00f-2749ddf41f1a",
+        "creativeSpecId": "87e89472-0259-493a-b038-4d3191ef8db6",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "861a32bd-16d5-426b-9395-a8ec0a54bec5",
+        "creativeSpecId": "1f9c5d36-7c5b-4e38-a398-88d5ee35a29b",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "0fa23468-2526-434a-9e3e-de6b0701c7d9",
+        "creativeSpecId": "75078883-8af9-40e1-ad6a-ceef1eb30538",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "b425fce2-49ed-4b4d-b66f-2686af1df44c",
+        "creativeSpecId": "8ea0b8ca-b27e-424e-8c6f-34014345c6df",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "ef43f2a7-52cb-46bb-9ede-c263ecf4a3a6",
+        "creativeSpecId": "42d3a56b-45c1-4e3f-a73a-011b98ebe526",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "5ff9bfa5-eb57-436b-a000-9e64a7203029",
+        "creativeSpecId": "6c738488-9738-4028-9deb-3efdba109fcb",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "55311d4e-8619-4efb-8245-ccd6d7b4f77f",
+        "creativeSpecId": "539738b4-6f4c-4e95-bea8-0133efcd0a83",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "1be0df39-7467-404c-9d2e-8f27dd5aa662",
+        "creativeSpecId": "00e5b27f-53e4-4988-a9d9-b876a164946a",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "79e63e7a-7d69-4e29-9100-5632df10401c",
+        "creativeSpecId": "2bd0991c-6ab5-4cb1-a992-5b39a5c84a31",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "93e98fe0-1e44-42ef-bb04-2b8a6c80468c",
+        "creativeSpecId": "30035bf5-dea4-407f-aced-d1e58cb3a099",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "88b203b0-bac4-4fd9-abea-692e640dec99",
+        "creativeSpecId": "dd555917-eaa3-4d85-b8cf-fa0f11acd1ba",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "b767a88f-5412-4196-9c9d-ff6348ad8210",
+        "creativeSpecId": "dc6bdac4-cd1a-4329-ac72-6802ac594d68",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "3c8b97a7-672c-4a83-acf5-a31dc93d4255",
+        "creativeSpecId": "fe75b891-ef40-403a-b2d5-c92518c3ad69",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "e286a481-d2cf-43c3-875a-440220c5f5ae",
+        "creativeSpecId": "ccc30105-3797-4a62-af9c-6e4e4824faeb",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "724662ff-fae6-472a-9050-0e2be4e2caaf",
+        "creativeSpecId": "f33d7ed8-8a98-4c1e-aa7e-b9720debbdb0",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "fadc2493-51d4-46a8-b016-4b5c1b45c9d1",
+        "creativeSpecId": "bf887623-67b6-4cc8-89f3-46a4d563a560",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "2b92f960-039d-4f7d-9510-b5467648263e",
+        "creativeSpecId": "d9e098f3-7de8-47cd-a434-88a1031e68a3",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "f50bfcc5-cfeb-497c-b7d7-1b4e1fa1737a",
+        "creativeSpecId": "2a017801-0ab1-40c3-a632-51767f3cfa97",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "849e0852-dfb1-44f3-9fa6-8d87e446fc94",
+        "creativeSpecId": "f8f35c9c-054a-44ca-b8aa-96cf885e04b9",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "146c4953-6bc8-4347-b7c8-db0daeb2cea4",
+        "creativeSpecId": "18a5232d-b4af-4621-b90c-a4fcd60c81f5",
+        "adsetSpecId": "86baf2cb-fcf0-43d8-a37a-df6b589a562a",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "0a54715b-e7e5-45ea-8a86-f8b7df5e568b",
+        "creativeSpecId": "82e2c7d9-65a9-40ee-b6a8-d245bb1978a7",
+        "adsetSpecId": "adac95f3-5f09-4c73-977a-344f94f64473",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "6cd52ce5-a1e5-462c-a53e-c431ed21010f",
+        "creativeSpecId": "91b7f830-ed03-4072-b1e7-6f9e1a2f70f6",
+        "adsetSpecId": "05656537-f433-45ec-bda6-174d3bb57181",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "84044d47-4058-4617-8674-f0c3a673789b",
+        "creativeSpecId": "335dc8ef-6137-4514-a6b0-95de8dc44836",
+        "adsetSpecId": "97d39ed5-7635-4414-8714-750646349534",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "df114f18-6467-4f77-b154-3506dff8bffd",
+        "creativeSpecId": "e8a89289-3664-46ca-9be6-63e27b87ba01",
+        "adsetSpecId": "af4d854e-e7c7-4d5c-bc5a-5b2a8130caf4",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      }
+    ]
+  }
+}

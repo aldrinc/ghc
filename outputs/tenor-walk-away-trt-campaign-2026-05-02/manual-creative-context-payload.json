@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "provider": "manual",
+  "angles": {
+    "selectedAngleId": "walk-away-trt-congruence",
+    "angleLibrary": [
+      {
+        "angleId": "walk-away-trt-congruence",
+        "angleName": "Walk Away From TRT Congruence",
+        "description": "Campaign creatives use the supplied downstream destination context and awareness level to stay congruent with the provided presales advertorial.",
+        "evidence": [
+          "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+          "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page"
+        ]
+      }
+    ]
+  },
+  "offer": {
+    "ump": "Tenor Daily Drive Essentials",
+    "ums": "Walk Away From TRT presales creative launch",
+    "corePromise": "Understand the daily protocol men are trying before committing to TRT.",
+    "valueStackSummary": "Presales advertorial traffic routes to the supplied Walk Away From TRT page and continues to the supplied Tenor sales page.",
+    "guaranteeType": "90-day guarantee",
+    "pricingRationale": "Current sales page offer framing is handled downstream on the supplied sales URL.",
+    "selectedVariantId": "walk-away-trt",
+    "selectedVariantName": "Walk Away From TRT",
+    "offerDetailsMarkdown": "# Destination Context\n\nPresales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page\n\n{\n  \"headline\": \"\\\"I Watched My Patient Walk Away From TRT.\\\" 90 Days Later, His Labs Made My Hands Shake.\",\n  \"subheadline\": \"Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\",\n  \"primaryProblem\": \"Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\",\n  \"promise\": \"Understand the daily protocol men are trying before committing to TRT.\",\n  \"mechanismDisclosureLevel\": \"Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\",\n  \"proofType\": \"Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\",\n  \"ctaUrgency\": \"Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\",\n  \"compliancePosture\": \"Matches the downstream advertorial posture and funnel stage.\",\n  \"assetStage\": \"Ad to advertorial/listicle, before the sales page.\",\n  \"visualEmphasis\": \"Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\"\n}"
+  },
+  "copyDocument": {
+    "headline": "\"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.",
+    "promiseContract": {
+      "loopQuestion": "Can the ad create a congruent click into the Walk Away From TRT advertorial?",
+      "specificPromise": "Understand the daily protocol men are trying before committing to TRT.",
+      "deliveryTest": "The creative matches the destination structure across promise, awareness level, proof, CTA/urgency, and asset stage.",
+      "minimumDelivery": "A reviewable Meta image creative attached to the campaign for human approval."
+    },
+    "presellMarkdown": "# Presales Destination\n\nURL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/\n\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.",
+    "salesPageMarkdown": "# Sales Destination\n\nURL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page",
+    "templatePayloads": {
+      "destinationContext": {
+        "headline": "\"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.",
+        "subheadline": "Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.",
+        "primaryProblem": "Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.",
+        "promise": "Understand the daily protocol men are trying before committing to TRT.",
+        "mechanismDisclosureLevel": "Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.",
+        "proofType": "Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.",
+        "ctaUrgency": "Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.",
+        "compliancePosture": "Matches the downstream advertorial posture and funnel stage.",
+        "assetStage": "Ad to advertorial/listicle, before the sales page.",
+        "visualEmphasis": "Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly."
+      }
+    }
+  },
+  "copyContext": {
+    "audienceProductMarkdown": "Audience: men 40+ evaluating low-drive, low-energy, and TRT-adjacent decisions. Product/workspace: Tenor Daily Drive Essentials.",
+    "brandVoiceMarkdown": "Tenor: premium, direct-response, mature men's health, evidence-led, not bro-y.",
+    "complianceMarkdown": "Only approved compliance input for this campaign: no product reveal and no mechanism reveal.",
+    "mentalModelsMarkdown": "Congruence means promise, mechanism disclosure level, awareness level, proof, CTA/urgency, compliance posture, and asset stage consistency from ad to advertorial to sales page.",
+    "awarenessAngleMatrixMarkdown": "Use the awareness level explicitly passed in each swipe generation payload. The review sample starts with Solution-Aware."
+  },
+  "experimentSpecs": [
+    {
+      "id": "walk-away-trt-congruence-review",
+      "name": "Walk Away From TRT Congruence Review",
+      "hypothesis": "Swipe-image creatives using only awareness level plus destination context can create congruent reviewable ads for the supplied presales URL.",
+      "metricIds": [],
+      "variants": [
+        {
+          "id": "presales",
+          "name": "Presales",
+          "description": "Ad-to-advertorial creatives for the supplied Walk Away From TRT presales URL.",
+          "channels": [
+            "meta"
+          ],
+          "guardrails": [
+            "no product reveal",
+            "no mechanism reveal"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+file '/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/peptideprice-foundational-onboarding.webm'
+file '/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/part-2-ui-download.webm'

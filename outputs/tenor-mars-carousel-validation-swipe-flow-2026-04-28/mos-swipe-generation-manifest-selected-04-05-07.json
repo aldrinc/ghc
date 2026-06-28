@@ -1,0 +1,156 @@
+{
+  "createdAt": "2026-04-29T02:26:47.708Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "sourcePage": "https://mengotomars.com/products/30-day-supply-starter-kit",
+  "outputs": [
+    {
+      "key": "04-tenor-guarantee-risk-reversal",
+      "sourceFile": "04-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "57bbdcce-0c27-44db-8140-8e390f778fc7",
+        "publicId": "0524556e-b62f-48d2-9090-51f5a6f70781",
+        "filename": "04-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 1080,
+        "height": 1080,
+        "url": "/public/assets/0524556e-b62f-48d2-9090-51f5a6f70781"
+      },
+      "workflowRunId": "f58dbe8f-2397-42ef-9026-b0087b5ad4ad",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-91773db2-67d5-47fb-b3c8-fe7703d585c1",
+      "assetId": "13b78eaa-2c92-411a-b369-31d3b8920367",
+      "publicId": "244546a1-1ff9-4851-928f-1752a3bea898",
+      "publicUrl": "https://api.moshq.app/public/assets/244546a1-1ff9-4851-928f-1752a3bea898",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-selected-04-05-07/04-tenor-guarantee-risk-reversal.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/0524556e-b62f-48d2-9090-51f5a6f70781",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "90-Day Tenor Guarantee",
+        "swipeAngle": "Tenor brand context: premium men's vitality brand, mature and evidence-aware, not loud supplement hype. Product: Daily Drive Essentials, black 60-capsule bottle, 2 vegan capsules daily. Visual direction should match the approved light carousel style: warm bone/off-white/stone background, black or near-black Aeonik-style typography, filled black icons/pictograms, blocky beautiful layout, restrained accent color only when useful. Keep it polished like a PDP carousel slide.\n\nTenor formula context to use: Tenor delivers 21 active ingredients in 2 vegan capsules daily — Tongkat Ali (400mg), Zinc (50mg), Maca (250mg), L-Arginine (250mg), Ginseng-Eleutherococcus blend (125mg), and a 745mg supporting matrix of clinically-studied botanicals. Every active dose is disclosed on the label.*\n\nUse the attached Mars carousel image as a layout/hierarchy reference for a Tenor guarantee/risk-reversal slide, not as a content source. Preserve the overall idea of a bold zero-risk guarantee slide with product bottle, credibility/social-proof energy, and a large bottom guarantee block. Adapt it for Tenor: use a premium light background, black bottle, Aeonik-style black text, filled black icons, and restrained warm accent. Use Tenor's risk reversal framing such as 90-Day Tenor Guarantee, return even the empty bottles, simple daily protocol, and 2 vegan capsules daily. Avoid body-transformation imagery; instead use product-first premium composition and a subtle realistic mature man/lifestyle inset if helpful. Keep it credible, not hypey.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:248e61564c841b368d2293478716a9eb9e4ddf42b68d5d61",
+        "asset_ids": [
+          "13b78eaa-2c92-411a-b369-31d3b8920367"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "05-tenor-ingredient-grid",
+      "sourceFile": "05-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "fe5f857c-c78e-45d2-b4f1-45e89108b3db",
+        "publicId": "94f8b228-e489-4bfd-8f1f-8e2e50d657a7",
+        "filename": "05-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 1080,
+        "height": 1080,
+        "url": "/public/assets/94f8b228-e489-4bfd-8f1f-8e2e50d657a7"
+      },
+      "workflowRunId": "a3d17480-08ac-48e3-b506-80e5acf5150c",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-b3633eaf-4609-4449-8c06-6f2cd006ff3f",
+      "assetId": "5dc32b26-6c02-4336-9d1d-60ac83f41d66",
+      "publicId": "15d4405a-8c38-4786-99c1-a658b29d164c",
+      "publicUrl": "https://api.moshq.app/public/assets/15d4405a-8c38-4786-99c1-a658b29d164c",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-selected-04-05-07/05-tenor-ingredient-grid.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/94f8b228-e489-4bfd-8f1f-8e2e50d657a7",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "21 active ingredients. Every dose disclosed.",
+        "swipeAngle": "Tenor brand context: premium men's vitality brand, mature and evidence-aware, not loud supplement hype. Product: Daily Drive Essentials, black 60-capsule bottle, 2 vegan capsules daily. Visual direction should match the approved light carousel style: warm bone/off-white/stone background, black or near-black Aeonik-style typography, filled black icons/pictograms, blocky beautiful layout, restrained accent color only when useful. Keep it polished like a PDP carousel slide.\n\nTenor formula context to use: Tenor delivers 21 active ingredients in 2 vegan capsules daily — Tongkat Ali (400mg), Zinc (50mg), Maca (250mg), L-Arginine (250mg), Ginseng-Eleutherococcus blend (125mg), and a 745mg supporting matrix of clinically-studied botanicals. Every active dose is disclosed on the label.*\n\nUse the attached Mars carousel image as a layout/hierarchy reference for an ingredient grid slide. Preserve the structure of multiple ingredient cards with dose chips and short benefit notes. Adapt it for Tenor with a light premium background, black text, filled/blocky ingredient visuals, and Aeonik-style typography. Focus the grid on Tongkat Ali 400mg, Zinc 50mg, Maca 250mg, L-Arginine 250mg, Ginseng-Eleutherococcus blend 125mg, and supporting botanicals matrix 745mg. Include the idea that 21 active ingredients are delivered in 2 vegan capsules daily and every active dose is disclosed. Make it look like a polished Tenor PDP carousel slide, not a copied Mars slide.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:d1382f69eccec486a0e439fd1fdd7b62cd09e4fc366abe34",
+        "asset_ids": [
+          "5dc32b26-6c02-4336-9d1d-60ac83f41d66"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "07-tenor-capsule-trust-badges",
+      "sourceFile": "07-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "7c8a5d05-7e63-4b45-9b93-b6c6d95ec7e8",
+        "publicId": "93a65941-52cc-443c-8143-6a772ca44e79",
+        "filename": "07-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 1080,
+        "height": 1080,
+        "url": "/public/assets/93a65941-52cc-443c-8143-6a772ca44e79"
+      },
+      "workflowRunId": "2ee3d778-b504-4354-8d22-85b336b53c5b",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e9c17e57-8940-447b-b83a-e45adea527c5",
+      "assetId": "b748b180-9c46-4d5e-9eed-d7f3bde38ed6",
+      "publicId": "71b2014a-5b47-44c6-8c68-72bdb76446a1",
+      "publicUrl": "https://api.moshq.app/public/assets/71b2014a-5b47-44c6-8c68-72bdb76446a1",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-selected-04-05-07/07-tenor-capsule-trust-badges.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/93a65941-52cc-443c-8143-6a772ca44e79",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "2 vegan capsules daily",
+        "swipeAngle": "Tenor brand context: premium men's vitality brand, mature and evidence-aware, not loud supplement hype. Product: Daily Drive Essentials, black 60-capsule bottle, 2 vegan capsules daily. Visual direction should match the approved light carousel style: warm bone/off-white/stone background, black or near-black Aeonik-style typography, filled black icons/pictograms, blocky beautiful layout, restrained accent color only when useful. Keep it polished like a PDP carousel slide.\n\nTenor formula context to use: Tenor delivers 21 active ingredients in 2 vegan capsules daily — Tongkat Ali (400mg), Zinc (50mg), Maca (250mg), L-Arginine (250mg), Ginseng-Eleutherococcus blend (125mg), and a 745mg supporting matrix of clinically-studied botanicals. Every active dose is disclosed on the label.*\n\nUse the attached Mars carousel image as a layout/hierarchy reference for a Tenor capsule and trust-badge slide. Preserve the central capsule/still-life composition and surrounding trust badge structure, but adapt to the approved Tenor light style. Use one premium capsule or capsule pair as the hero on a warm bone/stone surface, with filled black trust icons and Aeonik-style labels. Possible trust/quality themes: vegan capsules, exact active doses disclosed, non-GMO, third-party tested, cGMP manufactured, 2 capsules daily, 90-day guarantee. Keep the design light, blocky, premium, and beautiful, with black text/icons and restrained warm accent.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:061774e6490571b17988c1687367552211e4f4449d4a9b55",
+        "asset_ids": [
+          "b748b180-9c46-4d5e-9eed-d7f3bde38ed6"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

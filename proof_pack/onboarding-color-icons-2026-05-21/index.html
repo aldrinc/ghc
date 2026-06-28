@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Proof Dashboard</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172026; background: #f7f8fa; }
+    header { padding: 24px 28px; background: #172026; color: white; }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    h2 { margin: 26px 0 10px; font-size: 17px; }
+    main { padding: 22px 28px 36px; max-width: 1180px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .card { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 14px; }
+    .label { color: #5b6875; font-size: 12px; text-transform: uppercase; }
+    .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pass { background: #d9f4e4; color: #146c3c; }
+    .fail { background: #ffe1df; color: #9c231e; }
+    .warn { background: #fff1c7; color: #7b5600; }
+    .neutral { background: #e9edf2; color: #4b5663; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d9dee5; border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e7ebef; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #eef2f6; font-size: 12px; color: #394653; }
+    tr:last-child td { border-bottom: 0; }
+    code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Codex Proof Dashboard</h1>
+    <div>Onboarding color icons proof</div>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="card"><div class="label">Plan Contract</div><div class="value"><span class="pill pass">pass</span></div></div>
+      <div class="card"><div class="label">Source Manifest</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Provenance</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Planning Gate</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Plan Questions</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Parallelism</div><div class="value"><span class="pill pass">single_lane</span></div></div>
+      <div class="card"><div class="label">Lanes</div><div class="value">1</div></div>
+      <div class="card"><div class="label">Proof Files</div><div class="value">12</div></div>
+    </section>
+
+    <h2>Plan Items</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Status</th><th>Objective</th><th>Expected Files</th><th>Artifacts</th></tr></thead>
+      <tbody><tr><td>P01</td><td><span class='pill pass'>done</span></td><td>Add original reusable onboarding SVG icons.</td><td>mos/frontend/src/components/onboarding/OnboardingIcon.tsx, mos/frontend/src/components/onboarding/index.ts</td><td>proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json, proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json, proof_pack/onboarding-color-icons-2026-05-21/index.html</td></tr>
+<tr><td>P02</td><td><span class='pill pass'>done</span></td><td>Add color icon mode to ChoiceList and design-system CSS.</td><td>mos/frontend/src/components/onboarding/ChoiceList.tsx, mos/frontend/src/styles/design-system.css</td><td>proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json, proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json, proof_pack/onboarding-color-icons-2026-05-21/index.html</td></tr>
+<tr><td>P03</td><td><span class='pill pass'>done</span></td><td>Wire colorful icons into onboarding business, offering, and pricing choices.</td><td>mos/frontend/src/components/clients/OnboardingWizard.tsx</td><td>proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json, proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json, proof_pack/onboarding-color-icons-2026-05-21/index.html</td></tr>
+<tr><td>P04</td><td><span class='pill pass'>done</span></td><td>Add optional colorful icons to setup checklist rows.</td><td>mos/frontend/src/components/onboarding/SetupChecklist.tsx, mos/frontend/src/components/clients/OnboardingWizard.tsx</td><td>proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json, proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json, proof_pack/onboarding-color-icons-2026-05-21/index.html</td></tr>
+<tr><td>P05</td><td><span class='pill pass'>done</span></td><td>Update tests for icon presence while preserving onboarding and toast behavior.</td><td>mos/frontend/src/components/clients/OnboardingWizard.test.tsx, mos/frontend/src/components/ui/toast.test.tsx</td><td>proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json, proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json, proof_pack/onboarding-color-icons-2026-05-21/index.html</td></tr>
+<tr><td>P06</td><td><span class='pill pass'>done</span></td><td>Verify targeted tests, frontend build, QA artifact, lane proof, and proof dashboard.</td><td>docs/plans/2026-05-21-onboarding-color-icons-plan.md, proof_pack/onboarding-color-icons-2026-05-21</td><td>proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json, proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json, proof_pack/onboarding-color-icons-2026-05-21/index.html</td></tr></tbody>
+    </table>
+
+    <h2>Plan Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Plan Warnings</h2>
+    <div class="card"><ul><li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/styles/design-system.css:604: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1027: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1151: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1168: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1359: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1425: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1445: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1531: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1027: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1151: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1168: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1359: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1425: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1445: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1531: brittle marker `placeholder`</li></ul></div>
+
+    <h2>Provenance Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Blocked Source Items</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Planning Gate Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> unknown</div>
+      <div><strong>Skill loaded:</strong> </div>
+      <div><strong>Questions:</strong> 0</div>
+      <div><strong>Question rationale:</strong> </div>
+      <div><strong>Owner:</strong> </div>
+      <div><strong>Review:</strong> </div>
+      <div><strong>Stop:</strong> </div>
+    </div>
+    <table>
+      <thead><tr><th>Artifact</th><th>Path</th><th>Summary</th></tr></thead>
+      <tbody><tr><td colspan='3'>No planning gate proof loaded.</td></tr></tbody>
+    </table>
+
+    <h2>Parallel Lane Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> single_lane</div>
+      <div><strong>Reason:</strong> Single lane: the work changed one shared onboarding UI surface and overlapping writers would create merge risk.</div>
+      <div><strong>Fan-in:</strong> pass</div>
+      <ul><li><code>native_subagents</code>: 0</li>
+<li><code>lane_count</code>: 1</li>
+<li><code>local_parallel_tool_batches</code>: 4</li>
+<li><code>verification_commands</code>: 2</li></ul>
+    </div>
+    <table>
+      <thead><tr><th>Lane</th><th>Role</th><th>Mode</th><th>Status</th><th>Write Scope</th><th>Artifacts</th><th>Summary</th></tr></thead>
+      <tbody><tr><td>main-onboarding-icons</td><td>main_thread</td><td>single_lane</td><td><span class='pill pass'>pass</span></td><td>mos/frontend/src/components/onboarding, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/components/clients/OnboardingWizard.test.tsx, mos/frontend/src/components/ui/toast.test.tsx, mos/frontend/src/styles/design-system.css, proof_pack/onboarding-color-icons-2026-05-21</td><td>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json</td><td>Implemented reusable OnboardingIcon SVGs, ChoiceList color icon mode, setup checklist icon slots, wizard icon wiring, and targeted test coverage.</td></tr></tbody>
+    </table>
+
+    <h2>Proof Files</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Type</th><th>Path</th></tr></thead>
+      <tbody><tr><td>browser-onboarding-blocked.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/browser-onboarding-blocked.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/browser-onboarding-blocked.png</a></td></tr>
+<tr><td>browser-smoke.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/browser-smoke.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/browser-smoke.json</a></td></tr>
+<tr><td>color-icons-qa.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json</a></td></tr>
+<tr><td>lane-proof.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json</a></td></tr>
+<tr><td>plan.contract.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/plan.contract.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/plan.contract.json</a></td></tr>
+<tr><td>planctl-repair-prompt.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/planctl-repair-prompt.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/planctl-repair-prompt.md</a></td></tr>
+<tr><td>planctl-repair.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/planctl-repair.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/planctl-repair.json</a></td></tr>
+<tr><td>verify-20260521-095253-cd-mos-frontend-npm-test------run-src-components-clients-OnboardingWizard.test.t.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-cd-mos-frontend-npm-test------run-src-components-clients-OnboardingWizard.test.t.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-cd-mos-frontend-npm-test------run-src-components-clients-OnboardingWizard.test.t.log</a></td></tr>
+<tr><td>verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log</a></td></tr>
+<tr><td>verify-20260521-095257-cd-mos-frontend-npm-run-build.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095257-cd-mos-frontend-npm-run-build.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095257-cd-mos-frontend-npm-run-build.log</a></td></tr>
+<tr><td>verify-20260521-095310-Users-aldrinclement-.codex-bin-lanecheck-proof_pack-onboarding-color-icons-2026.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095310-Users-aldrinclement-.codex-bin-lanecheck-proof_pack-onboarding-color-icons-2026.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095310-Users-aldrinclement-.codex-bin-lanecheck-proof_pack-onboarding-color-icons-2026.log</a></td></tr>
+<tr><td>verify-20260521-095310-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095310-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095310-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log</a></td></tr></tbody>
+    </table>
+  </main>
+</body>
+</html>

@@ -1,0 +1,349 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-20-mos-ui-component-repair-plan",
+  "created_at": "2026-05-20T20:55:23.346245+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/mos-ui-component-repair",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Audit current MOS UI in Chrome and capture concrete visual defects.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-ui-component-repair/browser-audit.md",
+        "proof_pack/mos-ui-component-repair/screenshots"
+      ],
+      "acceptance": [
+        "Chrome screenshots exist for current workspaces/new and overview UI.",
+        "Audit names concrete component defects and route-level symptoms."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/mos-ui-component-repair/browser-audit.md"
+      ],
+      "proof_required": [
+        "browser_screenshots",
+        "audit_notes"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/browser-audit.md",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-before.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-overview-before.png"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "Add a local component review route rendering all core primitives and layout helpers.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "mos/frontend/src/App.tsx",
+        "mos/frontend/src/app/routes.tsx"
+      ],
+      "acceptance": [
+        "Review page renders buttons, badges, inputs, textarea, select, callouts, tabs, table, dialog, popover, menu, toast, progress, skeleton, page header, filter bar, empty/error states, and status badges.",
+        "Route is local/dev-facing and not a marketing or production funnel change."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run --silent build"
+      ],
+      "proof_required": [
+        "review_route_screenshot",
+        "build_log"
+      ],
+      "artifacts": [
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-desktop.png"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "objective": "Repair primitives and shared CSS from visual findings.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/ui",
+        "mos/frontend/src/components/layout",
+        "mos/frontend/src/components/StatusBadge.tsx",
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/globals.css",
+        "mos/frontend/src/styles/design-system.css"
+      ],
+      "acceptance": [
+        "Component density, radius, focus, hover, disabled, and text-overflow states are visually coherent.",
+        "No brand identity, logo, customer output, or funnel redesign is included."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run --silent check:design-system",
+        "cd mos/frontend && npm run --silent check:semantic-ui",
+        "cd mos/frontend && npm run --silent build"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "design_system_log",
+        "semantic_ui_log",
+        "build_log"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/diff-summary.md",
+        "proof_pack/mos-ui-component-repair/logs/design-system.log",
+        "proof_pack/mos-ui-component-repair/logs/semantic-ui.log",
+        "proof_pack/mos-ui-component-repair/logs/build.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "Validate repaired components and representative product routes in Chrome.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-desktop.png",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-mobile.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-after.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-overview-after.png"
+      ],
+      "acceptance": [
+        "Screenshots show no obvious overlap, clipped text, blown-out spacing, or incoherent hierarchy.",
+        "Chrome DOM/screenshot notes are written to browser-audit.md."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/mos-ui-component-repair/screenshots/component-review-desktop.png"
+      ],
+      "proof_required": [
+        "browser_screenshots",
+        "audit_notes"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-desktop.png",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-mobile.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-after.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-overview-after.png",
+        "proof_pack/mos-ui-component-repair/browser-audit.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "objective": "Run final local validation and proof dashboard.",
+      "source_line": 57,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-ui-component-repair/logs/design-system.log",
+        "proof_pack/mos-ui-component-repair/logs/semantic-ui.log",
+        "proof_pack/mos-ui-component-repair/logs/build.log",
+        "proof_pack/mos-ui-component-repair/logs/unit-tests.log",
+        "proof_pack/mos-ui-component-repair/index.html"
+      ],
+      "acceptance": [
+        "Design-system scan passes.",
+        "Semantic UI scan passes.",
+        "Build passes.",
+        "Unit tests pass or unrelated blocker is documented with exact cause.",
+        "Plan contract verifies."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run --silent check:design-system",
+        "cd mos/frontend && npm run --silent check:semantic-ui",
+        "cd mos/frontend && npm run --silent build",
+        "cd mos/frontend && npm run --silent test:unit"
+      ],
+      "proof_required": [
+        "command_logs",
+        "proof_dashboard"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/logs/design-system.log",
+        "proof_pack/mos-ui-component-repair/logs/semantic-ui.log",
+        "proof_pack/mos-ui-component-repair/logs/build.log",
+        "proof_pack/mos-ui-component-repair/logs/unit-tests.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "objective": "Extract Moz Design System source and align shared component primitives to the reference component values, excluding brand identity elements.",
+      "source_line": 46,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-ui-component-repair/source/moz-design-system-extract.json",
+        "proof_pack/mos-ui-component-repair/source/moz-design-system.css",
+        "mos/frontend/src/components/ui/button.tsx",
+        "mos/frontend/src/components/ui/input.tsx",
+        "mos/frontend/src/components/ui/select.tsx",
+        "mos/frontend/src/components/ui/textarea.tsx",
+        "mos/frontend/src/components/ui/badge.tsx",
+        "mos/frontend/src/components/StatusBadge.tsx",
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/design-system.css"
+      ],
+      "acceptance": [
+        "Reference extraction artifacts exist and include component token/rule summaries.",
+        "Core shared primitives match source component dimensions and shape: pill buttons, 54px fields, 12px input radius, 20px cards, 14px floating panels, 22px badges.",
+        "Brand logo, wordmark, and brand mark elements are not changed."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/mos-ui-component-repair/source/moz-design-system-extract.json",
+        "cd mos/frontend && npm run --silent check:semantic-ui"
+      ],
+      "proof_required": [
+        "source_extract",
+        "primitive_diff",
+        "semantic_ui_log"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/source/moz-design-system-extract.json",
+        "proof_pack/mos-ui-component-repair/screenshots/moz-design-system-reference-components.png",
+        "proof_pack/mos-ui-component-repair/diff-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "Expand component review route to cover skipped reference component anatomy and recapture browser proof.",
+      "source_line": 49,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-desktop.png",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-mobile.png",
+        "proof_pack/mos-ui-component-repair/browser-audit.md"
+      ],
+      "acceptance": [
+        "Review page includes button states, input states, chips, input groups, combobox-style panels, OTP cells, choice cards, status dots, and card variants.",
+        "Browser screenshots show the repaired primitives matching the reference more closely without overlap or clipping.",
+        "Representative product route screenshots are refreshed after primitive changes."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/mos-ui-component-repair/screenshots/component-review-desktop.png",
+        "test -f proof_pack/mos-ui-component-repair/screenshots/workspaces-new-after.png"
+      ],
+      "proof_required": [
+        "review_route_screenshots",
+        "audit_notes"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-desktop.png",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-mobile.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-after.png",
+        "proof_pack/mos-ui-component-repair/browser-audit.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P08",
+      "objective": "Audit the source HTML again and record the compound components missed by the previous implementation pass.",
+      "source_line": 49,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/mos-ui-component-repair/source-component-gap-audit.md",
+        "proof_pack/mos-ui-component-repair/source/moz-design-system-extract.json",
+        "proof_pack/mos-ui-component-repair/source/moz-design-system-extracted.html"
+      ],
+      "acceptance": [
+        "Gap audit names missed source components beyond basic primitives.",
+        "Excluded brand and marketing elements remain explicitly out of scope.",
+        "Repair targets include actual reusable system components, not only dev examples."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/mos-ui-component-repair/source-component-gap-audit.md",
+        "test -f proof_pack/mos-ui-component-repair/source/moz-design-system-extract.json"
+      ],
+      "proof_required": [
+        "source_gap_audit",
+        "source_extract"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/source-component-gap-audit.md",
+        "proof_pack/mos-ui-component-repair/source/moz-design-system-extract.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P09",
+      "objective": "Refactor actual first-run input and choice components to match the source-shaped system.",
+      "source_line": 49,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/onboarding/ChoiceList.tsx",
+        "mos/frontend/src/components/ui/input.tsx",
+        "mos/frontend/src/components/ui/select.tsx",
+        "mos/frontend/src/components/ui/textarea.tsx",
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/design-system.css",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-input-focused-after.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-choice-step-selected-after.png"
+      ],
+      "acceptance": [
+        "Focused workspace input uses a soft input ring token while retaining the ink border.",
+        "Onboarding choices support source-shaped single, multi, compact, and card variants without copied brand names.",
+        "Actual /workspaces/new browser proof shows the focused input and selected choice step."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/mos-ui-component-repair/screenshots/workspaces-new-input-focused-after.png",
+        "test -f proof_pack/mos-ui-component-repair/screenshots/workspaces-new-choice-step-selected-after.png",
+        "cd mos/frontend && npm run --silent check:semantic-ui"
+      ],
+      "proof_required": [
+        "actual_route_screenshots",
+        "semantic_ui_log"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-input-focused-after.png",
+        "proof_pack/mos-ui-component-repair/screenshots/workspaces-new-choice-step-selected-after.png",
+        "proof_pack/mos-ui-component-repair/workspaces-new-input-focused-after.audit.json",
+        "proof_pack/mos-ui-component-repair/workspaces-new-choice-step-selected-after.audit.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P10",
+      "objective": "Fix browser-blocking runtime cycle, expand the component harness, and recapture desktop/mobile proof.",
+      "source_line": 49,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/funnels/funnelRuntime.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-desktop-after-compound-repair.png",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-mobile-after-compound-repair.png",
+        "proof_pack/mos-ui-component-repair/logs/build-after-compound-repair.log",
+        "proof_pack/mos-ui-component-repair/logs/unit-tests-after-compound-repair.log"
+      ],
+      "acceptance": [
+        "/dev/components renders with no runtime console errors after the runtime split.",
+        "Expanded harness covers choice flows with Continue CTA, multi-select, compact choices, card choices, autocomplete, password strength, copyable value, phone, and currency inputs.",
+        "Desktop and mobile screenshots show no horizontal overflow.",
+        "Build and unit tests pass after the runtime import changes."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/mos-ui-component-repair/screenshots/component-review-desktop-after-compound-repair.png",
+        "test -f proof_pack/mos-ui-component-repair/screenshots/component-review-mobile-after-compound-repair.png",
+        "cd mos/frontend && npm run --silent build",
+        "cd mos/frontend && npm run --silent test:unit"
+      ],
+      "proof_required": [
+        "expanded_review_screenshots",
+        "browser_audit_json",
+        "build_log",
+        "unit_test_log"
+      ],
+      "artifacts": [
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-desktop-after-compound-repair.png",
+        "proof_pack/mos-ui-component-repair/screenshots/component-review-mobile-after-compound-repair.png",
+        "proof_pack/mos-ui-component-repair/component-review-desktop-after-compound-repair.audit.json",
+        "proof_pack/mos-ui-component-repair/component-review-mobile-after-compound-repair.audit.json",
+        "proof_pack/mos-ui-component-repair/logs/build-after-compound-repair.log",
+        "proof_pack/mos-ui-component-repair/logs/unit-tests-after-compound-repair.log"
+      ],
+      "notes": ""
+    }
+  ],
+  "global_verify_commands": [],
+  "global_acceptance": [],
+  "plan_gate_required": true,
+  "plan_gate_proof": "proof_pack/mos-ui-component-repair/plan-gate-proof.json"
+}

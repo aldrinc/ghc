@@ -1,0 +1,58 @@
+{
+  "createdAt": "2026-04-29T01:35:56.288Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "sourcePage": "https://mengotomars.com/products/30-day-supply-starter-kit",
+  "outputs": [
+    {
+      "key": "01-tenor-product-benefit-hero-v2-open-context",
+      "sourceFile": "01-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "18a77feb-1cf3-4d21-99ee-479797713725",
+        "publicId": "97356f98-cff7-457b-96e4-86e0a082d1e4",
+        "filename": "01-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 672,
+        "height": 672,
+        "url": "/public/assets/97356f98-cff7-457b-96e4-86e0a082d1e4"
+      },
+      "workflowRunId": "5fd10a8e-3b46-4373-88eb-a3d7966dd2c6",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-0868576c-8910-402c-94a9-abbe839886e4",
+      "assetId": "77375ca7-3c03-4bbb-a726-620272d4b616",
+      "publicId": "d5ab335d-ab63-41bf-84ce-1b03963a1b1e",
+      "publicUrl": "https://api.moshq.app/public/assets/d5ab335d-ab63-41bf-84ce-1b03963a1b1e",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-v2/01-tenor-product-benefit-hero-v2-open-context.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/97356f98-cff7-457b-96e4-86e0a082d1e4",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Tenor product benefit hero",
+        "swipeAngle": "Use the attached product carousel image as a layout and hierarchy reference for a Tenor version.\n\nBrand context:\nTenor is a premium men's vitality brand for men who want a simple daily protocol rather than clinics, prescriptions, or hype supplements. The product is Daily Drive Essentials, a black 60-capsule bottle with a restrained label. Brand feel is masculine, premium, editorial, evidence-aware, and direct. Visual world: bone/off-white, ink black, graphite, matte black product surfaces, and restrained warm accent color such as copper, muted gold, or deep ember. Typography should feel bold and mature rather than loud or novelty.\n\nProduct context:\nDaily Drive Essentials is positioned around clean and consistent energy, natural drive and libido, peak vitality and performance, exact active doses, and 2 capsules daily. Formula context includes Tongkat Ali, Zinc, Maca, L-Arginine, and Ginseng + Eleuthero. Tenor also has survey-based proof from 1,203 men around morning energy, physical stamina, mental sharpness, and overall vitality.\n\nPreserve from the reference:\n- centered product bottle as the hero\n- large proof/credibility number or proof module on the left\n- right-side vertical benefit stack with small icons\n- dark premium product-card composition\n- strong contrast and clear mobile-first hierarchy\n- energetic but clean ecommerce carousel feel\n\nHigh-level changes:\n- make it clearly Tenor, not Mars\n- adapt the proof and benefit language to Tenor's brand and product context\n- keep the icons as a structural element, but restyle them to feel premium and Tenor-branded\n- use a more refined Tenor color system instead of the source's orange/red space theme\n- keep the bottle recognizable and central\n- make the final image feel like a polished PDP carousel slide for Tenor",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:5d75002294e421ca5f7b0df5ed03a3028559cfbe768c0220",
+        "asset_ids": [
+          "77375ca7-3c03-4bbb-a726-620272d4b616"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

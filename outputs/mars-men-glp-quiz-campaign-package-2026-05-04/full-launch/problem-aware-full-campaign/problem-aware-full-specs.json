@@ -1,0 +1,866 @@
+{
+  "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+  "generationKey": "batch:tenor-glp-quiz-problem-aware-expansion-20260506",
+  "createdAt": "2026-05-07T03:21:41.848Z",
+  "logicalGroupCount": 83,
+  "rawAssetCount": 249,
+  "creativeSpecs": [
+    {
+      "action": "created",
+      "groupKey": "tenor-01-C001-glp",
+      "primaryAssetId": "32899eeb-2746-4c00-a55e-31f6b8ca0f08",
+      "siblingVariantAssetIds": [
+        "a0461bb0-9595-48f8-8311-4796444b19d5",
+        "6329159e-45ca-4101-b95b-5c188a5284ee"
+      ],
+      "creativeSpecId": "a8c480cb-3bd9-4f2d-8118-c3e9b47727ae"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-02-C002-glp",
+      "primaryAssetId": "04a5afea-cc07-41d9-83bd-da0f2dab4cc1",
+      "siblingVariantAssetIds": [
+        "5a547b48-5b8e-409c-979b-262f720aedfd",
+        "04f207ad-804b-44ce-b72f-4a3707e8c408"
+      ],
+      "creativeSpecId": "2242d9f0-0c39-4378-9c37-092e2604a0e5"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-03-C004-glp",
+      "primaryAssetId": "6acc13a1-9c7c-471a-9ffa-2c755b2a82bd",
+      "siblingVariantAssetIds": [
+        "0b56be07-782e-408c-acb9-87eab6063fb5",
+        "6ea0c1e2-a175-4ce4-b38b-a493f92bfe19"
+      ],
+      "creativeSpecId": "626da7b8-7178-421c-aedf-7d937ab6924b"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-04-C006-glp",
+      "primaryAssetId": "bf30e70e-e0fd-493a-930e-50051779ed12",
+      "siblingVariantAssetIds": [
+        "d33a30cd-1fe2-4836-bb3b-c17507ce45b0",
+        "8485d723-b997-42ed-b3d2-ef2e148c6637"
+      ],
+      "creativeSpecId": "b07a4fef-9787-4fdc-98d7-32b397eff0d6"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-05-C011-glp",
+      "primaryAssetId": "204da383-4758-49fb-8784-a6f3efe28d3f",
+      "siblingVariantAssetIds": [
+        "3b7d6c49-083f-4af7-8050-8674df4ee306",
+        "90f132c9-750a-4b05-98ab-cf50493431d6"
+      ],
+      "creativeSpecId": "5defb047-6b43-4c05-95a1-0f71ed2518af"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-06-C008-glp",
+      "primaryAssetId": "6b1383b5-16d5-4dd6-b3c2-cf0169710695",
+      "siblingVariantAssetIds": [
+        "2fd4dbe4-5ddd-46b9-903f-1a5884036c82",
+        "66f73938-cf92-40fa-83c4-c802594217af"
+      ],
+      "creativeSpecId": "b9e4e0c7-2bad-4a3e-9aa7-5864a3b35f12"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-07-C003-glp",
+      "primaryAssetId": "74485777-8a08-4b47-b984-79cad2d81bdb",
+      "siblingVariantAssetIds": [
+        "50475758-6d51-41c3-ae38-8388c8f574bc",
+        "55451095-e970-4eb8-936b-9345b0fd43a8"
+      ],
+      "creativeSpecId": "052888b4-1006-4b83-8fbd-9fba6e067b4b"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-08-C009-glp",
+      "primaryAssetId": "487781bf-f0d8-4d53-a92a-312f4243b9f2",
+      "siblingVariantAssetIds": [
+        "3653a47c-da24-416d-9aa1-33f36f346159",
+        "0ca844fb-1401-425f-b064-926beeac99f7"
+      ],
+      "creativeSpecId": "c7704d21-17ab-4bb2-a867-b2702fa4a6f9"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-09-C007-glp",
+      "primaryAssetId": "057916db-62ac-4298-ae5c-002865214bcd",
+      "siblingVariantAssetIds": [
+        "4b6e12d2-fe08-4526-8012-a94c919ceaae",
+        "71524594-72b7-4034-9bf0-6b9d9c1e07f9"
+      ],
+      "creativeSpecId": "4576ea7c-a54c-4333-b628-4b39fbb5fc7e"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-10-C005-glp",
+      "primaryAssetId": "c73aef71-a4e1-4ca0-9d39-f5ecd5ca774d",
+      "siblingVariantAssetIds": [
+        "439b599f-878e-49d5-8777-59f8d0601a3c",
+        "390727d9-d6c4-46ca-b621-55c43091c4f8"
+      ],
+      "creativeSpecId": "b53dbf08-e0e1-453b-8a3f-c36ca07e6af2"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-11-C010-glp",
+      "primaryAssetId": "1dff4079-bb58-4a27-b4f6-bf6eae62dda5",
+      "siblingVariantAssetIds": [
+        "e6123ca2-e263-49ab-9c20-81f8b4494290",
+        "1a368f9c-2a8e-429a-b8a7-cc359118abc1"
+      ],
+      "creativeSpecId": "56487f76-3fbb-4342-8255-98c2269eea97"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-12-C012-glp",
+      "primaryAssetId": "2a0fc138-178b-4446-80b6-3a234f8c6730",
+      "siblingVariantAssetIds": [
+        "3fc1b95a-51f8-4f8e-abd0-121df6114132",
+        "067f4b05-1ede-4ca1-acd3-0d47e9a9ccc4"
+      ],
+      "creativeSpecId": "8c48da41-ba67-47ce-bece-012b98f6c41f"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-13-C013-glp",
+      "primaryAssetId": "8b0dbe26-0841-479b-89f8-ba5ca797454d",
+      "siblingVariantAssetIds": [
+        "c10567a6-7b5a-463e-a5bc-c91e46eaba7b",
+        "5e39463d-a0c0-4d27-9d4e-340ab1fca95f"
+      ],
+      "creativeSpecId": "09629042-47c7-4087-b48a-994fc62ddac4"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-14-C022-quiz",
+      "primaryAssetId": "70581f29-f568-4f0d-909b-647d7cb6f3e9",
+      "siblingVariantAssetIds": [
+        "f6139dba-8ee9-40ac-82cc-7111ad1c2e21",
+        "5cc4487e-7cf0-44ca-8163-ae0fcee232f9"
+      ],
+      "creativeSpecId": "c5ca623f-1aaa-4a4a-97e5-4863472b9b9f"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-15-C019-quiz",
+      "primaryAssetId": "f731fbeb-7ff4-4288-b11e-28fcd4c4ed6a",
+      "siblingVariantAssetIds": [
+        "829a8bc0-ee6b-4a2b-9d3a-6cf063fce32b",
+        "8ff7cecb-0305-4535-89de-4a06b6f77168"
+      ],
+      "creativeSpecId": "e7b95afd-45f3-475c-8554-8259cc98cae5"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-16-C020-quiz",
+      "primaryAssetId": "0ace0196-1b06-41b6-941c-d8dd7c453430",
+      "siblingVariantAssetIds": [
+        "821d72b2-c530-4165-a02c-ce61deda0295",
+        "93a0740f-a9d8-4858-941f-092c9e76cdaf"
+      ],
+      "creativeSpecId": "74694029-8bf9-464c-9c3e-64a8d70d02d4"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-17-C016-quiz",
+      "primaryAssetId": "bfbea4bd-e8e9-4ca0-a762-f894567a977f",
+      "siblingVariantAssetIds": [
+        "f31e705c-3744-4b2e-8c97-8f7857098ad9",
+        "17558754-e28b-4442-a10e-ee8cd0a65de5"
+      ],
+      "creativeSpecId": "d93995fd-177e-4d9d-afb4-d61a6b8098ea"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-18-C017-quiz",
+      "primaryAssetId": "b8e40e8f-2a28-43e3-b8d1-99126d00ee8a",
+      "siblingVariantAssetIds": [
+        "34c80ade-927d-4cb5-9dcc-70c6986146b0",
+        "0c21b182-0177-46e1-81f2-3682e71b23cf"
+      ],
+      "creativeSpecId": "a50b270d-c7f3-4ae5-be37-c200bfc02820"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-19-C018-quiz",
+      "primaryAssetId": "f8536191-2696-4632-8ab6-d2c314dc0f9e",
+      "siblingVariantAssetIds": [
+        "c610440e-e885-4ac8-85a7-b95fe7ef9778",
+        "cea39b6d-752e-4be5-b878-3bd71806f3ac"
+      ],
+      "creativeSpecId": "de4510f8-d2d3-48b9-a578-b739b170e5cc"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-20-C021-quiz",
+      "primaryAssetId": "7e9d5437-7c91-4f05-a0cb-87bea14d102a",
+      "siblingVariantAssetIds": [
+        "85c7ee44-594e-4720-86ea-d633bf1a0cb0",
+        "78b48e11-902a-4fc5-a66e-9e286a04c671"
+      ],
+      "creativeSpecId": "be9d6c2e-8061-4a57-b9a6-2aa8cf517055"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-21-C023-quiz",
+      "primaryAssetId": "80d3c90e-3c83-4a2a-9543-c906046df723",
+      "siblingVariantAssetIds": [
+        "db0f27f6-f15e-42ec-87d1-5b44064846dc",
+        "acf5574b-5217-4585-83b9-06bc94726026"
+      ],
+      "creativeSpecId": "7ddc07e3-690b-46ff-b935-98594cd7e01d"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-22-C024-quiz",
+      "primaryAssetId": "bd563dbe-b799-4d1a-93fd-822c69102d50",
+      "siblingVariantAssetIds": [
+        "0dde28b2-7d0a-413e-938a-5d3b118fc952",
+        "a9f212bc-d5bb-4e6f-985a-4bf42213983d"
+      ],
+      "creativeSpecId": "9c5defb1-922b-4717-9d5e-d801c5a8cb2c"
+    },
+    {
+      "action": "created",
+      "groupKey": "tenor-23-C025-quiz",
+      "primaryAssetId": "d0d9d0a4-c700-4df6-8d23-e79f19c61808",
+      "siblingVariantAssetIds": [
+        "e5850e45-4eeb-4ddb-8503-e20f98c25ca3",
+        "0a6c3713-c283-4b75-83f8-668b3d23b013"
+      ],
+      "creativeSpecId": "f7b15c14-ded8-42f3-9681-585fa6f90b2f"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-01-glp",
+      "primaryAssetId": "b209390c-f96e-4495-b4db-66271109f826",
+      "siblingVariantAssetIds": [
+        "7525d247-43ef-4228-a619-99c81a6a16c3",
+        "589f8649-89b3-4fef-8c14-083b20a26390"
+      ],
+      "creativeSpecId": "afd07baf-dcee-42db-a4e7-105d0a422a19"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-02-glp",
+      "primaryAssetId": "f626ad98-1531-4371-935f-76510d9350a6",
+      "siblingVariantAssetIds": [
+        "068215ef-cca9-4e2f-ba4d-961f7b005292",
+        "448784de-65ae-48c8-a6a2-fa898946c6a2"
+      ],
+      "creativeSpecId": "2d42b4f6-b3cc-4d8e-9c27-bb12758959c0"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-03-glp",
+      "primaryAssetId": "1871e006-5f9b-41f7-b595-f46ab596d727",
+      "siblingVariantAssetIds": [
+        "95af093b-fdc0-4ea7-a4fe-de9d287d428a",
+        "d01b497f-b7af-463e-9435-6fd45ac46e40"
+      ],
+      "creativeSpecId": "3cb5e5d9-44a6-425d-aadd-a7dd517e7490"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-04-glp",
+      "primaryAssetId": "415feb9d-04ea-43f4-b0dc-57de082ad924",
+      "siblingVariantAssetIds": [
+        "7eccb9e3-b26c-4eb8-a97f-cebf997d8195",
+        "c95b8292-e375-475e-8b62-c3b00e9bd13e"
+      ],
+      "creativeSpecId": "a5ceab75-a1b8-470e-9d20-cc70ee7b5b61"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-05-glp",
+      "primaryAssetId": "9b07f464-43a6-4ecb-b064-5353c9dfbd36",
+      "siblingVariantAssetIds": [
+        "1488c471-eb80-4202-9e9c-2f8daeb5ce90",
+        "0f3b7f01-8264-40bf-9a76-7d88fc533a8e"
+      ],
+      "creativeSpecId": "2fc1761f-2a8f-4f6e-abe9-82c29373b358"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-06-glp",
+      "primaryAssetId": "6a0f8126-678b-4482-a4d9-66294a957e86",
+      "siblingVariantAssetIds": [
+        "27de698c-0138-485a-9655-4044f93795d7",
+        "0236150f-91b0-4e7e-85b9-a30b8be39a60"
+      ],
+      "creativeSpecId": "15525b38-5c2e-4d1d-ba5f-5664ca6be9e0"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-07-glp",
+      "primaryAssetId": "775390ec-1b0a-464f-aad9-5966914a92fe",
+      "siblingVariantAssetIds": [
+        "88055f33-fb9f-424e-9d8d-f97fa39786e8",
+        "c4e51ce6-5d80-4855-9af2-ad83c1c2662d"
+      ],
+      "creativeSpecId": "caf5e932-6337-4485-97f8-44393ec3c0b4"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-08-glp",
+      "primaryAssetId": "b8d9a04a-8eaa-4d46-a14e-ead0b0c6aa82",
+      "siblingVariantAssetIds": [
+        "5c765400-f6e4-4f95-8b42-f891eed6ea98",
+        "e8abd741-ce5d-43d2-b443-00a21dbe1c13"
+      ],
+      "creativeSpecId": "4f7c13f2-1eaf-43db-92a6-dcde4ee6cc5b"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-09-glp",
+      "primaryAssetId": "1e6f52ad-51a4-4e47-9dd1-47330535b25a",
+      "siblingVariantAssetIds": [
+        "d7c317f3-ee01-44e3-8fc4-3d252412ecea",
+        "e1a14192-fae1-44e8-bc39-61096180b05b"
+      ],
+      "creativeSpecId": "4ff9cb14-9d9d-4999-9abf-bebfc11ae150"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-10-glp",
+      "primaryAssetId": "ef529af1-d540-4e4d-bdda-0f78f8a05f1f",
+      "siblingVariantAssetIds": [
+        "5c58048a-54c9-43fd-969b-8040cdd5eaad",
+        "dde90d19-c22a-4234-81fa-e408e89edbf0"
+      ],
+      "creativeSpecId": "cfada355-606f-4a35-ba02-8f6fe12c31b9"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-11-glp",
+      "primaryAssetId": "445c04b3-4533-4da3-a2b3-2a7cc29acb8c",
+      "siblingVariantAssetIds": [
+        "a9fa4846-7073-4f24-88a5-65515f62098c",
+        "1669704b-175d-41b1-b491-6db91eb42a65"
+      ],
+      "creativeSpecId": "c0ed7636-be1c-4148-875a-682caefe20a4"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-12-glp",
+      "primaryAssetId": "5c36e1a4-eebc-4382-9e3a-f7b7a721ddf3",
+      "siblingVariantAssetIds": [
+        "7f5e4495-b766-4145-b2a6-caa8abad7a02",
+        "5c587bdf-0306-48a5-829e-4a6e5f2aa7ad"
+      ],
+      "creativeSpecId": "ed68a395-fba8-4ebe-b4e6-1cfad0e01c5c"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-13-glp",
+      "primaryAssetId": "5aacf815-ba26-49ce-9994-2bb8d734db83",
+      "siblingVariantAssetIds": [
+        "c1819951-e38b-4770-bd71-d47237115f62",
+        "49dc9312-2580-41b3-8264-6f3b78b738e6"
+      ],
+      "creativeSpecId": "1fb7d892-60aa-4bf3-803e-4a16989a0eb2"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-14-glp",
+      "primaryAssetId": "23f5ab0b-95a0-4772-b485-d40aeb3d418f",
+      "siblingVariantAssetIds": [
+        "5e57e052-bee3-4c8b-867c-59a22b744812",
+        "dba3c76c-6fda-4309-ab07-fb10d46ca423"
+      ],
+      "creativeSpecId": "e91bc98d-f4c2-4b15-ae02-064494772103"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-15-glp",
+      "primaryAssetId": "9c980b3d-1de3-44af-89ca-7162a2a8c4ff",
+      "siblingVariantAssetIds": [
+        "f5892c61-3dfc-414c-abc6-3dbe9fb74736",
+        "02a2dd1a-27fe-4ba9-b8e5-179052b78588"
+      ],
+      "creativeSpecId": "d310ab99-60e2-417c-9d4e-540887f7047c"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-16-glp",
+      "primaryAssetId": "e33bde34-c537-48f9-9001-ab22449593b3",
+      "siblingVariantAssetIds": [
+        "ab0bd80a-8391-43f5-9b18-176911b3ddcd",
+        "a9dc7234-53d6-4bce-95f0-7649130a0f53"
+      ],
+      "creativeSpecId": "c57f8f27-0938-47ea-88c7-011e8e897532"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-17-glp",
+      "primaryAssetId": "78c509b8-2fbc-4f7a-9945-a0575fab1092",
+      "siblingVariantAssetIds": [
+        "b432016b-13df-4fc0-8c1a-6944d691c2d0",
+        "a5b4de44-8163-4507-8ce6-23e29a972a88"
+      ],
+      "creativeSpecId": "55120215-56dc-49b8-ac84-2db06ee8fed6"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-18-glp",
+      "primaryAssetId": "e389356e-a17d-4fce-a9f5-5b9adb2a9ce7",
+      "siblingVariantAssetIds": [
+        "509715a2-eac0-46f3-86e9-92cd3a28eff2",
+        "b95c6378-445e-46ff-a4ee-a3fe26fe560b"
+      ],
+      "creativeSpecId": "583b100b-f566-4a2a-8f54-ae85c9a3d67e"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-19-glp",
+      "primaryAssetId": "7e24d222-0686-4b69-827d-49b3b1c9014c",
+      "siblingVariantAssetIds": [
+        "63c992fc-36a9-4dfe-b027-b5efb3aa7a0e",
+        "b7b93379-9a3d-4a75-84c3-997ab07947e5"
+      ],
+      "creativeSpecId": "766d1a6c-fea4-4ed1-a8ed-7b154ffdb706"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-20-glp",
+      "primaryAssetId": "6c6b66ee-3749-47f5-9e80-3e4e75d1d7fb",
+      "siblingVariantAssetIds": [
+        "af0fb09e-270f-4c70-a459-c395029ef303",
+        "35dfe94a-63df-46ff-81c0-fbcc9f9ad61a"
+      ],
+      "creativeSpecId": "492162aa-43b4-48fb-a4e4-9a542d8d7a3d"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-21-glp",
+      "primaryAssetId": "42700dab-87ad-4dab-91ad-1be1aaa21431",
+      "siblingVariantAssetIds": [
+        "49c5c7fe-9b56-473c-b461-849e6e25b11b",
+        "dff38e21-3a16-4bc5-a2e6-b73455b28ab3"
+      ],
+      "creativeSpecId": "c43bcc17-312c-4e99-a69e-afaddce4a4d7"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-22-glp",
+      "primaryAssetId": "450daa57-9dba-4f3c-a8f8-27a860e39a32",
+      "siblingVariantAssetIds": [
+        "6fec4b84-2496-4502-bfb4-313291ef1506",
+        "9a51b254-29c0-4b0b-87ef-849df5a0aa1d"
+      ],
+      "creativeSpecId": "279e0296-f0fd-4ea8-8450-a3813b8f4b6d"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-23-glp",
+      "primaryAssetId": "9b0d2aef-3e62-4e71-9af3-154bbb665b7a",
+      "siblingVariantAssetIds": [
+        "23083bfa-c142-40a1-b529-b402f86c980b",
+        "4a725d05-ed26-4b70-9dcc-94f253220c9b"
+      ],
+      "creativeSpecId": "311d60f6-afc6-4eb5-a7c4-85cd5410b89b"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-24-glp",
+      "primaryAssetId": "4676d0b8-8596-4ce6-b77a-4fc35407da77",
+      "siblingVariantAssetIds": [
+        "175005b6-b040-41a7-8e23-acfe060a93db",
+        "6018f978-3077-4b80-afa4-6fe7fff53ef5"
+      ],
+      "creativeSpecId": "c8176f1e-f5e9-4547-8d15-f30d6ad238c0"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-25-glp",
+      "primaryAssetId": "208941f8-a019-43e9-b28f-6f47d1b7a927",
+      "siblingVariantAssetIds": [
+        "b4bba466-1818-423c-a9c5-6f7fb41e7792",
+        "f1e1bc8d-3a8a-4081-9d07-a67335e94ba2"
+      ],
+      "creativeSpecId": "e4a2a632-c74e-42a8-a21b-bcdfb532adb9"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-26-glp",
+      "primaryAssetId": "53864c86-5a28-4cf9-81b2-20c099cd5a3f",
+      "siblingVariantAssetIds": [
+        "e95ce980-502f-4bd9-a8c0-b22843d5facf",
+        "10f76af3-4969-48d0-8666-d8d27a35aea0"
+      ],
+      "creativeSpecId": "aba1466f-e3f4-4f83-a0f8-6034705f91b7"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-27-glp",
+      "primaryAssetId": "117c485c-35ce-4f07-91b6-0731e822ca51",
+      "siblingVariantAssetIds": [
+        "4a326337-249c-4af9-b583-954a8d0cd450",
+        "29019128-d82e-4994-b2d3-e8f71194c21a"
+      ],
+      "creativeSpecId": "fd282d99-93ff-47c6-a2c6-506d84412780"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-28-glp",
+      "primaryAssetId": "084c29f7-92c7-4209-af5a-3d256bbe91df",
+      "siblingVariantAssetIds": [
+        "ae93dc7f-6459-48b2-b0a4-7a26c8995fe1",
+        "6b3e57f7-0715-471c-b115-56a5cdb063da"
+      ],
+      "creativeSpecId": "175be1b2-c124-444c-b9be-a1bd746242db"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-29-glp",
+      "primaryAssetId": "ecaab1fb-d292-41c4-b501-2205d9ce64db",
+      "siblingVariantAssetIds": [
+        "26f34038-859c-4788-9e1e-611cd45e16bf",
+        "23194ce3-a558-4fb1-a32b-e266d4b94975"
+      ],
+      "creativeSpecId": "9df8467a-c136-4102-9f7f-cfd4b9af8e32"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-30-glp",
+      "primaryAssetId": "a8b1cc0a-21ff-4b6a-93b2-fd1b0aa9de31",
+      "siblingVariantAssetIds": [
+        "42a7abcc-94cf-4759-a384-e70a446c8bb0",
+        "27dd1f87-7d77-4df1-9e52-c5c71a121c45"
+      ],
+      "creativeSpecId": "4b7b738f-9ab1-4a30-9a5b-64e66ec41dce"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-01-quiz",
+      "primaryAssetId": "8204b2a4-408d-4efe-b63d-2307efbe5bed",
+      "siblingVariantAssetIds": [
+        "d1fc822a-49aa-47a3-b25c-d4dbfca7d4a7",
+        "11d15ae1-38b0-4359-8bdc-72d084b3f876"
+      ],
+      "creativeSpecId": "7596b420-9ee0-4b2f-9a0f-81c9196ffc36"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-02-quiz",
+      "primaryAssetId": "25a0d7ae-28b7-4825-b938-ba5f7888b4ed",
+      "siblingVariantAssetIds": [
+        "bf9ae260-9400-4548-b174-93c2af3f338f",
+        "22c336cf-0169-4ea9-ba95-44361824059a"
+      ],
+      "creativeSpecId": "04745568-24bf-42e4-8a98-cc894aa87486"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-03-quiz",
+      "primaryAssetId": "099aa9e3-0a3c-419b-a2ef-22e4bf77645d",
+      "siblingVariantAssetIds": [
+        "c495034e-66a0-43d4-81d8-c954127033fc",
+        "141b5e55-7426-4c69-acff-9b929ea16862"
+      ],
+      "creativeSpecId": "8de59937-084d-48e3-bdf8-3659611f1ab4"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-04-quiz",
+      "primaryAssetId": "a9563646-3cc6-4ac6-9eaf-1266360ba1d3",
+      "siblingVariantAssetIds": [
+        "312cfecc-b5d2-4a77-9356-867e4584153a",
+        "0d9a6f16-34f0-49f9-b578-f76efaed8999"
+      ],
+      "creativeSpecId": "5080bcc8-6030-42f8-8c97-be54f8860ffa"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-05-quiz",
+      "primaryAssetId": "deb420bd-95ce-4e0d-8b32-11418689d054",
+      "siblingVariantAssetIds": [
+        "7e1c94b9-efde-4dc9-ad0c-0e1f4bf1640f",
+        "561ecff3-eb81-48be-b1d8-4e96efa7b688"
+      ],
+      "creativeSpecId": "ef03438a-9d7d-4cba-84c2-d04a9de8976b"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-06-quiz",
+      "primaryAssetId": "932f066a-f6ed-4cce-8034-5d70df1f0a22",
+      "siblingVariantAssetIds": [
+        "e65ffd27-d016-49d8-ae2e-77763f0ab4fb",
+        "6e4803bd-7d4a-4b52-ae95-d07edb737ba4"
+      ],
+      "creativeSpecId": "d1d4990b-4f6c-4e69-ac32-77cbe4d95d4b"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-07-quiz",
+      "primaryAssetId": "0c9391dc-743c-4493-97da-f9e88c61a333",
+      "siblingVariantAssetIds": [
+        "316cbf8d-d19c-4dbb-b8ac-5e4dcd505478",
+        "0455f46a-9b1f-48d7-99e7-cd4f6c132a31"
+      ],
+      "creativeSpecId": "b08433f2-c99c-42cd-b7aa-20efcdc34558"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-08-quiz",
+      "primaryAssetId": "39baf891-f77c-4190-8c18-c587a98944f0",
+      "siblingVariantAssetIds": [
+        "f9edd9f5-935e-47b3-bf60-a21208fd05a3",
+        "e5f3e256-e870-4a20-be6d-20a61bc8ae9c"
+      ],
+      "creativeSpecId": "d7ccc66c-a8b7-4856-a82b-5a770d091a28"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-09-quiz",
+      "primaryAssetId": "e1de4e6b-0614-4c09-990f-c5d7026998b3",
+      "siblingVariantAssetIds": [
+        "cde52bcd-0cda-4da9-9c6e-c73b08173e9e",
+        "8c293a94-6910-4bc3-b83f-3352fae15d7f"
+      ],
+      "creativeSpecId": "830056a9-7943-4fe1-8529-cac936a81abe"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-10-quiz",
+      "primaryAssetId": "a7ee217a-1586-4099-869b-cdd3341e39f4",
+      "siblingVariantAssetIds": [
+        "0c5cb2d4-b1c6-43fb-b423-ef8a9fdb4c36",
+        "ede8248a-8070-48dc-955d-108a471ab943"
+      ],
+      "creativeSpecId": "896eec79-c832-417a-8ca5-f77c83745e2d"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-11-quiz",
+      "primaryAssetId": "373a6c46-753d-4002-bc10-165a2f8620f4",
+      "siblingVariantAssetIds": [
+        "e40ca110-40f0-4f45-8395-d6b307ff7983",
+        "8092b5af-8622-41e5-af07-2888ae886c47"
+      ],
+      "creativeSpecId": "a02480b4-7cd5-45ec-913c-9d8ea7e91626"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-12-quiz",
+      "primaryAssetId": "fdd9b828-25e9-485b-bc6b-0d15bf728849",
+      "siblingVariantAssetIds": [
+        "33c5b4f0-b4c1-404e-9dc4-809ec0d014e1",
+        "6fb5d77d-9d3a-407a-a654-70161b964e25"
+      ],
+      "creativeSpecId": "ff79a75a-8a75-4d58-a512-4315d80cd150"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-13-quiz",
+      "primaryAssetId": "c6148d74-eb35-4a30-8ce4-7b9cac2be3bb",
+      "siblingVariantAssetIds": [
+        "81ba730b-3b3a-4832-84cc-98c8ce30dd9d",
+        "2d31c4b7-ce73-4d2e-9e5a-73ce6f54c704"
+      ],
+      "creativeSpecId": "af0f69c3-99ed-4db2-ae1f-89afd8da6847"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-14-quiz",
+      "primaryAssetId": "390ad211-ae9e-441c-9595-e3a799d8998e",
+      "siblingVariantAssetIds": [
+        "43882fcc-e918-448d-88fd-abddcf61bd6c",
+        "50a6645f-9b2e-4d94-9b36-31327d6a7e3b"
+      ],
+      "creativeSpecId": "fba0b035-27f4-4e3f-bba7-e1c4554e66df"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-15-quiz",
+      "primaryAssetId": "06766253-a194-4f85-921b-7780f73d7b6a",
+      "siblingVariantAssetIds": [
+        "d09c0fc2-568b-4fc8-b699-a27c3285ad8c",
+        "8a46a86f-1679-49f8-b02c-f960ba7ebbb9"
+      ],
+      "creativeSpecId": "46d87a5f-42d4-4c11-b175-8d91c97b1604"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-16-quiz",
+      "primaryAssetId": "2a65ca35-4347-4a4d-83d3-47b828ba3208",
+      "siblingVariantAssetIds": [
+        "09ea72ca-52ae-4ec4-a566-4094c0fb1ccc",
+        "c320f960-97d5-4bef-93ee-c1c521f2faba"
+      ],
+      "creativeSpecId": "5e33380e-c740-4301-ae95-a9ec2a5a42eb"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-17-quiz",
+      "primaryAssetId": "38d7e49f-9685-4fad-824d-44b1eebd3a74",
+      "siblingVariantAssetIds": [
+        "503557d3-5e62-44a5-9e5c-f55506d48f11",
+        "f75aa603-6395-4223-aac7-a1b2638a32e5"
+      ],
+      "creativeSpecId": "008d0684-09ea-4e2d-b848-25f90ec89732"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-18-quiz",
+      "primaryAssetId": "2f1abd93-096a-4995-ba18-f3a3adaa5b45",
+      "siblingVariantAssetIds": [
+        "29e82674-9f23-4c38-ba73-4f8e132d853f",
+        "7f299b6c-5ca0-4a61-9ac7-a1c315b663e1"
+      ],
+      "creativeSpecId": "920027c6-fb86-4b17-91ae-dacc8b680a7d"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-19-quiz",
+      "primaryAssetId": "10e251d4-72f3-43d5-b7a2-612519bab52b",
+      "siblingVariantAssetIds": [
+        "30620811-8fb2-493d-9c21-2ed3871be416",
+        "6ef297e9-d992-41c4-9e71-ef0dc23080e2"
+      ],
+      "creativeSpecId": "c914744d-c00a-4b70-909b-e7b42f6632a4"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-20-quiz",
+      "primaryAssetId": "082021ff-ad2f-4dde-9436-c750714f2a9d",
+      "siblingVariantAssetIds": [
+        "41082d95-303c-4242-8040-3d3c2c727955",
+        "cda48f4e-b560-47d6-ab4e-b16d97766a00"
+      ],
+      "creativeSpecId": "92603f4d-959e-4e04-b273-ea4ea7ac4c17"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-21-quiz",
+      "primaryAssetId": "bae6deb7-f6ee-45eb-be74-63f58e14fce4",
+      "siblingVariantAssetIds": [
+        "a1098be7-149a-4497-8ec3-5de81710c242",
+        "9a39a7e4-c6bf-4bfe-97af-424a06fc28d8"
+      ],
+      "creativeSpecId": "6dde3317-24fc-4267-a6fa-f9d9d0e4811a"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-22-quiz",
+      "primaryAssetId": "015168e1-bf2e-4a13-b1aa-b8479949059b",
+      "siblingVariantAssetIds": [
+        "38b4c8ba-b0c0-407d-a964-933842dc8b40",
+        "476cc01d-2b7d-44f6-9283-76b68e2f36e5"
+      ],
+      "creativeSpecId": "e6d058d1-7e18-4bde-8efa-add67f8b0768"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-23-quiz",
+      "primaryAssetId": "32edb8c2-d58a-4769-8438-c0306dd861ce",
+      "siblingVariantAssetIds": [
+        "e0be4a22-aa75-4b55-9fd5-e3a798140dbe",
+        "21da05d7-b96a-41f9-97de-0890846381f0"
+      ],
+      "creativeSpecId": "6c949971-d733-41ae-bb20-7ffc0d7b5d12"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-24-quiz",
+      "primaryAssetId": "355f5a45-b319-4a19-bf15-ab3932785d87",
+      "siblingVariantAssetIds": [
+        "f195464c-0abe-474b-a036-6e6d9ddbf02e",
+        "87585c5e-2f2a-4226-a671-ad91b0ae8086"
+      ],
+      "creativeSpecId": "ac2f5444-b827-487a-8dcd-6ec29977f085"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-25-quiz",
+      "primaryAssetId": "f1c15e58-72d4-4d45-b042-76387a78f479",
+      "siblingVariantAssetIds": [
+        "e099eb1b-1388-4a58-9701-d4cc46ec6abe",
+        "651a2444-505f-4065-8582-d0ed72126f20"
+      ],
+      "creativeSpecId": "dc5d96d7-c71c-40d3-bf97-2a8fa9eeb68f"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-26-quiz",
+      "primaryAssetId": "d953bd1d-f173-405a-83b4-9c439872ec7d",
+      "siblingVariantAssetIds": [
+        "06f81740-3144-48dd-93ac-1a62b010e736",
+        "9963042e-f70a-4ff1-ad09-6b4bd9ac659f"
+      ],
+      "creativeSpecId": "b05520d4-3ce7-4940-afb1-7be2e3846855"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-27-quiz",
+      "primaryAssetId": "3b4c2ef7-0c09-430f-ae9a-ed3cf170839b",
+      "siblingVariantAssetIds": [
+        "167e45e6-9ecb-437d-97d5-dbb0f24496df",
+        "f43077e7-1d05-4fbe-ad1f-7523fed38457"
+      ],
+      "creativeSpecId": "1847e256-b573-4ce9-9c7d-2bee04750329"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-28-quiz",
+      "primaryAssetId": "e5f91fa9-80c4-4d39-bac8-b0df0809c431",
+      "siblingVariantAssetIds": [
+        "be63d324-7b24-4270-9a1e-bf568139a311",
+        "53d5074c-020a-4504-a4fd-2682fcf9c12e"
+      ],
+      "creativeSpecId": "e8e4fac9-1ef7-4638-a198-9fad815eaa7b"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-29-quiz",
+      "primaryAssetId": "0648c297-eeea-4317-a23b-57c38b9d5a57",
+      "siblingVariantAssetIds": [
+        "afa0044b-5912-45f1-b9ec-a7659a744360",
+        "f30477e4-128b-4890-9166-eb4b96705a5e"
+      ],
+      "creativeSpecId": "8523ec7d-9eff-433c-ac80-2b995c33e4a8"
+    },
+    {
+      "action": "created",
+      "groupKey": "curated-30-quiz",
+      "primaryAssetId": "e307dc0a-a3fe-4e60-8fb3-c265b47fcdd9",
+      "siblingVariantAssetIds": [
+        "1beaf37f-ab97-4128-939c-c7c5d6df40e2",
+        "aeed0127-7fad-429a-b7e5-4b164b5e15bb"
+      ],
+      "creativeSpecId": "7e594ebe-9fc4-4926-aeb3-0697f2054108"
+    }
+  ],
+  "adsetSpecs": [
+    {
+      "action": "updated",
+      "bucketIndex": 1,
+      "adsetSpecId": "a5ceeb2b-4e3d-48cd-ae38-635964552207"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 2,
+      "adsetSpecId": "3262b57c-9e79-42fd-949b-9dd6681e2e72"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 3,
+      "adsetSpecId": "90c5f271-fe61-4f60-be60-7ac8e015ce1e"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 4,
+      "adsetSpecId": "d6f6796e-e727-44a2-9a0b-ae149edf85a4"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 5,
+      "adsetSpecId": "d7753f2e-6d38-4148-8e78-a32bac01175c"
+    }
+  ]
+}

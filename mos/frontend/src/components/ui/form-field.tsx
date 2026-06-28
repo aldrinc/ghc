@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type FormFieldProps = {
@@ -24,25 +24,31 @@ export type FormFieldProps = {
  */
 export function FormField({ label, helper, error, required, className, children }: FormFieldProps) {
   const autoId = useId();
+  const messageId = `${autoId}-message`;
+  let child = children;
+
+  if (isValidElement(children)) {
+    const element = children as ReactElement<{ id?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }>;
+    child = cloneElement(element, {
+      id: element.props.id ?? autoId,
+      "aria-describedby": error || helper ? messageId : element.props["aria-describedby"],
+      "aria-invalid": Boolean(error) || element.props["aria-invalid"],
+    });
+  }
 
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <label htmlFor={autoId} className="text-xs font-semibold text-content">
+    <div className={cn("space-y-2.5", className)}>
+      <label htmlFor={autoId} className="block text-sm font-semibold tracking-normal text-content">
         {label}
         {required ? <span className="ml-0.5 text-danger" aria-hidden="true">*</span> : null}
       </label>
 
-      {/* Wrap children so we can inject the id on the first focusable element.
-          For simplicity, we pass the id down as a data attribute consumers can
-          forward. In practice Input/Select accept `id` as a prop already. */}
-      <div data-field-id={autoId}>
-        {children}
-      </div>
+      <div data-field-id={autoId}>{child}</div>
 
       {error ? (
-        <p className="text-xs text-danger" role="alert">{error}</p>
+        <p id={messageId} className="flex items-center gap-1.5 text-sm font-medium text-danger" role="alert">{error}</p>
       ) : helper ? (
-        <p className="text-xs text-content-muted">{helper}</p>
+        <p id={messageId} className="text-sm text-content-muted">{helper}</p>
       ) : null}
     </div>
   );

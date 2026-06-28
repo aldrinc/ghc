@@ -1,0 +1,239 @@
+{
+  "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+  "campaignName": "Tenor Pipeline V3 Meta Draft - No Product Reveal - 2026-04-30",
+  "updatedAt": "2026-04-30T04:36:10.079Z",
+  "swipeCollectionId": "32f456e5-4bb8-4fe5-976a-d6bfbb466328",
+  "swipeCollectionName": "Tenor Pipeline V3 Meta Swipes - Default Clone - 2026-04-30",
+  "delivery": {
+    "id": "df1cd3df-c9b9-4a25-ae69-3cf3084c914e",
+    "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "deliveryMode": "external_urls",
+    "preSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+    "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+    "checkoutUrl": null,
+    "thankYouUrl": null,
+    "validationStatus": "invalid",
+    "validationError": "preSalesUrl does not visibly reference privacy handling.; preSalesUrl does not visibly expose contact or support information.; salesUrl does not visibly reference privacy handling.",
+    "validatedAt": "2026-04-30T03:22:48.388056+00:00",
+    "createdAt": "2026-04-30T02:12:41.789078+00:00",
+    "updatedAt": "2026-04-30T03:22:48.388063+00:00"
+  },
+  "creativeContextArtifactId": "b704945d-1675-4a86-9502-c16b083b1a42",
+  "experimentSpecArtifactId": "8ef1030b-1a09-4680-aa8a-8f57a7cef6e7",
+  "uploadedDocKeys": [
+    "campaign_loaded_angles",
+    "campaign_loaded_offer",
+    "campaign_loaded_copy",
+    "campaign_loaded_copy_context",
+    "campaign_creative_context",
+    "experiment_specs:0a9470aa-97be-4cc2-9099-a30ae8d1daf4"
+  ],
+  "manualCreativeContextPayloadPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/manual-creative-context-payload.json",
+  "funnelGenerationWorkflowRunId": "4c11c72c-0e55-4703-b27f-695d930f8a1a",
+  "funnelGenerationTemporalWorkflowId": "campaign-funnels-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-bf781da7-fce5-40b6-8f86-7aefa43e554c",
+  "stoppedWorkflowRunId": "033b0548-fc0a-4997-94f1-23526657f645",
+  "stoppedWorkflowSignalSentAt": "2026-04-30T04:15:39.656Z",
+  "campaignPackagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/campaign-package.json",
+  "campaignPackageCsvPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/campaign-package.csv",
+  "externalFunnelMode": true,
+  "externalDestinationRegistryPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/external-destination-registry.json",
+  "externalAdRoutingPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/external-ad-routing.json",
+  "externalAdRoutingCsvPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/external-ad-routing.csv",
+  "externalRoutingReviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/external-routing-review.md",
+  "externalDeliveryConfigPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/core-external-delivery-config.json",
+  "briefOptions": [
+    {
+      "artifactId": "06bdd326-ea2d-4084-8f83-396f55eade59",
+      "id": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "name": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "destinationPage": "pre-sales",
+      "funnelId": null,
+      "imageRequirementCount": 1,
+      "imageRequirementIndexes": [
+        0
+      ],
+      "requirements": [
+        {
+          "id": "req_0",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "top-of-funnel",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        }
+      ]
+    },
+    {
+      "artifactId": "06bdd326-ea2d-4084-8f83-396f55eade59",
+      "id": "brief_tenor_pipeline_v3_no_reveal_presales_carousel",
+      "name": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Carousel",
+      "destinationPage": "pre-sales",
+      "funnelId": null,
+      "imageRequirementCount": 3,
+      "imageRequirementIndexes": [
+        0,
+        1,
+        2
+      ],
+      "requirements": [
+        {
+          "id": "req_0",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "top-of-funnel",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        },
+        {
+          "id": "req_1",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "top-of-funnel",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        },
+        {
+          "id": "req_2",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "top-of-funnel",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        }
+      ]
+    },
+    {
+      "artifactId": "06bdd326-ea2d-4084-8f83-396f55eade59",
+      "id": "brief_tenor_pipeline_v3_no_reveal_sales_single",
+      "name": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Single Image",
+      "destinationPage": "sales",
+      "funnelId": null,
+      "imageRequirementCount": 1,
+      "imageRequirementIndexes": [
+        0
+      ],
+      "requirements": [
+        {
+          "id": "req_0",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "bottom-of-funnel",
+          "destinationType": "sales",
+          "destinationLabel": "Sales/PDP Page"
+        }
+      ]
+    },
+    {
+      "artifactId": "06bdd326-ea2d-4084-8f83-396f55eade59",
+      "id": "brief_tenor_pipeline_v3_no_reveal_sales_carousel",
+      "name": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Carousel",
+      "destinationPage": "sales",
+      "funnelId": null,
+      "imageRequirementCount": 3,
+      "imageRequirementIndexes": [
+        0,
+        1,
+        2
+      ],
+      "requirements": [
+        {
+          "id": "req_0",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "bottom-of-funnel",
+          "destinationType": "sales",
+          "destinationLabel": "Sales/PDP Page"
+        },
+        {
+          "id": "req_1",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "bottom-of-funnel",
+          "destinationType": "sales",
+          "destinationLabel": "Sales/PDP Page"
+        },
+        {
+          "id": "req_2",
+          "hook": "Source hook comes from phase-9 Meta ads markdown and the generation request swipeHook/swipeAngle.",
+          "angle": "Use the supplied Meta ad block passed at generation time; dramatize the hook without showing the product or mechanism.",
+          "format": "image",
+          "channel": "meta",
+          "constraints": [
+            "Do not show the Tenor product, product object, bottle, jar, box, pouch, label, packaging, capsules, pills, powder, scoop, sachet, price, guarantee, ratings, purchase cue, or supplement facts panel.",
+            "Do not reveal solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the product works.",
+            "Use the supplied pipeline-run-v3 phase-9 Meta ads copy as the source of truth for the hook and on-image concept.",
+            "Destination URLs are for Meta launch routing only and must not be displayed in the ad image."
+          ],
+          "funnelStage": "bottom-of-funnel",
+          "destinationType": "sales",
+          "destinationLabel": "Sales/PDP Page"
+        }
+      ]
+    }
+  ],
+  "generatedManifestPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated-manifest.json",
+  "generatedCount": 30,
+  "launchSpecsPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/launch-specs-created.json",
+  "launchGenerationKey": "tenor-pipeline-v3-meta-20260430",
+  "publishValidationPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/publish-validation.json",
+  "publishRunResponsePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/publish-run-response.json",
+  "publishRunId": "09d51168-301a-42b2-b74f-8cbfd9c6ebb0",
+  "metaCampaignId": "120245038268060293"
+}

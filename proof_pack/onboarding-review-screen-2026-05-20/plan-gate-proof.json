@@ -1,0 +1,63 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-20T00:00:00-05:00",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+  "questions_asked": [
+    {
+      "question": "Should review and editing be separate?",
+      "answer_source": "user: I think we should have a review screen and then an edit view if they want to edit it rather than this."
+    },
+    {
+      "question": "Should the visual UI skill be used for planning?",
+      "answer_source": "user: Use the visual UI skill to actually do the planning of the updated design."
+    },
+    {
+      "question": "Should implementation proceed?",
+      "answer_source": "user: Okay looks good go ahead with implementation."
+    }
+  ],
+  "question_sufficiency_rationale": "The user supplied the core decision and approved the visual plan. The remaining details are low-risk UI implementation choices constrained by existing onboarding code and tests.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/goal.md",
+      "summary": "Measurable target for a scannable read-only review step."
+    },
+    "problem_log": {
+      "path": "planning/problem-log.md",
+      "summary": "Observable review/edit mixing problem."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/root-cause.md",
+      "summary": "Review step reuses the edit form as confirmation UI."
+    },
+    "current_machine": {
+      "path": "planning/current-machine.md",
+      "summary": "Current mixed review/form flow."
+    },
+    "designed_machine": {
+      "path": "planning/designed-machine.md",
+      "summary": "Read-only review plus focused edit view."
+    },
+    "worst_day_test": {
+      "path": "planning/worst-day.md",
+      "summary": "Missing pricing and long extracted text remain reviewable."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/metrics.md",
+      "summary": "UI and submission success metrics."
+    },
+    "owner_date_review": {
+      "path": "planning/owner-review.md",
+      "summary": "Owner, review date, and validation owner."
+    },
+    "stop_condition": {
+      "path": "planning/stop-condition.md",
+      "summary": "Verification gates required before completion."
+    }
+  },
+  "owner": "main",
+  "review_date": "2026-05-20",
+  "stop_condition": "Plan is final only after plangatecheck passes."
+}

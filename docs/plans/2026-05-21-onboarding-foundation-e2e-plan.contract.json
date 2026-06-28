@@ -1,0 +1,485 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-21-onboarding-foundation-e2e-plan",
+  "created_at": "2026-05-21T23:50:33.289166+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-onboarding-foundation-e2e-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/docs/plans",
+  "proof_dir": "proof_pack",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Use existing MOS local dev services where available; start missing local services only.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Local Postgres, Temporal dev server, backend, frontend, and worker were used. Worker was restarted after the parent-status fix."
+    },
+    {
+      "id": "P02",
+      "objective": "Sign in with repo-local MOS test auth credentials.",
+      "source_line": 14,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Signed in with repo-local MOS test auth through the actual browser session."
+    },
+    {
+      "id": "P03",
+      "objective": "Create a new-business workspace through the actual onboarding UI.",
+      "source_line": 15,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Created new-business workspace Aurora Sleep Lab E2E Final 202605220030 through /workspaces/new."
+    },
+    {
+      "id": "P04",
+      "objective": "Capture screenshots at each meaningful screen.",
+      "source_line": 16,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Captured final-run screenshots 34-47 plus earlier failure/debug attempts."
+    },
+    {
+      "id": "P05",
+      "objective": "Confirm backend created workflow and foundation bundle artifacts.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Strategy run completed and persisted foundation_research_bundle 639b11f1-7bb2-41f0-8e3e-143a4457e453."
+    },
+    {
+      "id": "P06",
+      "objective": "Wait for readiness to become `foundation_ready` or capture failure details.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Readiness changed to ready and UI navigated to /workspaces/foundation-ready."
+    },
+    {
+      "id": "P07",
+      "objective": "Do not run Step 06.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Bundle contains only v2-02.foundation.01, .03, .04; no .06 key."
+    },
+    {
+      "id": "P08",
+      "objective": "UI onboarding can submit a new-business workspace.",
+      "source_line": 23,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Create workspace submitted successfully from the UI."
+    },
+    {
+      "id": "P09",
+      "objective": "Waiting/progress screen appears after submit.",
+      "source_line": 24,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Wait/progress screen captured at screenshots/46-final-success-wait-progress.png."
+    },
+    {
+      "id": "P10",
+      "objective": "Backend starts client onboarding and strategy foundation workflow.",
+      "source_line": 25,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Temporal strategy workflow completed; DB strategy_v2 run completed."
+    },
+    {
+      "id": "P11",
+      "objective": "Readiness endpoint gates while pending and unlocks when ready.",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "UI polling called foundation-readiness repeatedly and auto-unlocked after bundle completion."
+    },
+    {
+      "id": "P12",
+      "objective": "Screenshot artifacts exist for each screen.",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Screenshots exist for final workflow screens 34-47."
+    },
+    {
+      "id": "P13",
+      "objective": "If blocked, blocker is concrete with logs and DB/API evidence.",
+      "source_line": 28,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "No final blocker. One DB parent-status issue was found and fixed for future runs."
+    },
+    {
+      "id": "P14",
+      "objective": "Browser screenshots saved under `proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/`.",
+      "source_line": 32,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Screenshot directory populated under proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/."
+    },
+    {
+      "id": "P15",
+      "objective": "Backend/API readiness checks saved under `proof_pack/onboarding-foundation-e2e-2026-05-21/`.",
+      "source_line": 33,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Poll logs and summary JSON saved under proof_pack/onboarding-foundation-e2e-2026-05-21/."
+    },
+    {
+      "id": "P16",
+      "objective": "`planctl verify docs/plans/2026-05-21-onboarding-foundation-e2e-plan.contract.json --run`",
+      "source_line": 34,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Evidence artifact exists in proof pack.",
+        "Final E2E result matches the objective."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/index.html",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/e2e-summary.json",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/foundation-final-poll.log",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/46-final-success-wait-progress.png",
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-e2e-2026-05-21/screenshots/47-final-foundation-ready.png"
+      ],
+      "notes": "Contract verification is expected to pass after this contract update."
+    }
+  ],
+  "global_verify_commands": [
+    "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && .venv/bin/python -m py_compile app/temporal/workflows/client_onboarding.py app/temporal/activities/client_onboarding_activities.py app/temporal/worker.py app/llm/client.py app/config.py app/routers/clients.py app/temporal/activities/strategy_v2_activities.py app/temporal/workflows/strategy_v2.py",
+    "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && .venv/bin/pytest tests/test_client_onboarding_v2_ordering.py tests/test_strategy_v2_workflow_ordering.py -q",
+    "cd /Users/aldrinclement/Documents/programming/marketi && git diff --check -- mos/backend/app/temporal/workflows/client_onboarding.py mos/backend/app/temporal/activities/client_onboarding_activities.py mos/backend/app/temporal/worker.py mos/backend/tests/test_client_onboarding_v2_ordering.py mos/backend/app/llm/client.py mos/backend/app/config.py mos/backend/app/routers/clients.py mos/backend/app/temporal/activities/strategy_v2_activities.py mos/backend/app/temporal/workflows/strategy_v2.py mos/backend/.env.example mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx mos/frontend/src/components/clients/OnboardingWizard.tsx"
+  ],
+  "global_acceptance": [
+    "Final UI-driven onboarding run reaches /workspaces/foundation-ready.",
+    "Foundation bundle contains required docs 01, 03, 04 only.",
+    "Step 06 is absent from the foundation bundle.",
+    "Targeted backend compile, pytest, and diff checks pass."
+  ]
+}

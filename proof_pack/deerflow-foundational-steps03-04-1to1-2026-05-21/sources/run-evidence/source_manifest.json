@@ -1,0 +1,98 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "dsv4-foundational-03-04-run",
+  "created_at": "2026-05-21T20:12:39.169998+00:00",
+  "source_type": "local",
+  "source": "DeerFlow DSV4 foundational Steps 03/04 run evidence",
+  "operator_notes": "Raw events, outputs, validation, and comparison for DSV4 Step 03/04 benchmark. Step 06 intentionally not run.",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/dsv4-step03-raw.md",
+      "kind": "raw_files",
+      "sha256": "8d475495f59f84effa8cbde3757b1117b1110bd2dfea725c2a0dc6a2e8972ffa",
+      "bytes": 23940,
+      "captured_at": "2026-05-21T20:12:39.245865+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/dsv4-step03-step4-prompt.md",
+      "kind": "raw_files",
+      "sha256": "a035ed7bfe390c08c30886602b0935e93c5c8ea5c199b7d6ac15b1fedbf11926",
+      "bytes": 20271,
+      "captured_at": "2026-05-21T20:12:39.319847+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/events.jsonl",
+      "kind": "raw_files",
+      "sha256": "a9ac79abb801739c29718f97ee4f4fb43ef74860938b2d95c831ca9bc18d6c34",
+      "bytes": 21418434,
+      "captured_at": "2026-05-21T20:12:39.420906+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/raw.md",
+      "kind": "raw_files",
+      "sha256": "4706a62fb5b69cfb93ebaf30f70d0e6324d3e871c949a5b9e55bff963a37ee92",
+      "bytes": 81,
+      "captured_at": "2026-05-21T20:12:39.498723+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/run-meta.json",
+      "kind": "raw_files",
+      "sha256": "f25a544dcc9e30122ff3e719bfd43a7ef73fffbbeb06f05aec8c3db5eb824be1",
+      "bytes": 1366,
+      "captured_at": "2026-05-21T20:12:39.578254+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/events-ba4be3f8bd.jsonl",
+      "kind": "raw_files",
+      "sha256": "943671ae3f05473495f4825d662eaa8b38f3611320743bd92816015ffc6d0f81",
+      "bytes": 65219,
+      "captured_at": "2026-05-21T20:12:39.648531+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/run-meta-d429aee5ea.json",
+      "kind": "raw_files",
+      "sha256": "517f17364e1f521d1f922668a4bc8544d0d22a849723c9bf9d2c5bf516e50497",
+      "bytes": 1399,
+      "captured_at": "2026-05-21T20:12:39.720139+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/dsv4-foundational-03-04-validation.json",
+      "kind": "raw_files",
+      "sha256": "2cda5426afb784ff12b9fdf752d6d3ef8adb2dd95100493df65ecd8480db0eaf",
+      "bytes": 3871,
+      "captured_at": "2026-05-21T20:12:39.790388+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/sources/run-evidence/raw/dsv4-vs-gpt-foundational-03-04-comparison.md",
+      "kind": "raw_files",
+      "sha256": "b1c494bb8ccb2e3983087fe1045058b96cd8310f6a50a6f58bd192a9aae9748c",
+      "bytes": 1861,
+      "captured_at": "2026-05-21T20:12:39.860972+00:00",
+      "source": "local run artifact",
+      "notes": "DSV4 Step 03/04 benchmark evidence"
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-21T20:14:58.665349+00:00",
+    "errors": []
+  }
+}

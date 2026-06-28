@@ -1,0 +1,104 @@
+P
+Peptide Price Store 2026-05-24 21:00
+Workspace
+Strategy complete — ready to launch
+Workspace
+Overview
+Strategy
+Brand
+Sites
+Commerce
+Products
+Research
+Documents
+Ads & Brands
+Funnels
+Execution
+Campaigns
+Analytics
+Postiz
+Social Agents
+AI
+Assistant Chat
+Assets
+Creative Library
+Meta Ads
+Aldrin Clement
+aldrin.clement@gmail.com
+Toggle Sidebar
+Workspaces
+Strategy
+Workspace Product
+Select workspace product
+§-31
+Strategy Review
+
+Processing — we'll pause when a decision is needed.
+
+Actions
+Review
+Outputs
+Launch (6 gates left)
+All gates complete
+All human checkpoints have been completed. Foundational docs remain available below.
+Gate 6 of 6
+Step 1: Review Research
+Review foundational market research
+Completed
+Step 2: Select Competitors
+Pick competitor reference assets
+Completed
+Step 3: Choose Angle
+Pick your marketing angle
+Completed
+Step 4: Choose Messaging
+Select your messaging proposition pair
+Completed
+Step 5: Select Offer
+Pick the winning offer variant
+Completed
+Step 6: Approve Copy
+Review and approve final ad copy
+Completed
+Foundational docs
+Stage 1 full files expected by source of truth: competitor research, meta-prompt, deep research, and avatar brief.
+Download foundational ZIP
+Competitor Research
+Raw foundational competitor landscape output for step 01.
+Not opened
+Deep Research Meta-Prompt
+Raw foundational deep-research meta prompt output for step 03.
+Not opened
+Deep Research Corpus
+Raw foundational tagged deep-research corpus for step 04.
+Not opened
+Avatar Brief
+Foundational Step 06 full markdown
+Missing foundational document 'Avatar Brief' (expected step key v2-02.foundation.06).
+Missing
+Some foundational docs are missing
+• Avatar Brief
+Run details
+Activity log
+Recent workflow events and signals.
+Step	Status	When	Error
+foundation_research_bundle	completed	5/24/2026, 4:36:07 PM	—
+v2-02.foundation.04	completed	5/24/2026, 4:36:07 PM	—
+v2-02.foundation.03	completed	5/24/2026, 4:36:07 PM	—
+v2-02.foundation.01	completed	5/24/2026, 4:36:07 PM	—
+v2-02.foundation	completed	5/24/2026, 4:36:07 PM	—
+v2-02.foundation.04	completed	5/24/2026, 4:36:07 PM	—
+v2-02.foundation.04	started	5/24/2026, 4:27:52 PM	—
+v2-02.foundation.03	completed	5/24/2026, 4:27:52 PM	—
+v2-02.foundation.03	started	5/24/2026, 4:26:17 PM	—
+v2-02.foundation.01	completed	5/24/2026, 4:26:17 PM	—
+v2-02.foundation.01	started	5/24/2026, 4:18:00 PM	—
+v2-02.foundation	started	5/24/2026, 4:18:00 PM	—
+v2-02.foundation.04	started	5/24/2026, 4:09:43 PM	—
+v2-02.foundation.03	completed	5/24/2026, 4:09:43 PM	—
+v2-02.foundation.03	started	5/24/2026, 4:08:10 PM	—
+v2-02.foundation.01	completed	5/24/2026, 4:08:10 PM	—
+v2-02.foundation.01	started	5/24/2026, 4:01:14 PM	—
+v2-02.foundation	started	5/24/2026, 4:01:14 PM	—
+v2-01	completed	5/24/2026, 4:01:14 PM	—
+strategy_v2	started	5/24/2026, 4:01:14 PM	—

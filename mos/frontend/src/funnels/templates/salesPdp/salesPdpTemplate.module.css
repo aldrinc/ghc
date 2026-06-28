@@ -123,7 +123,7 @@
 
     The Sales PDP template historically used its own token names (`--color-*`,
     `--pdp-*`). When these semantic vars are missing, components fall back to the
-    app UI theme (Manus), which is why the Reviews component can look gray.
+    app UI theme, which is why the Reviews component can look gray.
 
     Map the semantic vars to this template’s palette so components inherit the
     template style guide by default.

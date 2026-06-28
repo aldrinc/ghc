@@ -1,0 +1,41 @@
+{
+  "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+  "metaCampaignId": "120245374665090293",
+  "status": "published",
+  "publishRunId": "c3df66bb-8f3f-418e-b052-fe78bd45177c",
+  "totalCreatives": 23,
+  "rendererCounts": {
+    "openai:gpt-image-2": 22,
+    "creative_service:models/gemini-3.1-flash-image-preview": 1
+  },
+  "productReference": {
+    "required": 14,
+    "attached": 14
+  },
+  "destinations": {
+    "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/": 13,
+    "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/": 10
+  },
+  "publishValidation": {
+    "ok": true,
+    "includedCount": 23,
+    "adsetCount": 5,
+    "bucketCount": 5,
+    "distribution": {
+      "1": 5,
+      "2": 5,
+      "3": 5,
+      "4": 4,
+      "5": 4
+    }
+  },
+  "publishResultSummary": {
+    "totalCount": 23,
+    "failedCount": 0,
+    "errorSamples": [],
+    "pendingCount": 0,
+    "publishedCount": 23,
+    "failedStageCounts": {}
+  },
+  "contactSheet": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated-contact-sheet.jpg"
+}

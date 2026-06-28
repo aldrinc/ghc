@@ -280,6 +280,106 @@ class PostizClient:
         except httpx.HTTPError as exc:
             raise PostizClientError(f"Failed to upload media to Postiz: {exc}") from exc
 
+    def upload_media_bytes(
+        self,
+        *,
+        filename: str,
+        content: bytes,
+        content_type: str = "image/png",
+    ) -> PostizUploadedMedia:
+        """
+        Upload generated media bytes to Postiz.
+        POST /public/v1/upload
+        """
+        headers = {"Authorization": self.api_key}
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = client.post(
+                    f"{self._api_base()}/upload",
+                    headers=headers,
+                    files={"file": (filename, content, content_type)},
+                )
+                self._raise_for_status(response)
+                payload = response.json()
+                data = payload if isinstance(payload, dict) else {}
+                return PostizUploadedMedia(
+                    id=data.get("id", ""),
+                    path=data.get("path", ""),
+                )
+        except httpx.HTTPError as exc:
+            raise PostizClientError(f"Failed to upload media bytes to Postiz: {exc}") from exc
+
+    def get_platform_analytics(self, integration_id: str) -> Any:
+        """
+        Fetch Postiz platform-level analytics.
+        GET /public/v1/analytics/{integrationId}
+        """
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = client.get(
+                    f"{self._api_base()}/analytics/{integration_id}",
+                    headers=self._headers(),
+                )
+                self._raise_for_status(response)
+                return response.json()
+        except httpx.HTTPError as exc:
+            raise PostizClientError(
+                f"Failed to fetch Postiz platform analytics for {integration_id}: {exc}"
+            ) from exc
+
+    def get_post_analytics(self, post_id: str) -> Any:
+        """
+        Fetch Postiz per-post analytics.
+        GET /public/v1/analytics/post/{postId}
+        """
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = client.get(
+                    f"{self._api_base()}/analytics/post/{post_id}",
+                    headers=self._headers(),
+                )
+                self._raise_for_status(response)
+                return response.json()
+        except httpx.HTTPError as exc:
+            raise PostizClientError(f"Failed to fetch Postiz post analytics for {post_id}: {exc}") from exc
+
+    def list_missing_release_candidates(self, post_id: str) -> Any:
+        """
+        List provider release candidates for a Postiz post missing a release id.
+        GET /public/v1/posts/{postId}/missing
+        """
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = client.get(
+                    f"{self._api_base()}/posts/{post_id}/missing",
+                    headers=self._headers(),
+                )
+                self._raise_for_status(response)
+                return response.json()
+        except httpx.HTTPError as exc:
+            raise PostizClientError(
+                f"Failed to fetch Postiz missing release candidates for {post_id}: {exc}"
+            ) from exc
+
+    def attach_release_id(self, post_id: str, release_id: str) -> Any:
+        """
+        Attach a provider release id to a Postiz post.
+        PUT /public/v1/posts/{postId}/release-id
+        """
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = client.put(
+                    f"{self._api_base()}/posts/{post_id}/release-id",
+                    headers=self._headers(),
+                    json={"releaseId": release_id},
+                )
+                self._raise_for_status(response)
+                return response.json()
+        except httpx.HTTPError as exc:
+            raise PostizClientError(
+                f"Failed to attach Postiz release id {release_id} to {post_id}: {exc}"
+            ) from exc
+
     def create_post(
         self,
         content: str,

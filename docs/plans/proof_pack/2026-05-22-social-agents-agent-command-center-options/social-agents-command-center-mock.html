@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Social Agents Command Center Mock</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --font-display: "Libre Baskerville", "Source Serif Pro", Georgia, serif;
+      --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+      --ink: #0b0d12;
+      --slate-50: #f7f8fa;
+      --slate-100: #f0f2f6;
+      --slate-200: #e3e6ee;
+      --slate-300: #cdd2dd;
+      --slate-500: #6b7280;
+      --slate-600: #4b5260;
+      --blue-50: #eff4ff;
+      --blue-100: #dbe6fe;
+      --blue-600: #2563eb;
+      --blue-700: #1d4fd8;
+      --success: #10b981;
+      --success-bg: #e7f8f1;
+      --warning: #f59e0b;
+      --warning-bg: #fef4de;
+      --danger: #ef4444;
+      --danger-bg: #feecec;
+      --bg: #ffffff;
+      --bg-soft: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: var(--slate-50);
+      --text: var(--ink);
+      --text-muted: var(--slate-600);
+      --border: #e6e9f0;
+      --divider: var(--border);
+      --accent: var(--blue-600);
+      --primary: var(--ink);
+      --primary-foreground: #ffffff;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 2px 4px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.06);
+      --radius: 8px;
+      --radius-sm: 6px;
+      --sidebar-width: clamp(212px, 18vw, 256px);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      min-height: 100vh;
+      background: var(--surface);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--bg-soft);
+      padding: 14px 12px;
+      color: var(--text);
+    }
+
+    .workspace-pill {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 8px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .muted {
+      color: var(--text-muted);
+    }
+
+    .nav-section {
+      margin-top: 18px;
+    }
+
+    .nav-title {
+      margin: 0 8px 6px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 2px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .nav-item {
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .nav-item.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+
+    .shell {
+      min-width: 0;
+      background: var(--surface);
+    }
+
+    .topbar {
+      display: flex;
+      min-height: 64px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      background: var(--surface);
+    }
+
+    .breadcrumb {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .product-picker {
+      min-width: min(220px, 100%);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .page {
+      padding: 24px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      color: var(--text);
+      font-family: var(--font-display);
+      font-weight: 400;
+      letter-spacing: 0;
+      line-height: 1.08;
+    }
+
+    h1 {
+      font-size: 30px;
+    }
+
+    h2 {
+      font-size: 24px;
+    }
+
+    h3 {
+      font-size: 18px;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .header-copy {
+      display: grid;
+      gap: 6px;
+    }
+
+    .header-copy p {
+      max-width: 720px;
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .header-link {
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .btn {
+      display: inline-flex;
+      height: 36px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--primary);
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      padding: 0 16px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 4px rgba(11, 13, 18, 0.08);
+    }
+
+    .btn.secondary {
+      border-color: var(--border);
+      background: transparent;
+      color: var(--text);
+    }
+
+    .btn.accent {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .badge {
+      display: inline-flex;
+      min-height: 22px;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface-2);
+      padding: 2px 8px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge.success {
+      border-color: rgba(16, 185, 129, 0.25);
+      background: var(--success-bg);
+      color: var(--success);
+    }
+
+    .badge.warning {
+      border-color: rgba(245, 158, 11, 0.25);
+      background: var(--warning-bg);
+      color: var(--warning);
+    }
+
+    .badge.info {
+      border-color: rgba(37, 99, 235, 0.3);
+      background: var(--blue-50);
+      color: var(--accent);
+    }
+
+    .view-switcher {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0 16px;
+    }
+
+    .switch-btn {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .switch-btn.active {
+      border-color: rgba(37, 99, 235, 0.3);
+      background: var(--blue-50);
+      color: var(--accent);
+    }
+
+    .mock-note {
+      display: inline-flex;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      padding: 4px 9px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .main-panel,
+    .rail {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .main-panel {
+      min-width: 0;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      border-bottom: 1px solid var(--divider);
+      padding: 18px;
+    }
+
+    .panel-title {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .panel-title p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .setup-path {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      padding: 12px;
+    }
+
+    .path-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .path-line {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+
+    .path-segment {
+      height: 5px;
+      border-radius: 999px;
+      background: var(--slate-200);
+    }
+
+    .path-segment.active {
+      background: var(--primary);
+    }
+
+    .progress-row {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .step-chip {
+      min-height: 66px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      padding: 10px;
+    }
+
+    .step-chip.active {
+      border-color: var(--primary);
+      background: var(--surface);
+      box-shadow: inset 0 0 0 1px var(--primary);
+    }
+
+    .step-index {
+      display: inline-grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .step-chip.active .step-index {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .step-label {
+      margin-top: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .step-meta {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .input,
+    .textarea,
+    .select-like {
+      width: 100%;
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 10px 11px;
+      font-size: 14px;
+      box-shadow: 0 0 0 0 rgba(11, 13, 18, 0);
+    }
+
+    .textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    .field-help {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .summary-item {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      padding: 12px;
+    }
+
+    .summary-label {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .summary-value {
+      margin-top: 6px;
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .status-card {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      padding: 12px;
+      min-height: 92px;
+    }
+
+    .status-icon {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .status-icon.success {
+      border-color: rgba(16, 185, 129, 0.25);
+      background: var(--success-bg);
+      color: var(--success);
+    }
+
+    .status-icon.warning {
+      border-color: rgba(245, 158, 11, 0.25);
+      background: var(--warning-bg);
+      color: var(--warning);
+    }
+
+    .status-card strong {
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.15;
+    }
+
+    .status-card span {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .next-action {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      padding: 18px;
+    }
+
+    .next-action h2 {
+      font-size: 25px;
+    }
+
+    .approval-list,
+    .activity-list,
+    .rail-list {
+      display: grid;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .approval-row,
+    .activity-row,
+    .rail-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      border-top: 1px solid var(--divider);
+      padding: 12px;
+    }
+
+    .approval-row:first-child,
+    .activity-row:first-child,
+    .rail-row:first-child {
+      border-top: 0;
+    }
+
+    .row-title {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .row-meta {
+      margin-top: 2px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 18px 0 10px;
+    }
+
+    .section-heading h3 {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .rail {
+      position: sticky;
+      top: 18px;
+      overflow: hidden;
+    }
+
+    .rail-header {
+      border-bottom: 1px solid var(--divider);
+      padding: 14px;
+    }
+
+    .rail-header h2 {
+      font-size: 18px;
+    }
+
+    .rail-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .rail-body {
+      padding: 0 14px 14px;
+    }
+
+    .rail-section {
+      border-top: 1px solid var(--divider);
+      padding: 12px 0;
+    }
+
+    .rail-section:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .rail-section-title {
+      margin-bottom: 8px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .rail-kv {
+      display: grid;
+      grid-template-columns: minmax(72px, 0.35fr) minmax(0, 1fr);
+      gap: 10px;
+      align-items: baseline;
+      padding: 7px 0;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .rail-kv:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .rail-kv span {
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .rail-kv strong {
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .status-line {
+      display: grid;
+      grid-template-columns: 9px minmax(0, 1fr);
+      gap: 8px;
+      align-items: baseline;
+      margin: 7px 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--slate-300);
+    }
+
+    .dot.success {
+      background: var(--success);
+    }
+
+    .dot.warning {
+      background: var(--warning);
+    }
+
+    .dot.info {
+      background: var(--accent);
+    }
+
+    .rail-callout {
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: var(--radius);
+      background: var(--warning-bg);
+      padding: 10px;
+      color: #8a5b00;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .carousel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
+      gap: 10px;
+      align-items: start;
+    }
+
+    .slide {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .slide-visual {
+      position: relative;
+      aspect-ratio: 9 / 16;
+      background:
+        linear-gradient(180deg, rgba(11, 13, 18, 0.08), rgba(11, 13, 18, 0.36)),
+        #dfe5ee;
+    }
+
+    .slide-visual.alt1 {
+      background:
+        linear-gradient(180deg, rgba(11, 13, 18, 0.08), rgba(11, 13, 18, 0.36)),
+        #d7e2f5;
+    }
+
+    .slide-visual.alt2 {
+      background:
+        linear-gradient(180deg, rgba(11, 13, 18, 0.08), rgba(11, 13, 18, 0.36)),
+        #d8ede5;
+    }
+
+    .slide-text {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 25%;
+      color: #fff;
+      text-align: center;
+      font-size: clamp(14px, 1.4vw, 20px);
+      font-weight: 900;
+      line-height: 1.05;
+      text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.55);
+    }
+
+    .slide-caption {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 8px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .handoff-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+      gap: 14px;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+    }
+
+    .check-item {
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: var(--surface);
+    }
+
+    .check-item.compact {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+    }
+
+    .checkmark {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .checkmark.pending {
+      background: var(--warning-bg);
+      color: var(--warning);
+    }
+
+    .view {
+      display: none;
+    }
+
+    .view.active {
+      display: block;
+      animation: fade-up 220ms ease both;
+    }
+
+    @keyframes fade-up {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 1120px) {
+      .workspace-grid,
+      .handoff-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .rail {
+        position: static;
+      }
+
+      .progress-row,
+      .carousel-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 780px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 16px;
+      }
+
+      .product-picker {
+        min-width: 0;
+      }
+
+      .page {
+        padding: 16px;
+      }
+
+      .page-header,
+      .panel-header {
+        flex-direction: column;
+      }
+
+      .button-row {
+        justify-content: flex-start;
+      }
+
+      .progress-row,
+      .summary-strip,
+      .status-grid,
+      .form-grid,
+      .carousel-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Mock app sidebar">
+      <div class="workspace-pill">
+        <div class="avatar">A</div>
+        <div class="truncate">
+          <div class="truncate" style="font-size: 13px; font-weight: 800;">Aurora Sleep Lab</div>
+          <div class="truncate muted" style="font-size: 12px;">Workspace</div>
+        </div>
+      </div>
+
+      <nav>
+        <section class="nav-section">
+          <p class="nav-title">Workspace</p>
+          <ul class="nav-list">
+            <li class="nav-item">Overview</li>
+            <li class="nav-item">Strategy</li>
+            <li class="nav-item">Brand</li>
+            <li class="nav-item">Sites</li>
+          </ul>
+        </section>
+        <section class="nav-section">
+          <p class="nav-title">Execution</p>
+          <ul class="nav-list">
+            <li class="nav-item">Campaigns</li>
+            <li class="nav-item">Analytics</li>
+            <li class="nav-item">Postiz</li>
+            <li class="nav-item active">Social Agents</li>
+          </ul>
+        </section>
+        <section class="nav-section">
+          <p class="nav-title">Assets</p>
+          <ul class="nav-list">
+            <li class="nav-item">Creative Library</li>
+            <li class="nav-item">Meta Ads</li>
+          </ul>
+        </section>
+      </nav>
+    </aside>
+
+    <main class="shell">
+      <header class="topbar">
+        <div class="breadcrumb">
+          <span>Workspaces</span>
+          <span>/</span>
+          <strong style="color: var(--text);">Social Agents</strong>
+        </div>
+        <div class="button-row">
+          <span class="muted" style="font-size: 12px; font-weight: 700;">Workspace Product</span>
+          <div class="product-picker">LumaRest Magnesium Cocoa</div>
+        </div>
+      </header>
+
+      <div class="page">
+        <div class="page-header">
+          <div class="header-copy">
+            <h1>Marketing Agent</h1>
+            <p>Approval-gated TikTok work through Postiz.</p>
+          </div>
+          <a class="header-link" href="#">Postiz</a>
+        </div>
+
+        <div class="view-switcher" aria-label="Mock screen selector">
+          <button class="switch-btn active" type="button" data-view="setup">Setup</button>
+          <button class="switch-btn" type="button" data-view="review">Review</button>
+        </div>
+
+        <div class="mock-note">
+          Visual mock
+        </div>
+
+        <section class="workspace-grid">
+          <div class="main-panel">
+            <div class="view active" id="view-setup">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <div>
+                    <span class="badge info">Step 1 of 5</span>
+                    <span class="badge warning">Needs mission</span>
+                  </div>
+                  <h2>Set mission</h2>
+                </div>
+                <button class="btn" type="button">Continue</button>
+              </div>
+              <div class="panel-body">
+                <div class="setup-path" aria-label="Setup progress">
+                  <div class="path-top">
+                    <span>Mission</span>
+                    <span>Next: Channels</span>
+                  </div>
+                  <div class="path-line">
+                    <span class="path-segment active"></span>
+                    <span class="path-segment"></span>
+                    <span class="path-segment"></span>
+                    <span class="path-segment"></span>
+                    <span class="path-segment"></span>
+                  </div>
+                </div>
+
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="agent-name">Agent name</label>
+                    <input class="input" id="agent-name" value="TikTok Carousel Agent">
+                  </div>
+                  <div class="field">
+                    <label for="offer">Product or offer</label>
+                    <input class="input" id="offer" value="LumaRest Magnesium Cocoa">
+                  </div>
+                  <div class="field full">
+                    <label for="objective">Mission</label>
+                    <textarea class="textarea" id="objective">Find carousel hooks that create conversion events.</textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="view" id="view-review">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <div>
+                    <span class="badge success">Agent configured</span>
+                    <span class="badge warning">Assets 4/6</span>
+                  </div>
+                  <h2>Review carousel</h2>
+                </div>
+                <button class="btn" type="button">Add 2 assets</button>
+              </div>
+              <div class="panel-body">
+                <div class="status-grid">
+                  <div class="status-card">
+                    <div class="status-icon success">OK</div>
+                    <strong>Draft ready</strong>
+                    <span>Six slides</span>
+                  </div>
+                  <div class="status-card">
+                    <div class="status-icon warning">4/6</div>
+                    <strong>Assets missing</strong>
+                    <span>Add 2</span>
+                  </div>
+                  <div class="status-card">
+                    <div class="status-icon success">P</div>
+                    <strong>Postiz</strong>
+                    <span>Connected</span>
+                  </div>
+                </div>
+
+                <div class="section-heading">
+                  <h3>Draft</h3>
+                  <span class="badge info">Postiz</span>
+                </div>
+                <div class="carousel-grid">
+                  <div class="slide">
+                    <div class="slide-visual"><div class="slide-text">POV: your routine looks calm</div></div>
+                    <div class="slide-caption"><span>1</span><span>Hook</span></div>
+                  </div>
+                  <div class="slide">
+                    <div class="slide-visual alt1"><div class="slide-text">You tried every fix</div></div>
+                    <div class="slide-caption"><span>2</span><span>Problem</span></div>
+                  </div>
+                  <div class="slide">
+                    <div class="slide-visual alt2"><div class="slide-text">So I tried a cleaner loop</div></div>
+                    <div class="slide-caption"><span>3</span><span>Discovery</span></div>
+                  </div>
+                  <div class="slide">
+                    <div class="slide-visual"><div class="slide-text">Wait, this feels doable</div></div>
+                    <div class="slide-caption"><span>4</span><span>Shift</span></div>
+                  </div>
+                  <div class="slide">
+                    <div class="slide-visual alt1"><div class="slide-text">This reset finally stuck</div></div>
+                    <div class="slide-caption"><span>5</span><span>Proof</span></div>
+                  </div>
+                  <div class="slide">
+                    <div class="slide-visual alt2"><div class="slide-text">Try the app, link in bio</div></div>
+                    <div class="slide-caption"><span>6</span><span>CTA</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="rail" aria-label="Agent Dossier">
+            <div class="rail-header">
+              <span class="badge info">Agent</span>
+              <h2 style="margin-top: 8px;">TikTok Carousel</h2>
+              <div class="rail-badges">
+                <span class="badge warning">Approval required</span>
+                <span class="badge info">Postiz</span>
+              </div>
+            </div>
+            <div class="rail-body">
+              <section class="rail-section">
+                <div class="rail-kv"><span>Mission</span><strong>Grow LumaRest</strong></div>
+                <div class="rail-kv"><span>Assets</span><strong>4/6</strong></div>
+              </section>
+
+              <section class="rail-section">
+                <div class="rail-callout">Add 2 assets.</div>
+              </section>
+
+              <section class="rail-section">
+                <div class="rail-section-title">Status</div>
+                <div class="status-line"><span class="dot success"></span><span>Mission saved</span></div>
+                <div class="status-line"><span class="dot success"></span><span>Source linked</span></div>
+                <div class="status-line"><span class="dot warning"></span><span>Assets incomplete</span></div>
+              </section>
+            </div>
+          </aside>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll(".switch-btn"));
+    const views = Array.from(document.querySelectorAll(".view"));
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.view;
+        buttons.forEach((item) => item.classList.toggle("active", item === button));
+        views.forEach((view) => view.classList.toggle("active", view.id === `view-${target}`));
+      });
+    });
+  </script>
+</body>
+</html>

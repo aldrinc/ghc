@@ -1,0 +1,214 @@
+{
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "generationKey": "batch:tenor-walk-away-trt-20260502",
+  "createdAt": "2026-05-02T20:55:48.756Z",
+  "creativeSpecs": [
+    {
+      "action": "verified",
+      "adId": "WA-01",
+      "assetId": "80e162c3-13a2-4584-a6ce-020daf04e55e",
+      "creativeSpecId": "d2ee6f37-deb1-4901-9885-467100bdb2f7"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-02",
+      "assetId": "417d5bae-bd93-49e1-b0cf-6e3aaa804ae4",
+      "creativeSpecId": "a71cbccf-ec03-45e1-be8a-e392db0df135"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-03",
+      "assetId": "9b823e1d-bf70-4232-9024-a053bde91178",
+      "creativeSpecId": "2c2822dd-48be-4322-8b3e-9aeb3b31db96"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-04",
+      "assetId": "881ed8fe-61a7-4bfc-afee-c483144774be",
+      "creativeSpecId": "0c039000-a2d9-4e35-ada7-6546ade3be95"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-05",
+      "assetId": "d9470a01-b151-44e9-bb8f-2ab11d961c07",
+      "creativeSpecId": "74b80cea-ed90-4680-913a-06c801737e67"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-06",
+      "assetId": "73c763df-a256-45f5-938d-e45d2e804990",
+      "creativeSpecId": "3d1c9c3a-5915-4fdf-b9f9-52d0f7fe5218"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-07",
+      "assetId": "7188ade4-1645-4cd1-b2bd-020f03400f14",
+      "creativeSpecId": "19dc0d31-ae0f-421c-8248-0a6cf32dd442"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-08",
+      "assetId": "a19147bb-b798-4c93-b31d-90c2ba6c560e",
+      "creativeSpecId": "6efdfe6b-ca30-496d-a45b-f0522fcd5f12"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-09",
+      "assetId": "096fe195-3a27-45f1-a28e-3e258f613276",
+      "creativeSpecId": "2ee1d6c5-7ae0-4168-b463-dd96c70625ec"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-10",
+      "assetId": "76c8690a-ed90-4be3-810d-dfe22fc2dcf2",
+      "creativeSpecId": "7cedd866-e9c0-4bf8-837e-31aab3055381"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-11",
+      "assetId": "c614cf97-458d-4688-8b74-3ad300595e54",
+      "creativeSpecId": "99a1274d-4027-463a-a1a9-0631801b0b17"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-12",
+      "assetId": "bec14033-f8a4-4f4b-94fa-12c94046e46b",
+      "creativeSpecId": "04755868-8ea2-4b62-98ba-599d69d19c73"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-13",
+      "assetId": "1d271033-16a7-4285-884c-c77748bb27c1",
+      "creativeSpecId": "b1469cf7-7edc-4266-8ef2-2c9597774946"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-14",
+      "assetId": "e9858314-b995-4d04-aa6e-1160f532f944",
+      "creativeSpecId": "9c764a99-2c7d-424f-98aa-98047b21389c"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-15",
+      "assetId": "196460ee-1e45-47e5-9d91-34f4e6bdc284",
+      "creativeSpecId": "13b6c9f9-7218-4a27-bc0f-f1ee664204c0"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-16",
+      "assetId": "48c9e014-7c96-48e1-878f-b1bdf5feb256",
+      "creativeSpecId": "776b0dcf-6a8e-4c70-87d8-0f3b9dc73373"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-17",
+      "assetId": "ee2be5ab-fb9d-4d86-ae46-9ed72aca5eb5",
+      "creativeSpecId": "e0d052f1-8f05-4790-9a53-3cca960e1b9e"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-18",
+      "assetId": "5cfb9670-d37b-408d-a2a0-075f64b5b2cc",
+      "creativeSpecId": "0a20d63f-fb37-4fd3-beb4-1daeb8f7c339"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-19",
+      "assetId": "0640ba24-14b0-435e-8681-b22bc4e67b20",
+      "creativeSpecId": "4e7299ca-6267-4f65-945d-96eeec4809a5"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-20",
+      "assetId": "4daf46bc-625c-4401-ba93-9c50fac0c3b1",
+      "creativeSpecId": "c27b08e1-3f54-448b-8c6e-15fb188ad703"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-21",
+      "assetId": "c6dbf060-7bae-406c-8c59-ee3cd9f1bbbd",
+      "creativeSpecId": "78ee5ebc-c8c9-45d3-965e-d046420f208b"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-22",
+      "assetId": "14b932f7-f61a-4917-a8f4-dbc915451f4b",
+      "creativeSpecId": "b89f0d4e-44c2-47a5-b267-79e41b342c92"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-23",
+      "assetId": "939e3bd8-f4ca-4d83-9d32-19dcf13e3a66",
+      "creativeSpecId": "a3cf1010-c08b-4cbe-bc57-cd9682b26eff"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-24",
+      "assetId": "e9878d46-524e-4124-a986-749772b97e13",
+      "creativeSpecId": "dd135076-7c01-44e0-9f0d-523fe99e2aa1"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-25",
+      "assetId": "722076eb-cf2c-46f5-8d8b-893a74768591",
+      "creativeSpecId": "d1ea400f-9328-48ae-b731-5923b209bcf2"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-26",
+      "assetId": "9688e568-dc42-4d26-a8b0-72de56137e2f",
+      "creativeSpecId": "e50059c3-fdf0-44a3-9dd4-7c1bf5fc6935"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-27",
+      "assetId": "de62234d-a6a5-4c4c-ae60-027a95f09513",
+      "creativeSpecId": "a624c8e4-aa1e-4786-81ef-069762da4c81"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-28",
+      "assetId": "e5d45b20-6354-49ae-9446-1990cbe6e9b5",
+      "creativeSpecId": "96016739-426c-4ad3-b637-daee3e1856ed"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-29",
+      "assetId": "4a98e6c6-e9cb-4c3e-ac5c-277302d670dc",
+      "creativeSpecId": "f8799ae2-80f9-4a1a-9306-94fd6f3b66ca"
+    },
+    {
+      "action": "verified",
+      "adId": "WA-30",
+      "assetId": "ae5e2163-3be3-4e4b-842b-9518d9400036",
+      "creativeSpecId": "b8c9a185-d96e-4189-9736-a39cd4a95210"
+    }
+  ],
+  "adsetSpecs": [
+    {
+      "action": "updated",
+      "bucketIndex": 1,
+      "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 2,
+      "adsetSpecId": "2c6c67ee-592b-4b52-9477-d74480767e23"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 3,
+      "adsetSpecId": "a63280c2-f191-4ba2-acf3-d15e6125c32c"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 4,
+      "adsetSpecId": "67cb0759-159f-4d84-9ee2-86af54e9e50e"
+    },
+    {
+      "action": "updated",
+      "bucketIndex": 5,
+      "adsetSpecId": "59ff8fb9-448c-4d24-8396-c7d70a4851ec"
+    }
+  ]
+}

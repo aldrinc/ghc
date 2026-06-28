@@ -1,0 +1,281 @@
+{
+  "status": "passed",
+  "evidence": {
+    "kind": "runtime_observed",
+    "source_manifest": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/source/source_manifest.json",
+    "automation_events": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/automation-events.jsonl"
+  },
+  "workspace_name": "Peptide Price Store 2026-05-24 21:00",
+  "source_url": "https://peptideprice.store/",
+  "competitor_urls": [],
+  "setup": {
+    "client_id": "e4eac211-7731-4bce-8342-29c91dedac1f",
+    "product_id": "09d64965-9811-4d5d-be67-f32cc9933d7b",
+    "onboarding_workflow_run_id": "c615b159-5a23-4001-bd31-7d53627d336d",
+    "onboarding_temporal_workflow_id": "client-onboarding-3662f19a-cf78-463c-809f-080461f4c2e9-e4eac211-7731-4bce-8342-29c91dedac1f-3ecd4425-d652-4030-b0d2-a46cdbafdfd5"
+  },
+  "readiness": {
+    "status": "foundation_ready",
+    "should_gate_overview": false,
+    "reason": "foundation_bundle_complete",
+    "strategy_workflow_run_id": "89d728c3-38ab-47ca-bbca-fd59ce3491dd",
+    "strategy_workflow_status": "completed",
+    "onboarding_workflow_run_id": "c615b159-5a23-4001-bd31-7d53627d336d",
+    "onboarding_workflow_status": "completed",
+    "required_step_keys": [
+      "v2-02.foundation.01",
+      "v2-02.foundation.03",
+      "v2-02.foundation.04"
+    ],
+    "present_step_keys": [
+      "v2-02.foundation.01",
+      "v2-02.foundation.03",
+      "v2-02.foundation.04"
+    ],
+    "missing_step_keys": [],
+    "checked_at": "2026-05-24T21:40:43.352363+00:00"
+  },
+  "strategy_workflow_run_id": "89d728c3-38ab-47ca-bbca-fd59ce3491dd",
+  "research_artifacts": [
+    {
+      "step_key": "v2-01",
+      "title": "Strategy V2 Stage 0 Build",
+      "doc_url": "artifact://a5350a6f-740a-497a-a379-ce321042f28c",
+      "doc_id": "a5350a6f-740a-497a-a379-ce321042f28c",
+      "summary": "Stage 0 product brief contract generated and validated."
+    },
+    {
+      "step_key": "v2-02.foundation.01",
+      "title": "Strategy V2 Foundational Step 01 Raw Output",
+      "doc_url": "artifact://27581c55-f31a-4e63-936c-49d977c71f93",
+      "doc_id": "27581c55-f31a-4e63-936c-49d977c71f93",
+      "summary": "Raw foundational competitor landscape output for step 01."
+    },
+    {
+      "step_key": "v2-02.foundation.03",
+      "title": "Strategy V2 Foundational Step 03 Raw Output",
+      "doc_url": "artifact://3cbc74b1-ac0d-4057-8058-6bcb3706d723",
+      "doc_id": "3cbc74b1-ac0d-4057-8058-6bcb3706d723",
+      "summary": "Raw foundational deep-research meta prompt output for step 03."
+    },
+    {
+      "step_key": "v2-02.foundation.04",
+      "title": "Strategy V2 Foundational Step 04 Raw Output",
+      "doc_url": "artifact://9c628c8e-8e9b-4373-9a3b-1ad167528b9b",
+      "doc_id": "9c628c8e-8e9b-4373-9a3b-1ad167528b9b",
+      "summary": "Raw foundational tagged deep-research corpus for step 04."
+    }
+  ],
+  "extraction_response_observed": {
+    "provider": "context_dev",
+    "domain": "peptideprice.store",
+    "business_url": "https://peptideprice.store",
+    "competitor_urls": [],
+    "fields": {
+      "business_name": {
+        "value": "PeptidePrice",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/retrieve",
+        "raw_path": "brand.name|title",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev brand + AI query"
+      },
+      "business_model": {
+        "value": "affiliate price comparison",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.business_model",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query"
+      },
+      "offering_kind": {
+        "value": "lead_generation",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.primary_offering_kind",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query"
+      },
+      "offering_type": {
+        "value": "Price comparison for research peptides",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.offering_type|products[0].category",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query + products"
+      },
+      "offering_name": {
+        "value": "§-31",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/products",
+        "raw_path": "products[0].name",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev products + AI query"
+      },
+      "offering_description": {
+        "value": "Peptide product available in various dosages and kits for research use only.",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/products",
+        "raw_path": "products[0].description",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev products + AI query"
+      },
+      "category": {
+        "value": "Research chemical price comparison",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.category|products[0].category",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query + products"
+      },
+      "pricing_model": {
+        "value": "flat",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.pricing_model|products[0].price.pricing_model|products[0].pricing_model",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query + products"
+      },
+      "price": {
+        "value": "35.06",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.price_or_rate|products[0].price",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query + products"
+      },
+      "target_customer": {
+        "value": "Researchers seeking peptides for research use only",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.target_customer",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query"
+      },
+      "key_outcome": {
+        "value": "Find best prices and deals on research peptides from multiple suppliers",
+        "provenance": "concrete",
+        "provider": "context_dev",
+        "endpoint": "/brand/ai/query",
+        "raw_path": "data_extracted.key_outcome",
+        "confidence": "provider_returned",
+        "evidence": "Context.dev AI query"
+      }
+    },
+    "requests": {
+      "prefetch_brand": {
+        "endpoint": "/brand/prefetch",
+        "body": {
+          "domain": "peptideprice.store"
+        },
+        "blocking": false
+      },
+      "retrieve_brand": {
+        "endpoint": "/brand/retrieve",
+        "params": {
+          "domain": "peptideprice.store"
+        }
+      },
+      "query_business_profile": {
+        "endpoint": "/brand/ai/query",
+        "data_to_extract": [
+          {
+            "datapoint_name": "business_name",
+            "datapoint_type": "text",
+            "datapoint_description": "The business or brand name shown on the website.",
+            "datapoint_example": "Acme Studio"
+          },
+          {
+            "datapoint_name": "business_model",
+            "datapoint_type": "text",
+            "datapoint_description": "How the business appears to make money, such as ecommerce, SaaS subscription, service business, lead generation, marketplace, course, membership, or other.",
+            "datapoint_example": "SaaS subscription"
+          },
+          {
+            "datapoint_name": "primary_offering_kind",
+            "datapoint_type": "text",
+            "datapoint_description": "Classify the primary thing sold as exactly one of: product, service, software, course, lead_generation, marketplace, other.",
+            "datapoint_example": "service"
+          },
+          {
+            "datapoint_name": "primary_offering_name",
+            "datapoint_type": "text",
+            "datapoint_description": "The main product, service, software, course, or offer name the business sells.",
+            "datapoint_example": "Revenue Sprint"
+          },
+          {
+            "datapoint_name": "primary_offering_description",
+            "datapoint_type": "text",
+            "datapoint_description": "A factual description of the main offering based only on website evidence.",
+            "datapoint_example": "A four-week implementation service for improving lifecycle email revenue."
+          },
+          {
+            "datapoint_name": "offering_type",
+            "datapoint_type": "text",
+            "datapoint_description": "The specific product or service type/category in plain language.",
+            "datapoint_example": "Email marketing agency"
+          },
+          {
+            "datapoint_name": "category",
+            "datapoint_type": "text",
+            "datapoint_description": "The broader category or niche the business operates in.",
+            "datapoint_example": "B2B marketing services"
+          },
+          {
+            "datapoint_name": "pricing_model",
+            "datapoint_type": "text",
+            "datapoint_description": "How pricing appears to work, such as one-time, monthly, yearly, per-seat, hourly, retainer, project-based, quote-based, custom, or unknown.",
+            "datapoint_example": "monthly retainer"
+          },
+          {
+            "datapoint_name": "price_or_rate",
+            "datapoint_type": "text",
+            "datapoint_description": "The visible price, starting price, rate, or pricing note. Return unknown if not visible.",
+            "datapoint_example": "Starting at $2,500/month"
+          },
+          {
+            "datapoint_name": "target_customer",
+            "datapoint_type": "text",
+            "datapoint_description": "The audience or customer segment explicitly implied by the website.",
+            "datapoint_example": "Founder-led B2B SaaS teams"
+          },
+          {
+            "datapoint_name": "key_outcome",
+            "datapoint_type": "text",
+            "datapoint_description": "The main outcome customers appear to buy, based only on website evidence.",
+            "datapoint_example": "Increase qualified demo bookings"
+          }
+        ]
+      },
+      "extract_products": {
+        "endpoint": "/brand/ai/products",
+        "body": {
+          "domain": "peptideprice.store",
+          "maxProducts": 6
+        }
+      }
+    },
+    "raw_artifact_id": "2f2cb312-471a-4c3b-b305-024c8bf7e21d"
+  },
+  "download": {
+    "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/downloads/peptideprice-foundational-docs.zip",
+    "suggestedFilename": "workflow-research-89d728c3-38ab-47ca-bbca-fd59ce3491dd.zip",
+    "extracted_dir": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/downloads/foundational-docs"
+  },
+  "screenshots_dir": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/screenshots",
+  "video_paths": {
+    "onboarding_and_generation": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/peptideprice-foundational-onboarding.webm",
+    "ui_download": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/part-2-ui-download.webm",
+    "combined_watchback": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/peptideprice-foundational-onboarding-full.webm"
+  }
+}

@@ -1,0 +1,428 @@
+{
+  "buttons": [
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "className": "inline-flex items-center gap-2 text-sm font-medium text-content-muted transition hover:text-content",
+      "color": "color(srgb 0.294118 0.321569 0.376471)",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "height": 16,
+      "radius": "0px",
+      "text": "Back to workspaces",
+      "width": 146
+    },
+    {
+      "background": "color(srgb 0.972549 0.980392 0.988235)",
+      "className": "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill border font-semibold tracking-tight transition-[background,border-color,color,box-shadow,transform] dur",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "0px",
+      "text": "Back",
+      "width": 106
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "className": "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill border font-semibold tracking-tight transition-[background,border-color,color,box-shadow,transform] dur",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "0px",
+      "text": "Continue",
+      "width": 138
+    }
+  ],
+  "cards": [
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "",
+      "height": 1100,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Back to workspacesSetup progress1/2Set up your marketing agentAdd the minimum source details needed ",
+      "width": 1860
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "rgb(229, 231, 235)",
+      "className": "first-run-surface min-h-screen bg-background text-foreground",
+      "height": 1100,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Back to workspacesSetup progress1/2Set up your marketing agentAdd the minimum source details needed ",
+      "width": 1860
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "px-4 pt-4 sm:px-6 lg:px-8",
+      "height": 41,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Back to workspaces",
+      "width": 1860
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "min-h-[calc(100svh-3.5rem)]",
+      "height": 1044,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Setup progress1/2Set up your marketing agentAdd the minimum source details needed to create the work",
+      "width": 1860
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "rgb(229, 231, 235)",
+      "className": "first-run-surface mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8",
+      "height": 808,
+      "radius": "0px",
+      "tag": "section",
+      "text": "Setup progress1/2Set up your marketing agentAdd the minimum source details needed to create the work",
+      "width": 1280
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "grid min-h-[min(760px,calc(100svh-8rem))] gap-8 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]",
+      "height": 760,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Set up your marketing agentAdd the minimum source details needed to create the workspace.Name your w",
+      "width": 1216
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "min-w-0 space-y-6",
+      "height": 760,
+      "radius": "0px",
+      "tag": "main",
+      "text": "Set up your marketing agentAdd the minimum source details needed to create the workspace.Name your w",
+      "width": 784
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "color(srgb 0.901961 0.913725 0.941176)",
+      "className": "flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between",
+      "height": 79,
+      "radius": "0px",
+      "tag": "header",
+      "text": "Set up your marketing agentAdd the minimum source details needed to create the workspace.",
+      "width": 784
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "min-w-0 space-y-1",
+      "height": 58,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Set up your marketing agentAdd the minimum source details needed to create the workspace.",
+      "width": 397
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-6",
+      "height": 225,
+      "radius": "0px",
+      "tag": "form",
+      "text": "Name your workspaceWorkspace nameBackContinue",
+      "width": 784
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "color(srgb 0.901961 0.913725 0.941176)",
+      "className": "rounded-md border border-border bg-surface px-5 py-5",
+      "height": 155,
+      "radius": "10px",
+      "tag": "div",
+      "text": "Name your workspaceWorkspace name",
+      "width": 784
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "flex flex-col gap-2 text-sm text-content",
+      "height": 69,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Workspace name",
+      "width": 742
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "color(srgb 0.901961 0.913725 0.941176)",
+      "className": "flex h-[46px] w-full rounded-md border border-input-border bg-input px-4 py-2 text-md text-content shadow-xs transition-[border-color,box-shadow,background,colo",
+      "height": 46,
+      "radius": "10px",
+      "tag": "input",
+      "text": "",
+      "width": 742
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "flex flex-wrap items-center justify-between gap-3",
+      "height": 46,
+      "radius": "0px",
+      "tag": "div",
+      "text": "BackContinue",
+      "width": 784
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "className": "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill border font-semibold tracking-tight transition-[background,border-color,color,box-s",
+      "height": 46,
+      "radius": "0px",
+      "tag": "button",
+      "text": "Continue",
+      "width": 138
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start",
+      "height": 685,
+      "radius": "0px",
+      "tag": "aside",
+      "text": "Setup progress1/2Setup context2 blockedWorkspaceNameNot setStageNot setModelSelect business modelOff",
+      "width": 400
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "color(srgb 0.901961 0.913725 0.941176)",
+      "className": "space-y-5 rounded-md border border-border bg-surface px-4 py-4",
+      "height": 645,
+      "radius": "10px",
+      "tag": "aside",
+      "text": "Setup context2 blockedWorkspaceNameNot setStageNot setModelSelect business modelOfferingKindNot setN",
+      "width": 400
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-2",
+      "height": 83,
+      "radius": "0px",
+      "tag": "section",
+      "text": "WorkspaceNameNot setStageNot setModelSelect business model",
+      "width": 366
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-2",
+      "height": 61,
+      "radius": "0px",
+      "tag": "dl",
+      "text": "NameNot setStageNot setModelSelect business model",
+      "width": 366
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-2",
+      "height": 83,
+      "radius": "0px",
+      "tag": "section",
+      "text": "OfferingKindNot setNameNot setPricingLater",
+      "width": 366
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-2",
+      "height": 61,
+      "radius": "0px",
+      "tag": "dl",
+      "text": "KindNot setNameNot setPricingLater",
+      "width": 366
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-3",
+      "height": 246,
+      "radius": "0px",
+      "tag": "section",
+      "text": "Source checklistWorkspacePendingName missingBusiness branchPendingNot selectedOffer setupPendingNot ",
+      "width": 366
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "color(srgb 0.901961 0.913725 0.941176)",
+      "className": "divide-y divide-border rounded-md border border-border bg-surface",
+      "height": 219,
+      "radius": "10px",
+      "tag": "div",
+      "text": "WorkspacePendingName missingBusiness branchPendingNot selectedOffer setupPendingNot set",
+      "width": 366
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "flex items-start gap-3 px-3 py-3",
+      "height": 72,
+      "radius": "0px",
+      "tag": "div",
+      "text": "WorkspacePendingName missing",
+      "width": 364
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "min-w-0 flex-1",
+      "height": 48,
+      "radius": "0px",
+      "tag": "div",
+      "text": "WorkspacePendingName missing",
+      "width": 312
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "color(srgb 0.901961 0.913725 0.941176)",
+      "className": "flex items-start gap-3 px-3 py-3",
+      "height": 73,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Business branchPendingNot selected",
+      "width": 364
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "min-w-0 flex-1",
+      "height": 48,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Business branchPendingNot selected",
+      "width": 312
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "color(srgb 0.901961 0.913725 0.941176)",
+      "className": "flex items-start gap-3 px-3 py-3",
+      "height": 73,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Offer setupPendingNot set",
+      "width": 364
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "min-w-0 flex-1",
+      "height": 48,
+      "radius": "0px",
+      "tag": "div",
+      "text": "Offer setupPendingNot set",
+      "width": 312
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-2",
+      "height": 96,
+      "radius": "0px",
+      "tag": "section",
+      "text": "BlockersWorkspace name is required.Business stage is required.",
+      "width": 366
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "space-y-2",
+      "height": 74,
+      "radius": "0px",
+      "tag": "ul",
+      "text": "Workspace name is required.Business stage is required.",
+      "width": 366
+    }
+  ],
+  "headings": [
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "26px",
+      "fontWeight": "600",
+      "height": 30,
+      "lineHeight": "29.9px",
+      "tag": "h1",
+      "text": "Set up your marketing agent",
+      "width": 397
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "21px",
+      "fontWeight": "600",
+      "height": 24,
+      "lineHeight": "24.15px",
+      "tag": "h2",
+      "text": "Name your workspace",
+      "width": 742
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 15,
+      "lineHeight": "14.95px",
+      "tag": "h2",
+      "text": "Setup context",
+      "width": 91
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": 14,
+      "lineHeight": "13.8px",
+      "tag": "h3",
+      "text": "Workspace",
+      "width": 366
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": 14,
+      "lineHeight": "13.8px",
+      "tag": "h3",
+      "text": "Offering",
+      "width": 366
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 15,
+      "lineHeight": "14.95px",
+      "tag": "h2",
+      "text": "Source checklist",
+      "width": 366
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "height": 14,
+      "lineHeight": "13.8px",
+      "tag": "h3",
+      "text": "Blockers",
+      "width": 366
+    }
+  ],
+  "overflow": [],
+  "title": "mOS Frontend",
+  "url": "http://localhost:5275/workspaces/new",
+  "viewport": {
+    "height": 1100,
+    "width": 1860
+  }
+}

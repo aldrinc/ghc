@@ -33,6 +33,7 @@ If GUI terminals are unavailable, run these manually in separate shells:
   ./scripts/start-shopify-funnel.sh
   ./scripts/start-shopify-ngrok.sh
   ./scripts/start-temporal.sh
+  ./scripts/start-postiz.sh
   ./scripts/start-backend.sh
   SKIP_PIP_INSTALL=1 ./scripts/start-worker.sh
   ./scripts/start-frontend.sh

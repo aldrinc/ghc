@@ -90,7 +90,7 @@ import {
   type CreateAddressInput,
   type UpdateAddressInput,
 } from "@/lib/medusa";
-import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/funnelRuntime";
 import {
   useImportedOneProductShellState,
   type ImportedOneProductShellState,

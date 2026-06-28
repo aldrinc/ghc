@@ -1,0 +1,392 @@
+[
+  {
+    "id": "RLR6Zx",
+    "name": "Dropped Email",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:21+00:00",
+    "updated": "2026-04-17T19:20:21+00:00"
+  },
+  {
+    "id": "RTJBwT",
+    "name": "Refunded Order",
+    "integration": {
+      "object": "integration",
+      "id": "0eMvjm",
+      "key": "shopify",
+      "name": "Shopify",
+      "category": "eCommerce"
+    },
+    "created": "2026-04-17T19:18:59+00:00",
+    "updated": "2026-04-17T19:18:59+00:00"
+  },
+  {
+    "id": "RYHRTc",
+    "name": "Clicked SMS",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "Rc6iyS",
+    "name": "Active on Site",
+    "integration": {
+      "object": "integration",
+      "id": "7FtS4J",
+      "key": "api",
+      "name": "API",
+      "category": "API"
+    },
+    "created": "2026-04-17T19:19:01+00:00",
+    "updated": "2026-04-17T19:19:01+00:00"
+  },
+  {
+    "id": "RmGPgz",
+    "name": "Sent SMS",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "SThFFB",
+    "name": "Checkout Started",
+    "integration": {
+      "object": "integration",
+      "id": "0eMvjm",
+      "key": "shopify",
+      "name": "Shopify",
+      "category": "eCommerce"
+    },
+    "created": "2026-04-17T19:18:42+00:00",
+    "updated": "2026-04-17T19:18:42+00:00"
+  },
+  {
+    "id": "SU2pN5",
+    "name": "Subscribed to List",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-05-04T15:01:06+00:00",
+    "updated": "2026-05-04T15:01:06+00:00"
+  },
+  {
+    "id": "SYwc5m",
+    "name": "Clicked Email",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:19:01+00:00",
+    "updated": "2026-04-17T19:19:01+00:00"
+  },
+  {
+    "id": "SgRT7k",
+    "name": "Received Email",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:19:02+00:00",
+    "updated": "2026-04-17T19:19:02+00:00"
+  },
+  {
+    "id": "SpS9Ca",
+    "name": "Skipped Send",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:21+00:00",
+    "updated": "2026-04-17T19:20:21+00:00"
+  },
+  {
+    "id": "TGav3n",
+    "name": "Subscribed to Back in Stock",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:18:59+00:00",
+    "updated": "2026-04-17T19:18:59+00:00"
+  },
+  {
+    "id": "TM9KpF",
+    "name": "Failed to Deliver SMS",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "Ta8GM4",
+    "name": "Received Automated Response SMS",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "UFHzc6",
+    "name": "Placed Order",
+    "integration": {
+      "object": "integration",
+      "id": "0eMvjm",
+      "key": "shopify",
+      "name": "Shopify",
+      "category": "eCommerce"
+    },
+    "created": "2026-04-17T19:18:42+00:00",
+    "updated": "2026-04-17T19:18:42+00:00"
+  },
+  {
+    "id": "ULW5zQ",
+    "name": "Viewed Product",
+    "integration": {
+      "object": "integration",
+      "id": "7FtS4J",
+      "key": "api",
+      "name": "API",
+      "category": "API"
+    },
+    "created": "2026-04-17T19:19:01+00:00",
+    "updated": "2026-04-17T19:19:01+00:00"
+  },
+  {
+    "id": "UWyAhx",
+    "name": "Failed to Deliver Automated Response SMS",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "Uci38D",
+    "name": "Clicked email to unsubscribe",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:21+00:00",
+    "updated": "2026-04-17T19:20:21+00:00"
+  },
+  {
+    "id": "UjbxDZ",
+    "name": "Cancelled Order",
+    "integration": {
+      "object": "integration",
+      "id": "0eMvjm",
+      "key": "shopify",
+      "name": "Shopify",
+      "category": "eCommerce"
+    },
+    "created": "2026-04-17T19:18:59+00:00",
+    "updated": "2026-04-17T19:18:59+00:00"
+  },
+  {
+    "id": "UtV6E6",
+    "name": "Placed Order",
+    "integration": {
+      "object": "integration",
+      "id": "0eMvjm",
+      "key": "shopify",
+      "name": "Shopify",
+      "category": "eCommerce"
+    },
+    "created": "2026-04-20T23:19:28+00:00",
+    "updated": "2026-04-20T23:19:28+00:00"
+  },
+  {
+    "id": "VRR8cq",
+    "name": "Subscribed to Email Marketing",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-05-04T15:01:06+00:00",
+    "updated": "2026-05-04T15:01:06+00:00"
+  },
+  {
+    "id": "VYHUD8",
+    "name": "Marked Email as Spam",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:21+00:00",
+    "updated": "2026-04-17T19:20:21+00:00"
+  },
+  {
+    "id": "VzzCUa",
+    "name": "Unsubscribed from SMS Marketing",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "WJCtM7",
+    "name": "Ordered Product",
+    "integration": {
+      "object": "integration",
+      "id": "0eMvjm",
+      "key": "shopify",
+      "name": "Shopify",
+      "category": "eCommerce"
+    },
+    "created": "2026-04-17T19:18:59+00:00",
+    "updated": "2026-04-17T19:18:59+00:00"
+  },
+  {
+    "id": "WJYtN2",
+    "name": "Relayed SMS",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "XM9N9B",
+    "name": "Bounced Email",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:21+00:00",
+    "updated": "2026-04-17T19:20:21+00:00"
+  },
+  {
+    "id": "XU3iEX",
+    "name": "Fulfilled Order",
+    "integration": {
+      "object": "integration",
+      "id": "0eMvjm",
+      "key": "shopify",
+      "name": "Shopify",
+      "category": "eCommerce"
+    },
+    "created": "2026-04-17T19:18:59+00:00",
+    "updated": "2026-04-17T19:18:59+00:00"
+  },
+  {
+    "id": "XZ2z3g",
+    "name": "Received SMS",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "XmZwqD",
+    "name": "Subscribed to SMS Marketing",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  },
+  {
+    "id": "YhaAfq",
+    "name": "Opened Email",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:19:02+00:00",
+    "updated": "2026-04-17T19:19:02+00:00"
+  },
+  {
+    "id": "Yxqmiv",
+    "name": "Opened Text",
+    "integration": {
+      "object": "integration",
+      "id": "0rG4eQ",
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "Internal"
+    },
+    "created": "2026-04-17T19:20:30+00:00",
+    "updated": "2026-04-17T19:20:30+00:00"
+  }
+]

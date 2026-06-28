@@ -1,0 +1,150 @@
+{
+  "workspacesProof": {
+    "url": "http://localhost:5275/workspaces",
+    "hasNewWorkspace": 1,
+    "loadFailed": 0,
+    "skeletonCount": 0
+  },
+  "onboardingProof": {
+    "url": "http://localhost:5275/workspaces/new",
+    "hasTitle": 1,
+    "inputHeight": "54px",
+    "inputBorder": "color(srgb 0.890196 0.901961 0.933333)"
+  },
+  "singlePanelOnboarding": {
+    "url": "http://localhost:5275/workspaces/new",
+    "hasTitle": 1,
+    "visualPanelCount": 0,
+    "firstRunGridCount": 0,
+    "inputHeight": "54px",
+    "mainBox": {
+      "x": 460,
+      "y": 280.453125,
+      "width": 520,
+      "height": 360.6875
+    }
+  },
+  "segmentedControlProof": {
+    "url": "http://localhost:5275/workspaces",
+    "cardsState": {
+      "controlClass": "mos-segmented-control",
+      "controlRect": {
+        "bottom": 158.09375,
+        "height": 44,
+        "right": 1447,
+        "width": 177.203125,
+        "x": 1269.796875,
+        "y": 114.09375
+      },
+      "optionCount": 2,
+      "optionTexts": [
+        "Cards",
+        "List"
+      ],
+      "selectedBackground": "rgb(11, 13, 18)",
+      "selectedColor": "rgb(255, 255, 255)",
+      "selectedInsideControl": true,
+      "selectedRect": {
+        "bottom": 154.09375,
+        "height": 36,
+        "right": 1359,
+        "width": 85.203125,
+        "x": 1273.796875,
+        "y": 118.09375
+      },
+      "selectedText": "Cards"
+    },
+    "listState": {
+      "controlRect": {
+        "bottom": 158.09375,
+        "height": 44,
+        "right": 1447,
+        "width": 177.203125,
+        "x": 1269.796875,
+        "y": 114.09375
+      },
+      "rowCount": 1,
+      "selectedInsideControl": true,
+      "selectedRect": {
+        "bottom": 154.09375,
+        "height": 36,
+        "right": 1443,
+        "width": 82,
+        "x": 1361,
+        "y": 118.09375
+      },
+      "selectedText": "List"
+    }
+  },
+  "onboardingProgressTypography": {
+    "url": "http://localhost:5275/workspaces/new",
+    "states": [
+      {
+        "label": "workspace",
+        "progress": 12,
+        "heading": "What should we call this workspace?",
+        "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+        "titleFontSize": "32px",
+        "titleLineHeight": "35.84px",
+        "titleFontWeight": "650"
+      },
+      {
+        "label": "business-type",
+        "progress": 24,
+        "heading": "Is this a new or already live business?",
+        "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+        "titleFontSize": "32px",
+        "titleLineHeight": "35.84px",
+        "titleFontWeight": "650"
+      },
+      {
+        "label": "business-type-selected-existing",
+        "progress": 24,
+        "heading": "Is this a new or already live business?",
+        "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+        "titleFontSize": "32px",
+        "titleLineHeight": "35.84px",
+        "titleFontWeight": "650"
+      },
+      {
+        "label": "existing-url",
+        "progress": 48,
+        "heading": "What is the business website?",
+        "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+        "titleFontSize": "32px",
+        "titleLineHeight": "35.84px",
+        "titleFontWeight": "650"
+      },
+      {
+        "label": "existing-competitors",
+        "progress": 72,
+        "heading": "Any competitors your agent should know about?",
+        "titleFontFamily": "\"DM Sans\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+        "titleFontSize": "32px",
+        "titleLineHeight": "35.84px",
+        "titleFontWeight": "650"
+      }
+    ],
+    "styles": {
+      "label": {
+        "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+        "fontSize": "15px",
+        "fontWeight": "600"
+      },
+      "description": {
+        "color": "color(srgb 0.294118 0.321569 0.376471)",
+        "fontSize": "13px",
+        "lineHeight": "20.15px"
+      },
+      "textarea": {
+        "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+        "borderColor": "color(srgb 0.0431373 0.0509804 0.0705882)",
+        "placeholderOpacity": "1"
+      },
+      "stepOpacity": "1"
+    },
+    "monotonicAroundBranchChoice": true,
+    "headingUsesSans": true,
+    "fieldTextReadable": true
+  }
+}

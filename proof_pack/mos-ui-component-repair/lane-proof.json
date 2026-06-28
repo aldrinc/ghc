@@ -1,0 +1,118 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Independent local validation commands were safe to run in parallel after the component edits; browser review and runtime-cycle repair stayed on the main thread for visual judgment.",
+  "lanes": [
+    {
+      "lane_id": "browser_review",
+      "objective": "Capture real browser proof for repaired component primitives, actual first-run inputs, and source-shaped choice flows.",
+      "role": "main browser reviewer",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-20T21:33:15Z",
+      "ended_at": "2026-05-20T22:09:36Z",
+      "read_scope": [
+        "mos/frontend/src/components",
+        "mos/frontend/src/pages/dev",
+        "proof_pack/mos-ui-component-repair/source"
+      ],
+      "write_scope": [
+        "screenshots",
+        "*.audit.json",
+        "browser-audit.md"
+      ],
+      "artifacts": [
+        "screenshots/component-review-desktop-after-compound-repair.png",
+        "screenshots/component-review-mobile-after-compound-repair.png",
+        "screenshots/workspaces-new-input-focused-after.png",
+        "screenshots/workspaces-new-choice-step-selected-after.png",
+        "component-review-desktop-after-compound-repair.audit.json",
+        "component-review-mobile-after-compound-repair.audit.json",
+        "workspaces-new-input-focused-after.audit.json",
+        "workspaces-new-choice-step-selected-after.audit.json",
+        "browser-audit.md"
+      ],
+      "summary": "Captured expanded component harness, focused workspace input, and selected workspace choice step with no horizontal overflow in desktop or mobile proof."
+    },
+    {
+      "lane_id": "runtime_cycle_repair",
+      "objective": "Fix browser-blocking runtime cycle discovered during component proof.",
+      "role": "main implementation lane",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-20T22:05:34Z",
+      "ended_at": "2026-05-20T22:07:44Z",
+      "read_scope": [
+        "mos/frontend/src/funnels/puckConfig.tsx",
+        "mos/frontend/src/funnels/templates",
+        "mos/frontend/src/components/commerce",
+        "mos/frontend/src/components/imported-site"
+      ],
+      "write_scope": [
+        "mos/frontend/src/funnels/funnelRuntime.tsx",
+        "runtime import call sites",
+        "affected runtime tests"
+      ],
+      "artifacts": [
+        "logs/build-after-compound-repair.log",
+        "logs/unit-tests-after-compound-repair.log"
+      ],
+      "summary": "Moved runtime context/path helpers out of puckConfig and updated templates/components/tests so /dev/components no longer blanks from the salesPdpDefaults TDZ cycle."
+    },
+    {
+      "lane_id": "design_semantic_checks",
+      "objective": "Run design-system and semantic token checks after component source alignment.",
+      "role": "local validation lane",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-20T22:09:54Z",
+      "ended_at": "2026-05-20T22:09:55Z",
+      "read_scope": [
+        "mos/frontend/src",
+        "mos/frontend/scripts"
+      ],
+      "write_scope": [
+        "logs/design-system.log",
+        "logs/semantic-ui.log"
+      ],
+      "artifacts": [
+        "logs/design-system-after-compound-repair.log",
+        "logs/semantic-after-compound-repair.log"
+      ],
+      "summary": "Both design-system migration and semantic UI token checks passed after the compound source/input repair."
+    },
+    {
+      "lane_id": "build_unit_checks",
+      "objective": "Run production build and unit test validation after the component repair.",
+      "role": "local validation lane",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-20T22:09:54Z",
+      "ended_at": "2026-05-20T22:11:09Z",
+      "read_scope": [
+        "mos/frontend/src",
+        "mos/frontend/package.json"
+      ],
+      "write_scope": [
+        "logs/build.log",
+        "logs/unit-tests.log"
+      ],
+      "artifacts": [
+        "logs/build-after-compound-repair.log",
+        "logs/unit-tests-after-compound-repair.log"
+      ],
+      "summary": "Production build completed and Vitest reported 47 files and 255 tests passed."
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main Codex thread",
+    "summary": "Browser proof, runtime-cycle repair, static checks, build, and unit tests all passed against the source-matched component/input repair."
+  },
+  "token_time_proxy": {
+    "native_subagents": 0,
+    "local_parallel_lanes": 2,
+    "main_thread_browser_lane": 1,
+    "main_thread_repair_lanes": 1
+  }
+}

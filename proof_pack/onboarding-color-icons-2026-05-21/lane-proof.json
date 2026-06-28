@@ -1,0 +1,45 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "single_lane",
+  "reason": "Single lane: the work changed one shared onboarding UI surface and overlapping writers would create merge risk.",
+  "lanes": [
+    {
+      "lane_id": "main-onboarding-icons",
+      "objective": "Add original colorful onboarding icons and wire them into choice and setup-progress screens.",
+      "role": "main_thread",
+      "mode": "single_lane",
+      "status": "pass",
+      "started_at": "2026-05-21T14:51:10.866Z",
+      "ended_at": "2026-05-21T14:51:10.866Z",
+      "read_scope": [
+        "mos/frontend/src/components/onboarding",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "/Users/aldrinclement/Downloads/quiz-theliven-842_8cp9u 3"
+      ],
+      "write_scope": [
+        "mos/frontend/src/components/onboarding",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/ui/toast.test.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "proof_pack/onboarding-color-icons-2026-05-21"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json"
+      ],
+      "summary": "Implemented reusable OnboardingIcon SVGs, ChoiceList color icon mode, setup checklist icon slots, wizard icon wiring, and targeted test coverage."
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main_codex_thread",
+    "summary": "Single-lane implementation required no fan-in merge. Tests and build passed before contract verification."
+  },
+  "token_time_proxy": {
+    "native_subagents": 0,
+    "lane_count": 1,
+    "local_parallel_tool_batches": 4,
+    "verification_commands": 2
+  }
+}

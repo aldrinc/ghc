@@ -1,0 +1,97 @@
+{
+  "createdAt": "2026-04-28T15:53:24.660Z",
+  "resumed": true,
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "outputs": [
+    {
+      "key": "01-product-hero",
+      "workflowRunId": "5e20cfe1-8ba1-4fbc-97af-90e4c4e56129",
+      "assetId": "e43c15fb-7865-460b-bbeb-a129aa73ec0a",
+      "publicId": "10f481c8-922c-472e-b6a3-7f66edaf1f38",
+      "publicUrl": "https://api.moshq.app/public/assets/10f481c8-922c-472e-b6a3-7f66edaf1f38",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated/01-product-hero.jpg",
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:e4e29007dc626a45358e6eff8ea2a789e3d65fd2d0605a3c",
+        "asset_ids": [
+          "e43c15fb-7865-460b-bbeb-a129aa73ec0a"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "02-survey-proof",
+      "workflowRunId": "b126cb6e-1da9-4cc7-ba07-ec9d3c3656c7",
+      "assetId": "6fe194ea-ca89-4c32-9575-2c6514df0412",
+      "publicId": "c9263b47-957a-45c4-b838-23effa4a72ff",
+      "publicUrl": "https://api.moshq.app/public/assets/c9263b47-957a-45c4-b838-23effa4a72ff",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated/02-survey-proof.jpg",
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:3880a3d36c5f955e4c64d1de098ba0706d9822264e16e8c1",
+        "asset_ids": [
+          "6fe194ea-ca89-4c32-9575-2c6514df0412"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "03-formula",
+      "workflowRunId": "c0a28846-0221-4d0e-b86d-0b3e63a58fc9",
+      "assetId": "b94075d3-ffba-4fab-8dd1-bfc8c6b6f17e",
+      "publicId": "be58b7a3-cd87-46e6-9443-ba7d4195634a",
+      "publicUrl": "https://api.moshq.app/public/assets/be58b7a3-cd87-46e6-9443-ba7d4195634a",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated/03-formula.jpg",
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:5089de9053deacd741f236264db69d689c6aec4d572d2d22",
+        "asset_ids": [
+          "b94075d3-ffba-4fab-8dd1-bfc8c6b6f17e"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "04-scientific-foundation",
+      "workflowRunId": "1a65efac-12bf-4641-9bd0-ec40d55c5e79",
+      "assetId": "e230cfcb-e77e-4e0a-9029-f4458d5ac8fc",
+      "publicId": "cedbbbc4-56d9-4bee-87d9-d6e0bc33d60a",
+      "publicUrl": "https://api.moshq.app/public/assets/cedbbbc4-56d9-4bee-87d9-d6e0bc33d60a",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated/04-scientific-foundation.jpg",
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:215e49af9ccb5d1b62c2f59ebe182b0ea6d67d2fe15c4d16",
+        "asset_ids": [
+          "e230cfcb-e77e-4e0a-9029-f4458d5ac8fc"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

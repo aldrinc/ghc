@@ -1,4 +1,4 @@
-import * as PopoverPrimitive from "@base-ui/react/popover";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { forwardRef } from "react";
 import { floatingPanel } from "@/components/ui/floating";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ export const PopoverContent = forwardRef<HTMLDivElement, PopoverPrimitive.Conten
       <PopoverPrimitive.Positioner className="z-dropdown">
         <PopoverPrimitive.Popup
           ref={ref}
-          className={cn(floatingPanel("min-w-[12rem] p-4 data-[open]:opacity-100 data-[closed]:opacity-100"), className)}
+            className={cn(floatingPanel("min-w-[12rem] p-5 data-[open]:opacity-100 data-[closed]:opacity-100"), className)}
           {...props}
         />
       </PopoverPrimitive.Positioner>

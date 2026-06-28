@@ -1,0 +1,791 @@
+{
+  "flow": {
+    "type": "flow",
+    "id": "YaNMuT",
+    "attributes": {
+      "name": "Ember — Welcome (Belief Shift)",
+      "status": "draft",
+      "archived": false,
+      "created": "2026-04-21T18:28:35+00:00",
+      "updated": "2026-04-21T18:28:35+00:00",
+      "trigger_type": "Added to List",
+      "definition": {
+        "triggers": [
+          {
+            "type": "list",
+            "id": "YrE9mB"
+          }
+        ],
+        "profile_filter": null,
+        "actions": [
+          {
+            "id": "104677723",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "The word disappeared mid-sentence. I know exactly what that feels like.",
+                "preview_text": "You're here because something changed.",
+                "template_id": "Rxv3Jc",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S1E1 — Problem Mirror",
+                "id": "VKmRmM"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677724"
+            }
+          },
+          {
+            "id": "104677724",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 2,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677725"
+            }
+          },
+          {
+            "id": "104677725",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "What most women assume about menopause brain fog (and why it keeps them stuck)",
+                "preview_text": "Common is not the same as unavoidable.",
+                "template_id": "UvjL8x",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S1E2 — The Old Belief",
+                "id": "SGTSC4"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677726"
+            }
+          },
+          {
+            "id": "104677726",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 1,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677728"
+            }
+          },
+          {
+            "id": "104677728",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Nobody told me my brain was running on empty",
+                "preview_text": "This isn't decline. It's fuel starvation — and it's refillable.",
+                "template_id": "TSiHvU",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S1E3 — The Bridge (Mechanism)",
+                "id": "S5SPZr"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677729"
+            }
+          },
+          {
+            "id": "104677729",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 2,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677730"
+            }
+          },
+          {
+            "id": "104677730",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "What the Brain Clarity Protocol actually looks like (it's simpler than you think)",
+                "preview_text": "One thing, at the same time every day, with your coffee.",
+                "template_id": "TfhETh",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S1E4 — The Protocol",
+                "id": "RsRMnN"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677731"
+            }
+          },
+          {
+            "id": "104677731",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 2,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677732"
+            }
+          },
+          {
+            "id": "104677732",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "\"But isn't creatine for bodybuilders?\" (I get this one a lot)",
+                "preview_text": "The gym association exists because fitness brands marketed it first.",
+                "template_id": "WQ9rUf",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S1E5 — Objection Handling",
+                "id": "V3HypL"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677736"
+            }
+          },
+          {
+            "id": "104677736",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 2,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677738"
+            }
+          },
+          {
+            "id": "104677738",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "She started 30 days ago. Here's what she told me.",
+                "preview_text": "These women started where you are.",
+                "template_id": "VA7kEZ",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S1E6 — Social Proof",
+                "id": "RZfzE3"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677739"
+            }
+          },
+          {
+            "id": "104677739",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 3,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677740"
+            }
+          },
+          {
+            "id": "104677740",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Your brain clarity protocol is ready when you are",
+                "preview_text": "You've been compensating for long enough.",
+                "template_id": "Rnex3q",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S1E7 — Final Nudge",
+                "id": "Xnxebu"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": null
+            }
+          }
+        ],
+        "entry_action_id": "104677723"
+      }
+    },
+    "relationships": {
+      "flow-actions": {
+        "links": {
+          "self": "https://a.klaviyo.com/api/flows/YaNMuT/relationships/flow-actions/",
+          "related": "https://a.klaviyo.com/api/flows/YaNMuT/flow-actions/"
+        }
+      },
+      "tags": {
+        "links": {
+          "self": "https://a.klaviyo.com/api/flows/YaNMuT/relationships/tags/",
+          "related": "https://a.klaviyo.com/api/flows/YaNMuT/tags/"
+        }
+      }
+    },
+    "links": {
+      "self": "https://a.klaviyo.com/api/flows/YaNMuT/"
+    }
+  },
+  "actions": [
+    {
+      "id": "104677723",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:35+00:00",
+        "updated": "2026-05-03T01:11:30+00:00",
+        "definition": {
+          "id": "104677723",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shopemberco.com",
+              "from_label": "Dr. Catherine Langford",
+              "reply_to_email": "support@shopemberco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "The word disappeared mid-sentence. I know exactly what that feels like.",
+              "preview_text": "You're here because something changed.",
+              "template_id": "Rxv3Jc",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[EMBER] S1E1 — Problem Mirror",
+              "id": "VKmRmM"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "104677724"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677724",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:36+00:00",
+        "updated": "2026-04-21T18:28:36+00:00",
+        "definition": {
+          "id": "104677724",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 2,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "104677725"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677725",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:36+00:00",
+        "updated": "2026-05-03T01:11:30+00:00",
+        "definition": {
+          "id": "104677725",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shopemberco.com",
+              "from_label": "Dr. Catherine Langford",
+              "reply_to_email": "support@shopemberco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "What most women assume about menopause brain fog (and why it keeps them stuck)",
+              "preview_text": "Common is not the same as unavoidable.",
+              "template_id": "UvjL8x",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[EMBER] S1E2 — The Old Belief",
+              "id": "SGTSC4"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "104677726"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677726",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:37+00:00",
+        "updated": "2026-04-21T18:28:37+00:00",
+        "definition": {
+          "id": "104677726",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 1,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "104677728"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677728",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:37+00:00",
+        "updated": "2026-05-03T01:11:30+00:00",
+        "definition": {
+          "id": "104677728",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shopemberco.com",
+              "from_label": "Dr. Catherine Langford",
+              "reply_to_email": "support@shopemberco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "Nobody told me my brain was running on empty",
+              "preview_text": "This isn't decline. It's fuel starvation — and it's refillable.",
+              "template_id": "TSiHvU",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[EMBER] S1E3 — The Bridge (Mechanism)",
+              "id": "S5SPZr"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "104677729"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677729",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:37+00:00",
+        "updated": "2026-04-21T18:28:37+00:00",
+        "definition": {
+          "id": "104677729",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 2,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "104677730"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677730",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:37+00:00",
+        "updated": "2026-05-03T01:11:30+00:00",
+        "definition": {
+          "id": "104677730",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shopemberco.com",
+              "from_label": "Dr. Catherine Langford",
+              "reply_to_email": "support@shopemberco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "What the Brain Clarity Protocol actually looks like (it's simpler than you think)",
+              "preview_text": "One thing, at the same time every day, with your coffee.",
+              "template_id": "TfhETh",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[EMBER] S1E4 — The Protocol",
+              "id": "RsRMnN"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "104677731"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677731",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:37+00:00",
+        "updated": "2026-04-21T18:28:37+00:00",
+        "definition": {
+          "id": "104677731",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 2,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "104677732"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677732",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:37+00:00",
+        "updated": "2026-05-03T01:11:30+00:00",
+        "definition": {
+          "id": "104677732",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shopemberco.com",
+              "from_label": "Dr. Catherine Langford",
+              "reply_to_email": "support@shopemberco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "\"But isn't creatine for bodybuilders?\" (I get this one a lot)",
+              "preview_text": "The gym association exists because fitness brands marketed it first.",
+              "template_id": "WQ9rUf",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[EMBER] S1E5 — Objection Handling",
+              "id": "V3HypL"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "104677736"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677736",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:38+00:00",
+        "updated": "2026-04-21T18:28:38+00:00",
+        "definition": {
+          "id": "104677736",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 2,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "104677738"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677738",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:38+00:00",
+        "updated": "2026-05-03T01:11:30+00:00",
+        "definition": {
+          "id": "104677738",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shopemberco.com",
+              "from_label": "Dr. Catherine Langford",
+              "reply_to_email": "support@shopemberco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "She started 30 days ago. Here's what she told me.",
+              "preview_text": "These women started where you are.",
+              "template_id": "VA7kEZ",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[EMBER] S1E6 — Social Proof",
+              "id": "RZfzE3"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "104677739"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677739",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:38+00:00",
+        "updated": "2026-04-21T18:28:38+00:00",
+        "definition": {
+          "id": "104677739",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 3,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "104677740"
+          }
+        }
+      }
+    },
+    {
+      "id": "104677740",
+      "type": "flow-action",
+      "attributes": {
+        "created": "2026-04-21T18:28:38+00:00",
+        "updated": "2026-05-03T01:11:30+00:00",
+        "definition": {
+          "id": "104677740",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shopemberco.com",
+              "from_label": "Dr. Catherine Langford",
+              "reply_to_email": "support@shopemberco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "Your brain clarity protocol is ready when you are",
+              "preview_text": "You've been compensating for long enough.",
+              "template_id": "Rnex3q",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[EMBER] S1E7 — Final Nudge",
+              "id": "Xnxebu"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": null
+          }
+        }
+      }
+    }
+  ]
+}

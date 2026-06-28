@@ -243,6 +243,7 @@ type DropdownMenuHighlightProps = Omit<
 
 function DropdownMenuHighlight({
   transition = { type: 'spring', stiffness: 350, damping: 35 },
+  animateOnHover = true,
   ...props
 }: DropdownMenuHighlightProps) {
   const { highlightedValue } = useDropdownMenu();
@@ -252,6 +253,7 @@ function DropdownMenuHighlight({
       data-slot="dropdown-menu-highlight"
       click={false}
       controlledItems
+      enabled={animateOnHover}
       transition={transition}
       value={highlightedValue}
       {...props}

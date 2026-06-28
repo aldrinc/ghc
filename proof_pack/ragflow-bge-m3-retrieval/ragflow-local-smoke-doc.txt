@@ -1,0 +1,3 @@
+This is a local RAGFlow smoke test document for MOS.
+The retrieval sentinel is MOS_RAGFLOW_BGE_M3_LOCAL_VECTOR_BRIDGE_20260527.
+If RAGFlow indexed the document with local BGE-M3 embeddings, retrieval should return this sentence.

@@ -436,3 +436,44 @@ def persist_client_onboarding_artifacts_activity(params: Dict[str, Any]) -> Dict
         "canon_persisted": bool(canon),
         "metric_schema_persisted": bool(metric_schema),
     }
+
+
+@activity.defn(name="client_onboarding.mark_workflow_status")
+def mark_client_onboarding_workflow_activity(params: Dict[str, Any]) -> Dict[str, bool]:
+    org_id = str(params["org_id"])
+    temporal_workflow_id = str(params["temporal_workflow_id"])
+    temporal_run_id = str(params["temporal_run_id"])
+    status_value = str(params["status"])
+    error_message = params.get("error_message")
+    payload_out = params.get("payload_out") if isinstance(params.get("payload_out"), dict) else None
+
+    try:
+        status_enum = WorkflowStatusEnum(status_value)
+    except ValueError as exc:
+        raise ValueError(f"Unsupported client onboarding workflow status: {status_value}") from exc
+
+    with session_scope() as session:
+        workflows_repo = WorkflowsRepository(session)
+        run = workflows_repo.get_by_temporal_ids(
+            org_id=org_id,
+            temporal_workflow_id=temporal_workflow_id,
+            temporal_run_id=temporal_run_id,
+        )
+        if not run:
+            return {"updated": False}
+
+        workflows_repo.set_status(
+            org_id=org_id,
+            workflow_run_id=str(run.id),
+            status=status_enum,
+            finished_at=datetime.now(timezone.utc),
+        )
+        workflows_repo.log_activity(
+            workflow_run_id=str(run.id),
+            step="client_onboarding",
+            status=status_value,
+            payload_out=payload_out,
+            error=str(error_message) if error_message else None,
+        )
+
+    return {"updated": True}

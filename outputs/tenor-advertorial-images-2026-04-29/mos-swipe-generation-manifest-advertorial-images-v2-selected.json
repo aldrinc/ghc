@@ -1,0 +1,122 @@
+{
+  "createdAt": "2026-04-29T19:00:59.422Z",
+  "outputs": [
+    {
+      "key": "01-hero-normal-labs-v2",
+      "sourceFile": "01-hero-photo-source.jpg",
+      "workflowRunId": "9b1b54a0-235e-425b-838e-fb49895b97bd",
+      "assetId": "c5e8b827-626f-4179-979e-54a5be06db0b",
+      "publicId": "b8817df6-fbbe-4f0a-ab89-5188fe42f77f",
+      "publicUrl": "https://api.moshq.app/public/assets/b8817df6-fbbe-4f0a-ab89-5188fe42f77f",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-v2/01-hero-normal-labs-v2.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/2c5b7f79-911d-4baf-9863-2fca401e5817",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Normal labs, different person",
+        "swipeAngle": "Tenor advertorial visual system: premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic editorial photography only. No flat illustration, no vector art, no abstract black ovals, no fake UI, no charts, no readable claims text, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Wide top hero. Updated black Tenor Daily Drive Essentials bottle on the right as product anchor, warm stone surface, soft morning light, subtle out-of-focus paper/lab-report cue on the left with no readable numbers. Mood: a man over 40 whose blood work says normal but his energy feels off. Clean editorial negative space for the page title below the image. No embedded headline copy.",
+        "aspectRatio": "21:9",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:22314022186f8ba396109b1d3e901083fcf2e3aa8b1e5859",
+        "asset_ids": [
+          "c5e8b827-626f-4179-979e-54a5be06db0b"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "04-lifestyle-recovery-v2",
+      "sourceFile": "04-lifestyle-photo-source.jpg",
+      "workflowRunId": "faa3fbac-1c0a-45a1-a447-8af4b642ba78",
+      "assetId": "ca704516-2288-4440-81e1-fd20837f2f9b",
+      "publicId": "d914dce7-88b7-4ae0-9998-92d35774dc03",
+      "publicUrl": "https://api.moshq.app/public/assets/d914dce7-88b7-4ae0-9998-92d35774dc03",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-v2/04-lifestyle-recovery-v2.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/553a843e-792a-4a72-948b-8db4ebffdf60",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Daily energy and recovery",
+        "swipeAngle": "Tenor advertorial visual system: premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic editorial photography only. No flat illustration, no vector art, no abstract black ovals, no fake UI, no charts, no readable claims text, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Inline lifestyle figure. Photorealistic scene of a realistic man in his early 50s seated near a window after a calm morning workout or weekend activity, relaxed posture, grounded expression, premium neutral interior, subtle bronze accent object. No product bottle, no backpack hero prop, no graphic shapes, no text, no gym aggression.",
+        "aspectRatio": "4:3",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:0460c528772984114cf5ab486111be87a75969f8e037abaf",
+        "asset_ids": [
+          "ca704516-2288-4440-81e1-fd20837f2f9b"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "05-two-capsule-protocol-v2",
+      "sourceFile": "05-daily-use-photo-source.jpg",
+      "workflowRunId": "ae117277-ed65-47e2-8ada-ed59ebf309aa",
+      "assetId": "d490decd-0def-4e2b-8138-42870703178b",
+      "publicId": "9ce15b08-121d-449d-96e8-c5d9eba8faad",
+      "publicUrl": "https://api.moshq.app/public/assets/9ce15b08-121d-449d-96e8-c5d9eba8faad",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-v2/05-two-capsule-protocol-v2.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/74f42c40-3840-4a8e-b7e3-751e63ae72a7",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Two capsules every morning",
+        "swipeAngle": "Tenor advertorial visual system: premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic editorial photography only. No flat illustration, no vector art, no abstract black ovals, no fake UI, no charts, no readable claims text, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Inline daily-use figure. Photorealistic morning routine still life: updated black Tenor Daily Drive Essentials bottle, exactly two capsules on a warm stone counter, water glass, simple notebook or breakfast plate, clean masculine organization. No piles of pills, no powder, no scoop, no shaker, no flat illustration, no text beyond unavoidable tiny bottle label detail.",
+        "aspectRatio": "4:3",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:e071f26b70f555bca1040fc828b7603699277d52a1e56a19",
+        "asset_ids": [
+          "d490decd-0def-4e2b-8138-42870703178b"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

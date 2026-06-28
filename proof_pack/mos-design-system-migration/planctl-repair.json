@@ -1,0 +1,31 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/plan.contract.json",
+  "verified_at": "2026-05-20T20:51:50.464119+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/ui/input.tsx:13: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/ui/textarea.tsx:12: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/logs/unit-tests.log:82: brittle marker `Not implemented`",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/logs/unit-tests.log:82: brittle marker `Not implemented`"
+  ],
+  "run_logs": [
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155040-Users-aldrinclement-.codex-bin-capturectl-verify-proof_pack-mos-design-system-m.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155040-git-status---short.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155040-cd-mos-frontend-npm-run---silent-check-design-system.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155041-cd-mos-frontend-npm-run---silent-build.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155053-cd-mos-frontend-npm-run---silent-check-semantic-ui.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155053-cd-mos-frontend-npm-run---silent-build.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155106-cd-mos-frontend-npm-run---silent-test-unit.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155116-cd-mos-frontend-npm-run---silent-build.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155128-cd-mos-frontend-npm-run---silent-test-unit.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155137-cd-mos-frontend-npm-run---silent-check-semantic-ui.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155138-cd-mos-frontend-npm-run---silent-build.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155149-git-diff----mos-frontend-src-funnels-templates-shared-designSystemBrandLogo.ts-m.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155149-cd-mos-frontend-npm-run---silent-check-design-system.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155150-Users-aldrinclement-.codex-bin-capturectl-verify-proof_pack-mos-design-system-m.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155150-Users-aldrinclement-.codex-bin-plangatecheck-proof_pack-mos-design-system-migra.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155150-Users-aldrinclement-.codex-bin-lanecheck-proof_pack-mos-design-system-migration.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/mos-design-system-migration/verify-20260520-155150-test--f-proof_pack-mos-design-system-migration-index.html.log"
+  ]
+}

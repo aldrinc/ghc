@@ -42,7 +42,39 @@ resolve_dev_host() {
     return 0
   fi
 
-  printf '127.0.0.1\n'
+  printf 'localhost\n'
+}
+
+env_file_defines() {
+  local name="$1"
+  local env_file="$FRONTEND_DIR/.env.local"
+
+  if [ ! -f "$env_file" ]; then
+    return 1
+  fi
+
+  grep -Eq "^[[:space:]]*(export[[:space:]]+)?${name}=" "$env_file"
+}
+
+is_loopback_host() {
+  case "$1" in
+    localhost|127.*|::1)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+default_api_base_url() {
+  local api_host="$BIND_HOST"
+
+  if [ "$api_host" = "127.0.0.1" ]; then
+    api_host="localhost"
+  fi
+
+  printf 'http://%s:%s\n' "$api_host" "$BACKEND_PORT"
 }
 
 cd "$FRONTEND_DIR"
@@ -52,7 +84,13 @@ if ! [[ "$FRONTEND_PORT" =~ ^[0-9]+$ ]] || (( FRONTEND_PORT < 1 || FRONTEND_PORT
 fi
 
 BIND_HOST="$(resolve_dev_host)"
-export VITE_API_BASE_URL="${VITE_API_BASE_URL:-http://${BIND_HOST}:${BACKEND_PORT}}"
+if [ -z "${VITE_API_BASE_URL:-}" ]; then
+  if ! is_loopback_host "$BIND_HOST"; then
+    export VITE_API_BASE_URL="$(default_api_base_url)"
+  elif ! env_file_defines "VITE_API_BASE_URL"; then
+    export VITE_API_BASE_URL="$(default_api_base_url)"
+  fi
+fi
 
 existing_frontend_pid="$(matching_frontend_pid "$FRONTEND_PORT")"
 if [ -n "$existing_frontend_pid" ]; then
@@ -78,5 +116,5 @@ fi
 
 CANONICAL_URL="$(DEV_ACCESS_HOST="$BIND_HOST" "$ROOT/scripts/resolve-dev-access-url.sh" "$FRONTEND_PORT")"
 echo "[frontend] Canonical access URL: ${CANONICAL_URL}"
-echo "[frontend] Starting Vite dev server on http://${BIND_HOST}:${FRONTEND_PORT} (API ${VITE_API_BASE_URL})"
+echo "[frontend] Starting Vite dev server on http://${BIND_HOST}:${FRONTEND_PORT}"
 exec npm run dev -- --host "$BIND_HOST" --port "$FRONTEND_PORT" --force

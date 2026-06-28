@@ -1,0 +1,511 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-21-onboarding-foundation-step-scope-plan",
+  "created_at": "2026-05-21T22:08:01.077254+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/onboarding-foundation-step-scope-2026-05-21",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Pass `foundation_only` into the foundational research activity.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P02",
+      "objective": "For `foundation_only=true`, run and persist only steps `01`, `03`, and `04`.",
+      "source_line": 14,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P03",
+      "objective": "Skip Stage 1 translation for foundation-only bundles because the current Stage 1 translator depends on Step 06 avatar brief data.",
+      "source_line": 15,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P04",
+      "objective": "Keep the full Strategy V2 path unchanged: it still runs Step 06 where downstream stages need avatar context.",
+      "source_line": 16,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P05",
+      "objective": "Update readiness to require only `01`, `03`, and `04`.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P06",
+      "objective": "Update onboarding UI ETA text to match the new DSV4-heavy flow.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P07",
+      "objective": "Onboarding foundation-only activity never calls Step 06.",
+      "source_line": 22,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P08",
+      "objective": "Readiness returns ready when `01`, `03`, and `04` are present.",
+      "source_line": 23,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P09",
+      "objective": "Full Strategy V2 still requires Step 06.",
+      "source_line": 24,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P10",
+      "objective": "Focused backend tests pass.",
+      "source_line": 25,
+      "status": "blocked",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Blocked by local Postgres on localhost:5433 refusing connections while loading mos/backend/tests/conftest.py. Manual helper/workflow smoke checks passed instead."
+    },
+    {
+      "id": "P11",
+      "objective": "Frontend typecheck/lint for touched files passes where available.",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P12",
+      "objective": "`python -m py_compile mos/backend/app/routers/clients.py mos/backend/app/temporal/workflows/strategy_v2.py mos/backend/app/temporal/activities/strategy_v2_activities.py`",
+      "source_line": 30,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Verified by py_compile, manual helper/workflow smoke, frontend build, and diff check. Pytest remains blocked by missing local Postgres; see verification artifact."
+    },
+    {
+      "id": "P13",
+      "objective": "`pytest mos/backend/tests/test_api.py::test_foundation_readiness_ready_when_bundle_complete mos/backend/tests/test_strategy_v2_workflow_ordering.py::test_strategy_v2_foundation_only_finishes_after_foundational_bundle -q`",
+      "source_line": 31,
+      "status": "blocked",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Blocked by local Postgres on localhost:5433 refusing connections while loading mos/backend/tests/conftest.py. Manual helper/workflow smoke checks passed instead."
+    },
+    {
+      "id": "P14",
+      "objective": "`ruff check mos/backend/app/routers/clients.py mos/backend/app/temporal/workflows/strategy_v2.py mos/backend/app/temporal/activities/strategy_v2_activities.py mos/backend/tests/test_api.py mos/backend/tests/test_strategy_v2_workflow_ordering.py`",
+      "source_line": 32,
+      "status": "blocked",
+      "expected_files": [
+        "mos/backend/app/routers/clients.py",
+        "mos/backend/app/temporal/workflows/strategy_v2.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx",
+        "mos/backend/tests/test_api.py",
+        "mos/backend/tests/test_strategy_v2_workflow_ordering.py",
+        "docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md",
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md",
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Onboarding foundation-only scope is 01/03/04 only.",
+        "Readiness gate requires 01/03/04 only.",
+        "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+        "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+      ],
+      "notes": "Full touched-file ruff is blocked by pre-existing lint debt in legacy files. Runtime compile, frontend build, and diff check passed; see verification artifact."
+    }
+  ],
+  "global_verify_commands": [
+    "python -m py_compile mos/backend/app/config.py mos/backend/app/routers/clients.py mos/backend/app/temporal/workflows/strategy_v2.py mos/backend/app/temporal/activities/strategy_v2_activities.py",
+    "npm run build --prefix mos/frontend",
+    "git diff --check -- mos/backend/.env.example mos/backend/app/config.py mos/backend/app/routers/clients.py mos/backend/app/temporal/workflows/strategy_v2.py mos/backend/app/temporal/activities/strategy_v2_activities.py mos/frontend/src/components/clients/OnboardingWizard.tsx mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx mos/backend/tests/test_api.py mos/backend/tests/test_strategy_v2_workflow_ordering.py docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.contract.json proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md"
+  ],
+  "global_acceptance": [
+    "Onboarding foundation-only scope is 01/03/04 only.",
+    "Readiness gate requires 01/03/04 only.",
+    "Full Strategy V2 can still use Step 06 outside foundation-only onboarding.",
+    "Steps 01/03/04 default to DSV4 path/model, with GPT preserved behind provider/model env flags where supported."
+  ]
+}

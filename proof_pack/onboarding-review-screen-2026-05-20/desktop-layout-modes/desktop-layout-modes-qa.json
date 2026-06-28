@@ -1,0 +1,144 @@
+{
+  "status": "passed",
+  "generatedAt": "2026-05-21T00:33:14.541Z",
+  "snapshots": [
+    {
+      "name": "01-simple-workspace",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/desktop-layout-modes/01-simple-workspace.png",
+      "title": "What should we call this workspace?",
+      "formClasses": "mos-onboarding-form mos-onboarding-form--simple",
+      "titleBox": {
+        "x": 340,
+        "y": 130,
+        "width": 760,
+        "height": 45,
+        "bottom": 175
+      },
+      "descriptionBox": {
+        "x": 340,
+        "y": 187,
+        "width": 760,
+        "height": 25,
+        "bottom": 211
+      },
+      "formBox": {
+        "x": 340,
+        "y": 243,
+        "width": 640,
+        "height": 159,
+        "bottom": 402
+      },
+      "frameBox": {
+        "x": 340,
+        "y": 243,
+        "width": 640,
+        "height": 81,
+        "bottom": 324
+      },
+      "actionsBox": {
+        "x": 340,
+        "y": 356,
+        "width": 640,
+        "height": 46,
+        "bottom": 402
+      },
+      "continueBox": {
+        "x": 340,
+        "y": 356,
+        "width": 640,
+        "height": 46,
+        "bottom": 402
+      },
+      "frameScrollHeight": 81,
+      "frameClientHeight": 81
+    },
+    {
+      "name": "02-choice-business-model",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/desktop-layout-modes/02-choice-business-model.png",
+      "title": "How will this business make money?",
+      "formClasses": "mos-onboarding-form mos-onboarding-form--choice",
+      "titleBox": {
+        "x": 340,
+        "y": 190,
+        "width": 760,
+        "height": 45,
+        "bottom": 235
+      },
+      "descriptionBox": {
+        "x": 340,
+        "y": 247,
+        "width": 760,
+        "height": 25,
+        "bottom": 271
+      },
+      "formBox": {
+        "x": 340,
+        "y": 303,
+        "width": 760,
+        "height": 548,
+        "bottom": 851
+      },
+      "frameBox": {
+        "x": 340,
+        "y": 303,
+        "width": 760,
+        "height": 524,
+        "bottom": 827
+      },
+      "actionsBox": {
+        "x": 340,
+        "y": 843,
+        "width": 760,
+        "height": 8,
+        "bottom": 851
+      },
+      "continueBox": null,
+      "frameScrollHeight": 524,
+      "frameClientHeight": 524
+    },
+    {
+      "name": "03-review",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/desktop-layout-modes/03-review.png",
+      "title": "Review workspace",
+      "formClasses": "mos-onboarding-form mos-onboarding-form--review",
+      "titleBox": {
+        "x": 340,
+        "y": 190,
+        "width": 760,
+        "height": 45,
+        "bottom": 235
+      },
+      "descriptionBox": {
+        "x": 340,
+        "y": 247,
+        "width": 760,
+        "height": 25,
+        "bottom": 271
+      },
+      "formBox": {
+        "x": 340,
+        "y": 303,
+        "width": 760,
+        "height": 548,
+        "bottom": 851
+      },
+      "frameBox": {
+        "x": 340,
+        "y": 303,
+        "width": 760,
+        "height": 420,
+        "bottom": 723
+      },
+      "actionsBox": {
+        "x": 340,
+        "y": 739,
+        "width": 760,
+        "height": 112,
+        "bottom": 851
+      },
+      "continueBox": null,
+      "frameScrollHeight": 1276,
+      "frameClientHeight": 420
+    }
+  ]
+}

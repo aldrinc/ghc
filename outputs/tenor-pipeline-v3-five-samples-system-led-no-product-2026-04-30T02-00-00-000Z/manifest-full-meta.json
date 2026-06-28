@@ -1,0 +1,318 @@
+{
+  "createdAt": "2026-04-30T02:03:34.867Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/generated-full-meta",
+  "pipeline": {
+    "metaAdsPath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md",
+    "payloadMode": "system_led_full_meta_ad_context_plus_compliance_constraints"
+  },
+  "workspace": {
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "workspaceName": "Tenor"
+  },
+  "validationIntent": {
+    "sourceCollection": "Default",
+    "productImagesAllowed": false,
+    "mechanismRevealAllowed": false,
+    "creativeGuidanceAddedByOperator": false
+  },
+  "outputs": [
+    {
+      "adId": "AV-A1",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "sourceSwipeTitle": "11.png"
+      },
+      "selectedAd": {
+        "rawMarkdown": "### AD AV-A1 — Contrarian\n**Primary Text:** \"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link]\n**Hook (first 125 chars):** \"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can los (125) PASS\n**Headline:** Normal Isn't Optimal (19 chars)\n**Destination:** advertorial-variant-a.md\n**Hook Type:** Contrarian\n**Format:** Single image — man in his 40s, domestic setting, natural light",
+        "headline": "Normal Isn't Optimal (19 chars)",
+        "primaryText": "\"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link]",
+        "destination": "advertorial-variant-a.md",
+        "hookType": "Contrarian",
+        "format": "Single image — man in his 40s, domestic setting, natural light"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor Daily Drive Essentials",
+        "swipeHook": "Normal Isn't Optimal",
+        "swipeAngle": "Meta ad copy/context from /Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md:\n\n### AD AV-A1 — Contrarian\n**Primary Text:** \"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link]\n**Hook (first 125 chars):** \"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can los (125) PASS\n**Headline:** Normal Isn't Optimal (19 chars)\n**Destination:** advertorial-variant-a.md\n**Hook Type:** Contrarian\n**Format:** Single image — man in his 40s, domestic setting, natural light\n\nCompliance constraints:\n- Do not show the product image or any product object.\n- Do not show bottles, jars, boxes, pouches, labels, supplement facts panels, capsules, pills, powders, scoops, sachets, packaging, price, guarantee, ratings, or purchase/offer cues.\n- Do not reveal the product mechanism or solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the solution works.\n- Do not invent clinical data, patient data, study citations, endorsements, testimonials, lab values, social metrics, names, ages, dates, or URLs beyond the provided Meta ad copy/context.\n- Final destination URL is pending.\n\nRun marker: pipeline-v3-system-led-full-meta-AV-A1-no-product-1777514179893.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "07c9e306-40bf-453a-93fe-fd674a358fba",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-5a6a11bb-fc14-4bf1-b029-5644d2fbc930"
+      },
+      "result": {
+        "workflowRunId": "07c9e306-40bf-453a-93fe-fd674a358fba",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-5a6a11bb-fc14-4bf1-b029-5644d2fbc930",
+        "assetId": "22b91cd7-c57e-4857-8865-496a89c3d5bb",
+        "publicId": "20bf7177-a618-4c97-b236-2e99670c42f5",
+        "publicUrl": "https://api.moshq.app/public/assets/20bf7177-a618-4c97-b236-2e99670c42f5",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/generated-full-meta/av-a1-system-led-full-meta-no-product.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:580cd0b08937c82dc2ceff1bbaacc8c52e4ff8fec116d15f",
+          "asset_ids": [
+            "22b91cd7-c57e-4857-8865-496a89c3d5bb"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/workflow-full-meta-av-a1.json"
+      }
+    },
+    {
+      "adId": "AV-C1",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "sourceSwipeTitle": "Static #2.png"
+      },
+      "selectedAd": {
+        "rawMarkdown": "### AD AV-C1 — Fear\n**Primary Text:** Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link]\n**Hook (first 125 chars):** Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down (125) PASS\n**Headline:** Before You Start TRT (21 chars)\n**Destination:** advertorial-variant-c.md\n**Hook Type:** Fear\n**Format:** Single image — stark medical imagery contrasted with 2 capsules",
+        "headline": "Before You Start TRT (21 chars)",
+        "primaryText": "Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link]",
+        "destination": "advertorial-variant-c.md",
+        "hookType": "Fear",
+        "format": "Single image — stark medical imagery contrasted with 2 capsules"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_founder_authority",
+        "requirementIndex": 1,
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor Daily Drive Essentials",
+        "swipeHook": "Before You Start TRT",
+        "swipeAngle": "Meta ad copy/context from /Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md:\n\n### AD AV-C1 — Fear\n**Primary Text:** Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link]\n**Hook (first 125 chars):** Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down (125) PASS\n**Headline:** Before You Start TRT (21 chars)\n**Destination:** advertorial-variant-c.md\n**Hook Type:** Fear\n**Format:** Single image — stark medical imagery contrasted with 2 capsules\n\nCompliance constraints:\n- Do not show the product image or any product object.\n- Do not show bottles, jars, boxes, pouches, labels, supplement facts panels, capsules, pills, powders, scoops, sachets, packaging, price, guarantee, ratings, or purchase/offer cues.\n- Do not reveal the product mechanism or solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the solution works.\n- Do not invent clinical data, patient data, study citations, endorsements, testimonials, lab values, social metrics, names, ages, dates, or URLs beyond the provided Meta ad copy/context.\n- Final destination URL is pending.\n\nRun marker: pipeline-v3-system-led-full-meta-AV-C1-no-product-1777514258936.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "029d8abb-d23a-4471-bde3-3a6136ebf128",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-0b84fc29-a6b0-457c-864b-230d8c4ade5b"
+      },
+      "result": {
+        "workflowRunId": "029d8abb-d23a-4471-bde3-3a6136ebf128",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-0b84fc29-a6b0-457c-864b-230d8c4ade5b",
+        "assetId": "0f2edb94-5a13-4f98-9e3e-05ff2ca1b416",
+        "publicId": "47a6ea04-0ae0-490f-9fa7-d969a415a048",
+        "publicUrl": "https://api.moshq.app/public/assets/47a6ea04-0ae0-490f-9fa7-d969a415a048",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/generated-full-meta/av-c1-system-led-full-meta-no-product.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:38aaaa39409dcac27237563815083a14431a5faf6cc25ff4",
+          "asset_ids": [
+            "0f2edb94-5a13-4f98-9e3e-05ff2ca1b416"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/workflow-full-meta-av-c1.json"
+      }
+    },
+    {
+      "adId": "L2",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "sourceSwipeTitle": "big_text.jpg"
+      },
+      "selectedAd": {
+        "rawMarkdown": "### AD L2 — Fear\n**Primary Text:** The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link]\n**Hook (first 125 chars):** The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingred (125) PASS\n**Headline:** What Your Label Hid (20 chars)\n**Hook Type:** Fear\n**Format:** Single image — supplement label with \"Proprietary Blend\" circled in red",
+        "headline": "What Your Label Hid (20 chars)",
+        "primaryText": "The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link]",
+        "destination": null,
+        "hookType": "Fear",
+        "format": "Single image — supplement label with \"Proprietary Blend\" circled in red"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor Daily Drive Essentials",
+        "swipeHook": "What Your Label Hid",
+        "swipeAngle": "Meta ad copy/context from /Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md:\n\n### AD L2 — Fear\n**Primary Text:** The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link]\n**Hook (first 125 chars):** The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingred (125) PASS\n**Headline:** What Your Label Hid (20 chars)\n**Hook Type:** Fear\n**Format:** Single image — supplement label with \"Proprietary Blend\" circled in red\n\nCompliance constraints:\n- Do not show the product image or any product object.\n- Do not show bottles, jars, boxes, pouches, labels, supplement facts panels, capsules, pills, powders, scoops, sachets, packaging, price, guarantee, ratings, or purchase/offer cues.\n- Do not reveal the product mechanism or solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the solution works.\n- Do not invent clinical data, patient data, study citations, endorsements, testimonials, lab values, social metrics, names, ages, dates, or URLs beyond the provided Meta ad copy/context.\n- Final destination URL is pending.\n\nRun marker: pipeline-v3-system-led-full-meta-L2-no-product-1777514325916.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "b3de72e1-1cfb-45cd-951f-950526747f52",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-f4f901c6-14bf-40d2-a924-e1b7eb249e48"
+      },
+      "result": {
+        "workflowRunId": "b3de72e1-1cfb-45cd-951f-950526747f52",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-f4f901c6-14bf-40d2-a924-e1b7eb249e48",
+        "assetId": "f8fc7063-07e5-4722-93cc-908e34acad3f",
+        "publicId": "ca9320f0-b6b5-41e1-8ceb-9d3b302e8096",
+        "publicUrl": "https://api.moshq.app/public/assets/ca9320f0-b6b5-41e1-8ceb-9d3b302e8096",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/generated-full-meta/l2-system-led-full-meta-no-product.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:db30c2dc635c9b7fc1f72c7877a920035a7326d7cf21cfb5",
+          "asset_ids": [
+            "f8fc7063-07e5-4722-93cc-908e34acad3f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/workflow-full-meta-l2.json"
+      }
+    },
+    {
+      "adId": "L8",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "sourceSwipeTitle": "fatigue.jpg"
+      },
+      "selectedAd": {
+        "rawMarkdown": "### AD L8 — Desire\n**Primary Text:** Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link]\n**Hook (first 125 chars):** Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coff (125) PASS\n**Headline:** Just You, Restored (17 chars)\n**Hook Type:** Desire\n**Format:** Single image — man mid-40s, engaged, domestic setting, heavy shadow",
+        "headline": "Just You, Restored (17 chars)",
+        "primaryText": "Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link]",
+        "destination": null,
+        "hookType": "Desire",
+        "format": "Single image — man mid-40s, engaged, domestic setting, heavy shadow"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor Daily Drive Essentials",
+        "swipeHook": "Just You, Restored",
+        "swipeAngle": "Meta ad copy/context from /Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md:\n\n### AD L8 — Desire\n**Primary Text:** Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link]\n**Hook (first 125 chars):** Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coff (125) PASS\n**Headline:** Just You, Restored (17 chars)\n**Hook Type:** Desire\n**Format:** Single image — man mid-40s, engaged, domestic setting, heavy shadow\n\nCompliance constraints:\n- Do not show the product image or any product object.\n- Do not show bottles, jars, boxes, pouches, labels, supplement facts panels, capsules, pills, powders, scoops, sachets, packaging, price, guarantee, ratings, or purchase/offer cues.\n- Do not reveal the product mechanism or solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the solution works.\n- Do not invent clinical data, patient data, study citations, endorsements, testimonials, lab values, social metrics, names, ages, dates, or URLs beyond the provided Meta ad copy/context.\n- Final destination URL is pending.\n\nRun marker: pipeline-v3-system-led-full-meta-L8-no-product-1777514394603.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "9058f01e-3711-4003-bbd2-d86a9a557677",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-c1888207-4a9f-491b-9a3f-0c8fc2fd4580"
+      },
+      "result": {
+        "workflowRunId": "9058f01e-3711-4003-bbd2-d86a9a557677",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-c1888207-4a9f-491b-9a3f-0c8fc2fd4580",
+        "assetId": "17e40d63-cd28-4163-9ae1-8bc322e2a113",
+        "publicId": "a1be2237-289b-4e18-9771-454905081173",
+        "publicUrl": "https://api.moshq.app/public/assets/a1be2237-289b-4e18-9771-454905081173",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/generated-full-meta/l8-system-led-full-meta-no-product.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:5010bb3bc74d6d6b579dff7c97d048f100bac2a75ec0ec35",
+          "asset_ids": [
+            "17e40d63-cd28-4163-9ae1-8bc322e2a113"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/workflow-full-meta-l8.json"
+      }
+    },
+    {
+      "adId": "PDP2",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "sourceSwipeTitle": "fb_message_ad.jpg"
+      },
+      "selectedAd": {
+        "rawMarkdown": "### AD PDP2 — Social Proof\n**Primary Text:** \"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link]\n**Hook (first 125 chars):** \"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three (125) PASS\n**Headline:** \"I Knew I Wasn't Going Back\" (30 chars)\n**Hook Type:** Social Proof\n**Format:** Single image — testimonial quote card, brand colors",
+        "headline": "\"I Knew I Wasn't Going Back\" (30 chars)",
+        "primaryText": "\"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link]",
+        "destination": null,
+        "hookType": "Social Proof",
+        "format": "Single image — testimonial quote card, brand colors"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_founder_authority",
+        "requirementIndex": 0,
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor Daily Drive Essentials",
+        "swipeHook": "\"I Knew I Wasn't Going Back\"",
+        "swipeAngle": "Meta ad copy/context from /Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md:\n\n### AD PDP2 — Social Proof\n**Primary Text:** \"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link]\n**Hook (first 125 chars):** \"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three (125) PASS\n**Headline:** \"I Knew I Wasn't Going Back\" (30 chars)\n**Hook Type:** Social Proof\n**Format:** Single image — testimonial quote card, brand colors\n\nCompliance constraints:\n- Do not show the product image or any product object.\n- Do not show bottles, jars, boxes, pouches, labels, supplement facts panels, capsules, pills, powders, scoops, sachets, packaging, price, guarantee, ratings, or purchase/offer cues.\n- Do not reveal the product mechanism or solution mechanics: no ingredient list, dosage, protocol architecture, hormone pathway, biological system diagram, comparison grid, checklist, or explanation of how the solution works.\n- Do not invent clinical data, patient data, study citations, endorsements, testimonials, lab values, social metrics, names, ages, dates, or URLs beyond the provided Meta ad copy/context.\n- Final destination URL is pending.\n\nRun marker: pipeline-v3-system-led-full-meta-PDP2-no-product-1777514462454.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "26ca63d6-1c27-42fd-a09f-76653d556374",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-29606bfc-639a-4ba7-b5bd-eb023f07d662"
+      },
+      "result": {
+        "workflowRunId": "26ca63d6-1c27-42fd-a09f-76653d556374",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-29606bfc-639a-4ba7-b5bd-eb023f07d662",
+        "assetId": "e438df1e-f7a4-4541-b83c-3f790c2ca8cb",
+        "publicId": "763bd647-1a40-4443-a9b6-5d16b4a96a5c",
+        "publicUrl": "https://api.moshq.app/public/assets/763bd647-1a40-4443-a9b6-5d16b4a96a5c",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/generated-full-meta/pdp2-system-led-full-meta-no-product.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:b2fd5d65c10072b30d68805b30ef6cf327e00d4fc78a021e",
+          "asset_ids": [
+            "e438df1e-f7a4-4541-b83c-3f790c2ca8cb"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-system-led-no-product-2026-04-30T02-00-00-000Z/workflow-full-meta-pdp2.json"
+      }
+    }
+  ]
+}

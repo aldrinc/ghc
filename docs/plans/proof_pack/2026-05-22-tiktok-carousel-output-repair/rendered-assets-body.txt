@@ -1,0 +1,142 @@
+A
+Aurora Sleep Lab E2E Final 202605220030
+Workspace
+Strategy complete — ready to launch
+Workspace
+Overview
+Strategy
+Brand
+Sites
+Commerce
+Products
+Research
+Documents
+Ads & Brands
+Funnels
+Execution
+Campaigns
+Analytics
+Postiz
+Social Agents
+AI
+Assistant Chat
+Assets
+Creative Library
+Meta Ads
+Aldrin Clement
+aldrin.clement@gmail.com
+Toggle Sidebar
+Workspaces
+Social Agents
+Workspace Product
+Select workspace product
+LumaRest Magnesium Cocoa
+Social Agents
+
+Connected social and TikTok carousel workflows for Aurora Sleep Lab E2E Final 202605220030.
+
+Postiz
+Postiz needs channels
+0 channels, 0 profiles. Posting stays in Postiz.
+Agent authority
+0 pending proposals.
+Growth loops
+2 programs, 1 variants in selected loop.
+TikTok Carousel
+Connected Social
+Action Queue
+Program
+
+Create the experiment container and conversion target.
+
+Select program
+Chrome E2E 2026-05-22T18-55-56-288Z Carousel Loop
+Chrome Smoke TikTok Carousel Loop
+Create Program
+Conversion Source
+Add Source
+Experiment And Variant
+Create Experiment
+Create Six-Slide Variant
+Draft Output Preview
+6/6 slides
+POV: your routine looks calm
+but your brain missed the memo
+SLIDE 1
+HOOK
+You tried every fix
+and still end the day wired
+SLIDE 2
+PROBLEM
+So I tried a cleaner
+wind-down loop
+SLIDE 3
+DISCOVERY
+Wait...
+this actually feels doable?
+SLIDE 4
+TRANSFORMATION
+Okay I'm obsessed
+with this reset
+SLIDE 5
+ESCALATION
+Try the app
+link in bio
+SLIDE 6
+CTA
+Rendered PNG Assets
+
+Burn final overlay text into six 9:16 source images before handing media to Postiz.
+
+6/6 source images
+Generate Source Images
+Render Six PNG Assets
+Use Rendered Assets In Handoff
+Slide 1
+Download PNG
+Slide 2
+Download PNG
+Slide 3
+Download PNG
+Slide 4
+Download PNG
+Slide 5
+Download PNG
+Slide 6
+Download PNG
+Postiz Handoff
+Draft
+Schedule
+Now
+No synced channels
+Approve Variant
+Media URLs: 0/6
+Create Postiz Handoff
+Selected Loop
+Chrome E2E 2026-05-22T18-55-56-288Z Carousel Loop
+Validate local Chrome end-to-end Social Agents flow.
+draft
+2 conversion sources
+1 experiments
+Latest Variant
+Chrome E2E 2026-05-22T18-55-56-288Z Carousel
+approved
+6 slides
+Chrome E2E 2026-05-22T18-55-56-288Z slide 1
+SLIDE 1
+HOOK
+Chrome E2E 2026-05-22T18-55-56-288Z slide 2
+SLIDE 2
+PROOF
+Chrome E2E 2026-05-22T18-55-56-288Z slide 3
+SLIDE 3
+PROOF
+Chrome E2E 2026-05-22T18-55-56-288Z slide 4
+SLIDE 4
+PROOF
+Chrome E2E 2026-05-22T18-55-56-288Z slide 5
+SLIDE 5
+PROOF
+Chrome E2E 2026-05-22T18-55-56-288Z slide 6
+SLIDE 6
+CTA

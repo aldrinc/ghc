@@ -75,6 +75,74 @@ def test_strategy_v2_workflow_does_not_execute_precanon_child(monkeypatch) -> No
     assert ("execute_activity", "build_strategy_v2_foundational_research_activity") in calls
 
 
+def test_strategy_v2_foundation_only_finishes_after_foundational_bundle(monkeypatch) -> None:
+    calls: list[tuple[str, str]] = []
+
+    async def _fake_execute_activity(activity_fn, payload, **_kwargs):  # noqa: ANN001, ANN003
+        activity_name = getattr(activity_fn, "__name__", str(activity_fn))
+        calls.append(("execute_activity", activity_name))
+        if activity_name == "check_strategy_v2_enabled_activity":
+            return {"enabled": True}
+        if activity_name == "ensure_strategy_v2_workflow_run_activity":
+            return {"workflow_run_id": "strategy-v2-run-id"}
+        if activity_name == "build_strategy_v2_stage0_activity":
+            return {
+                "stage0": _stage0_payload(),
+                "stage0_artifact_id": "artifact-stage0",
+                "step_payload_artifact_id": "artifact-step-v2-01",
+            }
+        if activity_name == "build_strategy_v2_foundational_research_activity":
+            assert payload["foundation_only"] is True
+            return {
+                "stage1": None,
+                "stage1_artifact_id": None,
+                "precanon_research": {
+                    "step_summaries": {"01": "summary"},
+                    "step_contents": {"01": "content", "03": "content", "04": "content"},
+                },
+                "step_payload_artifact_ids": {
+                    "v2-02.foundation.01": "artifact-foundation-01",
+                    "v2-02.foundation.03": "artifact-foundation-03",
+                    "v2-02.foundation.04": "artifact-foundation-04",
+                },
+            }
+        if activity_name == "persist_strategy_v2_foundation_bundle_activity":
+            assert payload["stage0_artifact_id"] == "artifact-stage0"
+            assert payload["stage1"] is None
+            assert payload["stage1_artifact_id"] is None
+            return {"foundation_bundle_artifact_id": "artifact-foundation-bundle"}
+        raise AssertionError(f"Unexpected activity call: {activity_name}")
+
+    async def _fake_wait_condition(*_args, **_kwargs):  # noqa: ANN003
+        raise AssertionError("Foundation-only setup must not wait for an operator signal.")
+
+    class _Info:
+        workflow_id = "strategy-v2-workflow-id"
+        run_id = "strategy-v2-run-id"
+
+    monkeypatch.setattr(strategy_v2_workflow_module.workflow, "execute_activity", _fake_execute_activity)
+    monkeypatch.setattr(strategy_v2_workflow_module.workflow, "wait_condition", _fake_wait_condition)
+    monkeypatch.setattr(strategy_v2_workflow_module.workflow, "info", lambda: _Info())
+
+    result = asyncio.run(
+        StrategyV2Workflow().run(
+            StrategyV2Input(
+                org_id="org-1",
+                client_id="client-1",
+                product_id="product-1",
+                onboarding_payload_id="payload-1",
+                operator_user_id="operator-1",
+                foundation_only=True,
+            )
+        )
+    )
+
+    assert result["status"] == "foundation_complete"
+    assert result["artifact_refs"]["foundation_bundle_artifact_id"] == "artifact-foundation-bundle"
+    assert ("execute_activity", "persist_strategy_v2_foundation_bundle_activity") in calls
+    assert ("execute_activity", "prepare_strategy_v2_competitor_asset_candidates_activity") not in calls
+
+
 def test_strategy_v2_workflow_stage2b_runs_as_checkpoint_activities(monkeypatch) -> None:
     calls: list[str] = []
 

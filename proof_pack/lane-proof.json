@@ -1,0 +1,101 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Native sub-agents were blocked by active tool policy; local parallel reads and source capture were used while main thread owned implementation.",
+  "lanes": [
+    {
+      "lane_id": "source_capture",
+      "objective": "Capture official RAGFlow API and supported model documentation used for implementation.",
+      "role": "source capture",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-27T15:58:51Z",
+      "ended_at": "2026-05-27T15:58:51Z",
+      "read_scope": [
+        "https://github.com/infiniflow/ragflow"
+      ],
+      "write_scope": [
+        "captures/ragflow-bge-m3-retrieval"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/source_manifest.json"
+      ],
+      "summary": "RAGFlow HTTP API and model-support docs were captured and verified."
+    },
+    {
+      "lane_id": "repo_inspection",
+      "objective": "Find existing provider-specific retrieval and chat patterns before editing.",
+      "role": "explorer",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-27T15:58:51Z",
+      "ended_at": "2026-05-27T15:58:51Z",
+      "read_scope": [
+        "mos/backend/app/routers",
+        "mos/backend/app/services",
+        "mos/backend/tests"
+      ],
+      "write_scope": [],
+      "artifacts": [
+        "ragflow-bge-m3-retrieval/repo-inspection.md"
+      ],
+      "summary": "Existing Gemini and Claude assistant surfaces showed the local pattern to mirror."
+    },
+    {
+      "lane_id": "implementation",
+      "objective": "Add RAGFlow retrieval service, endpoints, config, and docs without touching Gemini or Claude behavior.",
+      "role": "main implementation",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-27T15:58:51Z",
+      "ended_at": "2026-05-27T15:58:51Z",
+      "read_scope": [
+        "mos/backend"
+      ],
+      "write_scope": [
+        "mos/backend/app/services/ragflow_retrieval.py",
+        "mos/backend/app/routers/ragflow.py",
+        "mos/backend/app/config.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/routers/__init__.py",
+        "mos/backend/.env.example",
+        "mos/backend/tests/test_ragflow_retrieval.py"
+      ],
+      "artifacts": [
+        "ragflow-bge-m3-retrieval/implementation-summary.md"
+      ],
+      "summary": "Parallel RAGFlow retrieval path was added with explicit config and no provider fallback."
+    },
+    {
+      "lane_id": "verification",
+      "objective": "Run focused tests, compile checks, lint checks, source manifest verification, and provenance checks.",
+      "role": "verification",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-27T15:58:51Z",
+      "ended_at": "2026-05-27T15:58:51Z",
+      "read_scope": [
+        "mos/backend/tests",
+        "proof_pack",
+        "captures/ragflow-bge-m3-retrieval"
+      ],
+      "write_scope": [
+        "proof_pack"
+      ],
+      "artifacts": [
+        "ragflow-bge-m3-retrieval/verification-summary.md"
+      ],
+      "summary": "Focused RAGFlow tests, app API smoke tests, compile checks, lint checks, source manifest verify, and provenance check passed."
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main",
+    "summary": "Main thread integrated source, implementation, and verification lanes. No overlapping write ownership conflicts."
+  },
+  "token_time_proxy": {
+    "native_subagents": "blocked_by_tool_policy",
+    "local_parallel_tools": "used_for_reads_and_source_capture",
+    "verification": "focused_backend_tests_and_contract_checks"
+  }
+}

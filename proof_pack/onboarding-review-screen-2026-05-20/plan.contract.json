@@ -1,0 +1,379 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-20-onboarding-review-screen-redesign-plan",
+  "created_at": "2026-05-20T23:18:06.241546+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/onboarding-review-screen-2026-05-20",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Add read-only review helpers for labels, display values, attention items, pricing state, and competitor URL display.",
+      "source_line": 64,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/onboarding/FirstRunShell.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+        "proof_pack/onboarding-review-screen-2026-05-20"
+      ],
+      "acceptance": [
+        "Review state can derive readable values for workspace, offer, pricing, and competitors without editable controls.",
+        "Missing required fields and optional pricing gaps are modeled separately."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-onboarding-wizard-test.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-build.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/lane-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/plan-gate-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/index.html",
+        "proof_pack/onboarding-review-screen-2026-05-20/onboarding-review-screen.png"
+      ],
+      "notes": "Implemented and verified in the onboarding review screen ship loop."
+    },
+    {
+      "id": "P02",
+      "objective": "Replace default review form with read-only sections and a top attention area.",
+      "source_line": 65,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/onboarding/FirstRunShell.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+        "proof_pack/onboarding-review-screen-2026-05-20"
+      ],
+      "acceptance": [
+        "Review heading is Review workspace.",
+        "Default review mode shows attention items, compact changes, and grouped label/value sections.",
+        "Default review mode does not render business, offer, pricing, or competitor editable controls."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-onboarding-wizard-test.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-build.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/lane-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/plan-gate-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/index.html",
+        "proof_pack/onboarding-review-screen-2026-05-20/onboarding-review-screen.png"
+      ],
+      "notes": "Implemented and verified in the onboarding review screen ship loop."
+    },
+    {
+      "id": "P03",
+      "objective": "Add focused edit views for workspace, offer, pricing, competitors, and all details.",
+      "source_line": 66,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/onboarding/FirstRunShell.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+        "proof_pack/onboarding-review-screen-2026-05-20"
+      ],
+      "acceptance": [
+        "Section edit actions expose only relevant controls.",
+        "Edit all details exposes the existing full editable field set.",
+        "Done returns to the read-only review screen."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-onboarding-wizard-test.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-build.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/lane-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/plan-gate-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/index.html",
+        "proof_pack/onboarding-review-screen-2026-05-20/onboarding-review-screen.png"
+      ],
+      "notes": "Implemented and verified in the onboarding review screen ship loop."
+    },
+    {
+      "id": "P04",
+      "objective": "Preserve existing create-workspace payload behavior and existing/new business paths.",
+      "source_line": 67,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/onboarding/FirstRunShell.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+        "proof_pack/onboarding-review-screen-2026-05-20"
+      ],
+      "acceptance": [
+        "Existing-business extraction review still reaches workspace creation.",
+        "New service setup still submits without requiring price.",
+        "Create workspace remains disabled when required fields are incomplete."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-onboarding-wizard-test.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-build.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/lane-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/plan-gate-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/index.html",
+        "proof_pack/onboarding-review-screen-2026-05-20/onboarding-review-screen.png"
+      ],
+      "notes": "Implemented and verified in the onboarding review screen ship loop."
+    },
+    {
+      "id": "P05",
+      "objective": "Update tests to assert read-only review by default and explicit editing.",
+      "source_line": 68,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/onboarding/FirstRunShell.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+        "proof_pack/onboarding-review-screen-2026-05-20"
+      ],
+      "acceptance": [
+        "Targeted OnboardingWizard tests cover existing review read-only state.",
+        "Targeted tests cover explicit edit flow and service no-price submit."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-onboarding-wizard-test.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/frontend-build.log",
+        "proof_pack/onboarding-review-screen-2026-05-20/logs/browser-smoke.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/lane-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/plan-gate-proof.json",
+        "proof_pack/onboarding-review-screen-2026-05-20/index.html",
+        "proof_pack/onboarding-review-screen-2026-05-20/onboarding-review-screen.png"
+      ],
+      "notes": "Implemented and verified in the onboarding review screen ship loop."
+    },
+    {
+      "id": "P06",
+      "objective": "Tighten competitor helper copy and restyle shared toasts to match the filled status-surface design.",
+      "source_line": 69,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/ui/toast.tsx",
+        "mos/frontend/src/components/ui/toast.test.tsx",
+        "proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy"
+      ],
+      "acceptance": [
+        "Competitor helper text reads exactly One per line without the leave-blank sentence or trailing period.",
+        "Shared toasts render as filled status surfaces with icon, close control, 12px radius, and status-specific color.",
+        "Toast tests cover filled success and persistent loading surfaces.",
+        "Browser QA captures the competitor copy and toast visual state."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm test -- --run src/components/clients/OnboardingWizard.test.tsx src/components/ui/toast.test.tsx",
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy/toast-competitor-copy-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy/competitor-copy.png",
+        "proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy/toast-info.png",
+        "proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy/toast-competitor-copy-qa.json"
+      ],
+      "notes": "Follow-up polish requested after the onboarding layout pass."
+    },
+    {
+      "id": "P07",
+      "objective": "Align the onboarding simple-step progress rail, title, form controls, and CTA to one desktop measure.",
+      "source_line": 70,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/styles/design-system.css",
+        "proof_pack/onboarding-review-screen-2026-05-20/width-alignment"
+      ],
+      "acceptance": [
+        "The workspace-name step uses one 720px desktop column for progress, title, input, and Continue button.",
+        "The form is wider than the prior 640px cap but does not exceed the shared onboarding column.",
+        "Browser QA records matching widths for progress, title, form, input, and CTA."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/width-alignment/width-alignment-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/width-alignment/workspace-width-alignment.png",
+        "proof_pack/onboarding-review-screen-2026-05-20/width-alignment/width-alignment-qa.json"
+      ],
+      "notes": "Follow-up desktop alignment fix requested after the toast/copy polish."
+    },
+    {
+      "id": "P08",
+      "objective": "Shorten competitor page subtitle and replace internal client terminology in create/update toasts.",
+      "source_line": 71,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/api/clients.ts",
+        "mos/frontend/src/components/ui/toast.tsx",
+        "mos/frontend/src/components/ui/toast.test.tsx",
+        "mos/frontend/src/pages/dev/ComponentReviewPage.tsx",
+        "proof_pack/onboarding-review-screen-2026-05-20/copy-toast-alignment"
+      ],
+      "acceptance": [
+        "Competitor step subtitle reads exactly Optional.",
+        "Workspace creation/update toasts use workspace terminology instead of client terminology.",
+        "Title-only toast rows vertically center icon, title, and close control.",
+        "Tests cover competitor subtitle copy and title-only toast alignment."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm test -- --run src/components/clients/OnboardingWizard.test.tsx src/components/ui/toast.test.tsx",
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/copy-toast-alignment/copy-toast-alignment-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/copy-toast-alignment/workspace-created-toast.png",
+        "proof_pack/onboarding-review-screen-2026-05-20/copy-toast-alignment/copy-toast-alignment-qa.json"
+      ],
+      "notes": "Follow-up terminology and alignment polish requested from visual review."
+    },
+    {
+      "id": "P09",
+      "objective": "Update the setup success screen copy, ETA messaging, mOS agent language, and compact no-scroll layout.",
+      "source_line": 72,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/styles/design-system.css",
+        "proof_pack/onboarding-review-screen-2026-05-20/setup-success-screen"
+      ],
+      "acceptance": [
+        "Success title reads Setting up your workspace.",
+        "Success copy and summary show estimated time up to 20 minutes and email notification when ready.",
+        "Checklist uses mOS agent language, includes foundational docs, and removes the final Marketing agent ready step.",
+        "CTA reads Open workspace and keeps navigating into the workspace overview.",
+        "Success shell uses an 860px max desktop measure with wider title and description text."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm test -- --run src/components/clients/OnboardingWizard.test.tsx src/components/ui/toast.test.tsx",
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/setup-success-screen/setup-success-screen-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/setup-success-screen/setup-success-screen-qa.json"
+      ],
+      "notes": "Follow-up setup completion screen copy and layout polish requested from visual review."
+    },
+    {
+      "id": "P10",
+      "objective": "Disable onboarding primary action buttons until the current form step is valid.",
+      "source_line": 73,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "proof_pack/onboarding-review-screen-2026-05-20/disabled-actions"
+      ],
+      "acceptance": [
+        "Continue is disabled on required input steps until the required value is present.",
+        "URL-driven Continue actions stay disabled when URL input is invalid and enable for blank optional competitor fields.",
+        "Create workspace uses the same full-step validity gate as submit validation.",
+        "Review edit Done is disabled when required review fields are cleared.",
+        "Regression tests cover disabled empty input, invalid URL, and review edit Done behavior."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm test -- --run src/components/clients/OnboardingWizard.test.tsx src/components/ui/toast.test.tsx",
+        "test -f proof_pack/onboarding-review-screen-2026-05-20/disabled-actions/disabled-actions-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-review-screen-2026-05-20/disabled-actions/disabled-actions-qa.json"
+      ],
+      "notes": "Follow-up disabled-state validation requested for onboarding buttons."
+    }
+  ],
+  "global_verify_commands": [
+    "cd mos/frontend && npm test -- --run src/components/clients/OnboardingWizard.test.tsx src/components/ui/toast.test.tsx",
+    "cd mos/frontend && npm run build",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/layout-spacing-qa.json",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/auto-advance-layout-qa.json",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/desktop-layout-modes/desktop-layout-modes-qa.json",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy/toast-competitor-copy-qa.json",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/width-alignment/width-alignment-qa.json",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/copy-toast-alignment/copy-toast-alignment-qa.json",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/setup-success-screen/setup-success-screen-qa.json",
+    "test -f proof_pack/onboarding-review-screen-2026-05-20/disabled-actions/disabled-actions-qa.json",
+    "/Users/aldrinclement/.codex/bin/plangatecheck proof_pack/onboarding-review-screen-2026-05-20/plan-gate-proof.json",
+    "/Users/aldrinclement/.codex/bin/lanecheck proof_pack/onboarding-review-screen-2026-05-20/lane-proof.json"
+  ],
+  "global_acceptance": [
+    "Review/edit split implemented without backend payload changes.",
+    "Onboarding heading uses Libre Baskerville at a smaller scale, action divider is removed, and dense/review steps stay inside a stable frame.",
+    "Single-select-only wizard steps auto-advance, input steps keep Continue as the main footer action, and wizard Back is in the header rather than below Continue.",
+    "Desktop simple-input steps use a compact content-relative form while choice and review steps keep the larger stable frame.",
+    "Competitor helper copy is shortened and shared toasts use filled status surfaces matching the provided design direction.",
+    "Simple onboarding steps align progress, title, form fields, and CTA to one 720px desktop measure.",
+    "Competitor subtitle is Optional, workspace toasts avoid internal client terminology, and title-only toasts center their icon/text row.",
+    "Setup success screen explains setup is running, shows up to 20 minutes, uses mOS agent language, removes the final ready step, and opens the workspace.",
+    "Onboarding Continue/Create/Done primary actions remain disabled until the current step validation passes.",
+    "Targeted tests and frontend build pass.",
+    "Plan gate, lane gate, and planctl verification pass."
+  ]
+}

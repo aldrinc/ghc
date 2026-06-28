@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-20T20:35:24Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "docs/plans/2026-05-20-mos-design-system-migration-plan.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user supplied the source file, the target system, the scope, the hard brand exclusion, and the refinement: remove borrowed names such as Manus, prefer branded/neutral naming, and refactor outright instead of preserving aliases because the product is pre-user. Repo inspection supplied the implementation surface. No decision-critical question is required before plan-only output.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/goal.md",
+      "summary": "Measurable migration goal with brand exclusion."
+    },
+    "problem_log": {
+      "path": "planning/problem-log.md",
+      "summary": "Observable mismatch between new reference and current token/component/naming system."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/root-cause.md",
+      "summary": "Design reference has not become a repo-native token, primitive, naming, and verification system."
+    },
+    "current_machine": {
+      "path": "planning/current-machine.md",
+      "summary": "Current token/component/page workflow and failure point."
+    },
+    "designed_machine": {
+      "path": "planning/designed-machine.md",
+      "summary": "Target source-to-naming-contract-to-token-to-primitive-to-page workflow."
+    },
+    "worst_day_test": {
+      "path": "planning/worst-day.md",
+      "summary": "Stress test for dirty files, stale auth, borrowed-name breakage, and brand ambiguity."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/metrics.md",
+      "summary": "Execution and outcome metrics."
+    },
+    "owner_date_review": {
+      "path": "planning/owner-review.md",
+      "summary": "Owner, date, and review point."
+    },
+    "stop_condition": {
+      "path": "planning/stop-condition.md",
+      "summary": "Plan-only and implementation stop conditions."
+    }
+  },
+  "owner": "Codex main agent",
+  "review_date": "2026-05-21",
+  "stop_condition": "Plan is final only after plangatecheck passes; implementation starts only after the user says Ship the plan."
+}

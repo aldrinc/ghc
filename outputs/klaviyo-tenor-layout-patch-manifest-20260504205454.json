@@ -1,0 +1,145 @@
+{
+  "created_at": "2026-05-04T20:55:12.168Z",
+  "flow_id": "Vy4zyb",
+  "saved": [
+    {
+      "sequence": "01",
+      "template_id": "RhsKJf",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 01 - It's not just you",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 3772
+    },
+    {
+      "sequence": "02",
+      "template_id": "YtahLb",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 02 - Three things that fall together",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4357
+    },
+    {
+      "sequence": "03",
+      "template_id": "SsRAC7",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 03 - 21 ingredients, zero secrets",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 3862
+    },
+    {
+      "sequence": "04",
+      "template_id": "W3HmD5",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 04 - The Triad most men don't know exists",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4369
+    },
+    {
+      "sequence": "05",
+      "template_id": "RPQxZu",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 05 - The protocol, the guarantee, and the math",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4376
+    },
+    {
+      "sequence": "06",
+      "template_id": "SZfnTk",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Conditional 06 - The question most men don't ask until later",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4659
+    },
+    {
+      "sequence": "07",
+      "template_id": "RKdhE6",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Conditional 07 - A question",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4366
+    }
+  ],
+  "flow": [
+    {
+      "action_id": "105690567",
+      "sequence": "01",
+      "source_template_id": "RhsKJf",
+      "cloned_template_id": "QWhdFB",
+      "subject": "It's not just you",
+      "status": "draft",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 3772
+    },
+    {
+      "action_id": "105690569",
+      "sequence": "02",
+      "source_template_id": "YtahLb",
+      "cloned_template_id": "SE5QQG",
+      "subject": "Three things that fall together",
+      "status": "draft",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4357
+    },
+    {
+      "action_id": "105690571",
+      "sequence": "03",
+      "source_template_id": "SsRAC7",
+      "cloned_template_id": "Rq3KBs",
+      "subject": "21 ingredients, zero secrets",
+      "status": "draft",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 3862
+    },
+    {
+      "action_id": "105690573",
+      "sequence": "04",
+      "source_template_id": "W3HmD5",
+      "cloned_template_id": "XWJf2K",
+      "subject": "The Triad most men don't know exists",
+      "status": "draft",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4369
+    },
+    {
+      "action_id": "105690576",
+      "sequence": "05",
+      "source_template_id": "RPQxZu",
+      "cloned_template_id": "XS6YFm",
+      "subject": "The protocol, the guarantee, and the math",
+      "status": "draft",
+      "has_standard_header": true,
+      "has_internal_compliance_note": false,
+      "has_broken_reply_button": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4376
+    }
+  ],
+  "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-email-layout-preview-20260504205454.html",
+  "failures": []
+}

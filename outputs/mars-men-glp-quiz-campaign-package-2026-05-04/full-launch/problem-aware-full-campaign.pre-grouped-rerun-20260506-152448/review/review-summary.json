@@ -1,0 +1,26 @@
+{
+  "manifestPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/problem-aware-full-manifest.json",
+  "reviewDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/review",
+  "contactSheets": {
+    "contact-tenor-glp.jpg": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/review/contact-tenor-glp.jpg",
+    "contact-tenor-quiz.jpg": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/review/contact-tenor-quiz.jpg",
+    "contact-curated-glp.jpg": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/review/contact-curated-glp.jpg",
+    "contact-curated-quiz.jpg": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/review/contact-curated-quiz.jpg",
+    "contact-all.jpg": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/review/contact-all.jpg"
+  },
+  "counts": {
+    "total": 83,
+    "glp": 43,
+    "quiz": 40,
+    "tenorPackage": 23,
+    "standardCurated": 60,
+    "gptImage2": 23,
+    "nanoBananaFallback": 60
+  },
+  "imageQualityCheck": {
+    "checked": 83,
+    "blankishDetected": 0,
+    "minStddevMean": 36.784551423956934
+  },
+  "curatedNoProductRevealPolicy": "Curated source product-reveal policy:\nDo not show the Tenor product, Daily Drive Essentials packaging, bottles, capsules, labels, Supplement Facts panels, checkout/product-page imagery, or any product reference image in the generated image.\nKeep the image problem-aware and non-product-facing while preserving the selected swipe composition."
+}

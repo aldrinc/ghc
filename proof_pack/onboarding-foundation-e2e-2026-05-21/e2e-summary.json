@@ -1,0 +1,40 @@
+{
+  "status": "pass_with_parent_status_fix_applied",
+  "workspace": {
+    "client_id": "33cfaf6c-efb5-40db-9e72-bc16b8fc8df0",
+    "client_name": "Aurora Sleep Lab E2E Final 202605220030",
+    "product_id": "304d295c-4edd-4593-8b96-55bded3d3678",
+    "product_name": "LumaRest Magnesium Cocoa"
+  },
+  "workflow": {
+    "strategy_workflow_run_id": "2b6d775c-528c-46b9-92ca-05f869dbedf6",
+    "strategy_temporal_status": "COMPLETED",
+    "strategy_db_status": "completed",
+    "strategy_runtime": "26m41.31s",
+    "client_onboarding_temporal_status": "COMPLETED",
+    "client_onboarding_db_status_observed_before_patch": "running",
+    "client_onboarding_status_fix": "Parent workflow now waits for Strategy V2 and marks the client_onboarding DB run completed or failed."
+  },
+  "foundation_artifacts": {
+    "foundation_research_bundle": "639b11f1-7bb2-41f0-8e3e-143a4457e453",
+    "present_step_keys": [
+      "v2-02.foundation.01",
+      "v2-02.foundation.03",
+      "v2-02.foundation.04"
+    ],
+    "missing_step_keys": [],
+    "step06_present": false,
+    "stage1_artifact_id": null
+  },
+  "ui": {
+    "submitted_wait_screen": "screenshots/46-final-success-wait-progress.png",
+    "final_ready_screen": "screenshots/47-final-foundation-ready.png",
+    "final_url": "http://localhost:5275/workspaces/foundation-ready",
+    "final_heading": "Foundation complete"
+  },
+  "validation": {
+    "py_compile": "pass",
+    "pytest": "6 passed",
+    "git_diff_check": "pass"
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "generated_at": "2026-05-24T21:50:39.461Z",
+  "evidence": {
+    "source_manifest": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/source/source_manifest.json",
+    "run_summary": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/run-summary.json"
+  },
+  "workspace_name": "Peptide Price Store 2026-05-24 21:00",
+  "source_url": "https://peptideprice.store/",
+  "client_id": "e4eac211-7731-4bce-8342-29c91dedac1f",
+  "product_id": "09d64965-9811-4d5d-be67-f32cc9933d7b",
+  "strategy_workflow_run_id": "89d728c3-38ab-47ca-bbca-fd59ce3491dd",
+  "foundation_step_keys": [
+    "v2-02.foundation.01",
+    "v2-02.foundation.03",
+    "v2-02.foundation.04"
+  ],
+  "files": [
+    {
+      "rel": "index.html",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/index.html",
+      "bytes": 95860
+    },
+    {
+      "rel": "artifact-manifest.json",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/artifact-manifest.json",
+      "bytes": 3765
+    },
+    {
+      "rel": "plan.contract.json",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/plan.contract.json",
+      "bytes": 13289
+    },
+    {
+      "rel": "planctl-repair.json",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/planctl-repair.json",
+      "bytes": 5180
+    },
+    {
+      "rel": "provenance-check.json",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/provenance-check.json",
+      "bytes": 13232
+    },
+    {
+      "rel": "videos/peptideprice-foundational-onboarding-full.webm",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/peptideprice-foundational-onboarding-full.webm",
+      "bytes": 65705204
+    },
+    {
+      "rel": "videos/peptideprice-foundational-onboarding.webm",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/peptideprice-foundational-onboarding.webm",
+      "bytes": 65117268
+    },
+    {
+      "rel": "videos/part-2-ui-download.webm",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/videos/part-2-ui-download.webm",
+      "bytes": 588403
+    },
+    {
+      "rel": "downloads/peptideprice-foundational-docs.zip",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/downloads/peptideprice-foundational-docs.zip",
+      "bytes": 35374
+    },
+    {
+      "rel": "downloads/foundational-docs/v2-02.foundation.01-strategy-v2-foundational-step-01-raw-output.md",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/downloads/foundational-docs/v2-02.foundation.01-strategy-v2-foundational-step-01-raw-output.md",
+      "bytes": 32982
+    },
+    {
+      "rel": "downloads/foundational-docs/v2-02.foundation.03-strategy-v2-foundational-step-03-raw-output.md",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/downloads/foundational-docs/v2-02.foundation.03-strategy-v2-foundational-step-03-raw-output.md",
+      "bytes": 12235
+    },
+    {
+      "rel": "downloads/foundational-docs/v2-02.foundation.04-strategy-v2-foundational-step-04-raw-output.md",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/downloads/foundational-docs/v2-02.foundation.04-strategy-v2-foundational-step-04-raw-output.md",
+      "bytes": 52255
+    },
+    {
+      "rel": "screenshots/07-foundation-ready.png",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/screenshots/07-foundation-ready.png",
+      "bytes": 90250
+    },
+    {
+      "rel": "screenshots/08-foundational-docs-ready.png",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/screenshots/08-foundational-docs-ready.png",
+      "bytes": 291653
+    },
+    {
+      "rel": "screenshots/09-foundational-download-complete.png",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/screenshots/09-foundational-download-complete.png",
+      "bytes": 309294
+    },
+    {
+      "rel": "screenshots/proof-dashboard.png",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/screenshots/proof-dashboard.png",
+      "bytes": 4417412
+    },
+    {
+      "rel": "proof-dashboard-console.log",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/proof-dashboard-console.log",
+      "bytes": 173
+    },
+    {
+      "rel": "test-backend-research-archive.log",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/test-backend-research-archive.log",
+      "bytes": 3047
+    },
+    {
+      "rel": "test-deerflow-foundational.log",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/test-deerflow-foundational.log",
+      "bytes": 3046
+    },
+    {
+      "rel": "test-frontend-lint.log",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/test-frontend-lint.log",
+      "bytes": 105
+    }
+  ]
+}

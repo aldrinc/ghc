@@ -1,0 +1,442 @@
+{
+  "createdAt": "2026-04-30T03:30:51.792Z",
+  "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+  "campaignName": "Tenor Pipeline V3 Meta Draft - No Product Reveal - 2026-04-30",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "status": "draft_not_published_to_meta",
+  "delivery": {
+    "urlsPending": false,
+    "destinationRegistry": {
+      "schemaVersion": 1,
+      "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+      "urlState": "final_urls_supplied",
+      "salesDestinationKey": "sales_pdp",
+      "destinations": [
+        {
+          "key": "advertorial_a",
+          "type": "pre_sales_advertorial",
+          "label": "Advertorial A - Your Labs Are Normal",
+          "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-5-advertorial/advertorial-variant-a.md",
+          "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/your-labs-are-normal-the-30-000-lie-doctors-tell-men-over-40-and-how-to-avoid-the-trap/",
+          "onwardDestinationKey": "sales_pdp"
+        },
+        {
+          "key": "advertorial_b",
+          "type": "pre_sales_advertorial",
+          "label": "Advertorial B - The Two Pathways Every T-Booster Ignores",
+          "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-5-advertorial/advertorial-variant-b.md",
+          "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+          "onwardDestinationKey": "sales_pdp"
+        },
+        {
+          "key": "advertorial_c",
+          "type": "pre_sales_advertorial",
+          "label": "Advertorial C - Needles for Life / TRT Trap",
+          "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-5-advertorial/advertorial-variant-c.md",
+          "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+          "onwardDestinationKey": "sales_pdp"
+        },
+        {
+          "key": "listicle_a",
+          "type": "pre_sales_listicle",
+          "label": "Listicle A - 3 Reasons Your T-Booster Failed",
+          "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-6-listicle/listicle-variant-a.md",
+          "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/3-reasons-your-t-booster-failed-and-none-of-them-are-your-fault/",
+          "onwardDestinationKey": "sales_pdp"
+        },
+        {
+          "key": "listicle_b",
+          "type": "pre_sales_listicle",
+          "label": "Listicle B - Half the Science",
+          "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-6-listicle/listicle-variant-b.md",
+          "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/everything-youve-been-told-about-testosterone-support-is-based-on-half-the-science/",
+          "onwardDestinationKey": "sales_pdp"
+        },
+        {
+          "key": "listicle_c",
+          "type": "pre_sales_listicle",
+          "label": "Listicle C - 94% Morning Energy / 92% Like Yourself",
+          "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-6-listicle/listicle-variant-c.md",
+          "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+          "onwardDestinationKey": "sales_pdp"
+        },
+        {
+          "key": "sales_pdp",
+          "type": "sales_page",
+          "label": "Sales/PDP",
+          "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-7-sales-page/sales-page.md",
+          "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+          "onwardDestinationKey": null
+        }
+      ]
+    }
+  },
+  "compliance": {
+    "noProductImageOrObject": true,
+    "noMechanismReveal": true,
+    "noInventedUrlsOrEvidence": true
+  },
+  "assets": [
+    {
+      "adId": "AV-A1",
+      "stage": "advertorial",
+      "primaryText": "\"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link]",
+      "headline": "Normal Isn't Optimal (19 chars)",
+      "destinationSource": "advertorial-variant-a.md",
+      "destinationKey": "advertorial_a",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/your-labs-are-normal-the-30-000-lie-doctors-tell-men-over-40-and-how-to-avoid-the-trap/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant A.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-A2",
+      "stage": "advertorial",
+      "primaryText": "300 to 1,000. That's the testosterone reference range — a 700-point spread. You can lose two-thirds of your T and still be told your labs are \"normal.\" Here's what the reference range doesn't tell you — and what actually matters. [Link]",
+      "headline": "The 700-Point Spread (22 chars)",
+      "destinationSource": "advertorial-variant-a.md",
+      "destinationKey": "advertorial_a",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/your-labs-are-normal-the-30-000-lie-doctors-tell-men-over-40-and-how-to-avoid-the-trap/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant A.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-A3",
+      "stage": "advertorial",
+      "primaryText": "Why do some men with \"normal\" testosterone still feel drained, unfocused, and unlike themselves? Because testosterone that can't circulate is testosterone that can't work. The missing piece isn't more production — it's the nitric oxide pathway most supplements never address. Here's why it matters. [Link]",
+      "headline": "The Missing Pathway (19 chars)",
+      "destinationSource": "advertorial-variant-a.md",
+      "destinationKey": "advertorial_a",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/your-labs-are-normal-the-30-000-lie-doctors-tell-men-over-40-and-how-to-avoid-the-trap/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant A.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-A4",
+      "stage": "advertorial",
+      "primaryText": "5 signs your daily fatigue isn't \"just aging\" — and what your doctor's lab report isn't designed to tell you. 1) Energy crashes by 2pm daily. 2) Motivation requires active effort. 3) Focus slips mid-conversation. 4) Recovery takes longer. 5) You've normalized feeling diminished. These have a biological cause. [Link]",
+      "headline": "5 Signs It's Not Just Age (26 chars)",
+      "destinationSource": "advertorial-variant-a.md",
+      "destinationKey": "advertorial_a",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/your-labs-are-normal-the-30-000-lie-doctors-tell-men-over-40-and-how-to-avoid-the-trap/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant A.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-B1",
+      "stage": "advertorial",
+      "primaryText": "The Two Pathways Every T-Booster Ignores — And Why That's Why You Still Don't Feel Like Yourself. Most supplements target only testosterone production. They miss the other two systems that determine whether you actually feel the difference. Here's what was missing. [Link]",
+      "headline": "Two Pathways They Missed (25 chars)",
+      "destinationSource": "advertorial-variant-b.md",
+      "destinationKey": "advertorial_b",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant B.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-B2",
+      "stage": "advertorial",
+      "primaryText": "What if testosterone production is only 1/3 of the problem? Your body has to produce it, circulate it, AND protect it from stress depletion. Most T-boosters address Step 1 and stop. Here's what the other 2/3 requires — and why you've never heard this from a supplement company. [Link]",
+      "headline": "It's Not Just Production (23 chars)",
+      "destinationSource": "advertorial-variant-b.md",
+      "destinationKey": "advertorial_b",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant B.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-B3",
+      "stage": "advertorial",
+      "primaryText": "Everything you've been told about testosterone support is based on half the science. The research is clear: production, circulation, and stress response all have to work together. Addressing one while ignoring the other two is why your last T-booster did nothing. Here's the full picture. [Link]",
+      "headline": "Half the Science (16 chars)",
+      "destinationSource": "advertorial-variant-b.md",
+      "destinationKey": "advertorial_b",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant B.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-B4",
+      "stage": "advertorial",
+      "primaryText": "\"More testosterone\" was never the full answer. You can produce all the T in the world — if it can't circulate and your stress burns through it before it accumulates, you'll never feel the difference. That's why single-axis T-boosters fail. That's why this protocol supports all three pathways. That's the difference. [Link]",
+      "headline": "More T Was Never Enough (24 chars)",
+      "destinationSource": "advertorial-variant-b.md",
+      "destinationKey": "advertorial_b",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant B.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-C1",
+      "stage": "advertorial",
+      "primaryText": "Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link]",
+      "headline": "Before You Start TRT (21 chars)",
+      "destinationSource": "advertorial-variant-c.md",
+      "destinationKey": "advertorial_c",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant C.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-C2",
+      "stage": "advertorial",
+      "primaryText": "Before you sign up for a lifetime of needles, prescriptions, and blood work — try the protocol 1,203 men used before deciding they needed TRT. 90 days. Full refund if it doesn't work. Return even the empty bottles. You owe yourself the third option between gas station pills and permanent medical intervention. [Link]",
+      "headline": "The Third Option (16 chars)",
+      "destinationSource": "advertorial-variant-c.md",
+      "destinationKey": "advertorial_c",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant C.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-C3",
+      "stage": "advertorial",
+      "primaryText": "Your body can make enough testosterone and you can still feel nothing. Here's why: production is only Step 1. Circulation (nitric oxide) is Step 2. Stress protection (cortisol modulation) is Step 3. Most supplements stop at Step 1. Tenor addresses all three. Your last T-booster didn't fail — it was incomplete. [Link]",
+      "headline": "3 Steps, Not 1 (15 chars)",
+      "destinationSource": "advertorial-variant-c.md",
+      "destinationKey": "advertorial_c",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant C.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "AV-C4",
+      "stage": "advertorial",
+      "primaryText": "Three biological systems have to work together for you to feel the difference. Leydig cell function (production). Nitric oxide circulation (delivery). Stress response modulation (preservation). Most supplements hit one. Tenor supports all three with 21 disclosed ingredients. Here's how the architecture works. [Link]",
+      "headline": "Three Systems, One Protocol (28 chars)",
+      "destinationSource": "advertorial-variant-c.md",
+      "destinationKey": "advertorial_c",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+      "destinationRationale": "Meta ads file maps this ad to advertorial variant C.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L1",
+      "stage": "listicle",
+      "primaryText": "Stop trying to \"boost your testosterone.\" That approach has failed you three times already — and it's not your fault. The problem isn't production. It's the two other systems most supplements completely ignore. 3 reasons your T-booster didn't work. [Link]",
+      "headline": "Stop Boosting. Start Supporting. (30 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_b",
+      "destinationToken": "{{LISTICLE_B_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/everything-youve-been-told-about-testosterone-support-is-based-on-half-the-science/",
+      "destinationRationale": "Listicle B is the mechanism/contrarian variant; this ad emphasizes incomplete science, pathways, or protocol architecture.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L2",
+      "stage": "listicle",
+      "primaryText": "The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link]",
+      "headline": "What Your Label Hid (20 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_a",
+      "destinationToken": "{{LISTICLE_A_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/3-reasons-your-t-booster-failed-and-none-of-them-are-your-fault/",
+      "destinationRationale": "Listicle A is the past-failure/proprietary-blend variant; this ad emphasizes failed boosters or hidden-label risk.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L3",
+      "stage": "listicle",
+      "primaryText": "Wake up with energy that lasts past 2pm. Feel sharp in conversations without reaching for the next thought. Experience the version of yourself your wife and kids remember — not 25 again, not superhuman, just you. 94% of 1,203 men reported sustained morning energy. Here's the protocol. [Link]",
+      "headline": "Feel Like Yourself Again (24 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_c",
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "destinationRationale": "Listicle C is the desire/stat-forward variant; this ad emphasizes desired outcome, survey result, guarantee, or testimonial proof.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L4",
+      "stage": "listicle",
+      "primaryText": "2 capsules. Every morning. 10 seconds. That's the protocol 92% of men said made them feel more like themselves — drive, mood, confidence restored. Not a complex regimen. Not a prescription. Not a lifetime commitment. Just a daily protocol that addresses what T-boosters miss. [Link]",
+      "headline": "10 Seconds Each Morning (23 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_c",
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "destinationRationale": "Listicle C is the desire/stat-forward variant; this ad emphasizes desired outcome, survey result, guarantee, or testimonial proof.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L5",
+      "stage": "listicle",
+      "primaryText": "1,203 men tried this protocol. 94% reported sustained morning energy. 92% said they felt more like themselves. 87% felt sharper focus. 81% noticed improved stamina within weeks. These aren't marketing claims — they're survey results from men who switched from single-axis T-boosters to a complete protocol. [Link]",
+      "headline": "1,203 Men. 4 Results. (22 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_c",
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "destinationRationale": "Listicle C is the desire/stat-forward variant; this ad emphasizes desired outcome, survey result, guarantee, or testimonial proof.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L6",
+      "stage": "listicle",
+      "primaryText": "Five researchers. Three biological pathways. One daily protocol. The Multi-Pathway approach is informed by published research across endocrinology (King's College London), vascular biology (Medical College of Georgia), and men's health (UC Irvine). This is what happens when the science gets specific. [Link]",
+      "headline": "Backed by Research (19 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_b",
+      "destinationToken": "{{LISTICLE_B_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/everything-youve-been-told-about-testosterone-support-is-based-on-half-the-science/",
+      "destinationRationale": "Listicle B is the mechanism/contrarian variant; this ad emphasizes incomplete science, pathways, or protocol architecture.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L7",
+      "stage": "listicle",
+      "primaryText": "The checked-out husband. It's not who you are — it's what happens when your energy, drive, and presence quietly erode and no one gives you a name for why. 92% of men who addressed all three biological pathways reported feeling more like themselves. Before it costs more than your afternoon coffee. [Link]",
+      "headline": "Not Who You Are (17 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_c",
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "destinationRationale": "Listicle C is the desire/stat-forward variant; this ad emphasizes desired outcome, survey result, guarantee, or testimonial proof.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L8",
+      "stage": "listicle",
+      "primaryText": "Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link]",
+      "headline": "Just You, Restored (17 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_c",
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "destinationRationale": "Listicle C is the desire/stat-forward variant; this ad emphasizes desired outcome, survey result, guarantee, or testimonial proof.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L9",
+      "stage": "listicle",
+      "primaryText": "\"Three months in and the difference is night and day. My energy is steady all day. I'm present with my wife and kids again. I didn't realize how far I'd drifted.\" — Mark, 47. One of 1,203 men surveyed. 92% reported feeling more like themselves. Here's the protocol they followed. [Link]",
+      "headline": "Mark, 47: \"Night and Day\" (26 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_c",
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "destinationRationale": "Listicle C is the desire/stat-forward variant; this ad emphasizes desired outcome, survey result, guarantee, or testimonial proof.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L10",
+      "stage": "listicle",
+      "primaryText": "\"Proprietary Blend\" is legalized lying. Three words that let a company hide sub-clinical doses behind a single number while charging you for ingredients you're barely getting. You didn't fail those supplements. They were designed to fail you. Here's what a label looks like when there's nothing to hide. [Link]",
+      "headline": "Nothing to Hide (16 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_a",
+      "destinationToken": "{{LISTICLE_A_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/3-reasons-your-t-booster-failed-and-none-of-them-are-your-fault/",
+      "destinationRationale": "Listicle A is the past-failure/proprietary-blend variant; this ad emphasizes failed boosters or hidden-label risk.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L11",
+      "stage": "listicle",
+      "primaryText": "810K+ purchases. 24M+ servings. 400,000 lives impacted through giving partners. And a 90-day empty-bottle guarantee that says: if you don't feel more like yourself after consistent use, return even the empties for a full refund. No risk. No proprietary blends. No needles. Just a protocol that works. [Link]",
+      "headline": "810K+ Men. 90-Day Guarantee. (30 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_c",
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "destinationRationale": "Listicle C is the desire/stat-forward variant; this ad emphasizes desired outcome, survey result, guarantee, or testimonial proof.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "L12",
+      "stage": "listicle",
+      "primaryText": "21 ingredients. 3 pathways. 2 capsules. $1.17 per serving. The complete protocol that replaces the DIY stack of 6-12 separate supplements you've been researching, buying, and hoping works together. All disclosed doses. All third-party tested. All in one morning routine. See the full protocol. [Link]",
+      "headline": "One Protocol. Done. (19 chars)",
+      "destinationSource": null,
+      "destinationKey": "listicle_b",
+      "destinationToken": "{{LISTICLE_B_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/everything-youve-been-told-about-testosterone-support-is-based-on-half-the-science/",
+      "destinationRationale": "Listicle B is the mechanism/contrarian variant; this ad emphasizes incomplete science, pathways, or protocol architecture.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "PDP1",
+      "stage": "pdp",
+      "primaryText": "Quarterly Plan: $35/month. 3 free gifts in your first shipment. 90-day empty-bottle guarantee. 21 disclosed active ingredients supporting Leydig cell function, nitric oxide circulation, and stress response — the three systems that determine how you actually feel. Start the protocol risk-free. [Link]",
+      "headline": "$35/mo. 90-Day Guarantee. (25 chars)",
+      "destinationSource": null,
+      "destinationKey": "sales_pdp",
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+      "destinationRationale": "Meta ads file maps this ad directly to the sales/PDP page.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "PDP2",
+      "stage": "pdp",
+      "primaryText": "\"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link]",
+      "headline": "\"I Knew I Wasn't Going Back\" (30 chars)",
+      "destinationSource": null,
+      "destinationKey": "sales_pdp",
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+      "destinationRationale": "Meta ads file maps this ad directly to the sales/PDP page.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "PDP3",
+      "stage": "pdp",
+      "primaryText": "You're one \"proprietary blend\" away from wasting another 3 months and $100+ on a supplement that can't work. Before you buy another T-booster, check the label for those three words. Then look at what a disclosed-dose protocol actually contains — 400mg Tongkat Ali, 50mg Zinc, 250mg Maca, 250mg L-Arginine. [Link]",
+      "headline": "Check Your Label First (23 chars)",
+      "destinationSource": null,
+      "destinationKey": "sales_pdp",
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+      "destinationRationale": "Meta ads file maps this ad directly to the sales/PDP page.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "PDP4",
+      "stage": "pdp",
+      "primaryText": "What does a supplement label look like when the company has nothing to hide? 400mg Tongkat Ali. 50mg Zinc. 250mg Maca. 250mg L-Arginine. 125mg Ginseng-Eleutherococcus. 745mg botanical matrix. Every single active ingredient, every single dose, right on the bottle. This is what transparency looks like. [Link]",
+      "headline": "Every Dose. Right There. (24 chars)",
+      "destinationSource": null,
+      "destinationKey": "sales_pdp",
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+      "destinationRationale": "Meta ads file maps this ad directly to the sales/PDP page.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "PDP5",
+      "stage": "pdp",
+      "primaryText": "Morning energy that doesn't crash at 2pm. Focus that stays through the afternoon. Drive that doesn't require forced motivation. These aren't superhuman outcomes — they're what 94%, 87%, and 92% of men reported after addressing all three biological pathways. 2 capsules. Every morning. $1.17/serving. [Link]",
+      "headline": "Morning Energy That Lasts (25 chars)",
+      "destinationSource": null,
+      "destinationKey": "sales_pdp",
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+      "destinationRationale": "Meta ads file maps this ad directly to the sales/PDP page.",
+      "generatedAsset": null
+    },
+    {
+      "adId": "PDP6",
+      "stage": "pdp",
+      "primaryText": "\"I was skeptical after trying three different T-boosters that did nothing. The difference here is you can actually see what you're taking — every ingredient, every dose, right on the label.\" — David M., 52. The Multi-Pathway Protocol. 21 ingredients. 90-day guarantee. See the full breakdown. [Link]",
+      "headline": "\"You Can See What You're Taking\" (33 chars)",
+      "destinationSource": null,
+      "destinationKey": "sales_pdp",
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+      "destinationRationale": "Meta ads file maps this ad directly to the sales/PDP page.",
+      "generatedAsset": null
+    }
+  ]
+}

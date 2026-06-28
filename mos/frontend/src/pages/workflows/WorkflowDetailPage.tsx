@@ -37,7 +37,6 @@ const STRATEGY_V2_FOUNDATIONAL_STEP_KEYS = [
   "v2-02.foundation.01",
   "v2-02.foundation.03",
   "v2-02.foundation.04",
-  "v2-02.foundation.06",
 ] as const;
 
 function formatDate(value?: string | null) {
@@ -277,8 +276,8 @@ export function WorkflowDetailPage() {
         disabled={!workflowId || !hasCompleteFoundationalResearchZip || downloadWorkflowResearchZip.isPending}
         title={
           hasCompleteFoundationalResearchZip
-            ? "Download the four foundational strategy docs as a ZIP."
-            : "Available after all four foundational docs finish persisting."
+            ? "Download the foundational strategy docs as a ZIP."
+            : "Available after all foundational docs finish persisting."
         }
       >
         {downloadWorkflowResearchZip.isPending ? (

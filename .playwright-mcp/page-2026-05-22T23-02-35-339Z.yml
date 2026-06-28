@@ -1,0 +1,348 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - button "H Higgsfield Workspace" [ref=e12] [cursor=pointer]:
+              - generic [ref=e13]: H
+              - generic [ref=e14]:
+                - generic [ref=e15]: Higgsfield
+                - generic [ref=e16]: Workspace
+              - img [ref=e17]
+        - generic [ref=e22]: Strategy complete — ready to launch
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e25]: Workspace
+          - list [ref=e26]:
+            - listitem [ref=e27]:
+              - button "Overview" [ref=e29] [cursor=pointer]:
+                - img [ref=e31]
+                - generic [ref=e36]: Overview
+            - listitem [ref=e37]:
+              - button "Strategy" [ref=e39] [cursor=pointer]:
+                - img [ref=e41]
+                - generic [ref=e44]: Strategy
+            - listitem [ref=e45]:
+              - button "Brand" [ref=e47] [cursor=pointer]:
+                - img [ref=e49]
+                - generic [ref=e52]: Brand
+            - listitem [ref=e53]:
+              - button "Sites" [ref=e55] [cursor=pointer]:
+                - img [ref=e57]
+                - generic [ref=e61]: Sites
+            - listitem [ref=e62]:
+              - button "Commerce" [ref=e64] [cursor=pointer]:
+                - img [ref=e66]
+                - generic [ref=e69]: Commerce
+            - listitem [ref=e70]:
+              - button "Products" [ref=e72] [cursor=pointer]:
+                - img [ref=e74]
+                - generic [ref=e78]: Products
+        - generic [ref=e79]:
+          - generic [ref=e80]: Research
+          - list [ref=e81]:
+            - listitem [ref=e82]:
+              - button "Documents" [ref=e84] [cursor=pointer]:
+                - img [ref=e86]
+                - generic [ref=e89]: Documents
+            - listitem [ref=e90]:
+              - button "Ads & Brands" [ref=e92] [cursor=pointer]:
+                - img [ref=e94]
+                - generic [ref=e97]: Ads & Brands
+            - listitem [ref=e98]:
+              - button "Funnels" [ref=e100] [cursor=pointer]:
+                - img [ref=e102]
+                - generic [ref=e104]: Funnels
+        - generic [ref=e105]:
+          - generic [ref=e106]: Execution
+          - list [ref=e107]:
+            - listitem [ref=e108]:
+              - button "Campaigns" [ref=e110] [cursor=pointer]:
+                - img [ref=e112]
+                - generic [ref=e116]: Campaigns
+            - listitem [ref=e117]:
+              - button "Analytics" [ref=e119] [cursor=pointer]:
+                - img [ref=e121]
+                - generic [ref=e123]: Analytics
+            - listitem [ref=e124]:
+              - button "Postiz" [ref=e126] [cursor=pointer]:
+                - img [ref=e128]
+                - generic [ref=e131]: Postiz
+            - listitem [ref=e132]:
+              - button "Social Agents" [ref=e134] [cursor=pointer]:
+                - img [ref=e136]
+                - generic [ref=e139]: Social Agents
+        - generic [ref=e140]:
+          - generic [ref=e141]: AI
+          - list [ref=e142]:
+            - listitem [ref=e143]:
+              - button "Assistant Chat" [ref=e145] [cursor=pointer]:
+                - img [ref=e147]
+                - generic [ref=e149]: Assistant Chat
+        - generic [ref=e150]:
+          - generic [ref=e151]: Assets
+          - list [ref=e152]:
+            - listitem [ref=e153]:
+              - button "Creative Library" [ref=e155] [cursor=pointer]:
+                - img [ref=e157]
+                - generic [ref=e163]: Creative Library
+            - listitem [ref=e164]:
+              - button "Meta Ads" [ref=e166] [cursor=pointer]:
+                - img [ref=e168]
+                - generic [ref=e171]: Meta Ads
+      - list [ref=e173]:
+        - listitem [ref=e174]:
+          - button "Aldrin Clement Aldrin Clement aldrin.clement@gmail.com" [ref=e176] [cursor=pointer]:
+            - img "Aldrin Clement" [ref=e178]
+            - generic [ref=e179]:
+              - generic [ref=e180]: Aldrin Clement
+              - generic [ref=e181]: aldrin.clement@gmail.com
+            - img [ref=e182]
+      - button "Toggle Sidebar" [ref=e185] [cursor=pointer]
+    - main [ref=e186]:
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - button "Toggle Sidebar" [ref=e189] [cursor=pointer]:
+            - img
+            - generic [ref=e190]: Toggle Sidebar
+          - navigation "breadcrumb" [ref=e191]:
+            - list [ref=e192]:
+              - listitem [ref=e193]:
+                - link "Workspaces" [ref=e194] [cursor=pointer]:
+                  - /url: /workspaces
+              - listitem [ref=e195]:
+                - img [ref=e196]
+              - listitem [ref=e198]:
+                - link "Social Agents" [disabled] [ref=e199]
+        - generic [ref=e200]:
+          - generic [ref=e201]: Workspace Product
+          - combobox [ref=e202]:
+            - option "Select workspace product"
+            - option "Higgsfield AI Platform" [selected]
+      - generic [ref=e204]:
+        - generic [ref=e206]:
+          - generic [ref=e207]:
+            - heading "Marketing Agent" [level=2] [ref=e208]
+            - paragraph [ref=e209]: Approval-gated TikTok carousel work for Higgsfield.
+          - link "Postiz" [ref=e211] [cursor=pointer]:
+            - /url: /workspaces/execution/postiz
+            - img
+            - text: Postiz
+        - generic [ref=e212]:
+          - generic [ref=e213]:
+            - generic [ref=e214]:
+              - img [ref=e215]
+              - text: Postiz needs channels
+            - generic [ref=e218]: 0 channels, 0 profiles
+          - generic [ref=e219]:
+            - button "Approvals 0" [ref=e220] [cursor=pointer]:
+              - img
+              - text: Approvals
+              - generic [ref=e221]: "0"
+            - button "Channels" [ref=e222] [cursor=pointer]:
+              - img
+              - text: Channels
+            - button "Agent" [ref=e223] [cursor=pointer]:
+              - img
+              - text: Agent
+        - generic [ref=e225]:
+          - generic [ref=e227]:
+            - generic [ref=e228]:
+              - generic [ref=e229]:
+                - generic [ref=e230]: Step 2 of 2
+                - generic [ref=e231]: Test needed
+              - heading "Review carousel" [level=2] [ref=e366]
+            - generic [ref=e233]:
+              - button "Setup screen" [ref=e234] [cursor=pointer]:
+                - generic [ref=e235]: Setup
+                - generic [ref=e236]: Mission set
+              - button "Review screen" [pressed] [ref=e237] [cursor=pointer]:
+                - generic [ref=e238]: Review
+                - generic [ref=e239]: Test needed
+          - generic [ref=e367]:
+            - generic [ref=e368]:
+              - generic [ref=e369]:
+                - generic [ref=e370]: No test
+                - generic [ref=e371]: Draft
+                - generic [ref=e372]: 0/6
+                - generic [ref=e373]: Postiz
+              - button "Start test" [ref=e374] [cursor=pointer]:
+                - img
+                - text: Test
+            - generic [ref=e375]:
+              - article [ref=e376]:
+                - generic [ref=e377]:
+                  - img [ref=e379]
+                  - generic [ref=e384]:
+                    - generic [ref=e385]: S1
+                    - generic [ref=e386]: Needed
+                  - generic [ref=e387]:
+                    - generic [ref=e388]: "POV: your routine looks calm"
+                    - generic [ref=e389]: but your brain missed the memo
+                  - generic [ref=e390]:
+                    - generic [ref=e391]: Slide 1
+                    - generic [ref=e392]: HOOK
+                - generic [ref=e393]:
+                  - generic [ref=e394]:
+                    - generic [ref=e395]: Missing
+                    - generic [ref=e396]: HOOK
+                  - generic [ref=e397]:
+                    - button "Edit slide 1" [ref=e398] [cursor=pointer]:
+                      - img [ref=e399]
+                    - button "Add asset for slide 1" [ref=e402] [cursor=pointer]:
+                      - img [ref=e403]
+                    - button "Regenerate slide 1" [ref=e407] [cursor=pointer]:
+                      - img [ref=e408]
+                    - button "Approve slide 1" [disabled]:
+                      - img
+              - article [ref=e413]:
+                - generic [ref=e414]:
+                  - img [ref=e416]
+                  - generic [ref=e421]:
+                    - generic [ref=e422]: S2
+                    - generic [ref=e423]: Needed
+                  - generic [ref=e424]:
+                    - generic [ref=e425]: You tried every fix
+                    - generic [ref=e426]: and still end the day wired
+                  - generic [ref=e427]:
+                    - generic [ref=e428]: Slide 2
+                    - generic [ref=e429]: PROBLEM
+                - generic [ref=e430]:
+                  - generic [ref=e431]:
+                    - generic [ref=e432]: Missing
+                    - generic [ref=e433]: PROBLEM
+                  - generic [ref=e434]:
+                    - button "Edit slide 2" [ref=e435] [cursor=pointer]:
+                      - img [ref=e436]
+                    - button "Add asset for slide 2" [ref=e439] [cursor=pointer]:
+                      - img [ref=e440]
+                    - button "Regenerate slide 2" [ref=e444] [cursor=pointer]:
+                      - img [ref=e445]
+                    - button "Approve slide 2" [disabled]:
+                      - img
+              - article [ref=e450]:
+                - generic [ref=e451]:
+                  - img [ref=e453]
+                  - generic [ref=e458]:
+                    - generic [ref=e459]: S3
+                    - generic [ref=e460]: Needed
+                  - generic [ref=e461]:
+                    - generic [ref=e462]: So I tried a cleaner
+                    - generic [ref=e463]: wind-down loop
+                  - generic [ref=e464]:
+                    - generic [ref=e465]: Slide 3
+                    - generic [ref=e466]: DISCOVERY
+                - generic [ref=e467]:
+                  - generic [ref=e468]:
+                    - generic [ref=e469]: Missing
+                    - generic [ref=e470]: DISCOVERY
+                  - generic [ref=e471]:
+                    - button "Edit slide 3" [ref=e472] [cursor=pointer]:
+                      - img [ref=e473]
+                    - button "Add asset for slide 3" [ref=e476] [cursor=pointer]:
+                      - img [ref=e477]
+                    - button "Regenerate slide 3" [ref=e481] [cursor=pointer]:
+                      - img [ref=e482]
+                    - button "Approve slide 3" [disabled]:
+                      - img
+              - article [ref=e487]:
+                - generic [ref=e488]:
+                  - img [ref=e490]
+                  - generic [ref=e495]:
+                    - generic [ref=e496]: S4
+                    - generic [ref=e497]: Needed
+                  - generic [ref=e498]:
+                    - generic [ref=e499]: Wait...
+                    - generic [ref=e500]: this actually feels doable?
+                  - generic [ref=e501]:
+                    - generic [ref=e502]: Slide 4
+                    - generic [ref=e503]: TRANSFORMATION
+                - generic [ref=e504]:
+                  - generic [ref=e505]:
+                    - generic [ref=e506]: Missing
+                    - generic [ref=e507]: TRANSFORMATION
+                  - generic [ref=e508]:
+                    - button "Edit slide 4" [ref=e509] [cursor=pointer]:
+                      - img [ref=e510]
+                    - button "Add asset for slide 4" [ref=e513] [cursor=pointer]:
+                      - img [ref=e514]
+                    - button "Regenerate slide 4" [ref=e518] [cursor=pointer]:
+                      - img [ref=e519]
+                    - button "Approve slide 4" [disabled]:
+                      - img
+              - article [ref=e524]:
+                - generic [ref=e525]:
+                  - img [ref=e527]
+                  - generic [ref=e532]:
+                    - generic [ref=e533]: S5
+                    - generic [ref=e534]: Needed
+                  - generic [ref=e535]:
+                    - generic [ref=e536]: Okay I'm obsessed
+                    - generic [ref=e537]: with this reset
+                  - generic [ref=e538]:
+                    - generic [ref=e539]: Slide 5
+                    - generic [ref=e540]: ESCALATION
+                - generic [ref=e541]:
+                  - generic [ref=e542]:
+                    - generic [ref=e543]: Missing
+                    - generic [ref=e544]: ESCALATION
+                  - generic [ref=e545]:
+                    - button "Edit slide 5" [ref=e546] [cursor=pointer]:
+                      - img [ref=e547]
+                    - button "Add asset for slide 5" [ref=e550] [cursor=pointer]:
+                      - img [ref=e551]
+                    - button "Regenerate slide 5" [ref=e555] [cursor=pointer]:
+                      - img [ref=e556]
+                    - button "Approve slide 5" [disabled]:
+                      - img
+              - article [ref=e561]:
+                - generic [ref=e562]:
+                  - img [ref=e564]
+                  - generic [ref=e569]:
+                    - generic [ref=e570]: S6
+                    - generic [ref=e571]: Needed
+                  - generic [ref=e572]:
+                    - generic [ref=e573]: Try the app
+                    - generic [ref=e574]: link in bio
+                  - generic [ref=e575]:
+                    - generic [ref=e576]: Slide 6
+                    - generic [ref=e577]: CTA
+                - generic [ref=e578]:
+                  - generic [ref=e579]:
+                    - generic [ref=e580]: Missing
+                    - generic [ref=e581]: CTA
+                  - generic [ref=e582]:
+                    - button "Edit slide 6" [ref=e583] [cursor=pointer]:
+                      - img [ref=e584]
+                    - button "Add asset for slide 6" [ref=e587] [cursor=pointer]:
+                      - img [ref=e588]
+                    - button "Regenerate slide 6" [ref=e592] [cursor=pointer]:
+                      - img [ref=e593]
+                    - button "Approve slide 6" [disabled]:
+                      - img
+            - generic [ref=e599]:
+              - generic [ref=e600]:
+                - button "Media" [ref=e601] [cursor=pointer]:
+                  - img
+                  - text: Media
+                - button "Generate" [ref=e602] [cursor=pointer]:
+                  - img
+                  - text: Generate
+                - button "Render" [disabled]:
+                  - img
+                  - text: Render
+                - button "Use" [disabled]:
+                  - img
+                  - text: Use
+              - button "Editor" [ref=e603] [cursor=pointer]:
+                - img
+                - text: Editor
+                - img
+  - region "Notifications":
+    - dialog "Growth program created" [ref=e604]:
+      - generic [ref=e606]:
+        - img [ref=e608]
+        - heading "Growth program created" [level=2] [ref=e611]
+        - button [ref=e612] [cursor=pointer]:
+          - img [ref=e613]

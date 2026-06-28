@@ -1,0 +1,3334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mars Men Campaign Launch Kit</title>
+  <style>
+    :root { color-scheme: light; --ink:#191919; --muted:#62625d; --line:#d6d5cd; --paper:#f7f6f1; --panel:#fff; --accent:#115f49; --soft:#e5f0eb; --warm:#f3efe5; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:var(--paper); }
+    a { color:#07558d; overflow-wrap:anywhere; }
+    header.top { position:sticky; top:0; z-index:5; padding:20px 28px 16px; background:rgba(255,255,255,.97); border-bottom:1px solid var(--line); backdrop-filter:blur(8px); }
+    h1 { margin:0 0 8px; font-size:29px; line-height:1.1; letter-spacing:0; }
+    .sub { margin:0; color:var(--muted); max-width:1180px; }
+    .metrics, .slot-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; padding:16px 28px; }
+    .metric, .slot-card, .creative-card, .copy-card, .table-wrap { background:var(--panel); border:1px solid var(--line); border-radius:8px; }
+    .metric { padding:12px; min-height:78px; }
+    .metric b { display:block; font-size:26px; line-height:1; margin-bottom:8px; }
+    .metric span, .slot-kicker, .kicker, dt, .section-head p, .section-head span { color:var(--muted); }
+    .slot-card { padding:14px; }
+    .slot-card h2 { margin:3px 0 8px; font-size:18px; letter-spacing:0; }
+    .slot-card p { margin:0 0 10px; }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; padding:0 28px 18px; }
+    .filter { border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:999px; padding:8px 12px; cursor:pointer; font:inherit; }
+    .filter.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    main { padding:0 28px 56px; }
+    .section-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; border-top:1px solid var(--line); margin:18px 0 10px; padding-top:18px; }
+    .section-head h2 { margin:0 0 3px; font-size:20px; letter-spacing:0; }
+    .section-head p { margin:0; }
+    .creative-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(390px,1fr)); gap:14px; align-items:start; }
+    .copy-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(420px,1fr)); gap:14px; align-items:start; }
+    .creative-card { overflow:hidden; }
+    .thumb { display:block; background:#ededeb; height:370px; border-bottom:1px solid var(--line); }
+    .thumb img { width:100%; height:100%; object-fit:contain; display:block; }
+    .meta, .copy-card { padding:13px 14px 14px; }
+    .kicker, .slot-kicker { font-size:12px; }
+    h3 { font-size:17px; line-height:1.22; letter-spacing:0; margin:5px 0 9px; overflow-wrap:anywhere; }
+    .badges { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
+    .badges span { background:var(--soft); border:1px solid #c8ddd5; color:#114c3b; border-radius:999px; padding:3px 7px; font-size:12px; }
+    dl { display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; margin:12px 0; }
+    dt { font-size:11px; text-transform:uppercase; letter-spacing:.02em; }
+    dd { margin:1px 0 0; overflow-wrap:anywhere; }
+    details { border-top:1px solid var(--line); padding-top:10px; margin-top:10px; }
+    summary { color:var(--accent); cursor:pointer; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#f5f5f2; border:1px solid var(--line); border-radius:6px; padding:10px; max-height:360px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:12px; }
+    .instances { font-size:12px; }
+    .table-wrap { overflow:hidden; margin-top:20px; }
+    .table-wrap h2 { margin:0; padding:14px 16px 8px; font-size:18px; }
+    .hidden { display:none !important; }
+    @media (max-width:900px) { header.top { position:static; padding:18px; } .metrics, .slot-grid { padding:14px 18px; } .toolbar, main { padding-left:18px; padding-right:18px; } .creative-grid, .copy-grid { grid-template-columns:minmax(0,1fr); } .thumb { height:320px; } .section-head { display:block; } .section-head span { display:block; margin-top:5px; } }
+    @media (max-width:560px) { dl { grid-template-columns:1fr; } h1 { font-size:24px; } th,td { padding:5px 4px; } .instances { font-size:11px; } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>Mars Men Campaign Launch Kit</h1>
+    <p class="sub">Built for your planned launch: three new landers plus a quiz funnel. Creatives are deduped by exact static-image hash. Ad copy is deduped by headline, body, CTA, and link description.</p>
+  </header>
+  <section class="metrics">
+    <div class="metric"><b>4</b><span>Launch destinations</span></div>
+    <div class="metric"><b>30</b><span>Unique static creatives</span></div>
+    <div class="metric"><b>18</b><span>Unique ad-copy units</span></div>
+    <div class="metric"><b>108</b><span>Source ad instances covered</span></div>
+    <div class="metric"><b>78</b><span>Duplicate ad instances collapsed</span></div>
+  </section>
+  <section class="slot-grid">
+    
+      <article class="slot-card">
+        <div class="slot-kicker">New lander</div>
+        <h2>GLP lander</h2>
+        <p>Primary GLP advertorial/ref page plus one doctor-led GLP reference route.</p>
+        <dl>
+          <div><dt>Unique creatives</dt><dd>13</dd></div>
+          <div><dt>Unique copy units</dt><dd>3</dd></div>
+          <div><dt>Ad instances</dt><dd>36</dd></div>
+          <div><dt>Refs</dt><dd><a href="https://mengotomars.com/pages/10-reasons-glp">/pages/10-reasons-glp</a><br><a href="https://mengotomars.com/pages/dr-latt-glp">/pages/dr-latt-glp</a></dd></div>
+        </dl>
+      </article>
+
+      <article class="slot-card">
+        <div class="slot-kicker">New lander</div>
+        <h2>Weight-loss lander</h2>
+        <p>Hormonal weight-loss/T-upgrade page angle.</p>
+        <dl>
+          <div><dt>Unique creatives</dt><dd>2</dd></div>
+          <div><dt>Unique copy units</dt><dd>2</dd></div>
+          <div><dt>Ad instances</dt><dd>14</dd></div>
+          <div><dt>Refs</dt><dd><a href="https://mengotomars.com/pages/t-upgrade-with-weight-loss">/pages/t-upgrade-with-weight-loss</a></dd></div>
+        </dl>
+      </article>
+
+      <article class="slot-card">
+        <div class="slot-kicker">New lander</div>
+        <h2>TRT lander / TRT alternative references</h2>
+        <p>TRT upgrade page plus natural alternative/10-reasons reference page.</p>
+        <dl>
+          <div><dt>Unique creatives</dt><dd>5</dd></div>
+          <div><dt>Unique copy units</dt><dd>5</dd></div>
+          <div><dt>Ad instances</dt><dd>25</dd></div>
+          <div><dt>Refs</dt><dd><a href="https://mengotomars.com/pages/t-upgrade">/pages/t-upgrade</a><br><a href="https://mengotomars.com/pages/10-reasons">/pages/10-reasons</a></dd></div>
+        </dl>
+      </article>
+
+      <article class="slot-card">
+        <div class="slot-kicker">Quiz funnel</div>
+        <h2>Quiz funnel</h2>
+        <p>Quiz funnel route used as the conversion destination for broad offer/guarantee ads.</p>
+        <dl>
+          <div><dt>Unique creatives</dt><dd>10</dd></div>
+          <div><dt>Unique copy units</dt><dd>8</dd></div>
+          <div><dt>Ad instances</dt><dd>33</dd></div>
+          <div><dt>Refs</dt><dd><a href="https://mengotomars.com/pages/quiz-v6">/pages/quiz-v6</a></dd></div>
+        </dl>
+      </article>
+  </section>
+  <nav class="toolbar" aria-label="Launch filters"><button class="filter active" data-filter="all">All creatives (30)</button><button class="filter" data-filter="GLP lander">GLP lander (13)</button><button class="filter" data-filter="Weight-loss lander">Weight-loss lander (2)</button><button class="filter" data-filter="TRT lander / TRT alternative references">TRT lander / TRT alternative references (5)</button><button class="filter" data-filter="Quiz funnel">Quiz funnel (10)</button></nav>
+  <main>
+    
+    <section class="launch-section" data-section="GLP lander">
+      <div class="section-head">
+        <div><h2>GLP lander Creatives</h2><p><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a> · <a href="https://mengotomars.com/pages/dr-latt-glp">https://mengotomars.com/pages/dr-latt-glp</a></p></div>
+        <span>13 unique creatives</span>
+      </div>
+      <div class="creative-grid">
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C001">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/098bb8ed87aa-media-00e7d202abe0.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/098bb8ed87aa-media-00e7d202abe0.jpg" alt="Unique creative C001">
+        </a>
+        <div class="meta">
+          <div class="kicker">C001 · COPY001 · 9 ad instances</div>
+          <h3>What GLP-1 Does to Your T Levels</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>8 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903611, 94284666, 94284377, 94284350, 94284582, 94284507, 94284291, 95129975, 95129974</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>81-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903611</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903611">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903611?signature=019544b1009eb33802b00095993995fd168a33b6bd4cf2a1692c4fdcd779c7f1">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284666</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284666">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284666?signature=45f3dde9986db14b6b11ffd0ce78a1345a2c4a3bfa0af6925e50687ac00b8454">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284377</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284377">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284377?signature=e60d92c8195789c15ca93442b257ceeeb521a83e037e26f7efa9186a6c4c5350">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284350</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284350">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284350?signature=411ea13dd584209f4e5e536f535b1b1a7940c98870aedc12a043d8effb14183d">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284582</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284582">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284582?signature=4a5fb4fe90373c09cc133ab0dbc536d3473c178bffb5fd86461232f5d847e435">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284507</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284507">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284507?signature=8cf7834bd425019093f75441959c7e1dcd0d59fb28f1bc76da8f7dc104bf1ba3">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284291</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284291">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284291?signature=45f5483a041a8b62fdbc61caca4c020dc35dcc0f3ce70b16e51361635160f714">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129975</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129975">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129975?signature=c7173a4b171bbdbb4f133618bbfbf2d2b6274ab9ef75701779c0304af9d1103a">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129974</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>81</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129974">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129974?signature=8fa9f1fffd9d90808b937255a34f989035b4928b4cc70d5a529c6719532fff6a">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+
+Nobody&#39;s arguing that. But here&#39;s what your prescribing doctor probably didn&#39;t mention.
+
+Rapid weight loss triggers a massive cortisol spike.
+
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+
+You&#39;re thinner — but weaker, foggier, and running on fumes. That&#39;s not a win.
+
+Mars Men was built to protect what GLP-1s are quietly destroying.
+
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn&#39;t locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+
+This isn&#39;t theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+
+Right now it&#39;s 50% off with a full 90-day money-back guarantee.
+
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C002">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/76b0be9a7bca-media-c88282798474.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/76b0be9a7bca-media-c88282798474.jpg" alt="Unique creative C002">
+        </a>
+        <div class="meta">
+          <div class="kicker">C002 · COPY001 · 7 ad instances</div>
+          <h3>What GLP-1 Does to Your T Levels</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>6 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903470, 94284844, 94284842, 94903493, 94284384, 94284378, 94284374</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903470</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903470">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903470?signature=b22c6e387e5a809311d4189a3c9cb8e028fdc9aefeaa39b43b40cf2f705e350b">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284844</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284844">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284844?signature=24c54e6cb67c54355d3b5b10e9a1da82bdb1593cf4ee389317fdea4c4c6a6031">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284842</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284842">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284842?signature=45f356fc0d13b4f995142078f4034193e08dfc6ad9eeaf6d0ab591fac4612bf8">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903493</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903493">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903493?signature=9dcc95aabf4d7c89cf04041889acdbeb2f3c159ea7063922a94e117d8b572916">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284384</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284384">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284384?signature=5a4427e2de486495c218563ed1555a44c345d7d9f3899efc512ed9700d15f1aa">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284378</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284378">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284378?signature=0751381e604418494b109f0e47a44b3d363c044871d25d92829e9b0b2822bc27">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284374</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284374">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284374?signature=b9e78a287af1702b628636a0e2a0175ea682251926bfbac98ed596fec7dfacb8">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+
+Nobody&#39;s arguing that. But here&#39;s what your prescribing doctor probably didn&#39;t mention.
+
+Rapid weight loss triggers a massive cortisol spike.
+
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+
+You&#39;re thinner — but weaker, foggier, and running on fumes. That&#39;s not a win.
+
+Mars Men was built to protect what GLP-1s are quietly destroying.
+
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn&#39;t locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+
+This isn&#39;t theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+
+Right now it&#39;s 50% off with a full 90-day money-back guarantee.
+
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C003">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/c1ba5e281eac-media-da2f81639f04.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/c1ba5e281eac-media-da2f81639f04.jpg" alt="Unique creative C003">
+        </a>
+        <div class="meta">
+          <div class="kicker">C003 · COPY002 · 4 ad instances</div>
+          <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>3 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903631, 95129831, 94903796, 94903342</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903631</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903631">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903631?signature=56f10a4554293cf83911b3a14550a673aece176852abc3a9cb436a4fbacbab0c">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129831</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129831">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129831?signature=4c4ed1535dc5cd07b1b4bb5c90919539ac71547cb91d350c49db5e9a53d45569">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903796</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903796">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903796?signature=2565a1ffdda05bb6827e255dec32804c8a2fbf86aa93c4427dcc55c57bb6d022">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903342</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903342">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903342?signature=a2fea2875abc3466baa650ea713cb545a3791300a5c145b5ca7bb230d11e0525">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C004">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/1b56c8948bc9-media-240d57da4a2b.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/1b56c8948bc9-media-240d57da4a2b.jpg" alt="Unique creative C004">
+        </a>
+        <div class="meta">
+          <div class="kicker">C004 · COPY001 · 3 ad instances</div>
+          <h3>What GLP-1 Does to Your T Levels</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>2 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903638, 94903546, 94903532</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903638</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903638">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903638?signature=d3ca78e7e44dfb4b046ef1807c07e916badf38c7ae18641143d3e58f1205790c">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903546</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903546">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903546?signature=f707b33a121abdf52315c97108c504d2f758b3ed72ceb9a4fd6d9d4baf4e2b35">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903532</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903532">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903532?signature=de52f7b8f168344e6d49e2e98e7389ba2cd2683fbf7333a377c35f7f22c888c8">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+
+Nobody&#39;s arguing that. But here&#39;s what your prescribing doctor probably didn&#39;t mention.
+
+Rapid weight loss triggers a massive cortisol spike.
+
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+
+You&#39;re thinner — but weaker, foggier, and running on fumes. That&#39;s not a win.
+
+Mars Men was built to protect what GLP-1s are quietly destroying.
+
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn&#39;t locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+
+This isn&#39;t theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+
+Right now it&#39;s 50% off with a full 90-day money-back guarantee.
+
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C005">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/7397c229937f-media-4fa25d623ba9.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/7397c229937f-media-4fa25d623ba9.jpg" alt="Unique creative C005">
+        </a>
+        <div class="meta">
+          <div class="kicker">C005 · COPY002 · 3 ad instances</div>
+          <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>2 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>96362501, 94903835, 94903329</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>96362501</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-96362501">recipe</a> · <a href="https://app.gethookd.ai/share/ad/96362501?signature=c60603f42200e585a9d0f72a2d680edb138ae810d74fa2d280501312d51928eb">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903835</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903835">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903835?signature=3040ad57877b1467599f1bb3cbb93a493f33867b84410e519ffda109ddb86895">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903329</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903329">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903329?signature=bc4cfc9ac9fa891329a29e9cb035702ad2facd5a7c2e88fe69d8509f6bcec34b">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C006">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/9ab4883df561-media-0e324af298e4.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/9ab4883df561-media-0e324af298e4.jpg" alt="Unique creative C006">
+        </a>
+        <div class="meta">
+          <div class="kicker">C006 · COPY001 · 2 ad instances</div>
+          <h3>What GLP-1 Does to Your T Levels</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>1 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903621, 94903411</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903621</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903621">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903621?signature=59f5d8d9aa5154c4cb4440ebcd34b8a044e337f735ac8f6f00a765f47b178afb">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903411</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903411">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903411?signature=7cc5fe33dd1cec43b3ded8bc523fcd049409c0e72889f551ff5d30aaeb5a5934">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+
+Nobody&#39;s arguing that. But here&#39;s what your prescribing doctor probably didn&#39;t mention.
+
+Rapid weight loss triggers a massive cortisol spike.
+
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+
+You&#39;re thinner — but weaker, foggier, and running on fumes. That&#39;s not a win.
+
+Mars Men was built to protect what GLP-1s are quietly destroying.
+
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn&#39;t locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+
+This isn&#39;t theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+
+Right now it&#39;s 50% off with a full 90-day money-back guarantee.
+
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C007">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/6ef412352013-media-018cbc7056f4.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/6ef412352013-media-018cbc7056f4.jpg" alt="Unique creative C007">
+        </a>
+        <div class="meta">
+          <div class="kicker">C007 · COPY002 · 2 ad instances</div>
+          <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>1 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>96362512, 94903337</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>96362512</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-96362512">recipe</a> · <a href="https://app.gethookd.ai/share/ad/96362512?signature=a0758f5221ba24296eed3935c2ec2b8baade89da7b3c39b97d1c6180ecf67f6f">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903337</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903337">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903337?signature=426b0f23bf1b7c4a8c5d0d8e2dafe6e83b267ebf4f677d1485207773c76ad9fc">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C008">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/0de00a1de5b6-media-7235783988d2.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/0de00a1de5b6-media-7235783988d2.jpg" alt="Unique creative C008">
+        </a>
+        <div class="meta">
+          <div class="kicker">C008 · COPY002 · 1 ad instance</div>
+          <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903681</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903681</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903681">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903681?signature=c1e8524abde54275acf4326717f94eb0d6daf15eb68efc85c13a3d5a3eb41989">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C009">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/558c9dc8d87c-media-f6e795a77f80.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/558c9dc8d87c-media-f6e795a77f80.jpg" alt="Unique creative C009">
+        </a>
+        <div class="meta">
+          <div class="kicker">C009 · COPY002 · 1 ad instance</div>
+          <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>96362526</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>96362526</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-96362526">recipe</a> · <a href="https://app.gethookd.ai/share/ad/96362526?signature=9c357eaf984d5d32abc9749cf0a58d4852bc75bee0e82aaeb1de2f3987fdf2c7">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C010">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/25df8bfcaf02-media-2e268ac8fb46.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/25df8bfcaf02-media-2e268ac8fb46.jpg" alt="Unique creative C010">
+        </a>
+        <div class="meta">
+          <div class="kicker">C010 · COPY002 · 1 ad instance</div>
+          <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>95129903</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>95129903</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129903">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129903?signature=d144aa10d3b71a93fe65219a8d1356ca3b34f9840ae099ca14b28073d9f242c2">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C011">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/fbcf6358016d-media-d287a8de7737.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/fbcf6358016d-media-d287a8de7737.jpg" alt="Unique creative C011">
+        </a>
+        <div class="meta">
+          <div class="kicker">C011 · COPY001 · 1 ad instance</div>
+          <h3>What GLP-1 Does to Your T Levels</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903406</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903406</td>
+                  <td>COPY001</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903406">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903406?signature=ecbe35d827d78da61591d413b2ee72ccd26eae90331869b79d3a30bd6da28293">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+
+Nobody&#39;s arguing that. But here&#39;s what your prescribing doctor probably didn&#39;t mention.
+
+Rapid weight loss triggers a massive cortisol spike.
+
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+
+You&#39;re thinner — but weaker, foggier, and running on fumes. That&#39;s not a win.
+
+Mars Men was built to protect what GLP-1s are quietly destroying.
+
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn&#39;t locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+
+This isn&#39;t theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+
+Right now it&#39;s 50% off with a full 90-day money-back guarantee.
+
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C012">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/a019f8b96f3c-media-9955f30f0c8b.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/a019f8b96f3c-media-9955f30f0c8b.jpg" alt="Unique creative C012">
+        </a>
+        <div class="meta">
+          <div class="kicker">C012 · COPY002 · 1 ad instance</div>
+          <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>10-reasons-glp</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+          <p><b>First line:</b> GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Why This Natural Testosterone Support Supplement Crushes TRT – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>95129805</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>95129805</td>
+                  <td>COPY002</td>
+                  <td>10-reasons-glp</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129805">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129805?signature=844d0202359d41c8327119427248aa96baea543ab993d1d2f872eb84963a7e21">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="GLP lander" data-creative-id="C013">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/008180b6d442-media-b48c85e53ae7.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/008180b6d442-media-b48c85e53ae7.jpg" alt="Unique creative C013">
+        </a>
+        <div class="meta">
+          <div class="kicker">C013 · COPY003 · 1 ad instance</div>
+          <h3>The GLP-1 Side Effect No One Mentions</h3>
+          <div class="badges">
+            <span>GLP lander</span>
+            <span>dr-latt-glp</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/dr-latt-glp">https://mengotomars.com/pages/dr-latt-glp</a></p>
+          <p><b>First line:</b> What did they NOT tell you when they prescribed your GLP-1?</p>
+          <p><b>Page hook:</b> | Physiology, Anatomy &amp; Genetics, University of Oxford | Biotechnology, Columbia University</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903594</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>81-81</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903594</td>
+                  <td>COPY003</td>
+                  <td>dr-latt-glp</td>
+                  <td>81</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903594">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903594?signature=1018806551da3d3e9b83a00f6b2afea67502f10d3acef62b45bc0fe47e79b702">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>What did they NOT tell you when they prescribed your GLP-1?
+
+They told you about the nausea. The injection schedule. The dietary changes.
+
+But nobody mentioned what&#39;s happening to your testosterone.
+
+Here&#39;s the gap in your doctor&#39;s advice: GLP-1 medications trigger rapid weight loss. Great. But your body doesn&#39;t discriminate between fat and muscle when it&#39;s shedding weight that fast. You&#39;re losing lean tissue — the exact tissue responsible for keeping your metabolism firing and your T levels healthy.
+
+Research now shows GLP-1 users face significantly higher risk of testosterone deficiency. So while the number on the scale drops, so does the hormone responsible for your energy, your strength, your drive, and your performance in every area that matters.
+
+There&#39;s a reason you feel lighter but not better.
+
+Dr. Latt Mansor knows this better than almost anyone. Oxford PhD. Columbia MS. He consults with Navy SEALs and Olympic athletes on performance optimization. And he has a specific recommendation for every man currently on a GLP-1.
+
+It starts with eight ingredients most doctors have never heard of.
+
+Boron to lower SHBG and free up locked testosterone. Tongkat Ali to block aromatase — the enzyme converting your T to estrogen. Fenugreek to protect against another conversion pathway. All at full clinical doses in one daily stack called Mars Men.
+
+91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength.
+
+Mars Men is currently 50% off with a full 90-day money-back guarantee.
+
+Read Dr. Latt&#39;s 2-minute article on what GLP-1s are really doing to men&#39;s hormones — and the natural protocol he says every GLP-1 user needs.</pre>
+          </details>
+        </div>
+      </article>
+      </div>
+    </section>
+
+    <section class="launch-section" data-section="Weight-loss lander">
+      <div class="section-head">
+        <div><h2>Weight-loss lander Creatives</h2><p><a href="https://mengotomars.com/pages/t-upgrade-with-weight-loss">https://mengotomars.com/pages/t-upgrade-with-weight-loss</a></p></div>
+        <span>2 unique creatives</span>
+      </div>
+      <div class="creative-grid">
+      <article class="creative-card" data-slots="Weight-loss lander" data-creative-id="C014">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/7dbbc2d62a45-media-df7664f85a07.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/7dbbc2d62a45-media-df7664f85a07.jpg" alt="Unique creative C014">
+        </a>
+        <div class="meta">
+          <div class="kicker">C014 · COPY004 · 7 ad instances</div>
+          <h3>Fix Your Hormones. Lose The Gut.</h3>
+          <div class="badges">
+            <span>Weight-loss lander</span>
+            <span>t-upgrade-with-weight-loss</span>
+            <span>6 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade-with-weight-loss">https://mengotomars.com/pages/t-upgrade-with-weight-loss</a></p>
+          <p><b>First line:</b> Summer is 8 weeks away. Your body isn&#39;t ready.</p>
+          <p><b>Page hook:</b> Torch stubborn Belly fat with this Natural T-Upgrade – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903501, 94284615, 94284474, 94284317, 94284609, 94284344, 94284343</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903501</td>
+                  <td>COPY004</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903501">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903501?signature=109d74fb01e90b222cad8d4f30e95c26d5f79760b6258e6b006e320b63cdf381">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284615</td>
+                  <td>COPY004</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284615">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284615?signature=da42d4cd70f5df15d51fb61bc666d90113b8aaf9d81da4fc18da20733ec1ad7e">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284474</td>
+                  <td>COPY004</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284474">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284474?signature=6bf08f449e53c0d0b46f50787398d8f2b164b2c4b0aa50159a131750839be285">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284317</td>
+                  <td>COPY004</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284317">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284317?signature=94a884319f334c9ee424f03a73b7dc8aca5a414b2c3b25db69a87e2178ca1e03">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284609</td>
+                  <td>COPY004</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284609">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284609?signature=5594560cb6ad5473cd47e5d238cf2f5d598f36b6113ca714cf8bcf3c129f8454">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284344</td>
+                  <td>COPY004</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284344">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284344?signature=874f786f905d928af20404ee638eb5a2fae97bb0bf02b4e2204c953eb221a8fc">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284343</td>
+                  <td>COPY004</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284343">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284343?signature=a5d915a241d3ab985829300840898620c29668ac6d3fa957e95f94d835baa819">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Summer is 8 weeks away. Your body isn&#39;t ready.
+
+And here&#39;s the part no one tells you — the extra cardio won&#39;t fix it. The calorie cutting won&#39;t fix it. Not this time.
+
+Because after 30, your body starts converting testosterone into estrogen. That&#39;s not a metaphor.
+
+There&#39;s an enzyme called aromatase that literally takes the hormone that burns fat and builds muscle… and turns it into the hormone that stores belly fat and softens everything.
+
+Your gut isn&#39;t a discipline problem. It&#39;s a hormone problem.
+
+Every month you ignore it, the ratio shifts further. More estrogen. Less T. More fat stored around your chest and midsection. Less muscle holding on.
+
+Mars Men was built to attack this at the root. Tongkat Ali blocks the aromatase enzyme so your T stops converting to estrogen.
+
+Boron lowers SHBG so the testosterone you DO have actually gets used instead of locked up.
+
+8 clinically-dosed ingredients. One daily stack.
+
+91% of men reported higher energy within 90 days. 87% reported increased strength. These aren&#39;t lab rats — that&#39;s a survey of over 1,000 real customers.
+
+Right now it&#39;s 50% off with a 90-day money-back guarantee. You literally risk nothing.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Weight-loss lander" data-creative-id="C015">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/503eddff929e-media-5fc9144819a6.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/503eddff929e-media-5fc9144819a6.jpg" alt="Unique creative C015">
+        </a>
+        <div class="meta">
+          <div class="kicker">C015 · COPY005 · 7 ad instances</div>
+          <h3>Fix Your Hormones. Lose The Moobs.</h3>
+          <div class="badges">
+            <span>Weight-loss lander</span>
+            <span>t-upgrade-with-weight-loss</span>
+            <span>6 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade-with-weight-loss">https://mengotomars.com/pages/t-upgrade-with-weight-loss</a></p>
+          <p><b>First line:</b> Summer&#39;s 90 days away. Your hormones don&#39;t care.</p>
+          <p><b>Page hook:</b> Torch stubborn Belly fat with this Natural T-Upgrade – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94284772, 94284449, 94284316, 94284531, 94284495, 94284360, 94284315</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94284772</td>
+                  <td>COPY005</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284772">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284772?signature=ee2e1236537be6c907a04934cbb86c96f8d9c2d9b7dd8701ee3ab6ed0c641814">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284449</td>
+                  <td>COPY005</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284449">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284449?signature=dacca5d9e947d7e5c690437ca550c77af80f7c969441d798a21349d0573fa96c">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284316</td>
+                  <td>COPY005</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284316">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284316?signature=0eb1fb0b0071d2b0409efa661c31d33c8e0b262b7f97e235dbfb88d741239390">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284531</td>
+                  <td>COPY005</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284531">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284531?signature=3b931314db151fcc2e5adface65a94c64844921487a7c283f240b0e3c09c6125">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284495</td>
+                  <td>COPY005</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284495">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284495?signature=a63ab8652a07165538e2ae3f2f62ae0fd88b00a85dbf7333386fd9218bf4fb3e">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284360</td>
+                  <td>COPY005</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284360">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284360?signature=bbf35d2724d650dc270c0dea4f3d67d39336d1d697511334d9fc3a0f7d4069e3">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284315</td>
+                  <td>COPY005</td>
+                  <td>t-upgrade-with-weight-loss</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284315">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284315?signature=df40476196eca51cf5d344765f179cf48c32099c58e78a5effab8ff6552a5497">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Summer&#39;s 90 days away. Your hormones don&#39;t care.
+
+Right now, your body is running a 24/7 sabotage operation on your physique. Elevated cortisol is telling your body to store fat — especially around your midsection. An enzyme called aromatase is converting your testosterone into estrogen. And a protein called SHBG is locking up whatever T you have left so your muscles can&#39;t even use it.
+
+Three systems working against you. Crunches won&#39;t fix that. Neither will another crash diet.
+
+Mars Men was built to attack all three.
+
+Tongkat Ali blocks the enzyme converting your T to estrogen and drives cortisol down.
+
+Boron lowers SHBG so your body can actually USE the testosterone it makes.
+
+8 clinically-dosed ingredients total — each targeting a different piece of the hormonal puzzle.
+
+87% of men in a 1,000-person survey reported increased strength. One customer at 62 says he&#39;s stronger now than in his 20s and 30s.
+
+Right now it&#39;s 50% off for life — plus free shipping, a free Natural Testosterone Guide, and a free travel tin. Backed by a 90-day Higher-T Guarantee.
+
+Every week you wait, your body stores more fat and burns less muscle. That&#39;s not aging — that&#39;s hormones.</pre>
+          </details>
+        </div>
+      </article>
+      </div>
+    </section>
+
+    <section class="launch-section" data-section="TRT lander / TRT alternative references">
+      <div class="section-head">
+        <div><h2>TRT lander / TRT alternative references Creatives</h2><p><a href="https://mengotomars.com/pages/t-upgrade">https://mengotomars.com/pages/t-upgrade</a> · <a href="https://mengotomars.com/pages/10-reasons">https://mengotomars.com/pages/10-reasons</a></p></div>
+        <span>5 unique creatives</span>
+      </div>
+      <div class="creative-grid">
+      <article class="creative-card" data-slots="TRT lander / TRT alternative references" data-creative-id="C026">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/31217e466127-media-40ebe180ed0d.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/31217e466127-media-40ebe180ed0d.jpg" alt="Unique creative C026">
+        </a>
+        <div class="meta">
+          <div class="kicker">C026 · COPY006 · 8 ad instances</div>
+          <h3>See What&#39;s Actually Inside</h3>
+          <div class="badges">
+            <span>TRT lander / TRT alternative references</span>
+            <span>t-upgrade</span>
+            <span>7 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade">https://mengotomars.com/pages/t-upgrade</a></p>
+          <p><b>First line:</b> Most testosterone supplements are hiding something behind their &quot;proprietary blend&quot; label.</p>
+          <p><b>Page hook:</b> Your Natural Testosterone Upgrade – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903427, 94284766, 94284508, 94284307, 94903439, 94284375, 94284337, 95130018</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>81-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903427</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903427">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903427?signature=c83ed0fa171f705f6a959f5c4224ca6568cc10a5909782ffca6f4c2f981fdf27">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284766</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284766">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284766?signature=cacfce725d803af8e4c3631a8d9e259892b925f6610b12590c8bcfb21a82e485">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284508</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284508">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284508?signature=8f5fe7fd3d62dee2d2d903581ef8a40f54f40e7ae09f2bc64ae90266587474ca">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284307</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284307">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284307?signature=493a7762d388fed592fe48a093a97690cb9a57c6a2d72e1b773f0c5109f365a0">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903439</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903439">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903439?signature=25bbed89c56dcf713ec385e769b31b821c78c3a0cd4047c0e5ada4609a8b5737">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284375</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284375">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284375?signature=1b9f1fab975c6e043e8094a11729b4084b2e8b8eb181bbace9821ca566fdad56">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284337</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284337">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284337?signature=967a50dc3307585b0ff4c5ffa9bd87b89c2fcf741ae5f668869a32d769e75a58">share</a></td>
+                </tr>
+                <tr>
+                  <td>95130018</td>
+                  <td>COPY006</td>
+                  <td>t-upgrade</td>
+                  <td>81</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95130018">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95130018?signature=7ffff071ff81aa55c6f9c474ee8fde60bb16bc645f4807ba1816489b1c040eac">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Most testosterone supplements are hiding something behind their &quot;proprietary blend&quot; label.
+
+Here&#39;s what they don&#39;t want you to see.
+
+You&#39;re swallowing 2-3 underdosed ingredients buried in fillers — and wondering why nothing changes. Your T keeps dropping. Your energy keeps tanking. And every month you wait, those three thieves — SHBG, aromatase, and cortisol — steal more of what you have left.
+
+Mars Men shows you exactly what&#39;s inside. 8 ingredients. Full clinical doses. No proprietary blend. No mystery powder.
+
+Tongkat Ali at 1,000mg blocks the enzyme converting your T to estrogen. Boron at 4mg lowers SHBG so your body can actually USE the testosterone it makes.
+
+91% of men surveyed reported higher energy within 90 days. Not from stimulants. From actually addressing the hormone problem.
+
+Right now it&#39;s 50% off with a 90-day money-back guarantee.
+
+See how 8 ingredients work across 3 levels to unblock your testosterone — and why most formulas only target one.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="TRT lander / TRT alternative references" data-creative-id="C027">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/d51575a5518b-media-80c0140024d0.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/d51575a5518b-media-80c0140024d0.jpg" alt="Unique creative C027">
+        </a>
+        <div class="meta">
+          <div class="kicker">C027 · COPY007 · 8 ad instances</div>
+          <h3>Crush Cortisol. Reclaim Your T.</h3>
+          <div class="badges">
+            <span>TRT lander / TRT alternative references</span>
+            <span>t-upgrade</span>
+            <span>7 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade">https://mengotomars.com/pages/t-upgrade</a></p>
+          <p><b>First line:</b> Your stress hormone is eating your testosterone alive.</p>
+          <p><b>Page hook:</b> Your Natural Testosterone Upgrade – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903380, 94284408, 94284372, 94284347, 94284485, 94284409, 94284293, 95129952</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903380</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903380">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903380?signature=5cbe7652c0176ff9e96b0dd11acf1f8b0a7e6f5283603470e8de26aeb5010af8">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284408</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284408">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284408?signature=827868f4eff50240a9183a0ebd8c9f42fa13ffa323fed443429112e328575943">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284372</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284372">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284372?signature=f461647f1119b6330d17da89fe35d03a4bf87c6fce0e5ed7d029b5a1ee4ae339">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284347</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284347">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284347?signature=7c76072ef8b32b3c7ffdfefb4582cccbf2ff15308c0e4a85c6c16df605aeeb54">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284485</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284485">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284485?signature=f06e4784a9ca22e1699bc3faccad49b4d7d983969ea39d8ec2604666f055cd52">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284409</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284409">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284409?signature=70e55af55514fae20bdd84d88f696547e8463b038b6fca2376c611fac33ffb84">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284293</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284293">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284293?signature=59eecb489b2cfef8541a9c752d4ea92fd279a37a848c4569b06279b0c59dcfd8">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129952</td>
+                  <td>COPY007</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129952">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129952?signature=d522c2d35aa36c9954bc79f8a7ef834e86911fe0360bf33189a119d46c40efd2">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Your stress hormone is eating your testosterone alive.
+
+Not next year. Not &quot;eventually.&quot; Right now — while you&#39;re scrolling.
+
+Every time your stress spikes — the bad sleep, the work pressure, the packed schedule — your body floods with cortisol. And cortisol doesn&#39;t just make you feel wired and tired.
+
+It actively shuts down testosterone production at the source.
+
+Think of it as a thief running a 24/7 heist on your T. The more stressed you are, the less testosterone your body makes. Less energy. Less drive. Less muscle. Less of everything that makes you feel like you.
+
+And here&#39;s the brutal part: it compounds. Every month you don&#39;t address it, your levels drop further.
+
+Mars Men was built to crush cortisol while supporting healthy testosterone levels — the only formula designed to do both.
+
+Tongkat Ali at a full 1,000mg clinical dose drives cortisol down and blocks the enzyme that converts your T to estrogen. Boron lowers SHBG so your body can actually use the testosterone it makes.
+
+Eight ingredients. Three levels of attack.
+
+91% of men reported higher energy within 90 days in a survey of 1,000 customers.
+
+50% off right now with free shipping, a free T guide, and a 90-day money-back guarantee.
+
+See the full 4-level system that attacks all three testosterone thieves at once.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="TRT lander / TRT alternative references" data-creative-id="C029">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/2305e0a897e7-media-e7a22252a7c8.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/2305e0a897e7-media-e7a22252a7c8.jpg" alt="Unique creative C029">
+        </a>
+        <div class="meta">
+          <div class="kicker">C029 · COPY008 · 5 ad instances</div>
+          <h3>Try It or Stay Stuck.</h3>
+          <div class="badges">
+            <span>TRT lander / TRT alternative references</span>
+            <span>10-reasons</span>
+            <span>4 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons">https://mengotomars.com/pages/10-reasons</a></p>
+          <p><b>First line:</b> Two options. Pick one.</p>
+          <p><b>Page hook:</b> 10 Reasons Men Are Ditching TRT For Mars Men This Year (Natural &gt; Needles. Every Time.)</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94284974, 94903597, 94903517, 94284523, 94284448</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>ok</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94284974</td>
+                  <td>COPY008</td>
+                  <td>10-reasons</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284974">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284974?signature=a2a9c875b79e0d1bd9d4c6773e385a81eeeb24b899b319734eeba4caf699408f">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903597</td>
+                  <td>COPY008</td>
+                  <td>10-reasons</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903597">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903597?signature=7c653717c57c6a2c1ed2a7d1131406d9f2d22cd03a501cd35d0052a7493901e6">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903517</td>
+                  <td>COPY008</td>
+                  <td>10-reasons</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903517">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903517?signature=5f7fcbe794b118108019bca46ed6ab6d0b6ceb77dac8d54228facdaa3252d783">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284523</td>
+                  <td>COPY008</td>
+                  <td>10-reasons</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284523">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284523?signature=67ffe8b7213587cb46db4a953e3fb2e58ba5f8107070cada35f82647dc72d45c">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284448</td>
+                  <td>COPY008</td>
+                  <td>10-reasons</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284448">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284448?signature=32c2308a91048d07eeb9a96b6ac54552418a13748b95dd78db3f7d3252b0f0f6">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Two options. Pick one.
+❌ Keep feeling tired, unmotivated, and running on caffeine
+✅ Try Mars Men risk-free for 90 days and see what changes
+
+8 natural ingredients. Clinical doses. No artificial anything. Tongkat Ali, Shilajit, Boron, Zinc + more.
+
+If it doesn&#39;t work — full refund. If it does — night and day difference.
+
+See why men are calling this their T-upgrade.
+
+50% off for life + free shipping + free gifts.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="TRT lander / TRT alternative references" data-creative-id="C030">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/1f2d8e55f398-media-0aba0457721a.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/1f2d8e55f398-media-0aba0457721a.jpg" alt="Unique creative C030">
+        </a>
+        <div class="meta">
+          <div class="kicker">C030 · COPY009 · 2 ad instances</div>
+          <h3>New Year Sale: Save 50% Off + Free Gifts</h3>
+          <div class="badges">
+            <span>TRT lander / TRT alternative references</span>
+            <span>10-reasons</span>
+            <span>1 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons">https://mengotomars.com/pages/10-reasons</a></p>
+          <p><b>First line:</b> Give yourself a head start toward better energy, focus, and burning stubborn belly fat.</p>
+          <p><b>Page hook:</b> 10 Reasons Men Are Ditching TRT For Mars Men This Year (Natural &gt; Needles. Every Time.)</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903536, 94284742</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>ok</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903536</td>
+                  <td>COPY009</td>
+                  <td>10-reasons</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903536">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903536?signature=1e403822d53ded8130a2302f0b3d060a23901d0a69c4695a8bde59c0c52c1a4f">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284742</td>
+                  <td>COPY009</td>
+                  <td>10-reasons</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284742">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284742?signature=6d42e395558a45c08d728bdd12fe230ceb0629153afb6a7f0b88bd4a04cf9398">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Give yourself a head start toward better energy, focus, and burning stubborn belly fat.
+
+January 1st.
+
+Everyone&#39;s making promises.
+
+&quot;I&#39;m gonna lose 20 pounds.&quot;
+
+&quot;I&#39;m gonna get stronger.&quot;
+
+&quot;I&#39;m gonna feel like myself again.&quot;
+
+By March, most of them quit.
+
+But not you.
+
+Because while they&#39;re relying on motivation and willpower...
+
+You&#39;re running a SYSTEM.
+
+Mars Men isn&#39;t a resolution.
+
+It&#39;s the biological foundation that makes resolutions actually WORK.
+
+8 science-backed ingredients working together to support your testosterone production.
+
+So when you commit to change, your BODY commits with you.
+
+Your energy doesn&#39;t fade by Week 3.
+
+Your strength doesn&#39;t plateau by Week 6.
+
+Your progress doesn&#39;t stall by Week 12.
+
+Instead...
+
+By April, people are asking what you&#39;re doing differently.
+
+By July, your wife can&#39;t keep her hands off you.
+
+By December, you&#39;re the guy everyone else wishes they&#39;d become.
+
+Don&#39;t make another empty promise this New Year.
+
+Build the biological foundation for REAL transformation.
+
+And lock it in at 50% OFF during our New Year Sale.
+
+This is our biggest discount of the year...
+
+Plus FREE gifts when you stock up.
+
+Set yourself up for success NOW while you can save.
+
+👉 Start 2026 right - Get 50% off Mars Men + FREE gifts (New Year Sale)</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="TRT lander / TRT alternative references" data-creative-id="C028">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/acf42cbeca04-media-f25b1ed0e12f.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/acf42cbeca04-media-f25b1ed0e12f.jpg" alt="Unique creative C028">
+        </a>
+        <div class="meta">
+          <div class="kicker">C028 · COPY010 · 2 ad instances</div>
+          <h3>Don&#39;t Ignore Your Testosterone.</h3>
+          <div class="badges">
+            <span>TRT lander / TRT alternative references</span>
+            <span>t-upgrade</span>
+            <span>1 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade">https://mengotomars.com/pages/t-upgrade</a></p>
+          <p><b>First line:</b> Taking care of one thing? Good. Don&#39;t ignore the other. 💡</p>
+          <p><b>Page hook:</b> Your Natural Testosterone Upgrade – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903543, 94903448</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>failed</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903543</td>
+                  <td>COPY010</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903543">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903543?signature=03c311f00e5f1a49f51f62a2003d11361b33275cb9f2544f9332e16314acf7c6">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903448</td>
+                  <td>COPY010</td>
+                  <td>t-upgrade</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903448">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903448?signature=db12c10bd6943f8bb5113e1d1a3f62932c46238854c4cfd0e453a78143eadabb">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Taking care of one thing? Good. Don&#39;t ignore the other. 💡
+
+Your testosterone needs support too. After 30, T drops every year — and your energy, drive, and strength go with it.
+
+Mars Men: 8 natural ingredients at clinical doses supporting testosterone production.
+
+⚡ More energy
+💪 More strength
+🧠 More clarity
+
+See the signs your T might be crashing — and what to do about it.
+
+✅ 90-day guarantee
+✅ 50% off + free shipping + free gifts</pre>
+          </details>
+        </div>
+      </article>
+      </div>
+    </section>
+
+    <section class="launch-section" data-section="Quiz funnel">
+      <div class="section-head">
+        <div><h2>Quiz funnel Creatives</h2><p><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p></div>
+        <span>10 unique creatives</span>
+      </div>
+      <div class="creative-grid">
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C016">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/5e02fe6f3797-media-bd0da4209c0b.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/5e02fe6f3797-media-bd0da4209c0b.jpg" alt="Unique creative C016">
+        </a>
+        <div class="meta">
+          <div class="kicker">C016 · COPY012 · 6 ad instances</div>
+          <h3>50% Off + Free Gifts 🚀</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>5 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> You eat clean. You train hard. You’re STILL tired and gaining weight. Here’s why.</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903454, 94284482, 94904005, 94903676, 94903334, 95129874</dd></div>
+            <div><dt>Image</dt><dd>1080x1080</dd></div>
+            <div><dt>Score range</dt><dd>61-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903454</td>
+                  <td>COPY012</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903454">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903454?signature=8dcabbd1db51e32e94385724cfac63680e40bf9accfdfd24135ac6481cd08452">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284482</td>
+                  <td>COPY012</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284482">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284482?signature=d0fd227d299593725875054a1f7e0d570a71b10d4757d3d7544ba43643117c25">share</a></td>
+                </tr>
+                <tr>
+                  <td>94904005</td>
+                  <td>COPY012</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94904005">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94904005?signature=23f9d3c3bf330fdd99b2e5f78aa2afebf682821202654ae19064f70153b506a5">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903676</td>
+                  <td>COPY012</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903676">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903676?signature=51de51c62bf20bf8a4457d8c9d667882d531b9fe97e50160593a939e7e18c8ab">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903334</td>
+                  <td>COPY012</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903334">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903334?signature=6e9d4f739acd597521a1ff3dfa756273fab41691b869cc2cbb684cb144309f94">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129874</td>
+                  <td>COPY012</td>
+                  <td>quiz-v6</td>
+                  <td>61</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129874">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129874?signature=b82158fcaee4a39844ddea0c1f1395878fd0207e1ef69410b36e2b8f0a9b5bbc">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>You eat clean. You train hard. You’re STILL tired and gaining weight. Here’s why.
+
+If you’re over 35 and constantly tired, dragging through the day, or frustrated in the gym…
+
+It’s not motivation or willpower.
+
+It’s testosterone.
+
+T levels start dropping around age 30. And that slow hormonal drain robs you of energy, drive, strength, confidence, and performance.
+
+One day you wake up and wonder:
+
+“What happened?”
+
+Most guys try to fix it by doubling down on workouts… eating cleaner… drinking more coffee…
+
+And when that doesn’t work?
+
+They end up with a cabinet full of overpriced, under-dosed supplements. Or worse, they consider jumping on TRT.
+
+Here’s the truth:
+
+You don’t need needles, prescriptions, or a dozen bottles.
+
+You need one clinically dosed stack that helps your body produce more testosterone, naturally.
+
+That’s what Mars Men was built for.
+
+It’s an all-in-one daily testosterone support formula with 8 powerhouse ingredients, including:
+
+🌿 Tongkat Ali – Boosts drive, energy, and morning wood
+🪨 Shilajit – Fuels stamina so you don’t crash mid-day
+🛡️ Zinc – Keeps hormones balanced and focus sharp
+⚙️ Boron – Frees up testosterone for more motivation
+🌾 Fenugreek – Fires up libido and bedroom confidence
+⚡ Taurine – Speeds recovery and sharpens mental focus
+☀️💪 Vitamins D, K1 + K2 – Supports bones, mood, and daily energy
+
+No BS. No fairy dust. Just full clinical doses your body can feel.
+
+In a recent survey, men using Mars Men for 90 days reported:
+
+✅ 91% increase in energy
+✅ 87% felt stronger and more recovered
+✅ 82% noticed improved vitality
+✅ +60% testosterone boost (verified by bloodwork)
+
+No needles. No stacking. No cycling. Just results.
+
+Claim your 90-Day Launch Kit now and get 50% off — plus 2 free gifts: a Testosterone Optimization Guide and portable travel tin.
+
+Over 121,000+ men have already transformed their lives with this formula.
+
+If you don’t feel stronger, sharper, and more energized in 90 days — you get every penny back. No questions asked.
+
+👉 Reclaim your masculinity. Naturally. Click the link below.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C017">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/e82b83c0aa51-media-5ff217ccfc52.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/e82b83c0aa51-media-5ff217ccfc52.jpg" alt="Unique creative C017">
+        </a>
+        <div class="meta">
+          <div class="kicker">C017 · COPY013 · 6 ad instances</div>
+          <h3>50% Off — 90-Day Guarantee</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>5 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> 429,576+ men didn&#39;t switch to Mars Men because of a slick ad.</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94284473, 94284416, 94903490, 94284913, 94284899, 94284649</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94284473</td>
+                  <td>COPY013</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284473">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284473?signature=6d2db7bd2927c212c0a119ac7c596dd2facad6780866f039af8348df869f0738">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284416</td>
+                  <td>COPY013</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284416">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284416?signature=0c4b8b899052cf3de7ea2490e2c2575d39c15ff1a2f5881a0a6dd114942fac58">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903490</td>
+                  <td>COPY013</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903490">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903490?signature=3d0bfe693bc30116fd76a4ac73a11c1c43a7dc442b2dd942278bf3edff81b1bc">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284913</td>
+                  <td>COPY013</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284913">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284913?signature=892392ae1cbe2d566b82b292a0e338e5668443c6f6b86d89ade933797ddd2744">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284899</td>
+                  <td>COPY013</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284899">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284899?signature=aee43b5cd8b507fd9eed0c5268b78f7ad5705ef7ca8de1745dbb4d0bb1143572">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284649</td>
+                  <td>COPY013</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284649">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284649?signature=8bec287836ce28ee35cfdc6c03f6c76ed7ede2c8dd2adf2254c823d5b3e1d21e">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>429,576+ men didn&#39;t switch to Mars Men because of a slick ad.
+
+They switched because their bloodwork changed.
+
+One man&#39;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#39;t explain. Another guy tried 10 different supplements — spent hundreds — before finding the one his bloodwork actually responded to. His words: &quot;The bloodwork doesn&#39;t lie.&quot;
+
+Then there&#39;s the guy who QUIT TRT for Mars Men and came back with higher numbers than he ever had on testosterone replacement therapy. Or the 52-year-old who lost 30 pounds and says his wife can&#39;t keep her hands off him.
+
+These aren&#39;t cherry-picked outliers. In a survey of over 1,000 customers:
+
+→ 91% reported higher energy in 90 days
+
+→ 87% reported increased strength
+
+→ 82% reported improved male vitality
+
+The formula: 8 clinically-dosed ingredients targeting testosterone from three angles — make more (Shilajit, Zinc, D3), keep more (Tongkat Ali, Boron, Fenugreek), and protect what you&#39;ve got (Taurine).
+
+Every batch third-party tested. cGMP certified. Made in the USA.
+
+50% off. Plus a 90-day money-back guarantee. No risk. Just results or a full refund.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C018">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/99968e21b82d-media-3a1928e80dbe.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/99968e21b82d-media-3a1928e80dbe.jpg" alt="Unique creative C018">
+        </a>
+        <div class="meta">
+          <div class="kicker">C018 · COPY014 · 4 ad instances</div>
+          <h3>50% Off — 90-Day Guarantee</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>3 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> 429,576+ men didn&#39;t switch to Mars Men because of a slick ad.</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903516, 94284425, 94903408, 96362519</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>81-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903516</td>
+                  <td>COPY014</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903516">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903516?signature=e073428c9ba772d8f5c96aafc82d2145a1185d160e33e172b919276fa43b716a">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284425</td>
+                  <td>COPY014</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284425">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284425?signature=3087e1ea06a208a778e6667fde7e383f9947252386dfa5e6e9e4296e4b57d249">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903408</td>
+                  <td>COPY014</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903408">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903408?signature=55e53a60caaffcd708497ff3df48e1f9c5a491f9abef05148f071022a6d992be">share</a></td>
+                </tr>
+                <tr>
+                  <td>96362519</td>
+                  <td>COPY014</td>
+                  <td>quiz-v6</td>
+                  <td>81</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-96362519">recipe</a> · <a href="https://app.gethookd.ai/share/ad/96362519?signature=bdf59c59a78b1f2f0c09547b6a475536281868bb66a5dfdd763525655cf8db38">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>429,576+ men didn&#39;t switch to Mars Men because of a slick ad.
+
+They switched because their bloodwork changed.
+
+One man&#39;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#39;t explain. Another guy tried 10 different supplements — spent hundreds — before finding the one his bloodwork actually responded to. His words: &quot;The bloodwork doesn&#39;t lie.&quot;
+
+Then there&#39;s the guy who QUIT TRT for Mars Men and came back with higher numbers than he ever had on testosterone replacement therapy. Or the 52-year-old who lost 30 pounds and says his wife can&#39;t keep her hands off him.
+
+These aren&#39;t cherry-picked outliers. In a survey of over 1,000 customers:
+
+→ 91% reported higher energy in 90 days
+
+→ 87% reported increased strength
+
+→ 82% reported improved male vitality
+
+The formula: 8 clinically-dosed ingredients targeting testosterone from three angles — make more (Shilajit, Zinc, D3), keep more (Tongkat Ali, Boron, Fenugreek), and protect what you&#39;ve got (Taurine).
+
+Every batch third-party tested. cGMP certified. Made in the USA.
+
+50% off. Plus a 90-day money-back guarantee. No risk. Just results or a full refund.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C019">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/f8c1502ad727-media-a22273679195.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/f8c1502ad727-media-a22273679195.jpg" alt="Unique creative C019">
+        </a>
+        <div class="meta">
+          <div class="kicker">C019 · COPY011 · 4 ad instances</div>
+          <h3>Stop Losing T. Start Today.</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>3 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> Your testosterone is dropping right now. And it&#39;s not &quot;just getting older.&quot;</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903485, 94284394, 95130056, 95129919</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903485</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903485">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903485?signature=e50976ba7fc6418481aabb5b3c9f874ade004439ad42f9ba4e78a75573ed6fce">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284394</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284394">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284394?signature=dd47aafa4f62e4d970d6192aeec5cb5b5a8eb57a5f730941eae75d4f631ffa9e">share</a></td>
+                </tr>
+                <tr>
+                  <td>95130056</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95130056">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95130056?signature=fc55e6febed94aa60276d8a9a336dc6531c556fc679b61f2acf142e84eb4295a">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129919</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129919">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129919?signature=f2a634d74104954a4dd52bd1c24c74836821013b9420c7fe74e045f57905bd79">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Your testosterone is dropping right now. And it&#39;s not &quot;just getting older.&quot;
+
+Every single month you put off doing something about it, your body converts more of your remaining T into estrogen.
+
+Your SHBG locks up what&#39;s left. And cortisol — from stress, bad sleep, and modern life — tanks production at the source.
+
+That brain fog at 2pm?
+
+The gut that won&#39;t budge no matter what you eat?
+
+The fact that you&#39;d rather scroll your phone than do anything with your evening?
+
+That&#39;s not laziness. That&#39;s a hormone problem. And it compounds the longer you wait.
+
+Mars Men was built to fight all three thieves simultaneously.
+
+Tongkat Ali blocks the enzyme that converts your T to estrogen and drives cortisol down.
+
+Boron lowers SHBG so your body can actually use the testosterone it makes.
+
+And the full 8-ingredient stack works across three pathways — making more T, keeping what you&#39;ve got, and protecting the cells that produce it.
+
+91% of men reported higher energy within 90 days in a survey of over 1,000 customers. Not a vague &quot;maybe I feel something.&quot; Real, noticeable energy.
+
+Right now it&#39;s 50% off — plus free gifts and free shipping. Every bottle is backed by a 90-day Higher-T Guarantee.
+
+If you don&#39;t feel the difference, you get every cent back.
+
+But here&#39;s the thing — your T isn&#39;t going to fix itself while you &quot;think about it.&quot;</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C020">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/212a134b0db2-media-a346103f01a8.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/212a134b0db2-media-a346103f01a8.jpg" alt="Unique creative C020">
+        </a>
+        <div class="meta">
+          <div class="kicker">C020 · COPY011 · 4 ad instances</div>
+          <h3>Stop Losing T. Start Today.</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>3 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> Your testosterone is dropping right now. And it&#39;s not &quot;just getting older.&quot;</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94284399, 94284351, 95129899, 95129849</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94284399</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284399">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284399?signature=7e42af1aca8df719fa021ac7ea3551a0a9e0442648db043cb157ff59d96021f7">share</a></td>
+                </tr>
+                <tr>
+                  <td>94284351</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94284351">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94284351?signature=b8064e6c494e170d2e223da891ba2d8a103e1f17fff0c7331e5257663b8074cd">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129899</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129899">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129899?signature=2e50d65f56a7decf596c177bf1fc3510e762ff07b5fc8500a77278079951066a">share</a></td>
+                </tr>
+                <tr>
+                  <td>95129849</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-95129849">recipe</a> · <a href="https://app.gethookd.ai/share/ad/95129849?signature=4589f54ddcb099cae0d267080db689f2e5dbc30f371b594aca2489c3fb93bc99">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Your testosterone is dropping right now. And it&#39;s not &quot;just getting older.&quot;
+
+Every single month you put off doing something about it, your body converts more of your remaining T into estrogen.
+
+Your SHBG locks up what&#39;s left. And cortisol — from stress, bad sleep, and modern life — tanks production at the source.
+
+That brain fog at 2pm?
+
+The gut that won&#39;t budge no matter what you eat?
+
+The fact that you&#39;d rather scroll your phone than do anything with your evening?
+
+That&#39;s not laziness. That&#39;s a hormone problem. And it compounds the longer you wait.
+
+Mars Men was built to fight all three thieves simultaneously.
+
+Tongkat Ali blocks the enzyme that converts your T to estrogen and drives cortisol down.
+
+Boron lowers SHBG so your body can actually use the testosterone it makes.
+
+And the full 8-ingredient stack works across three pathways — making more T, keeping what you&#39;ve got, and protecting the cells that produce it.
+
+91% of men reported higher energy within 90 days in a survey of over 1,000 customers. Not a vague &quot;maybe I feel something.&quot; Real, noticeable energy.
+
+Right now it&#39;s 50% off — plus free gifts and free shipping. Every bottle is backed by a 90-day Higher-T Guarantee.
+
+If you don&#39;t feel the difference, you get every cent back.
+
+But here&#39;s the thing — your T isn&#39;t going to fix itself while you &quot;think about it.&quot;</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C021">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/32cf92e6a2c7-media-c933df4e7cd2.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/32cf92e6a2c7-media-c933df4e7cd2.jpg" alt="Unique creative C021">
+        </a>
+        <div class="meta">
+          <div class="kicker">C021 · COPY015 · 3 ad instances</div>
+          <h3>90-Day Guarantee Because We Know It Works.</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>2 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> Your grandfather had more testosterone at 60 than you do at 35.</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903773, 94903614, 94903320</dd></div>
+            <div><dt>Image</dt><dd>1080x1080</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903773</td>
+                  <td>COPY015</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903773">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903773?signature=be943bbc1970763083e4b3b893879da0b8751a75e96999e64441f23e63cda721">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903614</td>
+                  <td>COPY015</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903614">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903614?signature=390ab2ab51334d817a51643a45efb1596448cfdf70470ff5ed8d85322912768f">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903320</td>
+                  <td>COPY015</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903320">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903320?signature=6a1000c80f782174978cb22c7d989edbc258ff2f6fd7bbf6582eadbb3f05a38d">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Your grandfather had more testosterone at 60 than you do at 35.
+
+He didn&#39;t have:
+❌ Plastics leaching estrogen into his water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11pm
+
+You&#39;re not weak. You&#39;re poisoned.
+
+Mars Men was built to fight back.
+💪 Tongkat Ali blocks the enzyme stealing your T
+💪 Boron frees up testosterone that&#39;s locked away
+💪 Shilajit grows more T-producing cells in your balls
+
+No dirt powders. No cheap fillers. No fairy dust.
+
+Just the 8 ingredients designed to support your T production from every angle.
+
+50% off your first month. 90-day guarantee.
+
+Stop blaming yourself. Start fighting back.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C022">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/fcd77c660ceb-media-9a7496d2f1ad.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/fcd77c660ceb-media-9a7496d2f1ad.jpg" alt="Unique creative C022">
+        </a>
+        <div class="meta">
+          <div class="kicker">C022 · COPY011 · 2 ad instances</div>
+          <h3>Stop Losing T. Start Today.</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>1 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> Your testosterone is dropping right now. And it&#39;s not &quot;just getting older.&quot;</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903689, 96362585</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>81-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903689</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903689">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903689?signature=aa874a24df3992d506048ef72f2addc6fe6cb06efc3f4545148791df377c43ed">share</a></td>
+                </tr>
+                <tr>
+                  <td>96362585</td>
+                  <td>COPY011</td>
+                  <td>quiz-v6</td>
+                  <td>81</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-96362585">recipe</a> · <a href="https://app.gethookd.ai/share/ad/96362585?signature=ce0851bce237191f2bdfd88e6ae82c6c96a8b78192c4b4cc2fcca18e0fd704bf">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Your testosterone is dropping right now. And it&#39;s not &quot;just getting older.&quot;
+
+Every single month you put off doing something about it, your body converts more of your remaining T into estrogen.
+
+Your SHBG locks up what&#39;s left. And cortisol — from stress, bad sleep, and modern life — tanks production at the source.
+
+That brain fog at 2pm?
+
+The gut that won&#39;t budge no matter what you eat?
+
+The fact that you&#39;d rather scroll your phone than do anything with your evening?
+
+That&#39;s not laziness. That&#39;s a hormone problem. And it compounds the longer you wait.
+
+Mars Men was built to fight all three thieves simultaneously.
+
+Tongkat Ali blocks the enzyme that converts your T to estrogen and drives cortisol down.
+
+Boron lowers SHBG so your body can actually use the testosterone it makes.
+
+And the full 8-ingredient stack works across three pathways — making more T, keeping what you&#39;ve got, and protecting the cells that produce it.
+
+91% of men reported higher energy within 90 days in a survey of over 1,000 customers. Not a vague &quot;maybe I feel something.&quot; Real, noticeable energy.
+
+Right now it&#39;s 50% off — plus free gifts and free shipping. Every bottle is backed by a 90-day Higher-T Guarantee.
+
+If you don&#39;t feel the difference, you get every cent back.
+
+But here&#39;s the thing — your T isn&#39;t going to fix itself while you &quot;think about it.&quot;</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C023">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/48ec97bba25a-media-3eb856b68527.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/48ec97bba25a-media-3eb856b68527.jpg" alt="Unique creative C023">
+        </a>
+        <div class="meta">
+          <div class="kicker">C023 · COPY016 · 2 ad instances</div>
+          <h3>50% off + Free Gifts 🚀</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>1 duplicate instances</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> LIMITED TIME - 50% OFF + FREE GIFTS 🔥</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903605, 94903499</dd></div>
+            <div><dt>Image</dt><dd>1080x1080</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903605</td>
+                  <td>COPY016</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903605">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903605?signature=62bfc5358a16919f26c7c22088cf80d87aaf2e69830adbc6b3c4807be76a1b90">share</a></td>
+                </tr>
+                <tr>
+                  <td>94903499</td>
+                  <td>COPY016</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903499">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903499?signature=9d09bd680616467992bc0335799b7969df337ae303d50a09ffcb7613da52e8ce">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>LIMITED TIME - 50% OFF + FREE GIFTS 🔥
+
+Scientifically formulated. Naturally sourced. Discover how Mars Men is helping men support healthy T-levels and reclaim their edge…
+
+Shop now and get 50% OFF + FREE gifts for a limited time only!</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C024">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/32276a29e084-media-9e2fafd19c70.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/32276a29e084-media-9e2fafd19c70.jpg" alt="Unique creative C024">
+        </a>
+        <div class="meta">
+          <div class="kicker">C024 · COPY017 · 1 ad instance</div>
+          <h3>90-Day Guarantee Because We Know It Works.</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> Your grandfather had more testosterone at 60 than you do at 35.</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903387</dd></div>
+            <div><dt>Image</dt><dd>1080x1920</dd></div>
+            <div><dt>Score range</dt><dd>91-91</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903387</td>
+                  <td>COPY017</td>
+                  <td>quiz-v6</td>
+                  <td>91</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903387">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903387?signature=826145dd83741b3ffd122f080ca98b5638f63f24ec5099f33472ce7e4598de3c">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Your grandfather had more testosterone at 60 than you do at 35.
+
+He didn&#39;t have:
+❌ Plastics leaching estrogen into his water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11pm
+
+You&#39;re not weak. You&#39;re poisoned.
+
+Mars Men was built to fight back.
+💪 Tongkat Ali blocks the enzyme stealing your T
+💪 Boron frees up testosterone that&#39;s locked away
+💪 Shilajit grows more T-producing cells in your balls
+
+No dirt powders. No cheap fillers. No fairy dust.
+
+Just the 8 ingredients designed to support your T production from every angle.
+
+50% off your first month. 90-day guarantee.
+
+Stop blaming yourself. Start fighting back.</pre>
+          </details>
+        </div>
+      </article>
+
+      <article class="creative-card" data-slots="Quiz funnel" data-creative-id="C025">
+        <a class="thumb" href="mars-men-static-canonical-recipes-share/assets/remote/fc3f2223de20-media-d9f39882a6da.jpg">
+          <img src="mars-men-static-canonical-recipes-share/assets/remote/fc3f2223de20-media-d9f39882a6da.jpg" alt="Unique creative C025">
+        </a>
+        <div class="meta">
+          <div class="kicker">C025 · COPY018 · 1 ad instance</div>
+          <h3>50% Off + Free Gifts 🚀</h3>
+          <div class="badges">
+            <span>Quiz funnel</span>
+            <span>quiz-v6</span>
+            <span>singleton</span>
+          </div>
+          <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+          <p><b>First line:</b> Embarrassed by &quot;moobs&quot;? Those aren&#39;t just from extra calories. They&#39;re a visible sign of the hormone imbalance affecting millions of men.</p>
+          <p><b>Page hook:</b> The Natural And Effective Way To Increase Testosterone, Energy, Strength &amp; Male Vitality – Mars Men</p>
+          <dl>
+            <div><dt>Ad IDs</dt><dd>94903752</dd></div>
+            <div><dt>Image</dt><dd>1080x1350</dd></div>
+            <div><dt>Score range</dt><dd>81-81</dd></div>
+            <div><dt>Capture</dt><dd>not_captured</dd></div>
+          </dl>
+          <details open>
+            <summary>Ad instances and source links</summary>
+            
+            <table class="instances">
+              <thead><tr><th>Ad ID</th><th>Copy</th><th>Route</th><th>Score</th><th>Links</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>94903752</td>
+                  <td>COPY018</td>
+                  <td>quiz-v6</td>
+                  <td>81</td>
+                  <td><a href="mars-men-static-canonical-recipes-share/index.html#ad-94903752">recipe</a> · <a href="https://app.gethookd.ai/share/ad/94903752?signature=c72f69a7b23ac1b0730f1a71c7c9d4420d9ee165f67a3418151d53a9bb5e21e0">share</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+          <details>
+            <summary>Representative ad copy</summary>
+            <pre>Embarrassed by &quot;moobs&quot;? Those aren&#39;t just from extra calories. They&#39;re a visible sign of the hormone imbalance affecting millions of men.
+
+Let&#39;s talk about something most men never mention...
+
+Those embarrassing &quot;moobs&quot; that make them keep their shirt on at the beach.
+
+Here&#39;s the truth: they&#39;re not just about extra pizza or skipping chest day.
+
+They&#39;re a visible symptom of the hormone imbalance affecting millions of men.
+
+See, when our hormone levels drop (which research shows starts happening around 30), our body&#39;s balance shifts. The result? Soft tissue where pecs should be.
+
+And that same imbalance is why men feel drained by 3PM... why workouts feel flat... why their drive isn&#39;t what it used to be.
+
+The Massachusetts Male Aging Study confirmed what many men feel… Hormone levels are declining faster than ever before, regardless of age.
+
+You can try everything...
+
+More bench presses. Cutting carbs. Fat burners. Even considering surgery.
+
+But if you don&#39;t address the underlying hormone balance, you&#39;re just wasting time and money.
+
+That&#39;s why we created Mars Men.
+
+It&#39;s an all-in-one natural formula with 8 powerful ingredients designed to support your body&#39;s natural balance:
+
+🌿 Tongkat Ali:  Helps regulate cortisol while supporting natural hormones
+🪨 Shilajit:  Improves stamina and helps your body feel younger
+🛡 Zinc:  Essential mineral for hormone production
+⚙️ Boron:  Helps optimize free hormone levels
+🌾 Fenugreek:  Supports healthy male vitality
+⚡ Taurine:  Improves circulation and recovery
+☀️ Vitamins D, K1 + K2:  Support mood and hormone balance
+
+In a recent survey of Mars Men customers:
+✅ 91% reported higher energy levels
+✅ 87% noticed increased strength
+✅ 82% experienced improved vitality
+
+5 capsules per day. That&#39;s it.
+
+No needles or prescriptions. Just a simple daily habit that helps support your body&#39;s natural hormone balance.
+
+Try the 90-Day Kit today  |  50% OFF + 2 free gifts.
+
+If it doesn&#39;t work for you? You don&#39;t pay. Period.
+
+Reclaim your masculine physique. Naturally.</pre>
+          </details>
+        </div>
+      </article>
+      </div>
+    </section>
+    
+    <section class="copy-section" data-section="GLP lander">
+      <div class="section-head"><div><h2>GLP lander Copy Bank</h2><p>3 unique copy units</p></div></div>
+      <div class="copy-grid">
+      <article class="copy-card" data-slots="GLP lander">
+        <div class="kicker">COPY001 · C001, C002, C004, C006, C011 · 22 ad instances</div>
+        <h3>What GLP-1 Does to Your T Levels</h3>
+        <div class="badges"><span>GLP lander</span><span>10-reasons-glp</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Mars Men&#39;s clinical doses of Zinc (30mg) and Vitamin D (4,000 IU) signal your body to preserve lean mass while burning fat.3 4 You don&#39;t just get lighter. You get leaner.</p>
+        <p><b>Ad IDs:</b> 94903611, 94903470, 94284844, 94284842, 94284666, 94284377, 94284350, 94903638, 94903621, 94903546, 94903493, 94284582, 94284507, 94284384, 94284378, 94284374, 94284291, 94903532, 94903411, 94903406, 95129975, 95129974</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>The weight&#39;s coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+
+Nobody&#39;s arguing that. But here&#39;s what your prescribing doctor probably didn&#39;t mention.
+
+Rapid weight loss triggers a massive cortisol spike.
+
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+
+You&#39;re thinner — but weaker, foggier, and running on fumes. That&#39;s not a win.
+
+Mars Men was built to protect what GLP-1s are quietly destroying.
+
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn&#39;t locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+
+This isn&#39;t theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+
+Right now it&#39;s 50% off with a full 90-day money-back guarantee.
+
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="GLP lander">
+        <div class="kicker">COPY002 · C008, C003, C009, C007, C005, C010, C012 · 13 ad instances</div>
+        <h3>Keep Muscle + Metabolism on GLP-1s</h3>
+        <div class="badges"><span>GLP lander</span><span>10-reasons-glp</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons-glp">https://mengotomars.com/pages/10-reasons-glp</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> ✅ 100% Satisfaction Guaranteed</p>
+        <p><b>Ad IDs:</b> 94903681, 94903631, 96362526, 96362512, 96362501, 95129903, 95129831, 94903835, 94903796, 94903342, 94903337, 94903329, 95129805</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>GLP-1s suppress appetite so hard your body starts eating muscle for fuel not fat.
+
+Mars Men keeps muscle strong, metabolism firing, and T levels protected as fat drops. Natural, third-party tested, and safe no needles, no shutdown. 💪
+
+Get your edge back while burning fat.
+
+👉 50% OFF for a limited time.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="GLP lander">
+        <div class="kicker">COPY003 · C013 · 1 ad instance</div>
+        <h3>The GLP-1 Side Effect No One Mentions</h3>
+        <div class="badges"><span>GLP lander</span><span>dr-latt-glp</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/dr-latt-glp">https://mengotomars.com/pages/dr-latt-glp</a></p>
+        <p><b>CTA:</b> See details</p>
+        <p><b>Link description:</b> By Dr. Latt Mansor, PhD, M.S. | Physiology, Anatomy &amp; Genetics, University of Oxford | Biotechnology, Columbia University</p>
+        <p><b>Ad IDs:</b> 94903594</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>What did they NOT tell you when they prescribed your GLP-1?
+
+They told you about the nausea. The injection schedule. The dietary changes.
+
+But nobody mentioned what&#39;s happening to your testosterone.
+
+Here&#39;s the gap in your doctor&#39;s advice: GLP-1 medications trigger rapid weight loss. Great. But your body doesn&#39;t discriminate between fat and muscle when it&#39;s shedding weight that fast. You&#39;re losing lean tissue — the exact tissue responsible for keeping your metabolism firing and your T levels healthy.
+
+Research now shows GLP-1 users face significantly higher risk of testosterone deficiency. So while the number on the scale drops, so does the hormone responsible for your energy, your strength, your drive, and your performance in every area that matters.
+
+There&#39;s a reason you feel lighter but not better.
+
+Dr. Latt Mansor knows this better than almost anyone. Oxford PhD. Columbia MS. He consults with Navy SEALs and Olympic athletes on performance optimization. And he has a specific recommendation for every man currently on a GLP-1.
+
+It starts with eight ingredients most doctors have never heard of.
+
+Boron to lower SHBG and free up locked testosterone. Tongkat Ali to block aromatase — the enzyme converting your T to estrogen. Fenugreek to protect against another conversion pathway. All at full clinical doses in one daily stack called Mars Men.
+
+91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength.
+
+Mars Men is currently 50% off with a full 90-day money-back guarantee.
+
+Read Dr. Latt&#39;s 2-minute article on what GLP-1s are really doing to men&#39;s hormones — and the natural protocol he says every GLP-1 user needs.</pre>
+        </details>
+      </article>
+      </div>
+    </section>
+
+    <section class="copy-section" data-section="Weight-loss lander">
+      <div class="section-head"><div><h2>Weight-loss lander Copy Bank</h2><p>2 unique copy units</p></div></div>
+      <div class="copy-grid">
+      <article class="copy-card" data-slots="Weight-loss lander">
+        <div class="kicker">COPY004 · C014 · 7 ad instances</div>
+        <h3>Fix Your Hormones. Lose The Gut.</h3>
+        <div class="badges"><span>Weight-loss lander</span><span>t-upgrade-with-weight-loss</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade-with-weight-loss">https://mengotomars.com/pages/t-upgrade-with-weight-loss</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Your ability to burn fat’s not broken – it&#39;s hormonally blocked.  Say goodbye to the stubborn belly fat, the afternoon energy crashes, and the frustration of diets that don&#39;t work. You deserve to look in the mirror and see the man you know you can be.</p>
+        <p><b>Ad IDs:</b> 94903501, 94284615, 94284474, 94284317, 94284609, 94284344, 94284343</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Summer is 8 weeks away. Your body isn&#39;t ready.
+
+And here&#39;s the part no one tells you — the extra cardio won&#39;t fix it. The calorie cutting won&#39;t fix it. Not this time.
+
+Because after 30, your body starts converting testosterone into estrogen. That&#39;s not a metaphor.
+
+There&#39;s an enzyme called aromatase that literally takes the hormone that burns fat and builds muscle… and turns it into the hormone that stores belly fat and softens everything.
+
+Your gut isn&#39;t a discipline problem. It&#39;s a hormone problem.
+
+Every month you ignore it, the ratio shifts further. More estrogen. Less T. More fat stored around your chest and midsection. Less muscle holding on.
+
+Mars Men was built to attack this at the root. Tongkat Ali blocks the aromatase enzyme so your T stops converting to estrogen.
+
+Boron lowers SHBG so the testosterone you DO have actually gets used instead of locked up.
+
+8 clinically-dosed ingredients. One daily stack.
+
+91% of men reported higher energy within 90 days. 87% reported increased strength. These aren&#39;t lab rats — that&#39;s a survey of over 1,000 real customers.
+
+Right now it&#39;s 50% off with a 90-day money-back guarantee. You literally risk nothing.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Weight-loss lander">
+        <div class="kicker">COPY005 · C015 · 7 ad instances</div>
+        <h3>Fix Your Hormones. Lose The Moobs.</h3>
+        <div class="badges"><span>Weight-loss lander</span><span>t-upgrade-with-weight-loss</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade-with-weight-loss">https://mengotomars.com/pages/t-upgrade-with-weight-loss</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Your ability to burn fat’s not broken – it&#39;s hormonally blocked.  Say goodbye to the stubborn belly fat, the afternoon energy crashes, and the frustration of diets that don&#39;t work. You deserve to look in the mirror and see the man you know you can be.</p>
+        <p><b>Ad IDs:</b> 94284772, 94284449, 94284316, 94284531, 94284495, 94284360, 94284315</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Summer&#39;s 90 days away. Your hormones don&#39;t care.
+
+Right now, your body is running a 24/7 sabotage operation on your physique. Elevated cortisol is telling your body to store fat — especially around your midsection. An enzyme called aromatase is converting your testosterone into estrogen. And a protein called SHBG is locking up whatever T you have left so your muscles can&#39;t even use it.
+
+Three systems working against you. Crunches won&#39;t fix that. Neither will another crash diet.
+
+Mars Men was built to attack all three.
+
+Tongkat Ali blocks the enzyme converting your T to estrogen and drives cortisol down.
+
+Boron lowers SHBG so your body can actually USE the testosterone it makes.
+
+8 clinically-dosed ingredients total — each targeting a different piece of the hormonal puzzle.
+
+87% of men in a 1,000-person survey reported increased strength. One customer at 62 says he&#39;s stronger now than in his 20s and 30s.
+
+Right now it&#39;s 50% off for life — plus free shipping, a free Natural Testosterone Guide, and a free travel tin. Backed by a 90-day Higher-T Guarantee.
+
+Every week you wait, your body stores more fat and burns less muscle. That&#39;s not aging — that&#39;s hormones.</pre>
+        </details>
+      </article>
+      </div>
+    </section>
+
+    <section class="copy-section" data-section="TRT lander / TRT alternative references">
+      <div class="section-head"><div><h2>TRT lander / TRT alternative references Copy Bank</h2><p>5 unique copy units</p></div></div>
+      <div class="copy-grid">
+      <article class="copy-card" data-slots="TRT lander / TRT alternative references">
+        <div class="kicker">COPY006 · C026 · 8 ad instances</div>
+        <h3>See What&#39;s Actually Inside</h3>
+        <div class="badges"><span>TRT lander / TRT alternative references</span><span>t-upgrade</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade">https://mengotomars.com/pages/t-upgrade</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Your T’s not broken - it’s blocked. Say goodbye to the afternoon crashes, the soft midsection, and the brain fog. You deserve to feel like yourself again.</p>
+        <p><b>Ad IDs:</b> 94903427, 94284766, 94284508, 94284307, 94903439, 94284375, 94284337, 95130018</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Most testosterone supplements are hiding something behind their &quot;proprietary blend&quot; label.
+
+Here&#39;s what they don&#39;t want you to see.
+
+You&#39;re swallowing 2-3 underdosed ingredients buried in fillers — and wondering why nothing changes. Your T keeps dropping. Your energy keeps tanking. And every month you wait, those three thieves — SHBG, aromatase, and cortisol — steal more of what you have left.
+
+Mars Men shows you exactly what&#39;s inside. 8 ingredients. Full clinical doses. No proprietary blend. No mystery powder.
+
+Tongkat Ali at 1,000mg blocks the enzyme converting your T to estrogen. Boron at 4mg lowers SHBG so your body can actually USE the testosterone it makes.
+
+91% of men surveyed reported higher energy within 90 days. Not from stimulants. From actually addressing the hormone problem.
+
+Right now it&#39;s 50% off with a 90-day money-back guarantee.
+
+See how 8 ingredients work across 3 levels to unblock your testosterone — and why most formulas only target one.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="TRT lander / TRT alternative references">
+        <div class="kicker">COPY007 · C027 · 8 ad instances</div>
+        <h3>Crush Cortisol. Reclaim Your T.</h3>
+        <div class="badges"><span>TRT lander / TRT alternative references</span><span>t-upgrade</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade">https://mengotomars.com/pages/t-upgrade</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Your T’s not broken - it’s blocked. Say goodbye to the afternoon crashes, the soft midsection, and the brain fog. You deserve to feel like yourself again.</p>
+        <p><b>Ad IDs:</b> 94903380, 94284408, 94284372, 94284347, 94284485, 94284409, 94284293, 95129952</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Your stress hormone is eating your testosterone alive.
+
+Not next year. Not &quot;eventually.&quot; Right now — while you&#39;re scrolling.
+
+Every time your stress spikes — the bad sleep, the work pressure, the packed schedule — your body floods with cortisol. And cortisol doesn&#39;t just make you feel wired and tired.
+
+It actively shuts down testosterone production at the source.
+
+Think of it as a thief running a 24/7 heist on your T. The more stressed you are, the less testosterone your body makes. Less energy. Less drive. Less muscle. Less of everything that makes you feel like you.
+
+And here&#39;s the brutal part: it compounds. Every month you don&#39;t address it, your levels drop further.
+
+Mars Men was built to crush cortisol while supporting healthy testosterone levels — the only formula designed to do both.
+
+Tongkat Ali at a full 1,000mg clinical dose drives cortisol down and blocks the enzyme that converts your T to estrogen. Boron lowers SHBG so your body can actually use the testosterone it makes.
+
+Eight ingredients. Three levels of attack.
+
+91% of men reported higher energy within 90 days in a survey of 1,000 customers.
+
+50% off right now with free shipping, a free T guide, and a 90-day money-back guarantee.
+
+See the full 4-level system that attacks all three testosterone thieves at once.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="TRT lander / TRT alternative references">
+        <div class="kicker">COPY008 · C029 · 5 ad instances</div>
+        <h3>Try It or Stay Stuck.</h3>
+        <div class="badges"><span>TRT lander / TRT alternative references</span><span>10-reasons</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons">https://mengotomars.com/pages/10-reasons</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Most men wait for &quot;the right time&quot; (New Year&#39;s, “before summer”, after the holidays.) Meanwhile, the men who actually transform just start. Starting today means you&#39;re not wasting another week pretending you&#39;ll do it later. In 90 days, you&#39;ll either be optimized—or you&#39;ll still be waiting for ...</p>
+        <p><b>Ad IDs:</b> 94284974, 94903597, 94903517, 94284523, 94284448</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Two options. Pick one.
+❌ Keep feeling tired, unmotivated, and running on caffeine
+✅ Try Mars Men risk-free for 90 days and see what changes
+
+8 natural ingredients. Clinical doses. No artificial anything. Tongkat Ali, Shilajit, Boron, Zinc + more.
+
+If it doesn&#39;t work — full refund. If it does — night and day difference.
+
+See why men are calling this their T-upgrade.
+
+50% off for life + free shipping + free gifts.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="TRT lander / TRT alternative references">
+        <div class="kicker">COPY009 · C030 · 2 ad instances</div>
+        <h3>New Year Sale: Save 50% Off + Free Gifts</h3>
+        <div class="badges"><span>TRT lander / TRT alternative references</span><span>10-reasons</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/10-reasons">https://mengotomars.com/pages/10-reasons</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Starting your day with testosterone support means you&#39;re setting your body up for better workouts, faster recovery, and better muscle growth. The combination of ingredients works together to support the kind of body changes that actually matter.*</p>
+        <p><b>Ad IDs:</b> 94903536, 94284742</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Give yourself a head start toward better energy, focus, and burning stubborn belly fat.
+
+January 1st.
+
+Everyone&#39;s making promises.
+
+&quot;I&#39;m gonna lose 20 pounds.&quot;
+
+&quot;I&#39;m gonna get stronger.&quot;
+
+&quot;I&#39;m gonna feel like myself again.&quot;
+
+By March, most of them quit.
+
+But not you.
+
+Because while they&#39;re relying on motivation and willpower...
+
+You&#39;re running a SYSTEM.
+
+Mars Men isn&#39;t a resolution.
+
+It&#39;s the biological foundation that makes resolutions actually WORK.
+
+8 science-backed ingredients working together to support your testosterone production.
+
+So when you commit to change, your BODY commits with you.
+
+Your energy doesn&#39;t fade by Week 3.
+
+Your strength doesn&#39;t plateau by Week 6.
+
+Your progress doesn&#39;t stall by Week 12.
+
+Instead...
+
+By April, people are asking what you&#39;re doing differently.
+
+By July, your wife can&#39;t keep her hands off you.
+
+By December, you&#39;re the guy everyone else wishes they&#39;d become.
+
+Don&#39;t make another empty promise this New Year.
+
+Build the biological foundation for REAL transformation.
+
+And lock it in at 50% OFF during our New Year Sale.
+
+This is our biggest discount of the year...
+
+Plus FREE gifts when you stock up.
+
+Set yourself up for success NOW while you can save.
+
+👉 Start 2026 right - Get 50% off Mars Men + FREE gifts (New Year Sale)</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="TRT lander / TRT alternative references">
+        <div class="kicker">COPY010 · C028 · 2 ad instances</div>
+        <h3>Don&#39;t Ignore Your Testosterone.</h3>
+        <div class="badges"><span>TRT lander / TRT alternative references</span><span>t-upgrade</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/t-upgrade">https://mengotomars.com/pages/t-upgrade</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> Your T’s not broken - it’s blocked. Say goodbye to the afternoon crashes, the soft midsection, and the brain fog. You deserve to feel like yourself again.</p>
+        <p><b>Ad IDs:</b> 94903543, 94903448</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Taking care of one thing? Good. Don&#39;t ignore the other. 💡
+
+Your testosterone needs support too. After 30, T drops every year — and your energy, drive, and strength go with it.
+
+Mars Men: 8 natural ingredients at clinical doses supporting testosterone production.
+
+⚡ More energy
+💪 More strength
+🧠 More clarity
+
+See the signs your T might be crashing — and what to do about it.
+
+✅ 90-day guarantee
+✅ 50% off + free shipping + free gifts</pre>
+        </details>
+      </article>
+      </div>
+    </section>
+
+    <section class="copy-section" data-section="Quiz funnel">
+      <div class="section-head"><div><h2>Quiz funnel Copy Bank</h2><p>8 unique copy units</p></div></div>
+      <div class="copy-grid">
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY011 · C022, C019, C020 · 10 ad instances</div>
+        <h3>Stop Losing T. Start Today.</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> -</p>
+        <p><b>Ad IDs:</b> 94903689, 94903485, 94284399, 94284394, 94284351, 95130056, 95129919, 95129899, 95129849, 96362585</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Your testosterone is dropping right now. And it&#39;s not &quot;just getting older.&quot;
+
+Every single month you put off doing something about it, your body converts more of your remaining T into estrogen.
+
+Your SHBG locks up what&#39;s left. And cortisol — from stress, bad sleep, and modern life — tanks production at the source.
+
+That brain fog at 2pm?
+
+The gut that won&#39;t budge no matter what you eat?
+
+The fact that you&#39;d rather scroll your phone than do anything with your evening?
+
+That&#39;s not laziness. That&#39;s a hormone problem. And it compounds the longer you wait.
+
+Mars Men was built to fight all three thieves simultaneously.
+
+Tongkat Ali blocks the enzyme that converts your T to estrogen and drives cortisol down.
+
+Boron lowers SHBG so your body can actually use the testosterone it makes.
+
+And the full 8-ingredient stack works across three pathways — making more T, keeping what you&#39;ve got, and protecting the cells that produce it.
+
+91% of men reported higher energy within 90 days in a survey of over 1,000 customers. Not a vague &quot;maybe I feel something.&quot; Real, noticeable energy.
+
+Right now it&#39;s 50% off — plus free gifts and free shipping. Every bottle is backed by a 90-day Higher-T Guarantee.
+
+If you don&#39;t feel the difference, you get every cent back.
+
+But here&#39;s the thing — your T isn&#39;t going to fix itself while you &quot;think about it.&quot;</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY012 · C016 · 6 ad instances</div>
+        <h3>50% Off + Free Gifts 🚀</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> -</p>
+        <p><b>Ad IDs:</b> 94903454, 94284482, 94904005, 94903676, 94903334, 95129874</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>You eat clean. You train hard. You’re STILL tired and gaining weight. Here’s why.
+
+If you’re over 35 and constantly tired, dragging through the day, or frustrated in the gym…
+
+It’s not motivation or willpower.
+
+It’s testosterone.
+
+T levels start dropping around age 30. And that slow hormonal drain robs you of energy, drive, strength, confidence, and performance.
+
+One day you wake up and wonder:
+
+“What happened?”
+
+Most guys try to fix it by doubling down on workouts… eating cleaner… drinking more coffee…
+
+And when that doesn’t work?
+
+They end up with a cabinet full of overpriced, under-dosed supplements. Or worse, they consider jumping on TRT.
+
+Here’s the truth:
+
+You don’t need needles, prescriptions, or a dozen bottles.
+
+You need one clinically dosed stack that helps your body produce more testosterone, naturally.
+
+That’s what Mars Men was built for.
+
+It’s an all-in-one daily testosterone support formula with 8 powerhouse ingredients, including:
+
+🌿 Tongkat Ali – Boosts drive, energy, and morning wood
+🪨 Shilajit – Fuels stamina so you don’t crash mid-day
+🛡️ Zinc – Keeps hormones balanced and focus sharp
+⚙️ Boron – Frees up testosterone for more motivation
+🌾 Fenugreek – Fires up libido and bedroom confidence
+⚡ Taurine – Speeds recovery and sharpens mental focus
+☀️💪 Vitamins D, K1 + K2 – Supports bones, mood, and daily energy
+
+No BS. No fairy dust. Just full clinical doses your body can feel.
+
+In a recent survey, men using Mars Men for 90 days reported:
+
+✅ 91% increase in energy
+✅ 87% felt stronger and more recovered
+✅ 82% noticed improved vitality
+✅ +60% testosterone boost (verified by bloodwork)
+
+No needles. No stacking. No cycling. Just results.
+
+Claim your 90-Day Launch Kit now and get 50% off — plus 2 free gifts: a Testosterone Optimization Guide and portable travel tin.
+
+Over 121,000+ men have already transformed their lives with this formula.
+
+If you don’t feel stronger, sharper, and more energized in 90 days — you get every penny back. No questions asked.
+
+👉 Reclaim your masculinity. Naturally. Click the link below.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY013 · C017 · 6 ad instances</div>
+        <h3>50% Off — 90-Day Guarantee</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> See details</p>
+        <p><b>Link description:</b> -</p>
+        <p><b>Ad IDs:</b> 94284473, 94284416, 94903490, 94284913, 94284899, 94284649</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>429,576+ men didn&#39;t switch to Mars Men because of a slick ad.
+
+They switched because their bloodwork changed.
+
+One man&#39;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#39;t explain. Another guy tried 10 different supplements — spent hundreds — before finding the one his bloodwork actually responded to. His words: &quot;The bloodwork doesn&#39;t lie.&quot;
+
+Then there&#39;s the guy who QUIT TRT for Mars Men and came back with higher numbers than he ever had on testosterone replacement therapy. Or the 52-year-old who lost 30 pounds and says his wife can&#39;t keep her hands off him.
+
+These aren&#39;t cherry-picked outliers. In a survey of over 1,000 customers:
+
+→ 91% reported higher energy in 90 days
+
+→ 87% reported increased strength
+
+→ 82% reported improved male vitality
+
+The formula: 8 clinically-dosed ingredients targeting testosterone from three angles — make more (Shilajit, Zinc, D3), keep more (Tongkat Ali, Boron, Fenugreek), and protect what you&#39;ve got (Taurine).
+
+Every batch third-party tested. cGMP certified. Made in the USA.
+
+50% off. Plus a 90-day money-back guarantee. No risk. Just results or a full refund.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY014 · C018 · 4 ad instances</div>
+        <h3>50% Off — 90-Day Guarantee</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> -</p>
+        <p><b>Ad IDs:</b> 94903516, 94284425, 94903408, 96362519</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>429,576+ men didn&#39;t switch to Mars Men because of a slick ad.
+
+They switched because their bloodwork changed.
+
+One man&#39;s doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn&#39;t explain. Another guy tried 10 different supplements — spent hundreds — before finding the one his bloodwork actually responded to. His words: &quot;The bloodwork doesn&#39;t lie.&quot;
+
+Then there&#39;s the guy who QUIT TRT for Mars Men and came back with higher numbers than he ever had on testosterone replacement therapy. Or the 52-year-old who lost 30 pounds and says his wife can&#39;t keep her hands off him.
+
+These aren&#39;t cherry-picked outliers. In a survey of over 1,000 customers:
+
+→ 91% reported higher energy in 90 days
+
+→ 87% reported increased strength
+
+→ 82% reported improved male vitality
+
+The formula: 8 clinically-dosed ingredients targeting testosterone from three angles — make more (Shilajit, Zinc, D3), keep more (Tongkat Ali, Boron, Fenugreek), and protect what you&#39;ve got (Taurine).
+
+Every batch third-party tested. cGMP certified. Made in the USA.
+
+50% off. Plus a 90-day money-back guarantee. No risk. Just results or a full refund.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY015 · C021 · 3 ad instances</div>
+        <h3>90-Day Guarantee Because We Know It Works.</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> ✅ 100% Satisfaction Guaranteed</p>
+        <p><b>Ad IDs:</b> 94903773, 94903614, 94903320</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Your grandfather had more testosterone at 60 than you do at 35.
+
+He didn&#39;t have:
+❌ Plastics leaching estrogen into his water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11pm
+
+You&#39;re not weak. You&#39;re poisoned.
+
+Mars Men was built to fight back.
+💪 Tongkat Ali blocks the enzyme stealing your T
+💪 Boron frees up testosterone that&#39;s locked away
+💪 Shilajit grows more T-producing cells in your balls
+
+No dirt powders. No cheap fillers. No fairy dust.
+
+Just the 8 ingredients designed to support your T production from every angle.
+
+50% off your first month. 90-day guarantee.
+
+Stop blaming yourself. Start fighting back.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY016 · C023 · 2 ad instances</div>
+        <h3>50% off + Free Gifts 🚀</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> ✅ 100% Satisfaction Guaranteed</p>
+        <p><b>Ad IDs:</b> 94903605, 94903499</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>LIMITED TIME - 50% OFF + FREE GIFTS 🔥
+
+Scientifically formulated. Naturally sourced. Discover how Mars Men is helping men support healthy T-levels and reclaim their edge…
+
+Shop now and get 50% OFF + FREE gifts for a limited time only!</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY017 · C024 · 1 ad instance</div>
+        <h3>90-Day Guarantee Because We Know It Works.</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> -</p>
+        <p><b>Ad IDs:</b> 94903387</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Your grandfather had more testosterone at 60 than you do at 35.
+
+He didn&#39;t have:
+❌ Plastics leaching estrogen into his water
+❌ Seed oils in everything he ate
+❌ Blue light frying his hormones at 11pm
+
+You&#39;re not weak. You&#39;re poisoned.
+
+Mars Men was built to fight back.
+💪 Tongkat Ali blocks the enzyme stealing your T
+💪 Boron frees up testosterone that&#39;s locked away
+💪 Shilajit grows more T-producing cells in your balls
+
+No dirt powders. No cheap fillers. No fairy dust.
+
+Just the 8 ingredients designed to support your T production from every angle.
+
+50% off your first month. 90-day guarantee.
+
+Stop blaming yourself. Start fighting back.</pre>
+        </details>
+      </article>
+
+      <article class="copy-card" data-slots="Quiz funnel">
+        <div class="kicker">COPY018 · C025 · 1 ad instance</div>
+        <h3>50% Off + Free Gifts 🚀</h3>
+        <div class="badges"><span>Quiz funnel</span><span>quiz-v6</span></div>
+        <p><b>Reference URL:</b><br><a href="https://mengotomars.com/pages/quiz-v6">https://mengotomars.com/pages/quiz-v6</a></p>
+        <p><b>CTA:</b> Shop now</p>
+        <p><b>Link description:</b> -</p>
+        <p><b>Ad IDs:</b> 94903752</p>
+        <details open>
+          <summary>Ad body</summary>
+          <pre>Embarrassed by &quot;moobs&quot;? Those aren&#39;t just from extra calories. They&#39;re a visible sign of the hormone imbalance affecting millions of men.
+
+Let&#39;s talk about something most men never mention...
+
+Those embarrassing &quot;moobs&quot; that make them keep their shirt on at the beach.
+
+Here&#39;s the truth: they&#39;re not just about extra pizza or skipping chest day.
+
+They&#39;re a visible symptom of the hormone imbalance affecting millions of men.
+
+See, when our hormone levels drop (which research shows starts happening around 30), our body&#39;s balance shifts. The result? Soft tissue where pecs should be.
+
+And that same imbalance is why men feel drained by 3PM... why workouts feel flat... why their drive isn&#39;t what it used to be.
+
+The Massachusetts Male Aging Study confirmed what many men feel… Hormone levels are declining faster than ever before, regardless of age.
+
+You can try everything...
+
+More bench presses. Cutting carbs. Fat burners. Even considering surgery.
+
+But if you don&#39;t address the underlying hormone balance, you&#39;re just wasting time and money.
+
+That&#39;s why we created Mars Men.
+
+It&#39;s an all-in-one natural formula with 8 powerful ingredients designed to support your body&#39;s natural balance:
+
+🌿 Tongkat Ali:  Helps regulate cortisol while supporting natural hormones
+🪨 Shilajit:  Improves stamina and helps your body feel younger
+🛡 Zinc:  Essential mineral for hormone production
+⚙️ Boron:  Helps optimize free hormone levels
+🌾 Fenugreek:  Supports healthy male vitality
+⚡ Taurine:  Improves circulation and recovery
+☀️ Vitamins D, K1 + K2:  Support mood and hormone balance
+
+In a recent survey of Mars Men customers:
+✅ 91% reported higher energy levels
+✅ 87% noticed increased strength
+✅ 82% experienced improved vitality
+
+5 capsules per day. That&#39;s it.
+
+No needles or prescriptions. Just a simple daily habit that helps support your body&#39;s natural hormone balance.
+
+Try the 90-Day Kit today  |  50% OFF + 2 free gifts.
+
+If it doesn&#39;t work for you? You don&#39;t pay. Period.
+
+Reclaim your masculine physique. Naturally.</pre>
+        </details>
+      </article>
+      </div>
+    </section>
+    <section class="table-wrap">
+      <h2>Duplicate Creative Groups</h2>
+      <table>
+        <thead><tr><th>Creative</th><th>Ad instances</th><th>Copy</th><th>Title</th><th>Route</th><th>Ad IDs</th></tr></thead>
+        <tbody>
+          <tr><td>C001</td><td>9</td><td>COPY001</td><td>What GLP-1 Does to Your T Levels</td><td>GLP / 10-reasons-glp</td><td>94903611, 94284666, 94284377, 94284350, 94284582, 94284507, 94284291, 95129975, 95129974</td></tr>
+          <tr><td>C002</td><td>7</td><td>COPY001</td><td>What GLP-1 Does to Your T Levels</td><td>GLP / 10-reasons-glp</td><td>94903470, 94284844, 94284842, 94903493, 94284384, 94284378, 94284374</td></tr>
+          <tr><td>C003</td><td>4</td><td>COPY002</td><td>Keep Muscle + Metabolism on GLP-1s</td><td>GLP / 10-reasons-glp</td><td>94903631, 95129831, 94903796, 94903342</td></tr>
+          <tr><td>C004</td><td>3</td><td>COPY001</td><td>What GLP-1 Does to Your T Levels</td><td>GLP / 10-reasons-glp</td><td>94903638, 94903546, 94903532</td></tr>
+          <tr><td>C005</td><td>3</td><td>COPY002</td><td>Keep Muscle + Metabolism on GLP-1s</td><td>GLP / 10-reasons-glp</td><td>96362501, 94903835, 94903329</td></tr>
+          <tr><td>C006</td><td>2</td><td>COPY001</td><td>What GLP-1 Does to Your T Levels</td><td>GLP / 10-reasons-glp</td><td>94903621, 94903411</td></tr>
+          <tr><td>C007</td><td>2</td><td>COPY002</td><td>Keep Muscle + Metabolism on GLP-1s</td><td>GLP / 10-reasons-glp</td><td>96362512, 94903337</td></tr>
+          <tr><td>C014</td><td>7</td><td>COPY004</td><td>Fix Your Hormones. Lose The Gut.</td><td>Weight loss / t-upgrade-with-weight-loss</td><td>94903501, 94284615, 94284474, 94284317, 94284609, 94284344, 94284343</td></tr>
+          <tr><td>C015</td><td>7</td><td>COPY005</td><td>Fix Your Hormones. Lose The Moobs.</td><td>Weight loss / t-upgrade-with-weight-loss</td><td>94284772, 94284449, 94284316, 94284531, 94284495, 94284360, 94284315</td></tr>
+          <tr><td>C026</td><td>8</td><td>COPY006</td><td>See What&#39;s Actually Inside</td><td>TRT upgrade / t-upgrade</td><td>94903427, 94284766, 94284508, 94284307, 94903439, 94284375, 94284337, 95130018</td></tr>
+          <tr><td>C027</td><td>8</td><td>COPY007</td><td>Crush Cortisol. Reclaim Your T.</td><td>TRT upgrade / t-upgrade</td><td>94903380, 94284408, 94284372, 94284347, 94284485, 94284409, 94284293, 95129952</td></tr>
+          <tr><td>C029</td><td>5</td><td>COPY008</td><td>Try It or Stay Stuck.</td><td>TRT alternative / 10-reasons</td><td>94284974, 94903597, 94903517, 94284523, 94284448</td></tr>
+          <tr><td>C030</td><td>2</td><td>COPY009</td><td>New Year Sale: Save 50% Off + Free Gifts</td><td>TRT alternative / 10-reasons</td><td>94903536, 94284742</td></tr>
+          <tr><td>C028</td><td>2</td><td>COPY010</td><td>Don&#39;t Ignore Your Testosterone.</td><td>TRT upgrade / t-upgrade</td><td>94903543, 94903448</td></tr>
+          <tr><td>C016</td><td>6</td><td>COPY012</td><td>50% Off + Free Gifts 🚀</td><td>Quiz funnel / quiz-v6</td><td>94903454, 94284482, 94904005, 94903676, 94903334, 95129874</td></tr>
+          <tr><td>C017</td><td>6</td><td>COPY013</td><td>50% Off — 90-Day Guarantee</td><td>Quiz funnel / quiz-v6</td><td>94284473, 94284416, 94903490, 94284913, 94284899, 94284649</td></tr>
+          <tr><td>C018</td><td>4</td><td>COPY014</td><td>50% Off — 90-Day Guarantee</td><td>Quiz funnel / quiz-v6</td><td>94903516, 94284425, 94903408, 96362519</td></tr>
+          <tr><td>C019</td><td>4</td><td>COPY011</td><td>Stop Losing T. Start Today.</td><td>Quiz funnel / quiz-v6</td><td>94903485, 94284394, 95130056, 95129919</td></tr>
+          <tr><td>C020</td><td>4</td><td>COPY011</td><td>Stop Losing T. Start Today.</td><td>Quiz funnel / quiz-v6</td><td>94284399, 94284351, 95129899, 95129849</td></tr>
+          <tr><td>C021</td><td>3</td><td>COPY015</td><td>90-Day Guarantee Because We Know It Works.</td><td>Quiz funnel / quiz-v6</td><td>94903773, 94903614, 94903320</td></tr>
+          <tr><td>C022</td><td>2</td><td>COPY011</td><td>Stop Losing T. Start Today.</td><td>Quiz funnel / quiz-v6</td><td>94903689, 96362585</td></tr>
+          <tr><td>C023</td><td>2</td><td>COPY016</td><td>50% off + Free Gifts 🚀</td><td>Quiz funnel / quiz-v6</td><td>94903605, 94903499</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+  <script>
+    const buttons = [...document.querySelectorAll('.filter')];
+    const filterables = [...document.querySelectorAll('.creative-card, .copy-card')];
+    const sections = [...document.querySelectorAll('.launch-section, .copy-section')];
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      const filter = button.dataset.filter;
+      buttons.forEach((b) => b.classList.toggle('active', b === button));
+      filterables.forEach((node) => node.classList.toggle('hidden', filter !== 'all' && !node.dataset.slots.split('|').includes(filter)));
+      sections.forEach((section) => {
+        const visible = [...section.querySelectorAll('.creative-card, .copy-card')].some((node) => !node.classList.contains('hidden'));
+        section.classList.toggle('hidden', !visible);
+      });
+    }));
+  </script>
+</body>
+</html>

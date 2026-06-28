@@ -1,0 +1,223 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "PLAN",
+  "created_at": "2026-05-20T22:55:43.720171+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/PLAN.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair",
+  "proof_dir": "proof_pack",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Replace copied Manus design tokens with neutral MOS tokens and define every token currently used by components.",
+      "source_line": 7,
+      "status": "done",
+      "expected_files": [
+        "../../mos/frontend/src/styles/theme.css"
+      ],
+      "acceptance": [
+        "theme.css contains no Manus/manus token names or comments",
+        "theme.css defines all MOS tokens referenced by app CSS and Tailwind config, excluding Tailwind/Radix runtime variables"
+      ],
+      "verify_commands": [
+        "node check-theme-tokens.cjs"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "token-check.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "Add missing first-run, choice-card, and enhanced input CSS so onboarding primitives render as designed.",
+      "source_line": 8,
+      "status": "done",
+      "expected_files": [
+        "../../mos/frontend/src/styles/design-system.css"
+      ],
+      "acceptance": [
+        "design-system.css defines .first-run-* and .mos-choice* classes used by onboarding components",
+        "choice cards render selected, disabled, compact, and card variants with visible affordances",
+        "input group styles match the same tokenized input treatment"
+      ],
+      "verify_commands": [
+        "bash -lc \"cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run --silent check:semantic-ui\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "semantic-ui.log",
+        "component-review.png",
+        "onboarding.png"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "objective": "Restore sign-in routing to the existing `/sign-in` path flow while keeping the neutral wordmark untouched.",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "../../mos/frontend/src/pages/auth/SignInPage.tsx"
+      ],
+      "acceptance": [
+        "SignIn routing uses path mode for /sign-in",
+        "Wordmark content remains unchanged"
+      ],
+      "verify_commands": [
+        "rg 'routing=\"path\"|<span style=\\{wordmarkTextStyle\\}>mOS</span>' /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/auth/SignInPage.tsx"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "signin-routing.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "Validate with static token checks, frontend build, component review screenshot, onboarding screenshot, and workspace screenshot.",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        "component-review.png",
+        "onboarding.png",
+        "workspaces.png"
+      ],
+      "acceptance": [
+        "frontend build completes",
+        "browser screenshots show non-broken component review, onboarding, and workspace surfaces"
+      ],
+      "verify_commands": [
+        "bash -lc \"cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run --silent build\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "build.log",
+        "workspaces.png",
+        "unit-tests.log",
+        "browser-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "objective": "Remove the split-panel onboarding page treatment and validate the actual onboarding page as a single focused flow.",
+      "source_line": 11,
+      "status": "done",
+      "expected_files": [
+        "../../mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "../../mos/frontend/src/components/onboarding/FirstRunShell.tsx",
+        "onboarding.png"
+      ],
+      "acceptance": [
+        "OnboardingWizard no longer passes visual content into FirstRunShell for the workspace-name step",
+        "The onboarding page screenshot shows one centered flow, not a two-panel card"
+      ],
+      "verify_commands": [
+        "bash -lc \"! rg 'visual=|onboardingVisual|isFirstStep' /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "onboarding.png",
+        "browser-proof.json"
+      ],
+      "notes": "browser-proof.json and onboarding.png provide the visual proof."
+    },
+    {
+      "id": "P06",
+      "objective": "Repair the workspace Cards/List segmented selector and validate it in the live workspaces UI.",
+      "source_line": 12,
+      "status": "done",
+      "expected_files": [
+        "../../mos/frontend/src/pages/workspaces/WorkspacesPage.tsx",
+        "../../mos/frontend/src/styles/design-system.css",
+        "workspaces.png"
+      ],
+      "acceptance": [
+        "WorkspacesPage uses the MOS segmented-control classes instead of inline selected-state Tailwind piles",
+        "design-system.css defines the segmented control and selected option treatment using MOS tokens",
+        "Browser proof confirms the selected segment stays contained inside the control and both view states can be toggled"
+      ],
+      "verify_commands": [
+        "rg 'mos-segmented-control|mos-segmented-option' /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/WorkspacesPage.tsx /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/styles/design-system.css"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "workspaces.png",
+        "browser-proof.json",
+        "segmented-control.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "Repair onboarding progress behavior and typography readability, then validate the exact branch-choice sequence in browser.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        "../../mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "../../mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "../../mos/frontend/src/components/ui/field.tsx",
+        "../../mos/frontend/src/components/ui/input.tsx",
+        "../../mos/frontend/src/components/ui/textarea.tsx",
+        "../../mos/frontend/src/styles/design-system.css",
+        "../../mos/frontend/src/styles/globals.css",
+        "onboarding-progress-typography.png",
+        "onboarding-progress-typography-proof.json"
+      ],
+      "acceptance": [
+        "Onboarding progress uses fixed milestone values instead of dynamic branch-dependent step totals",
+        "Selecting new or existing business does not reduce progress before the next step",
+        "First-run and default app headings use readable sans typography unless a component explicitly opts into display type",
+        "Field labels, descriptions, and placeholders have readable sizing and opacity",
+        "Browser proof captures the workspace -> business type -> selected existing -> URL -> competitors sequence"
+      ],
+      "verify_commands": [
+        "bash -lc \"cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run --silent test:unit -- src/components/clients/OnboardingWizard.test.tsx src/components/onboarding/FirstRunShell.test.tsx\"",
+        "bash -lc \"cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run --silent check:semantic-ui\"",
+        "node check-theme-tokens.cjs"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "onboarding-progress-typography.png",
+        "onboarding-progress-typography-proof.json",
+        "browser-proof.json",
+        "build.log"
+      ],
+      "notes": "Browser proof shows progress 12 -> 24 -> 24 -> 48 -> 72 and DM Sans first-run headings."
+    }
+  ],
+  "global_verify_commands": [
+    "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/PLAN.contract.json"
+  ],
+  "global_acceptance": [
+    "All repair contract items are marked done or explicitly blocked with notes"
+  ]
+}

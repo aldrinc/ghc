@@ -1,0 +1,71 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-27T00:00:00-05:00",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "chat:outline-ragflow-deepseek-integration",
+  "questions_asked": [
+    {
+      "question": "Which 3-5 RAG workflows matter most: internal research, content analysis, support QA, ad/offer research, codebase docs, or something else?",
+      "answer_source": "pending_user_answer"
+    },
+    {
+      "question": "What corpus should be the spike sample, and does it include private/client data with ACL requirements?",
+      "answer_source": "pending_user_answer"
+    },
+    {
+      "question": "Do you want DeepSeek via hosted API first, or self-hosted/open-source inference first?",
+      "answer_source": "pending_user_answer"
+    },
+    {
+      "question": "What does Gemini File Search currently do that must not regress: citation quality, latency, parsing, UI workflow, or answer quality?",
+      "answer_source": "pending_user_answer"
+    },
+    {
+      "question": "Should RAGFlow become the canonical retrieval layer, or only a parallel option behind an adapter until it wins evaluation?",
+      "answer_source": "pending_user_answer"
+    }
+  ],
+  "question_sufficiency_rationale": "The user asked for an outline, not an implementation-ready build. The plan records assumptions and leaves deployment-critical choices as explicit next questions.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/ragflow-goal.md",
+      "summary": "Measurable target for vendor-neutral RAG with DeepSeek."
+    },
+    "problem_log": {
+      "path": "planning/ragflow-problem-log.md",
+      "summary": "Current vendor-coupled retrieval problems."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/ragflow-root-cause.md",
+      "summary": "RAG and model choice are coupled to vendor products."
+    },
+    "current_machine": {
+      "path": "planning/ragflow-current-machine.md",
+      "summary": "Current Gemini File Search and Claude Projects machine."
+    },
+    "designed_machine": {
+      "path": "planning/ragflow-designed-machine.md",
+      "summary": "Target RAGFlow-centered service boundary."
+    },
+    "worst_day_test": {
+      "path": "planning/ragflow-worst-day.md",
+      "summary": "Failure conditions and clean degradation."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/ragflow-metrics.md",
+      "summary": "RAG migration quality and execution metrics."
+    },
+    "owner_date_review": {
+      "path": "planning/ragflow-owner-review.md",
+      "summary": "Owner, review timing, and model authorization boundary."
+    },
+    "stop_condition": {
+      "path": "planning/ragflow-stop-condition.md",
+      "summary": "Planning completion and implementation prerequisites."
+    }
+  },
+  "owner": "main",
+  "review_date": "2026-06-10",
+  "stop_condition": "Plan is outline-ready; implementation starts only after target workflows, corpus sample, model path, and eval criteria are selected."
+}

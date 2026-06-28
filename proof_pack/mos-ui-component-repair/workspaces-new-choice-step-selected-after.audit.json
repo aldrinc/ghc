@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "border": "1px rgb(227, 230, 238)",
+      "height": 82,
+      "iconBg": "rgb(240, 242, 246)",
+      "iconColor": "rgb(11, 13, 18)",
+      "radius": "14px",
+      "ringBg": "rgb(255, 255, 255)",
+      "ringBorder": "1px rgb(205, 210, 221)",
+      "selected": false,
+      "text": "New businessNot live yet. Tell your agent what you plan to sell."
+    },
+    {
+      "border": "1px rgb(11, 13, 18)",
+      "height": 100,
+      "iconBg": "rgb(11, 13, 18)",
+      "iconColor": "rgb(255, 255, 255)",
+      "radius": "14px",
+      "ringBg": "rgb(11, 13, 18)",
+      "ringBorder": "1px rgb(11, 13, 18)",
+      "selected": true,
+      "text": "Existing businessAlready has a website your agent can use as source material."
+    }
+  ],
+  "selectedCount": 1,
+  "url": "http://localhost:5275/workspaces/new"
+}

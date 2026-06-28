@@ -1,0 +1,417 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - heading [level=2] [ref=e540]: Component Review
+          - paragraph [ref=e8]: Local MOS primitive harness for density, radius, focus, disabled, overflow, and floating states.
+        - button [ref=e541] [cursor=pointer]: Show toast
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - heading [level=2] [ref=e542]: Buttons
+          - paragraph [ref=e14]: "Reference: pill shape, 46px default, 36/54/64px sizes, halo hover and focus states."
+        - generic [ref=e15]:
+          - button [ref=e543] [cursor=pointer]:
+            - img
+            - text: Get started
+          - button [ref=e544] [cursor=pointer]:
+            - img
+            - text: Get started
+          - button [ref=e545] [cursor=pointer]: Book a demo
+          - button [ref=e546] [cursor=pointer]: Ghost
+          - button [ref=e547] [cursor=pointer]:
+            - img
+            - text: Delete campaign
+          - button [ref=e548] [cursor=pointer]: Read the docs
+        - generic [ref=e22]:
+          - button [ref=e549] [cursor=pointer]: Small
+          - button [ref=e550] [cursor=pointer]: Default
+          - button [ref=e551] [cursor=pointer]: Large
+          - button [ref=e552] [cursor=pointer]: Extra large
+          - button [ref=e553] [cursor=pointer]:
+            - img
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]: Default
+            - button [ref=e554] [cursor=pointer]: Launch campaign
+          - generic [ref=e32]:
+            - generic [ref=e33]: Hover
+            - button [ref=e555] [cursor=pointer]: Launch campaign
+          - generic [ref=e35]:
+            - generic [ref=e36]: Focused
+            - button [ref=e556] [cursor=pointer]: Launch campaign
+          - generic [ref=e38]:
+            - generic [ref=e39]: Loading
+            - button [ref=e557] [cursor=pointer]:
+              - img
+              - text: Launching...
+          - generic [ref=e41]:
+            - generic [ref=e42]: With arrow
+            - button [ref=e558] [cursor=pointer]:
+              - text: Continue
+              - img
+          - generic [ref=e44]:
+            - generic [ref=e45]: Icon only
+            - button [ref=e559] [cursor=pointer]:
+              - img
+          - generic [ref=e47]:
+            - generic [ref=e48]: Disabled
+            - button [disabled]: Disabled
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - heading [level=2] [ref=e560]: Badges, Pills And Status
+          - paragraph [ref=e52]: "Reference: 22px badges, subtle borders, dots with soft rings, and small pills for selected values."
+        - generic [ref=e53]:
+          - generic [ref=e54]: Neutral
+          - generic [ref=e55]: Accent
+          - generic [ref=e56]: Info
+          - generic [ref=e57]: Success
+          - generic [ref=e58]: Warning
+          - generic [ref=e59]: Danger
+        - generic [ref=e60]:
+          - generic [ref=e63]: running
+          - generic [ref=e65]: completed
+          - generic [ref=e67]: failed
+          - generic [ref=e69]: cancelled
+          - generic [ref=e71]: pending
+        - generic [ref=e72]:
+          - generic [ref=e73]: Live
+          - generic [ref=e74]: Brand voice
+          - generic [ref=e75]: Organic social
+          - generic [ref=e76]: Needs input
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - heading [level=2] [ref=e561]: Forms
+          - paragraph [ref=e80]: "Reference: 54px controls, 12px corners, 1.5px borders, black focus ring, explicit error and disabled states."
+        - generic [ref=e81]:
+          - generic [ref=e82]:
+            - generic [ref=e83]: Workspace name*
+            - textbox [ref=e562]:
+              - /placeholder: Enter workspace name
+            - paragraph [ref=e86]: Short labels should stay close to their controls.
+          - generic [ref=e87]:
+            - generic [ref=e88]: Stage
+            - combobox [ref=e563]
+            - alert [ref=e91]: This field shows the error style.
+          - generic [ref=e92]:
+            - generic [ref=e93]: Search field
+            - generic [ref=e95]:
+              - img
+              - textbox [ref=e564]:
+                - /placeholder: Search components
+          - generic [ref=e97]:
+            - generic [ref=e98]: Disabled input
+            - textbox [disabled] [ref=e565]:
+              - /placeholder: Unavailable
+          - generic [ref=e101]:
+            - generic [ref=e102]: Brief
+            - textbox [ref=e566]:
+              - /placeholder: Write a short internal note.
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - generic [ref=e107]: Default
+            - textbox [ref=e567]:
+              - /placeholder: acme.com
+          - generic [ref=e109]:
+            - generic [ref=e110]: Focused
+            - textbox [ref=e111]: acme.com
+          - generic [ref=e112]:
+            - generic [ref=e113]: Error
+            - textbox [ref=e114]: missing-at-symbol
+          - generic [ref=e115]:
+            - generic [ref=e116]: Input group
+            - generic [ref=e117]:
+              - generic [ref=e118]: https://
+              - textbox [ref=e119]: acme.com
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e123]:
+                - generic [ref=e124]: Email
+                - generic [ref=e125]: Paid social
+              - img [ref=e126]
+            - generic [ref=e128]:
+              - generic [ref=e129]:
+                - img [ref=e130]
+                - generic [ref=e132]: Email
+                - generic [ref=e133]: Selected
+              - generic [ref=e134]:
+                - generic [ref=e135]: Paid social
+                - generic [ref=e136]: Meta
+              - generic [ref=e137]:
+                - generic [ref=e138]: Organic social
+                - generic [ref=e139]: Queued
+          - generic [ref=e140]:
+            - text: OTP
+            - generic [ref=e141]:
+              - textbox [ref=e568]: "2"
+              - textbox [ref=e569]: "8"
+              - textbox [ref=e570]: "4"
+              - textbox [ref=e571]
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - generic [ref=e148]: Website with icon
+            - generic [ref=e150]:
+              - img
+              - textbox [ref=e572]:
+                - /placeholder: acme.com
+          - generic [ref=e152]:
+            - generic [ref=e153]: Search docs
+            - generic [ref=e155]:
+              - img
+              - searchbox [ref=e573]
+              - generic [ref=e157]: ⌘K
+              - generic [ref=e158]:
+                - button [ref=e574] [cursor=pointer]:
+                  - generic [ref=e160]: Connecting LinkedIn
+                  - generic [ref=e161]: Setup
+                - button [ref=e575] [cursor=pointer]:
+                  - generic [ref=e163]: Brand voice training
+                  - generic [ref=e164]: Brand
+          - generic [ref=e165]:
+            - generic [ref=e166]: Password strength
+            - generic [ref=e168]:
+              - generic [ref=e169]:
+                - textbox [ref=e170]: strong-password
+                - button [ref=e576] [cursor=pointer]:
+                  - img [ref=e172]
+              - generic [ref=e178]: Strong
+          - generic [ref=e179]:
+            - generic [ref=e180]: Phone
+            - generic [ref=e182]:
+              - img
+              - textbox [ref=e577]:
+                - /placeholder: (555) 204-9811
+          - generic [ref=e184]:
+            - generic [ref=e185]: Currency
+            - generic [ref=e187]:
+              - img [ref=e189]
+              - textbox [ref=e191]: "89.00"
+              - generic [ref=e192]: USD
+          - generic [ref=e193]:
+            - generic [ref=e194]: Copyable value
+            - generic [ref=e196]:
+              - img [ref=e198]
+              - textbox [ref=e201]: ada@acme.com
+              - button [ref=e578] [cursor=pointer]:
+                - img [ref=e203]
+                - text: Copy
+      - generic [ref=e206]:
+        - generic [ref=e207]:
+          - heading [level=2] [ref=e579]: Choice Cards
+          - paragraph [ref=e209]: "Full source choice system: single-select flows with Continue CTA, multi-select cards, compact choices, and grid/card choices."
+        - generic [ref=e210]:
+          - generic [ref=e211]:
+            - generic [ref=e212]:
+              - heading [level=3] [ref=e580]: What is the main bottleneck?
+              - paragraph [ref=e214]: Single-select stack with full-width cards and a footer action.
+            - listbox [ref=e581]:
+              - option [ref=e582] [cursor=pointer]:
+                - img [ref=e218]
+                - generic [ref=e220]:
+                  - generic [ref=e222]: Our marketing is kind of a mess
+                  - generic [ref=e223]: Inconsistent, scattered, or embarrassing to review.
+                - img [ref=e225]
+              - option [selected] [ref=e583] [cursor=pointer]:
+                - img [ref=e229]
+                - generic [ref=e231]:
+                  - generic [ref=e233]: We ship faster than we market
+                  - generic [ref=e234]: Product is great, but no one's hearing about it.
+                - img [ref=e236]
+              - option [ref=e584] [cursor=pointer]:
+                - img [ref=e240]
+                - generic [ref=e242]:
+                  - generic [ref=e244]: Same content, every single day
+                  - generic [ref=e245]: Customers keep asking the same questions.
+                - img [ref=e247]
+              - option [ref=e585] [cursor=pointer]:
+                - img [ref=e251]
+                - generic [ref=e255]:
+                  - generic [ref=e257]: All of the above
+                  - generic [ref=e258]: Use this when the system needs a full reset.
+                - img [ref=e260]
+            - button [ref=e586] [cursor=pointer]:
+              - text: Continue
+              - img
+          - generic [ref=e264]:
+            - generic [ref=e265]:
+              - generic [ref=e266]:
+                - heading [level=3] [ref=e587]: Where should MOS publish?
+                - paragraph [ref=e268]: Multi-select uses square rings and multiple selected cards.
+              - listbox [ref=e588]:
+                - option [selected] [ref=e589] [cursor=pointer]:
+                  - img [ref=e272]
+                  - generic [ref=e275]:
+                    - generic [ref=e277]: LinkedIn
+                    - generic [ref=e278]: B2B reach · connected account.
+                  - img [ref=e280]
+                - option [selected] [ref=e590] [cursor=pointer]:
+                  - img [ref=e284]
+                  - generic [ref=e287]:
+                    - generic [ref=e289]: Email
+                    - generic [ref=e290]: Subscribers in your list.
+                  - img [ref=e292]
+                - option [ref=e591] [cursor=pointer]:
+                  - img [ref=e296]
+                  - generic [ref=e301]:
+                    - generic [ref=e303]: Blog
+                    - generic [ref=e304]: Long-form posts on your domain.
+                  - img [ref=e306]
+            - generic [ref=e308]:
+              - generic [ref=e309]:
+                - heading [level=3] [ref=e592]: Compact choices
+                - listbox [ref=e593]:
+                  - option [ref=e594] [cursor=pointer]:
+                    - generic [ref=e315]: Just me
+                    - img [ref=e317]
+                  - option [selected] [ref=e595] [cursor=pointer]:
+                    - generic [ref=e322]: 2-10
+                    - img [ref=e324]
+                  - option [ref=e596] [cursor=pointer]:
+                    - generic [ref=e329]: 11-50
+                    - img [ref=e331]
+                  - option [ref=e597] [cursor=pointer]:
+                    - generic [ref=e336]: 50+
+                    - img [ref=e338]
+              - generic [ref=e340]:
+                - heading [level=3] [ref=e598]: Grid card choices
+                - listbox [ref=e599]:
+                  - option [selected] [ref=e600] [cursor=pointer]:
+                    - img [ref=e345]
+                    - generic [ref=e348]:
+                      - generic [ref=e350]: E-commerce
+                      - generic [ref=e351]: Product-first online store.
+                    - img [ref=e353]
+                  - option [ref=e601] [cursor=pointer]:
+                    - img [ref=e357]
+                    - generic [ref=e360]:
+                      - generic [ref=e362]: Course
+                      - generic [ref=e363]: Training or packaged knowledge.
+                    - img [ref=e365]
+                  - option [ref=e602] [cursor=pointer]:
+                    - img [ref=e369]
+                    - generic [ref=e371]:
+                      - generic [ref=e373]: Software
+                      - generic [ref=e374]: App, tool, or SaaS.
+                    - img [ref=e376]
+                  - option [ref=e603] [cursor=pointer]:
+                    - img [ref=e380]
+                    - generic [ref=e383]:
+                      - generic [ref=e385]: Service
+                      - generic [ref=e386]: Done-for-you work.
+                    - img [ref=e388]
+                  - option [ref=e604] [cursor=pointer]:
+                    - img [ref=e392]
+                    - generic [ref=e396]:
+                      - generic [ref=e398]: Marketplace
+                      - generic [ref=e399]: Two-sided platform.
+                    - img [ref=e401]
+                  - option [ref=e605] [cursor=pointer]:
+                    - img [ref=e405]
+                    - generic [ref=e409]:
+                      - generic [ref=e411]: Other
+                      - generic [ref=e412]: Does not fit common buckets.
+                    - img [ref=e414]
+      - generic [ref=e416]:
+        - generic [ref=e417]:
+          - heading [level=2] [ref=e606]: Filters And Tabs
+          - paragraph [ref=e419]: Repeated controls should not shift layout when selected or hovered.
+        - generic [ref=e420]:
+          - button [ref=e607] [cursor=pointer]: All
+          - button [ref=e608] [cursor=pointer]: Ready
+          - button [ref=e609] [cursor=pointer]: Blocked
+          - textbox [ref=e610]:
+            - /placeholder: Filter rows
+        - generic [ref=e425]:
+          - tablist [ref=e426]:
+            - tab [selected] [ref=e611] [cursor=pointer]: Overview
+            - tab [ref=e612] [cursor=pointer]: Activity
+            - tab [ref=e613] [cursor=pointer]: Settings
+          - tabpanel [ref=e614]:
+            - generic [ref=e434]:
+              - generic [ref=e435]: Selected tab
+              - generic [ref=e436]: The panel uses shared callout, spacing, and focus styles.
+      - generic [ref=e437]:
+        - generic [ref=e438]:
+          - heading [level=2] [ref=e615]: Table
+          - paragraph [ref=e440]: Table density should support scanning without giant row padding or clipped metadata.
+        - table [ref=e442]:
+          - rowgroup [ref=e443]:
+            - row [ref=e616]:
+              - columnheader [ref=e617]: Item
+              - columnheader [ref=e618]: Status
+              - columnheader [ref=e619]: Owner
+          - rowgroup [ref=e448]:
+            - row [ref=e620]:
+              - cell [ref=e621]: Workspace source
+              - cell [ref=e622]:
+                - generic [ref=e453]: completed
+              - cell [ref=e623]: Operator
+            - row [ref=e624]:
+              - cell [ref=e625]: Strategy brief
+              - cell [ref=e626]:
+                - generic [ref=e460]: running
+              - cell [ref=e627]: Operator
+            - row [ref=e628]:
+              - cell [ref=e629]: Creative queue
+              - cell [ref=e630]:
+                - generic [ref=e466]: completed
+              - cell [ref=e631]: System
+      - generic [ref=e468]:
+        - generic [ref=e469]:
+          - heading [level=2] [ref=e632]: Floating Surfaces
+          - paragraph [ref=e471]: Menus, popovers, tooltips, dialogs, and alert dialogs should share panel radius and shadow.
+        - generic [ref=e472]:
+          - button [ref=e633] [cursor=pointer]:
+            - img
+            - text: Menu
+          - button [ref=e634] [cursor=pointer]: Popover
+          - button [ref=e635] [cursor=pointer]: Tooltip
+          - button [expanded] [ref=e636] [cursor=pointer]: Dialog
+          - button [ref=e637] [cursor=pointer]: Alert dialog
+        - generic [ref=e478]:
+          - generic [ref=e479]:
+            - generic [ref=e480]: Open detail
+            - generic [ref=e481]: Duplicate
+            - generic [ref=e483]: Archive
+          - generic [ref=e484]:
+            - generic [ref=e485]: Popover surface
+            - paragraph [ref=e486]: Compact content should stay legible inside floating panels.
+          - generic [ref=e488]: Tooltip copy
+      - generic [ref=e489]:
+        - generic [ref=e490]:
+          - heading [level=2] [ref=e638]: Feedback States
+          - paragraph [ref=e492]: Empty, error, progress, skeleton, and callout states need consistent surfaces.
+        - generic [ref=e493]:
+          - generic [ref=e495]:
+            - generic [ref=e496]:
+              - generic [ref=e497]: No matching rows
+              - generic [ref=e498]: The empty state should stay compact enough for repeated product screens.
+            - button [ref=e639] [cursor=pointer]: Reset filters
+          - generic [ref=e501]:
+            - generic [ref=e502]: Load failed
+            - generic [ref=e503]: Error states use danger color without expanding into oversized panels.
+            - button [ref=e640] [cursor=pointer]: Retry
+          - generic [ref=e505]:
+            - generic [ref=e506]:
+              - generic [ref=e507]: Progress
+              - generic [ref=e508]: In progress
+            - progressbar [ref=e509]
+        - generic [ref=e515]:
+          - generic [ref=e519]:
+            - generic [ref=e520]: Neutral callout
+            - generic [ref=e521]: Neutral copy should not dominate the screen.
+          - generic [ref=e525]:
+            - generic [ref=e526]: Success callout
+            - generic [ref=e527]: Success copy should be clear but compact.
+          - generic [ref=e531]:
+            - generic [ref=e532]: Warning callout
+            - generic [ref=e533]: Warning copy should carry visual weight without shouting.
+          - generic [ref=e537]:
+            - generic [ref=e538]: Danger callout
+            - generic [ref=e539]: Danger copy should be obvious and still scannable.
+    - region "Notifications"
+  - dialog "Dialog title" [ref=e644]:
+    - heading "Dialog title" [level=2] [ref=e645]
+    - paragraph [ref=e646]: Dialog body uses shared floating panel styles with readable default header rhythm.
+    - button "Close" [active] [ref=e648] [cursor=pointer]

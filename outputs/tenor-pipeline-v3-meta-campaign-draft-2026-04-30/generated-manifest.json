@@ -1,0 +1,1543 @@
+{
+  "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+  "campaignName": "Tenor Pipeline V3 Meta Draft - No Product Reveal - 2026-04-30",
+  "swipeCollectionId": "32f456e5-4bb8-4fe5-976a-d6bfbb466328",
+  "generatedAt": "2026-04-30T04:23:04.197Z",
+  "compliance": {
+    "productShown": false,
+    "mechanismRevealAllowed": false,
+    "source": "manual creative context + swipe image request fields"
+  },
+  "outputs": [
+    {
+      "adId": "AV-A1",
+      "stage": "advertorial",
+      "headline": "Normal Isn't Optimal (19 chars)",
+      "primaryText": "\"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link]",
+      "destination": "advertorial-variant-a.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "assetId": "11a360ce-56e0-4fdc-b174-49d806b86aac",
+      "publicId": "c6e0646a-0ba3-42d1-aa90-0f21a669abba",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a1-11a360ce-56e0-4fdc-b174-49d806b86aac.jpg",
+      "workflowRunId": "ac881e60-de69-41bd-8a26-75be8324c541",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-e1d12346-507f-4070-8cca-f2cd85d69a1b",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+      "sourceSwipeTitle": "fatigue.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "0928226f-8b2d-503e-abae-f8008417f4c5",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 62278,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:0132c2fc8638106e8a78dc487fa4c00622ab20946d962e85",
+        "asset_ids": [
+          "11a360ce-56e0-4fdc-b174-49d806b86aac"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-A2",
+      "stage": "advertorial",
+      "headline": "The 700-Point Spread (22 chars)",
+      "primaryText": "300 to 1,000. That's the testosterone reference range — a 700-point spread. You can lose two-thirds of your T and still be told your labs are \"normal.\" Here's what the reference range doesn't tell you — and what actually matters. [Link]",
+      "destination": "advertorial-variant-a.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "assetId": "feec87db-763e-4713-ab2c-e0d50c412330",
+      "publicId": "ab38e105-1e75-4e97-98b1-b7c330b9cb73",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a2-feec87db-763e-4713-ab2c-e0d50c412330.jpg",
+      "workflowRunId": "26848a3d-c7fa-421e-85d6-3fe1c06a4f09",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-afd3d83d-a2bd-4a18-9265-a6158e37265c",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+      "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "ef9b444b-79ed-5d84-b81d-d1e407f65fe8",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 1547001,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:419c33c074f5599999d80fbb15c28dc297617ce64a91e567",
+        "asset_ids": [
+          "feec87db-763e-4713-ab2c-e0d50c412330"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-A3",
+      "stage": "advertorial",
+      "headline": "The Missing Pathway (19 chars)",
+      "primaryText": "Why do some men with \"normal\" testosterone still feel drained, unfocused, and unlike themselves? Because testosterone that can't circulate is testosterone that can't work. The missing piece isn't more production — it's the nitric oxide pathway most supplements never address. Here's why it matters. [Link]",
+      "destination": "advertorial-variant-a.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "assetId": "6caaf28e-644b-44f9-b043-6a77fc1681bf",
+      "publicId": "4c5f28c3-80aa-4a06-92ef-cb8d6a283116",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a3-6caaf28e-644b-44f9-b043-6a77fc1681bf.jpg",
+      "workflowRunId": "a8c521b6-9475-49e9-8faa-1b17b31e706c",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-bcbf41f6-fcc5-4a1e-bc71-fe403ec2b340",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+      "sourceSwipeTitle": "5.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "a65698de-a14a-5851-984b-a28f29db1588",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 1553236,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:365873ad16b8bed54961154f34610387c832b5f6b5b7b178",
+        "asset_ids": [
+          "6caaf28e-644b-44f9-b043-6a77fc1681bf"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-A4",
+      "stage": "advertorial",
+      "headline": "5 Signs It's Not Just Age (26 chars)",
+      "primaryText": "5 signs your daily fatigue isn't \"just aging\" — and what your doctor's lab report isn't designed to tell you. 1) Energy crashes by 2pm daily. 2) Motivation requires active effort. 3) Focus slips mid-conversation. 4) Recovery takes longer. 5) You've normalized feeling diminished. These have a biological cause. [Link]",
+      "destination": "advertorial-variant-a.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_A_URL_PENDING}}",
+      "assetId": "0b299b87-bbb2-42ce-8d89-c59b786a7db8",
+      "publicId": "09174327-7223-4188-a42a-8ee588abdb15",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-a4-0b299b87-bbb2-42ce-8d89-c59b786a7db8.jpg",
+      "workflowRunId": "6643894a-7187-4b3a-8249-8eca62931ed9",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-9f855500-6bd4-456e-86df-18cd26c29c96",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_carousel",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Carousel",
+      "requirementIndex": 0,
+      "companySwipeId": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+      "sourceSwipeTitle": "6.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "5b8463de-663d-5b3a-9e65-26062d2f7c6e",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 2762428,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:ea09444ca2379cadf50d95edbf7ddff5eaca0581f49f8bf7",
+        "asset_ids": [
+          "0b299b87-bbb2-42ce-8d89-c59b786a7db8"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-B1",
+      "stage": "advertorial",
+      "headline": "Two Pathways They Missed (25 chars)",
+      "primaryText": "The Two Pathways Every T-Booster Ignores — And Why That's Why You Still Don't Feel Like Yourself. Most supplements target only testosterone production. They miss the other two systems that determine whether you actually feel the difference. Here's what was missing. [Link]",
+      "destination": "advertorial-variant-b.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "assetId": "68e67a56-31e1-4b34-a185-24867fdbf265",
+      "publicId": "e6834997-c91a-4c3d-b921-08bfd78fa609",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b1-68e67a56-31e1-4b34-a185-24867fdbf265.jpg",
+      "workflowRunId": "9e5b51f4-8437-45a7-88f7-83197ee82639",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-b8c36993-a524-4fbe-963b-d9c8f54d4b25",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "058b868e-4568-578e-99bc-21f0491ed671",
+      "sourceSwipeTitle": "7.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "31b25d46-e6c7-5dad-8ae2-d969d3d27b3f",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "058b868e-4568-578e-99bc-21f0491ed671",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 2501376,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:eeccc6d975299ab448ec0ceed88598e95f1464053762bb99",
+        "asset_ids": [
+          "68e67a56-31e1-4b34-a185-24867fdbf265"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-B2",
+      "stage": "advertorial",
+      "headline": "It's Not Just Production (23 chars)",
+      "primaryText": "What if testosterone production is only 1/3 of the problem? Your body has to produce it, circulate it, AND protect it from stress depletion. Most T-boosters address Step 1 and stop. Here's what the other 2/3 requires — and why you've never heard this from a supplement company. [Link]",
+      "destination": "advertorial-variant-b.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "assetId": "efeff0d8-4b2e-4eb2-83cc-1c0935348639",
+      "publicId": "0da61863-d4bb-4d9a-933e-b745fe893b11",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b2-efeff0d8-4b2e-4eb2-83cc-1c0935348639.jpg",
+      "workflowRunId": "fd0d82dd-1e8e-44df-94aa-4d629b211fbd",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-6853ee89-3929-417d-b01a-e09bf8963e69",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+      "sourceSwipeTitle": "8.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "ecbd77b8-d4b0-531f-a27f-d93345959e05",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 2206026,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:a941558ab7cfbaadbce2428b20a648fbfa334c70eb1db84f",
+        "asset_ids": [
+          "efeff0d8-4b2e-4eb2-83cc-1c0935348639"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-B3",
+      "stage": "advertorial",
+      "headline": "Half the Science (16 chars)",
+      "primaryText": "Everything you've been told about testosterone support is based on half the science. The research is clear: production, circulation, and stress response all have to work together. Addressing one while ignoring the other two is why your last T-booster did nothing. Here's the full picture. [Link]",
+      "destination": "advertorial-variant-b.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "assetId": "3e529cc4-5975-4ddc-b905-5026f107e9d6",
+      "publicId": "1d562868-f3fa-48a7-96d7-a63ed0182703",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b3-3e529cc4-5975-4ddc-b905-5026f107e9d6.jpg",
+      "workflowRunId": "f04770a2-67e3-4fbd-9752-a94ae417c562",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-51f188a9-9064-4f2c-9419-54914af5c9d4",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+      "sourceSwipeTitle": "9.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "e9ebeda3-287e-543c-b779-e441e22d0436",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 2438428,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:9f256ffb70e83136b0e6be98d021422e6a15f5122ac67ee4",
+        "asset_ids": [
+          "3e529cc4-5975-4ddc-b905-5026f107e9d6"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-B4",
+      "stage": "advertorial",
+      "headline": "More T Was Never Enough (24 chars)",
+      "primaryText": "\"More testosterone\" was never the full answer. You can produce all the T in the world — if it can't circulate and your stress burns through it before it accumulates, you'll never feel the difference. That's why single-axis T-boosters fail. That's why this protocol supports all three pathways. That's the difference. [Link]",
+      "destination": "advertorial-variant-b.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_B_URL_PENDING}}",
+      "assetId": "0c8410d4-46d0-4e99-b297-e912a7de9c10",
+      "publicId": "7a71a5db-675b-4487-93e5-762cff8a4776",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-b4-0c8410d4-46d0-4e99-b297-e912a7de9c10.jpg",
+      "workflowRunId": "6610ae46-4fe8-4f42-a544-2d90f666f612",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-eacee48a-e5eb-44f9-a500-05aab2468fe9",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+      "sourceSwipeTitle": "big_text.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "82b39652-4279-57e7-8960-0eaaa1b0438b",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 1114641,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:1323386ae539bd4639a18d0f464eeb46bb827875513637ec",
+        "asset_ids": [
+          "0c8410d4-46d0-4e99-b297-e912a7de9c10"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-C1",
+      "stage": "advertorial",
+      "headline": "Before You Start TRT (21 chars)",
+      "primaryText": "Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link]",
+      "destination": "advertorial-variant-c.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "assetId": "ee72ed2f-d294-4ce8-8a51-8c4f51bb0805",
+      "publicId": "55ad63fa-abdd-4ff1-b8f6-5ca26baf5c25",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c1-ee72ed2f-d294-4ce8-8a51-8c4f51bb0805.jpg",
+      "workflowRunId": "635609c4-8afb-4f39-8a41-7b7c9b67d855",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-29ce762b-45f7-425b-86a0-c6078d8b4f34",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+      "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "ef9b444b-79ed-5d84-b81d-d1e407f65fe8",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 1547001,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:edad99c1532227f7fdcfee34c680e9d7c88d8175070e8bdd",
+        "asset_ids": [
+          "ee72ed2f-d294-4ce8-8a51-8c4f51bb0805"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-C2",
+      "stage": "advertorial",
+      "headline": "The Third Option (16 chars)",
+      "primaryText": "Before you sign up for a lifetime of needles, prescriptions, and blood work — try the protocol 1,203 men used before deciding they needed TRT. 90 days. Full refund if it doesn't work. Return even the empty bottles. You owe yourself the third option between gas station pills and permanent medical intervention. [Link]",
+      "destination": "advertorial-variant-c.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "assetId": "9f7e7454-f7ce-48f7-af36-1ecd74e917c4",
+      "publicId": "f8ef2b75-3da4-4e48-b6c4-214ee95ff7be",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c2-9f7e7454-f7ce-48f7-af36-1ecd74e917c4.jpg",
+      "workflowRunId": "91f0a048-4dac-4538-ace3-8f9f9e848973",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-6dbcedaf-5570-481e-9604-cd1374d4eb21",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+      "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "ef9b444b-79ed-5d84-b81d-d1e407f65fe8",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 1547001,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:e060305d7bdbcd9923de66fd929483fdd0d76e9db7a7ecd5",
+        "asset_ids": [
+          "9f7e7454-f7ce-48f7-af36-1ecd74e917c4"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-C3",
+      "stage": "advertorial",
+      "headline": "3 Steps, Not 1 (15 chars)",
+      "primaryText": "Your body can make enough testosterone and you can still feel nothing. Here's why: production is only Step 1. Circulation (nitric oxide) is Step 2. Stress protection (cortisol modulation) is Step 3. Most supplements stop at Step 1. Tenor addresses all three. Your last T-booster didn't fail — it was incomplete. [Link]",
+      "destination": "advertorial-variant-c.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "assetId": "b23b6840-d51a-4f90-9baa-29158a8853d3",
+      "publicId": "cd3b314e-e6ea-4cc3-93a8-4cfc8b7523ae",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c3-b23b6840-d51a-4f90-9baa-29158a8853d3.jpg",
+      "workflowRunId": "e4f9fe18-4026-473a-8558-e5a1ab050c30",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-794d3398-f087-4c1d-b5a4-f561c1f215ec",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_carousel",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Carousel",
+      "requirementIndex": 0,
+      "companySwipeId": "a9b9b792-bea4-579a-993f-95994908d8bb",
+      "sourceSwipeTitle": "brush.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "312a024b-fa7a-512c-a712-04d2ea4a323d",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "a9b9b792-bea4-579a-993f-95994908d8bb",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 19777,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:30e3fd047001d5fe10e17e1fdcc5ba7d263cf01e4a6257b9",
+        "asset_ids": [
+          "b23b6840-d51a-4f90-9baa-29158a8853d3"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "AV-C4",
+      "stage": "advertorial",
+      "headline": "Three Systems, One Protocol (28 chars)",
+      "primaryText": "Three biological systems have to work together for you to feel the difference. Leydig cell function (production). Nitric oxide circulation (delivery). Stress response modulation (preservation). Most supplements hit one. Tenor supports all three with 21 disclosed ingredients. Here's how the architecture works. [Link]",
+      "destination": "advertorial-variant-c.md",
+      "destinationToken": "{{ADVERTORIAL_VARIANT_C_URL_PENDING}}",
+      "assetId": "f67f24bb-b915-4c47-a9af-ee3935220aa5",
+      "publicId": "fb7cc794-04cd-439a-9401-6736d5e22d13",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/av-c4-f67f24bb-b915-4c47-a9af-ee3935220aa5.jpg",
+      "workflowRunId": "88d279f1-8236-46b6-af47-ede77879e027",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-20c47ff9-89d8-42df-818f-a4e92ae65388",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+      "sourceSwipeTitle": "care_bag.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "ed607c21-81fa-5a9a-be11-fbc6a5914230",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 42844,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:985f44ffcc08ea83037ae835208e39446f0a7afa4c18ee60",
+        "asset_ids": [
+          "f67f24bb-b915-4c47-a9af-ee3935220aa5"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L1",
+      "stage": "listicle",
+      "headline": "Stop Boosting. Start Supporting. (30 chars)",
+      "primaryText": "Stop trying to \"boost your testosterone.\" That approach has failed you three times already — and it's not your fault. The problem isn't production. It's the two other systems most supplements completely ignore. 3 reasons your T-booster didn't work. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_B_URL_PENDING}}",
+      "assetId": "4e8c716c-a303-4907-9d9e-558effa0b61d",
+      "publicId": "cc9530cd-af3b-4be4-a9ce-4f472056c12a",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l1-4e8c716c-a303-4907-9d9e-558effa0b61d.jpg",
+      "workflowRunId": "d0c06ab6-f75c-4003-b0bf-56dd4028c870",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-daafea1c-1de6-4a16-b093-9de7bcfe6765",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_carousel",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Carousel",
+      "requirementIndex": 0,
+      "companySwipeId": "20c77ba2-f32c-5003-9c8f-539ba629c532",
+      "sourceSwipeTitle": "derm_fag.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "624ad409-61c1-563d-9d87-8464521884c0",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "20c77ba2-f32c-5003-9c8f-539ba629c532",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 192498,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:ec6c3d8063f473d4c03e2893cc57b84d8b9d29eaed5b7f0a",
+        "asset_ids": [
+          "4e8c716c-a303-4907-9d9e-558effa0b61d"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L2",
+      "stage": "listicle",
+      "headline": "What Your Label Hid (20 chars)",
+      "primaryText": "The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_A_URL_PENDING}}",
+      "assetId": "3c90769c-ac9a-4a38-8ba2-66ea0d694e11",
+      "publicId": "35774dca-0e6e-4ccd-b982-7c00e7640a59",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l2-3c90769c-ac9a-4a38-8ba2-66ea0d694e11.jpg",
+      "workflowRunId": "2c11414a-9bef-4100-bbf4-b48ff8c041cb",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-d6424d3e-89e0-4bb3-92a0-b146cec1f678",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+      "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "ef9b444b-79ed-5d84-b81d-d1e407f65fe8",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 1547001,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:0aaadcee35a6276d9a0c33375307d067c1adcb97504c5d06",
+        "asset_ids": [
+          "3c90769c-ac9a-4a38-8ba2-66ea0d694e11"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L3",
+      "stage": "listicle",
+      "headline": "Feel Like Yourself Again (24 chars)",
+      "primaryText": "Wake up with energy that lasts past 2pm. Feel sharp in conversations without reaching for the next thought. Experience the version of yourself your wife and kids remember — not 25 again, not superhuman, just you. 94% of 1,203 men reported sustained morning energy. Here's the protocol. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "assetId": "f7b974f8-0d85-4572-95ef-940896b0777a",
+      "publicId": "c734ba2d-74d4-40a7-900e-5c3f6a5bb95a",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l3-f7b974f8-0d85-4572-95ef-940896b0777a.jpg",
+      "workflowRunId": "9b6003c0-e310-4cd8-bdd7-2da4e45deb65",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-050e6da9-24c8-4ffc-b80f-426b5c772fef",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+      "sourceSwipeTitle": "fatigue.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "0928226f-8b2d-503e-abae-f8008417f4c5",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 62278,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:25199b46335e617a761681e2a80039027057a49f97292cf8",
+        "asset_ids": [
+          "f7b974f8-0d85-4572-95ef-940896b0777a"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L4",
+      "stage": "listicle",
+      "headline": "10 Seconds Each Morning (23 chars)",
+      "primaryText": "2 capsules. Every morning. 10 seconds. That's the protocol 92% of men said made them feel more like themselves — drive, mood, confidence restored. Not a complex regimen. Not a prescription. Not a lifetime commitment. Just a daily protocol that addresses what T-boosters miss. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "assetId": "cdc714a0-90d2-4324-82b6-975125f3659d",
+      "publicId": "964b22b7-4a65-449c-a087-ede421689361",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l4-cdc714a0-90d2-4324-82b6-975125f3659d.jpg",
+      "workflowRunId": "aa6eb6c1-c512-4cc1-9aa4-d1bfd02c8d46",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-cfc235c2-5377-4a7d-af7f-6bc4e36e2c7d",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+      "sourceSwipeTitle": "fb_message_ad.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "60a4b479-cd16-5578-abf4-432e24c34b2b",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 34645,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:59120c5da024791057771a31f38e7c7d6ea8dcc05d2d142d",
+        "asset_ids": [
+          "cdc714a0-90d2-4324-82b6-975125f3659d"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L5",
+      "stage": "listicle",
+      "headline": "1,203 Men. 4 Results. (22 chars)",
+      "primaryText": "1,203 men tried this protocol. 94% reported sustained morning energy. 92% said they felt more like themselves. 87% felt sharper focus. 81% noticed improved stamina within weeks. These aren't marketing claims — they're survey results from men who switched from single-axis T-boosters to a complete protocol. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "assetId": "896cfb58-2d82-4ae3-88b0-0ea94eacb6ca",
+      "publicId": "435b6230-8af0-4c62-98a0-87f80bf10ffb",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l5-896cfb58-2d82-4ae3-88b0-0ea94eacb6ca.jpg",
+      "workflowRunId": "3c1a3fbb-a45f-402d-8249-755f351ba877",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-e733ef70-ffda-47cd-9abc-88752e2bbe07",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_carousel",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Carousel",
+      "requirementIndex": 0,
+      "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+      "sourceSwipeTitle": "green.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "21c5bb1e-f166-562e-91a5-283c860d01b5",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "e2ff843d-e853-55eb-b306-4398900615ef",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 854522,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:b08de85b9a70f10fb5c386423dd48544d82a0012ee955eba",
+        "asset_ids": [
+          "896cfb58-2d82-4ae3-88b0-0ea94eacb6ca"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L6",
+      "stage": "listicle",
+      "headline": "Backed by Research (19 chars)",
+      "primaryText": "Five researchers. Three biological pathways. One daily protocol. The Multi-Pathway approach is informed by published research across endocrinology (King's College London), vascular biology (Medical College of Georgia), and men's health (UC Irvine). This is what happens when the science gets specific. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_B_URL_PENDING}}",
+      "assetId": "1cd420bb-4419-44eb-8ad7-dec45f49aeb5",
+      "publicId": "b3720f27-a776-4098-b602-35ba622ad26b",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l6-1cd420bb-4419-44eb-8ad7-dec45f49aeb5.jpg",
+      "workflowRunId": "00d65d60-26fe-45df-8dbe-8ca1f799e92f",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-59383003-8374-43dd-ae44-7233b924b9e3",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "e358e68d-730a-5f8b-9bc9-fb7742985f43",
+      "sourceSwipeTitle": "grocery.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "4387e41a-3b34-5c9f-8813-041965df54e5",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "e358e68d-730a-5f8b-9bc9-fb7742985f43",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 104757,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:1f2b4cd315bd1be41f888cc91210002259a2afd6ac4599bd",
+        "asset_ids": [
+          "1cd420bb-4419-44eb-8ad7-dec45f49aeb5"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L7",
+      "stage": "listicle",
+      "headline": "Not Who You Are (17 chars)",
+      "primaryText": "The checked-out husband. It's not who you are — it's what happens when your energy, drive, and presence quietly erode and no one gives you a name for why. 92% of men who addressed all three biological pathways reported feeling more like themselves. Before it costs more than your afternoon coffee. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "assetId": "77376256-392b-4c93-a40e-1627bfdef0ee",
+      "publicId": "7aef5cf1-9fb4-4cb6-b53f-af28a16cf77a",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l7-77376256-392b-4c93-a40e-1627bfdef0ee.jpg",
+      "workflowRunId": "df5e4ed4-423e-40d5-af5a-d63530ddd156",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-1e0ce3f6-c8ff-4b86-b585-9dd999fe9ba5",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+      "sourceSwipeTitle": "fatigue.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "0928226f-8b2d-503e-abae-f8008417f4c5",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 62278,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:8984a2514f5cfed87bf0bdcbf62eafd1994032a21e8fde93",
+        "asset_ids": [
+          "77376256-392b-4c93-a40e-1627bfdef0ee"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L8",
+      "stage": "listicle",
+      "headline": "Just You, Restored (17 chars)",
+      "primaryText": "Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "assetId": "ff4f3189-6a46-4eb0-a18e-27f761aef4c2",
+      "publicId": "6780b338-ad9c-4731-bb58-10fbf07adacc",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l8-ff4f3189-6a46-4eb0-a18e-27f761aef4c2.jpg",
+      "workflowRunId": "fd670d5e-458a-42e8-afb4-4f4bd24b5a35",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-0c64e1dd-ef86-43ab-bac7-3a114718cd7e",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+      "sourceSwipeTitle": "fatigue.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "0928226f-8b2d-503e-abae-f8008417f4c5",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 62278,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:6f46bbdec667af1bfa7d83fc1e3844e2a6c0eaeb57a8bb8c",
+        "asset_ids": [
+          "ff4f3189-6a46-4eb0-a18e-27f761aef4c2"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L9",
+      "stage": "listicle",
+      "headline": "Mark, 47: \"Night and Day\" (26 chars)",
+      "primaryText": "\"Three months in and the difference is night and day. My energy is steady all day. I'm present with my wife and kids again. I didn't realize how far I'd drifted.\" — Mark, 47. One of 1,203 men surveyed. 92% reported feeling more like themselves. Here's the protocol they followed. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "assetId": "14997762-da57-49ee-8027-13f1078fe212",
+      "publicId": "06374785-ad6f-495d-b930-101c4ed3c5fc",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l9-14997762-da57-49ee-8027-13f1078fe212.jpg",
+      "workflowRunId": "bc885bd2-1b6c-4f74-99ff-a07b6f439706",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-4f83c30d-c6ba-42b6-adc9-3c02c5789e54",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+      "sourceSwipeTitle": "raise_a_winner.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "e9df9acb-a27b-5c4b-aaf1-4f1232125c43",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 46199,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:d957153953aa07124f172823b335151f8c28ac7e65fa76a3",
+        "asset_ids": [
+          "14997762-da57-49ee-8027-13f1078fe212"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L10",
+      "stage": "listicle",
+      "headline": "Nothing to Hide (16 chars)",
+      "primaryText": "\"Proprietary Blend\" is legalized lying. Three words that let a company hide sub-clinical doses behind a single number while charging you for ingredients you're barely getting. You didn't fail those supplements. They were designed to fail you. Here's what a label looks like when there's nothing to hide. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_A_URL_PENDING}}",
+      "assetId": "9c0d289b-df7c-4671-bf75-45f56bd8c82b",
+      "publicId": "2b9163dc-a0d8-4917-adcd-918eea4bcbfe",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l10-9c0d289b-df7c-4671-bf75-45f56bd8c82b.jpg",
+      "workflowRunId": "e207a843-06a7-4d56-bf4d-5898ca79ffdf",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-4a74c335-949a-4d32-a682-c72a5faa90fb",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+      "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "ef9b444b-79ed-5d84-b81d-d1e407f65fe8",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 1547001,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:b19d144a7c26679dba25c2f5f64cd42d002051261a64eb29",
+        "asset_ids": [
+          "9c0d289b-df7c-4671-bf75-45f56bd8c82b"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L11",
+      "stage": "listicle",
+      "headline": "810K+ Men. 90-Day Guarantee. (30 chars)",
+      "primaryText": "810K+ purchases. 24M+ servings. 400,000 lives impacted through giving partners. And a 90-day empty-bottle guarantee that says: if you don't feel more like yourself after consistent use, return even the empties for a full refund. No risk. No proprietary blends. No needles. Just a protocol that works. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_C_URL_PENDING}}",
+      "assetId": "c1b12aba-2a76-4992-aad2-77959a369b72",
+      "publicId": "9aba7518-a53e-49c0-96e7-bde9347575ae",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l11-c1b12aba-2a76-4992-aad2-77959a369b72.jpg",
+      "workflowRunId": "66198945-a5c6-44fe-ae2b-2798187d9bfd",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-a247fab0-6e1a-4c3f-b3f6-f8bab8545dee",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+      "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "ef9b444b-79ed-5d84-b81d-d1e407f65fe8",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 1547001,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:9dca36c874af6cb03be9693e247c246eeeb2c928e4326a83",
+        "asset_ids": [
+          "c1b12aba-2a76-4992-aad2-77959a369b72"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "L12",
+      "stage": "listicle",
+      "headline": "One Protocol. Done. (19 chars)",
+      "primaryText": "21 ingredients. 3 pathways. 2 capsules. $1.17 per serving. The complete protocol that replaces the DIY stack of 6-12 separate supplements you've been researching, buying, and hoping works together. All disclosed doses. All third-party tested. All in one morning routine. See the full protocol. [Link]",
+      "destination": null,
+      "destinationToken": "{{LISTICLE_B_URL_PENDING}}",
+      "assetId": "9fed8f51-32e5-44d8-9cf0-c70b559f57c3",
+      "publicId": "709d3e33-d608-4ec4-9ac9-6f06d046b008",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/l12-9fed8f51-32e5-44d8-9cf0-c70b559f57c3.jpg",
+      "workflowRunId": "1e59c203-a359-4607-ac08-09295499587b",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-767b75f3-c2c7-445a-b9bf-fd3e2930249e",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_presales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Pre-Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "74a2f8b1-2386-5213-ac31-16ee3860a08c",
+      "sourceSwipeTitle": "Static #1.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "d978d9b1-bb0c-508b-870a-fccfc7b17a27",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "74a2f8b1-2386-5213-ac31-16ee3860a08c",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #1.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%231.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #1.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%231.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 2497879,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%231.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:2d9b832c0c8f0d70de86be8efb9635efa0410c5b1a68a513",
+        "asset_ids": [
+          "9fed8f51-32e5-44d8-9cf0-c70b559f57c3"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "PDP1",
+      "stage": "pdp",
+      "headline": "$35/mo. 90-Day Guarantee. (25 chars)",
+      "primaryText": "Quarterly Plan: $35/month. 3 free gifts in your first shipment. 90-day empty-bottle guarantee. 21 disclosed active ingredients supporting Leydig cell function, nitric oxide circulation, and stress response — the three systems that determine how you actually feel. Start the protocol risk-free. [Link]",
+      "destination": null,
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "assetId": "64f570c3-93b4-4283-b059-3640137f18cd",
+      "publicId": "18c16c82-56d6-4b2c-af52-0a1b6b7782cd",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp1-64f570c3-93b4-4283-b059-3640137f18cd.jpg",
+      "workflowRunId": "3208fc7f-21ec-4966-afd6-252a2e64e1e2",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-83f26ccb-dfa0-4b4f-9a7a-06afccba7279",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_sales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+      "sourceSwipeTitle": "Static #2.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "5dfe0fbd-1207-5dd7-a3be-922b6b4cbda6",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #2.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%232.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #2.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%232.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 1384288,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%232.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:0115c1baab89f129af26f461f6ebcba670b5ca3227bb40be",
+        "asset_ids": [
+          "64f570c3-93b4-4283-b059-3640137f18cd"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "PDP2",
+      "stage": "pdp",
+      "headline": "\"I Knew I Wasn't Going Back\" (30 chars)",
+      "primaryText": "\"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link]",
+      "destination": null,
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "assetId": "0565daa9-1712-4f0e-8f95-84f448d1a8fc",
+      "publicId": "4c06c77b-8c59-41ba-b7e5-4850c84e9787",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp2-0565daa9-1712-4f0e-8f95-84f448d1a8fc.jpg",
+      "workflowRunId": "aaac4740-f9f8-477d-b25b-5416a67f7981",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-49db6305-cdb3-4710-942c-ac60824bba1a",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_sales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "00e357f9-7953-5d6b-8b80-18a91e8a1510",
+      "sourceSwipeTitle": "Static #3.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "67713aa3-d44e-5dd9-bcd4-b4474e3f2415",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "00e357f9-7953-5d6b-8b80-18a91e8a1510",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #3.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%233.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #3.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%233.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 1994100,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%233.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:568ada5d723877c6f060aaee1489539220e0896f77e3aa88",
+        "asset_ids": [
+          "0565daa9-1712-4f0e-8f95-84f448d1a8fc"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "PDP3",
+      "stage": "pdp",
+      "headline": "Check Your Label First (23 chars)",
+      "primaryText": "You're one \"proprietary blend\" away from wasting another 3 months and $100+ on a supplement that can't work. Before you buy another T-booster, check the label for those three words. Then look at what a disclosed-dose protocol actually contains — 400mg Tongkat Ali, 50mg Zinc, 250mg Maca, 250mg L-Arginine. [Link]",
+      "destination": null,
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "assetId": "e06c0f25-bdfd-4be2-875a-510e28908c75",
+      "publicId": "f15a8475-d5ad-46f4-938a-e1a38c8c137c",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp3-e06c0f25-bdfd-4be2-875a-510e28908c75.jpg",
+      "workflowRunId": "2829e054-12e9-49cf-bd5c-76edc6784a28",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-261d1ffd-4a7b-4b16-a982-6732459dcfd1",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_sales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "5e0bec7e-c4de-5135-a739-32de79c28f35",
+      "sourceSwipeTitle": "Static #4.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "cae23d09-df17-592e-beba-33827a5d623c",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "5e0bec7e-c4de-5135-a739-32de79c28f35",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #4.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%234.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #4.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%234.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 1617876,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%234.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:75f380d423bb70537501cd2e6e7dc8bf537e4ccc923c4518",
+        "asset_ids": [
+          "e06c0f25-bdfd-4be2-875a-510e28908c75"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "PDP4",
+      "stage": "pdp",
+      "headline": "Every Dose. Right There. (24 chars)",
+      "primaryText": "What does a supplement label look like when the company has nothing to hide? 400mg Tongkat Ali. 50mg Zinc. 250mg Maca. 250mg L-Arginine. 125mg Ginseng-Eleutherococcus. 745mg botanical matrix. Every single active ingredient, every single dose, right on the bottle. This is what transparency looks like. [Link]",
+      "destination": null,
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "assetId": "2bccdb26-a6ae-495b-b76a-9954c6d71d48",
+      "publicId": "f5c248dc-af63-4759-8f1b-6d0a541ff30e",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp4-2bccdb26-a6ae-495b-b76a-9954c6d71d48.jpg",
+      "workflowRunId": "a0fa3663-6386-4aef-972e-2b5f14cfdbd1",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-951b5864-a96c-46c9-b095-37b51f41acae",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_sales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "b7787513-5b32-578e-85e3-b367207a4238",
+      "sourceSwipeTitle": "target_1.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "a7d06718-78fb-51c0-b73c-5af5904a4f31",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "b7787513-5b32-578e-85e3-b367207a4238",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 97276,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:7e3ff87bad6c48639a69d8328b6fdd1eb62032136502f197",
+        "asset_ids": [
+          "2bccdb26-a6ae-495b-b76a-9954c6d71d48"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "PDP5",
+      "stage": "pdp",
+      "headline": "Morning Energy That Lasts (25 chars)",
+      "primaryText": "Morning energy that doesn't crash at 2pm. Focus that stays through the afternoon. Drive that doesn't require forced motivation. These aren't superhuman outcomes — they're what 94%, 87%, and 92% of men reported after addressing all three biological pathways. 2 capsules. Every morning. $1.17/serving. [Link]",
+      "destination": null,
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "assetId": "4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9",
+      "publicId": "071df0cd-263b-4f8d-baaa-f65771a0fab3",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp5-4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9.jpg",
+      "workflowRunId": "a6209038-5cd0-4bb9-b444-09af94d79b42",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-29fb1dce-a920-49c3-8e80-918981c12ab4",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_sales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+      "sourceSwipeTitle": "fatigue.jpg",
+      "sourceSwipeMedia": [
+        {
+          "id": "0928226f-8b2d-503e-abae-f8008417f4c5",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/jpeg",
+          "size_bytes": 62278,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:ca3a441366677dc43840412a3d6d0eb25d374b604481e83d",
+        "asset_ids": [
+          "4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "adId": "PDP6",
+      "stage": "pdp",
+      "headline": "\"You Can See What You're Taking\" (33 chars)",
+      "primaryText": "\"I was skeptical after trying three different T-boosters that did nothing. The difference here is you can actually see what you're taking — every ingredient, every dose, right on the label.\" — David M., 52. The Multi-Pathway Protocol. 21 ingredients. 90-day guarantee. See the full breakdown. [Link]",
+      "destination": null,
+      "destinationToken": "{{PDP_URL_PENDING}}",
+      "assetId": "aa7e9828-df76-4866-a87d-1a076d0494d9",
+      "publicId": "b956c62f-07dc-49fb-85b1-2d2d7bb22969",
+      "localImagePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated/pdp6-aa7e9828-df76-4866-a87d-1a076d0494d9.jpg",
+      "workflowRunId": "80089f6d-0b44-4820-ae42-1dc67eb44816",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-0a9470aa-97be-4cc2-9099-a30ae8d1daf4-5f396855-7f6d-49cb-afd6-b9a490a8dbf8",
+      "assetBriefId": "brief_tenor_pipeline_v3_no_reveal_sales_single",
+      "assetBriefName": "Tenor Pipeline V3 No Product/Mechanism Reveal - Sales Single Image",
+      "requirementIndex": 0,
+      "companySwipeId": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+      "sourceSwipeTitle": "10.png",
+      "sourceSwipeMedia": [
+        {
+          "id": "5e59f8dc-0383-5274-b6ca-d3e4630c5200",
+          "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+          "swipe_asset_id": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+          "media_asset_id": null,
+          "external_media_id": null,
+          "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png",
+          "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png",
+          "thumbnail_path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png",
+          "thumbnail_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png",
+          "disk": "hetzner-public-read",
+          "type": "image",
+          "mime_type": "image/png",
+          "size_bytes": 2923601,
+          "video_length": null,
+          "download_url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png"
+        }
+      ],
+      "payloadOut": {
+        "job_id": "embedded-freestyle:25ab74b0db08920a7742290ce8fb985113ec00fa6e75c1f5",
+        "asset_ids": [
+          "aa7e9828-df76-4866-a87d-1a076d0494d9"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

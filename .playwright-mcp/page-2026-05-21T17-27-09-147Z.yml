@@ -1,0 +1,29 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - button "Previous" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - text: Previous
+      - generic [ref=e7]:
+        - generic:
+          - progressbar "Setup progress"
+      - button "Onboarding options" [ref=e9] [cursor=pointer]:
+        - img
+    - main [ref=e11]:
+      - generic [ref=e12]:
+        - heading "Is this a new or already live business?" [level=1] [ref=e29]
+        - paragraph [ref=e18]: We'll start from scratch or research your existing business to get you setup.
+      - listbox "Business stage" [ref=e31]:
+        - option "New business Start from scratch with what you sell or plan to sell." [ref=e32] [cursor=pointer]:
+          - img [ref=e34]
+          - generic [ref=e40]:
+            - generic [ref=e42]: New business
+            - generic [ref=e43]: Start from scratch with what you sell or plan to sell.
+          - img [ref=e45]
+        - option "Already live business Use your website so your agent can learn the business." [ref=e47] [cursor=pointer]:
+          - img [ref=e49]
+          - generic [ref=e55]:
+            - generic [ref=e57]: Already live business
+            - generic [ref=e58]: Use your website so your agent can learn the business.
+          - img [ref=e60]
+  - region "Notifications"

@@ -1,0 +1,239 @@
+{
+  "createdAt": "2026-04-29T19:14:36.806Z",
+  "outputs": [
+    {
+      "key": "01-hero-normal-labs",
+      "sourceFile": "01-hero-normal-labs-source.jpg",
+      "workflowRunId": "c954fbb7-1a0a-41dd-b028-c18e3d82dbae",
+      "assetId": "5cedc14d-51d2-4d57-b201-726c5ee8ad26",
+      "publicId": "52f75ecc-8a1a-4e94-af65-ea9f8efa9331",
+      "publicUrl": "https://api.moshq.app/public/assets/52f75ecc-8a1a-4e94-af65-ea9f8efa9331",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-no-product/01-hero-normal-labs.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/ae54abc0-6aac-4f58-8608-6ee8b5c39167",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Normal labs, different person",
+        "swipeAngle": "Hard compliance constraint: do not show the Tenor product or any supplement product. No bottle, jar, box, label, supplement facts panel, capsules, pills, powders, scoops, sachets, packaging, branded object, logo, or readable product text. This image must be editorial context only, not a product visual. Premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic only. No fake UI, no charts, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Wide advertorial hero image. Create a quiet, premium editorial scene: soft morning light on a warm stone surface, an out-of-focus lab report or paper cue with no readable numbers, and a subtle driveway / early morning atmosphere suggesting a 47-year-old man processing normal bloodwork but not feeling normal. No product objects of any kind.",
+        "aspectRatio": "21:9",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:63e8f82f8288ba7a08a3e9289df0ed55a79c7905bf0dc591",
+        "asset_ids": [
+          "5cedc14d-51d2-4d57-b201-726c5ee8ad26"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "02-mechanism-actives",
+      "sourceFile": "02-mechanism-actives-source.jpg",
+      "workflowRunId": "0db8dc6b-8590-431c-ba60-4b5b28398dd4",
+      "assetId": "a35dff67-a86e-48ef-8d76-cb542586ea41",
+      "publicId": "c99e8644-c05d-43a8-bb53-8ea657e16dfc",
+      "publicUrl": "https://api.moshq.app/public/assets/c99e8644-c05d-43a8-bb53-8ea657e16dfc",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-no-product/02-mechanism-actives.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/e7246517-d399-446f-8381-f6e0bb0ae741",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "The lock and key mechanism",
+        "swipeAngle": "Hard compliance constraint: do not show the Tenor product or any supplement product. No bottle, jar, box, label, supplement facts panel, capsules, pills, powders, scoops, sachets, packaging, branded object, logo, or readable product text. This image must be editorial context only, not a product visual. Premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic only. No fake UI, no charts, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Inline figure for the androgen receptor mechanism section. Create a sophisticated scientific still life using abstract lock-and-key receptor shapes, mineral stones, botanical elements, and warm lab-style surfaces. It should feel evidence-based but not clinical. No molecular labels, no readable diagrams, no product objects.",
+        "aspectRatio": "4:3",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:50e4df7e8f742e88d53e9e85751bcef4ca483ba39caaef23",
+        "asset_ids": [
+          "a35dff67-a86e-48ef-8d76-cb542586ea41"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "03-formulation-context",
+      "sourceFile": "03-product-kit-label-source.jpg",
+      "workflowRunId": "88d5c711-f049-4851-b606-2ea5e3efbfe6",
+      "assetId": "d16d180a-9279-43d9-a97d-4713d5ea5c7b",
+      "publicId": "e2a77090-cf19-4320-8b9e-a28bc76b295f",
+      "publicUrl": "https://api.moshq.app/public/assets/e2a77090-cf19-4320-8b9e-a28bc76b295f",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-no-product/03-formulation-context.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/3f4f1779-f5fc-41f0-9a0b-27929623e2d2",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "The restoration protocol",
+        "swipeAngle": "Hard compliance constraint: do not show the Tenor product or any supplement product. No bottle, jar, box, label, supplement facts panel, capsules, pills, powders, scoops, sachets, packaging, branded object, logo, or readable product text. This image must be editorial context only, not a product visual. Premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic only. No fake UI, no charts, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Inline image for the restoration protocol section. Create a premium editorial formulation workspace: botanical roots, mineral stones, a clean notebook with unreadable marks, and warm natural light. It should suggest disclosed actives and scientific formulation without showing any supplement product, capsules, bottle, label, or packaging.",
+        "aspectRatio": "4:3",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:1e691d2c755ad95128e13c6fa9ffcfe713b4c411a845e820",
+        "asset_ids": [
+          "d16d180a-9279-43d9-a97d-4713d5ea5c7b"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "04-lifestyle-recovery",
+      "sourceFile": "04-lifestyle-recovery-source.jpg",
+      "workflowRunId": "37ef43c4-2b82-494e-b4ac-cdb52f48b096",
+      "assetId": "620320ac-c3f5-428f-989a-8979713e193a",
+      "publicId": "991026eb-099d-42aa-9acf-61795e0a3b90",
+      "publicUrl": "https://api.moshq.app/public/assets/991026eb-099d-42aa-9acf-61795e0a3b90",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-no-product/04-lifestyle-recovery.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/31931d30-829e-46e1-8b2f-f56c293620a7",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Daily energy and recovery",
+        "swipeAngle": "Hard compliance constraint: do not show the Tenor product or any supplement product. No bottle, jar, box, label, supplement facts panel, capsules, pills, powders, scoops, sachets, packaging, branded object, logo, or readable product text. This image must be editorial context only, not a product visual. Premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic only. No fake UI, no charts, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Inline lifestyle figure. Photorealistic scene of a realistic man in his early 50s near a window after a calm morning workout or weekend activity, relaxed posture, grounded expression, premium neutral interior, subtle bronze accent object. No supplement product, no gym aggression, no medical claim, no text.",
+        "aspectRatio": "4:3",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:2e0333251dc5043b6ea79845226524550ca56ce41b12b30d",
+        "asset_ids": [
+          "620320ac-c3f5-428f-989a-8979713e193a"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "05-morning-routine",
+      "sourceFile": "05-two-capsule-protocol-source.jpg",
+      "workflowRunId": "79d6ae89-652d-4635-9232-aae4675d26e1",
+      "assetId": "09525b80-4161-4f97-a377-49388214fe46",
+      "publicId": "a32e7402-b46e-4403-bbc7-65544e9dbcf4",
+      "publicUrl": "https://api.moshq.app/public/assets/a32e7402-b46e-4403-bbc7-65544e9dbcf4",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-no-product/05-morning-routine.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/70b00366-5294-42c9-9440-05410af1449c",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Morning routine",
+        "swipeAngle": "Hard compliance constraint: do not show the Tenor product or any supplement product. No bottle, jar, box, label, supplement facts panel, capsules, pills, powders, scoops, sachets, packaging, branded object, logo, or readable product text. This image must be editorial context only, not a product visual. Premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic only. No fake UI, no charts, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Inline daily routine figure for the getting-started section. Photorealistic morning still life with a water glass, notebook, keys, and warm stone counter. It should imply a simple morning protocol without showing capsules, pills, bottle, label, packaging, powders, scoops, or any product.",
+        "aspectRatio": "4:3",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:98e7822bfb903b6400995b095666b89043904ce636954c24",
+        "asset_ids": [
+          "09525b80-4161-4f97-a377-49388214fe46"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "06-volume-signal",
+      "sourceFile": "06-volume-signal-source.jpg",
+      "workflowRunId": "8189309e-8471-42f5-bcd4-95059cb8b07f",
+      "assetId": "aaab4d6a-aa9e-4e82-9bdc-1a7180a7f154",
+      "publicId": "f0244958-606e-4531-a402-e8efe637fcbe",
+      "publicUrl": "https://api.moshq.app/public/assets/f0244958-606e-4531-a402-e8efe637fcbe",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-no-product/06-volume-signal.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/2740cfe1-c4d7-4628-8be6-04c565453139",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "The volume signal",
+        "swipeAngle": "Hard compliance constraint: do not show the Tenor product or any supplement product. No bottle, jar, box, label, supplement facts panel, capsules, pills, powders, scoops, sachets, packaging, branded object, logo, or readable product text. This image must be editorial context only, not a product visual. Premium editorial health and longevity photography for men over 40. Warm off-white, stone, black, graphite, and muted bronze accents. Natural window light, clean shadows, restrained contrast, article-native composition. Photorealistic only. No fake UI, no charts, no doctors, no hospitals, no needles, no shirtless gym tropes, no before/after imagery. Inline proof/volume-signal figure. Create a premium editorial quality-control workspace: anonymous paperwork with no readable text, subtle checkmark-like process cue, mineral or stone objects, clean daylight. It should imply testing, scale, and rigor without any product, label, certification logo, badge, or packaging.",
+        "aspectRatio": "4:3",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:3d43a25ef293a3f2a641b299cdc84548fe3d61bd18ce90de",
+        "asset_ids": [
+          "aaab4d6a-aa9e-4e82-9bdc-1a7180a7f154"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "native_subagents",
+  "reason": "Two read-only native subagents audited independent design-system and brand/naming lanes while the main thread implemented and verified the migration.",
+  "lanes": [
+    {
+      "lane_id": "lane-01-ui-audit",
+      "objective": "Find MOS frontend design-system primitives, high-risk product surfaces, and existing naming debt.",
+      "role": "explorer",
+      "mode": "native_subagent",
+      "status": "done",
+      "started_at": "2026-05-20T20:36:00Z",
+      "ended_at": "2026-05-20T20:40:00Z",
+      "summary": "Identified primitive files, product surfaces, and `manus` token debt. Recommended avoiding blanket raw-style edits because template/runtime previews contain intentional data styling.",
+      "read_scope": [
+        "mos/frontend/src/components/ui",
+        "mos/frontend/src/components/layout",
+        "mos/frontend/src/pages",
+        "mos/frontend/src/styles",
+        "mos/frontend/tailwind.config.ts"
+      ],
+      "write_scope": [],
+      "artifacts": [
+        "borrowed-name-inventory.md",
+        "token-map.md"
+      ]
+    },
+    {
+      "lane_id": "lane-02-brand-naming-audit",
+      "objective": "Identify brand-sensitive files and borrowed names that must be removed or protected.",
+      "role": "explorer",
+      "mode": "native_subagent",
+      "status": "done",
+      "started_at": "2026-05-20T20:36:00Z",
+      "ended_at": "2026-05-20T20:41:00Z",
+      "summary": "Marked logo, sign-in, brand design-system, and funnel brand output as protected. Confirmed `manus` as the primary borrowed namespace to remove.",
+      "read_scope": [
+        "mos/frontend/src/funnels/templates/shared",
+        "mos/frontend/src/pages/auth",
+        "mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx",
+        "mos/frontend/src/styles",
+        "mos/frontend/tailwind.config.ts"
+      ],
+      "write_scope": [],
+      "artifacts": [
+        "brand-sensitive-files.md",
+        "brand-freeze-review.md"
+      ]
+    },
+    {
+      "lane_id": "lane-03-main-implementation",
+      "objective": "Implement token, primitive, surface, naming, and verification changes.",
+      "role": "main",
+      "mode": "main_thread",
+      "status": "done",
+      "started_at": "2026-05-20T20:41:00Z",
+      "ended_at": "2026-05-20T20:49:26Z",
+      "summary": "Installed neutral token system, updated Tailwind and core primitives, migrated representative surfaces, added design-system scan, repaired the onboarding test harness, and captured validation logs.",
+      "read_scope": [
+        "mos/frontend/src",
+        "mos/frontend/tailwind.config.ts",
+        "mos/frontend/package.json",
+        "proof_pack/mos-design-system-migration"
+      ],
+      "write_scope": [
+        "mos/frontend/src/styles",
+        "mos/frontend/src/components/ui",
+        "mos/frontend/src/components/layout",
+        "mos/frontend/src/components/StatusBadge.tsx",
+        "mos/frontend/src/pages/swipes/SwipesPage.tsx",
+        "mos/frontend/src/pages/workspaces/SitesPage.tsx",
+        "mos/frontend/scripts/check-design-system-migration.mjs",
+        "mos/frontend/package.json",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "proof_pack/mos-design-system-migration"
+      ],
+      "artifacts": [
+        "implementation-summary.md",
+        "logs/design-system-scan.log",
+        "logs/semantic-ui.log",
+        "logs/build.log",
+        "logs/unit-tests.log",
+        "borrowed-name-scan.log"
+      ]
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "Codex main agent",
+    "summary": "Read-only audit outputs were integrated into implementation scope. No write conflicts occurred because subagents had no write ownership."
+  },
+  "token_time_proxy": {
+    "lane_count": 3,
+    "native_subagent_count": 2,
+    "local_validation_commands": 8,
+    "parallelism": "native subagents plus local parallel command batches"
+  }
+}

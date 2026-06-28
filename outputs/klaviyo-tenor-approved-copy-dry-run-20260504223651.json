@@ -1,0 +1,82 @@
+{
+  "created_at": "2026-05-04T22:36:51.541Z",
+  "previews": [
+    {
+      "sequence": "01",
+      "subject": "It's not just age",
+      "preview": "Your energy, drive, and focus are slipping — and you've noticed",
+      "cta": "",
+      "has_callout_source": false,
+      "has_bold_source": true,
+      "html_bytes": 5219,
+      "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223651-01.html",
+      "failures": []
+    },
+    {
+      "sequence": "02",
+      "subject": "The 3 systems declining together",
+      "preview": "Most men are told it's one thing. It's not.",
+      "cta": "",
+      "has_callout_source": true,
+      "has_bold_source": true,
+      "html_bytes": 5678,
+      "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223651-02.html",
+      "failures": []
+    },
+    {
+      "sequence": "03",
+      "subject": "Why I left the clinic",
+      "preview": "The conversation that changed everything",
+      "cta": "",
+      "has_callout_source": true,
+      "has_bold_source": true,
+      "html_bytes": 6509,
+      "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223651-03.html",
+      "failures": []
+    },
+    {
+      "sequence": "04",
+      "subject": "1,200 men can't all be wrong",
+      "preview": "What happens when you support all three systems",
+      "cta": "Get The Protocol — Save 52%",
+      "has_callout_source": true,
+      "has_bold_source": true,
+      "html_bytes": 6514,
+      "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223651-04.html",
+      "failures": []
+    },
+    {
+      "sequence": "05",
+      "subject": "Save 52% on your first 90 days",
+      "preview": "The Daily Drive Essentials protocol + $62 Welcome Kit",
+      "cta": "Get The Protocol — Save 52%",
+      "has_callout_source": true,
+      "has_bold_source": true,
+      "html_bytes": 6844,
+      "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223651-05.html",
+      "failures": []
+    },
+    {
+      "sequence": "06",
+      "subject": "One thing I should clarify",
+      "preview": "What the guarantee actually covers",
+      "cta": "Get The Protocol — Save 52%",
+      "has_callout_source": true,
+      "has_bold_source": true,
+      "html_bytes": 5687,
+      "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223651-06.html",
+      "failures": []
+    },
+    {
+      "sequence": "07",
+      "subject": "One question",
+      "preview": "The answer might explain why nothing has worked yet",
+      "cta": "Get The Protocol — Save 52%",
+      "has_callout_source": true,
+      "has_bold_source": true,
+      "html_bytes": 5698,
+      "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223651-07.html",
+      "failures": []
+    }
+  ]
+}

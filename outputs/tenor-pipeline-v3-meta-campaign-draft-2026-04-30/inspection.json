@@ -1,0 +1,692 @@
+{
+  "checkedAt": "2026-04-30T03:31:01.884Z",
+  "campaigns": [
+    {
+      "id": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+      "name": "Tenor Pipeline V3 Meta Draft - No Product Reveal - 2026-04-30",
+      "channels": [
+        "meta"
+      ],
+      "assetBriefTypes": [
+        "image"
+      ],
+      "defaultSwipeCollectionId": "32f456e5-4bb8-4fe5-976a-d6bfbb466328",
+      "createdAt": "2026-04-30T02:12:41.772123+00:00"
+    },
+    {
+      "id": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+      "name": "Tenor - The Vanishing Man",
+      "channels": [
+        "meta"
+      ],
+      "assetBriefTypes": [
+        "image"
+      ],
+      "defaultSwipeCollectionId": "b89e89f4-2565-4b5d-afd1-195532613bfb",
+      "createdAt": "2026-04-19T14:28:45.370538+00:00"
+    }
+  ],
+  "collections": [
+    {
+      "id": "b89e89f4-2565-4b5d-afd1-195532613bfb",
+      "name": "Tenor initial swipe collection",
+      "kind": "curated",
+      "itemCount": 30,
+      "writable": true
+    },
+    {
+      "id": "32f456e5-4bb8-4fe5-976a-d6bfbb466328",
+      "name": "Tenor Pipeline V3 Meta Swipes - Default Clone - 2026-04-30",
+      "kind": "curated",
+      "itemCount": 30,
+      "writable": true
+    },
+    {
+      "id": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+      "name": "Default",
+      "kind": "default",
+      "itemCount": 30,
+      "writable": false
+    },
+    {
+      "id": "b6025248-33f4-467a-8480-ea79c9c78c03",
+      "name": "Tenor pdp samples 06-11 20260419T163438Z",
+      "kind": "uploaded",
+      "itemCount": 0,
+      "writable": true
+    },
+    {
+      "id": "b30aca00-df9b-40ed-8606-43149f2cef0c",
+      "name": "Tenor listicle carousel source swipes 2026-04-28T15:48:13.409Z",
+      "kind": "uploaded",
+      "itemCount": 0,
+      "writable": true
+    }
+  ],
+  "defaultCollection": {
+    "id": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+    "name": "Default",
+    "kind": "default",
+    "itemCount": 30,
+    "swipes": [
+      {
+        "id": "00e357f9-7953-5d6b-8b80-18a91e8a1510",
+        "title": "Static #3.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%233.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%233.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #3.png"
+          }
+        ]
+      },
+      {
+        "id": "058b868e-4568-578e-99bc-21f0491ed671",
+        "title": "7.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/7.png"
+          }
+        ]
+      },
+      {
+        "id": "20c77ba2-f32c-5003-9c8f-539ba629c532",
+        "title": "derm_fag.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/derm_fag.jpg"
+          }
+        ]
+      },
+      {
+        "id": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+        "title": "spanish_doctor_cta.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/spanish_doctor_cta.jpg"
+          }
+        ]
+      },
+      {
+        "id": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "title": "6.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/6.png"
+          }
+        ]
+      },
+      {
+        "id": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "title": "fatigue.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg"
+          }
+        ]
+      },
+      {
+        "id": "5e0bec7e-c4de-5135-a739-32de79c28f35",
+        "title": "Static #4.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%234.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%234.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #4.png"
+          }
+        ]
+      },
+      {
+        "id": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+        "title": "care_bag.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/care_bag.jpg"
+          }
+        ]
+      },
+      {
+        "id": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+        "title": "8.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/8.png"
+          }
+        ]
+      },
+      {
+        "id": "74a2f8b1-2386-5213-ac31-16ee3860a08c",
+        "title": "Static #1.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%231.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%231.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #1.png"
+          }
+        ]
+      },
+      {
+        "id": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "title": "Static #2.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%232.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%232.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static #2.png"
+          }
+        ]
+      },
+      {
+        "id": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "title": "11.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/11.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/11.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/11.png"
+          }
+        ]
+      },
+      {
+        "id": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "title": "old_school.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/old_school.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/old_school.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/old_school.jpg"
+          }
+        ]
+      },
+      {
+        "id": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "title": "drawing.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/drawing.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/drawing.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/drawing.jpg"
+          }
+        ]
+      },
+      {
+        "id": "a9b9b792-bea4-579a-993f-95994908d8bb",
+        "title": "brush.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/brush.jpg"
+          }
+        ]
+      },
+      {
+        "id": "a9f04eb9-c9ae-5621-a9c5-4e4f87ac8b1f",
+        "title": "_initial_swipe_contact_sheet.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/_initial_swipe_contact_sheet.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/_initial_swipe_contact_sheet.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/_initial_swipe_contact_sheet.jpg"
+          }
+        ]
+      },
+      {
+        "id": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "title": "researchers.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/researchers.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/researchers.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/researchers.jpg"
+          }
+        ]
+      },
+      {
+        "id": "b7787513-5b32-578e-85e3-b367207a4238",
+        "title": "target_1.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/target_1.jpg"
+          }
+        ]
+      },
+      {
+        "id": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "title": "big_text.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg"
+          }
+        ]
+      },
+      {
+        "id": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+        "title": "9.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/9.png"
+          }
+        ]
+      },
+      {
+        "id": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+        "title": "10.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/10.png"
+          }
+        ]
+      },
+      {
+        "id": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+        "title": "12.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/12.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/12.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/12.png"
+          }
+        ]
+      },
+      {
+        "id": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "title": "raise_a_winner.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/raise_a_winner.jpg"
+          }
+        ]
+      },
+      {
+        "id": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "title": "boss_babe.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/boss_babe.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/boss_babe.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/boss_babe.jpg"
+          }
+        ]
+      },
+      {
+        "id": "e2ff843d-e853-55eb-b306-4398900615ef",
+        "title": "green.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/green.jpg"
+          }
+        ]
+      },
+      {
+        "id": "e358e68d-730a-5f8b-9bc9-fb7742985f43",
+        "title": "grocery.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/grocery.jpg"
+          }
+        ]
+      },
+      {
+        "id": "eab14ed3-2d63-528b-8611-f93c194d2a2d",
+        "title": "women_health.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/women_health.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/women_health.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/women_health.jpg"
+          }
+        ]
+      },
+      {
+        "id": "f1921084-1850-53af-8cc3-ae44c9691320",
+        "title": "health_cute_advertorial.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/health_cute_advertorial.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/health_cute_advertorial.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/health_cute_advertorial.jpg"
+          }
+        ]
+      },
+      {
+        "id": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+        "title": "5.png",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png",
+            "mimeType": "image/png",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/5.png"
+          }
+        ]
+      },
+      {
+        "id": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "title": "fb_message_ad.jpg",
+        "adUnitFormat": null,
+        "placementShape": null,
+        "productImagePolicy": null,
+        "productPresence": null,
+        "visualArchetype": null,
+        "media": [
+          {
+            "url": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg",
+            "thumbnailUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg",
+            "mimeType": "image/jpeg",
+            "path": "dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  "oldCampaignBriefs": [
+    {
+      "artifactId": "ecf67fd2-9a77-4bfa-a6f6-b38b1bc3bb3a",
+      "id": "brief_editorial_wound_scene",
+      "name": "brief_editorial_wound_scene",
+      "destinationPage": "pre-sales",
+      "funnelId": null,
+      "imageRequirementCount": 2,
+      "imageRequirementIndexes": [
+        0,
+        1
+      ],
+      "requirements": [
+        {
+          "hook": "Your doctor said your labs were normal. You haven't felt normal in months.",
+          "angle": "Wound recognition — name the quiet drift men blame on stress or age and reframe it as a four-factor hormonal cascade with a real name",
+          "format": "image",
+          "channel": "meta",
+          "funnelStage": "unaware",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        },
+        {
+          "hook": "\"In the normal range\" is the most expensive sentence in men's health.",
+          "angle": "Normal-range gap — the difference between medically normal and personally depleted is the problem nobody is measuring",
+          "format": "image",
+          "channel": "meta",
+          "funnelStage": "problem-aware",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        }
+      ]
+    },
+    {
+      "artifactId": "ecf67fd2-9a77-4bfa-a6f6-b38b1bc3bb3a",
+      "id": "brief_editorial_founder_authority",
+      "name": "brief_editorial_founder_authority",
+      "destinationPage": "pre-sales",
+      "funnelId": null,
+      "imageRequirementCount": 2,
+      "imageRequirementIndexes": [
+        0,
+        1
+      ],
+      "requirements": [
+        {
+          "hook": "I'm an MD. My labs came back normal. I didn't feel normal. That's why I built this.",
+          "angle": "Founder credibility — a former internal medicine physician who experienced the drift himself and built the protocol he wished existed",
+          "format": "image",
+          "channel": "meta",
+          "funnelStage": "solution-aware",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        },
+        {
+          "hook": "This isn't TRT. Most men don't need TRT. They need their floor raised first.",
+          "angle": "Pre-TRT positioning — most men don't need TRT, they need their hormonal floor raised first",
+          "format": "image",
+          "channel": "meta",
+          "funnelStage": "solution-aware",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        }
+      ]
+    },
+    {
+      "artifactId": "ecf67fd2-9a77-4bfa-a6f6-b38b1bc3bb3a",
+      "id": "brief_editorial_mechanism_reveal",
+      "name": "brief_editorial_mechanism_reveal",
+      "destinationPage": "pre-sales",
+      "funnelId": null,
+      "imageRequirementCount": 3,
+      "imageRequirementIndexes": [
+        0,
+        1,
+        2
+      ],
+      "requirements": [
+        {
+          "hook": "Your body is losing ground four different ways. Your lab measures one of them.",
+          "angle": "Mechanism education — four separate hormonal factors are compounding silently and your lab only measures one of them",
+          "format": "image",
+          "channel": "meta",
+          "funnelStage": "problem-aware",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        },
+        {
+          "hook": "It has a name. It has four factors. And unlike aging, it's something you can actually address.",
+          "angle": "Cascade naming — giving the unnamed drift a clinical framework makes it intervenable instead of inevitable",
+          "format": "image",
+          "channel": "meta",
+          "funnelStage": "problem-aware",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        },
+        {
+          "hook": "Every test booster on the shelf targets one lever. The cascade has four.",
+          "angle": "Protocol differentiation — every test booster targets one lever while the cascade has four inputs",
+          "format": "image",
+          "channel": "meta",
+          "funnelStage": "solution-aware",
+          "destinationType": "pre-sales",
+          "destinationLabel": "Pre-Sales Landing Page"
+        }
+      ]
+    }
+  ]
+}

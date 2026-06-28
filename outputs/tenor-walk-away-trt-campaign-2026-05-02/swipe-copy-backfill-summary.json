@@ -1,0 +1,259 @@
+{
+  "runId": "swipe-copy-backfill-20260503T012048Z",
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "assetBriefId": "brief_editorial_wound_scene",
+  "assetBriefArtifactId": "ac685e85-cb95-487c-b3ae-d93cccdf3acd",
+  "batchId": "tenor-walk-away-trt-20260502",
+  "manifestAssetCount": 30,
+  "updatedCount": 30,
+  "skippedCount": 0,
+  "adCopyPackArtifactId": "af61bdfd-10cf-428c-81b4-1439e34d62c0",
+  "stage1FileSearchMode": "not_requested",
+  "geminiStoreNames": [],
+  "geminiRagDocKeys": [],
+  "geminiRagBundleDocKeys": [],
+  "geminiRagDocumentNames": [],
+  "updated": [
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 1,
+      "total": 30,
+      "assetId": "80e162c3-13a2-4584-a6ce-020daf04e55e",
+      "headline": "MD Warns: Read This Before Committing To TRT",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 2,
+      "total": 30,
+      "assetId": "417d5bae-bd93-49e1-b0cf-6e3aaa804ae4",
+      "headline": "What Happens When You Walk Away From TRT",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 3,
+      "total": 30,
+      "assetId": "9b823e1d-bf70-4232-9024-a053bde91178",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 4,
+      "total": 30,
+      "assetId": "881ed8fe-61a7-4bfc-afee-c483144774be",
+      "headline": "Before You Commit To TRT, Read This First",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 5,
+      "total": 30,
+      "assetId": "d9470a01-b151-44e9-bb8f-2ab11d961c07",
+      "headline": "Before You Commit to TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 6,
+      "total": 30,
+      "assetId": "73c763df-a256-45f5-938d-e45d2e804990",
+      "headline": "Before You Commit to TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 7,
+      "total": 30,
+      "assetId": "7188ade4-1645-4cd1-b2bd-020f03400f14",
+      "headline": "Before You Commit To TRT, You Need To Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 8,
+      "total": 30,
+      "assetId": "a19147bb-b798-4c93-b31d-90c2ba6c560e",
+      "headline": "Before Committing To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 9,
+      "total": 30,
+      "assetId": "096fe195-3a27-45f1-a28e-3e258f613276",
+      "headline": "Patient Walks Away From TRT, Shocks His MD",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 10,
+      "total": 30,
+      "assetId": "76c8690a-ed90-4be3-810d-dfe22fc2dcf2",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 11,
+      "total": 30,
+      "assetId": "c614cf97-458d-4688-8b74-3ad300595e54",
+      "headline": "Before You Commit To The Needle, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 12,
+      "total": 30,
+      "assetId": "bec14033-f8a4-4f4b-94fa-12c94046e46b",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 13,
+      "total": 30,
+      "assetId": "1d271033-16a7-4285-884c-c77748bb27c1",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 14,
+      "total": 30,
+      "assetId": "e9858314-b995-4d04-aa6e-1160f532f944",
+      "headline": "What Made Him Cancel His TRT Appointment",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 15,
+      "total": 30,
+      "assetId": "196460ee-1e45-47e5-9d91-34f4e6bdc284",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 16,
+      "total": 30,
+      "assetId": "48c9e014-7c96-48e1-878f-b1bdf5feb256",
+      "headline": "Before Committing To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 17,
+      "total": 30,
+      "assetId": "ee2be5ab-fb9d-4d86-ae46-9ed72aca5eb5",
+      "headline": "Before You Commit To TRT, Read This First",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 18,
+      "total": 30,
+      "assetId": "5cfb9670-d37b-408d-a2a0-075f64b5b2cc",
+      "headline": "Read The Doctor's Full Report",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 19,
+      "total": 30,
+      "assetId": "0640ba24-14b0-435e-8681-b22bc4e67b20",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 20,
+      "total": 30,
+      "assetId": "4daf46bc-625c-4401-ba93-9c50fac0c3b1",
+      "headline": "Before You Commit To The Clinic, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 21,
+      "total": 30,
+      "assetId": "c6dbf060-7bae-406c-8c59-ee3cd9f1bbbd",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 22,
+      "total": 30,
+      "assetId": "14b932f7-f61a-4917-a8f4-dbc915451f4b",
+      "headline": "Why He Walked Away From TRT",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 23,
+      "total": 30,
+      "assetId": "939e3bd8-f4ca-4d83-9d32-19dcf13e3a66",
+      "headline": "Before You Commit To The Clinic, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 24,
+      "total": 30,
+      "assetId": "e9878d46-524e-4124-a986-749772b97e13",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 25,
+      "total": 30,
+      "assetId": "722076eb-cf2c-46f5-8d8b-893a74768591",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 26,
+      "total": 30,
+      "assetId": "9688e568-dc42-4d26-a8b0-72de56137e2f",
+      "headline": "Before You Commit To The Needle, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 27,
+      "total": 30,
+      "assetId": "de62234d-a6a5-4c4c-ae60-027a95f09513",
+      "headline": "Before You Commit To The Needle, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 28,
+      "total": 30,
+      "assetId": "e5d45b20-6354-49ae-9446-1990cbe6e9b5",
+      "headline": "Before You Commit To TRT, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 29,
+      "total": 30,
+      "assetId": "4a98e6c6-e9cb-4c3e-ac5c-277302d670dc",
+      "headline": "Before You Commit To Injections, Read This",
+      "cta": "Learn More"
+    },
+    {
+      "event": "updated_asset_copy",
+      "ordinal": 30,
+      "total": 30,
+      "assetId": "ae5e2163-3be3-4e4b-842b-9518d9400036",
+      "headline": "Why So Many Men Are Walking Away From TRT",
+      "cta": "Learn More"
+    }
+  ],
+  "skipped": []
+}

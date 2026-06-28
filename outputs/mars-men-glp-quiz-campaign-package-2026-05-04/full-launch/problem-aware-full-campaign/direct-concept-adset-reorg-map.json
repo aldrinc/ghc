@@ -1,0 +1,754 @@
+{
+  "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+  "metaCampaignId": "120245546805940293",
+  "publishRunId": "00ecd9f0-15f3-4421-8c7f-1358aefa7d1b",
+  "rows": [
+    {
+      "groupKey": "tenor-01-C001-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C001",
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "tenor-02-C002-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C002",
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "tenor-03-C004-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C004",
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "tenor-04-C006-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C006",
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "tenor-05-C011-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C011",
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "tenor-06-C008-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C008",
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "tenor-07-C003-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C003",
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "tenor-08-C009-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C009",
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "tenor-09-C007-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C007",
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "tenor-10-C005-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C005",
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "tenor-11-C010-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C010",
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "tenor-12-C012-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C012",
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "tenor-13-C013-glp",
+      "sourceType": "tenor_package",
+      "destinationKey": "glp",
+      "sourceCreativeId": "C013",
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "tenor-14-C022-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C022",
+      "sourceCopyId": "COPY011",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "tenor-15-C019-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C019",
+      "sourceCopyId": "COPY011",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "tenor-16-C020-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C020",
+      "sourceCopyId": "COPY011",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "tenor-17-C016-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C016",
+      "sourceCopyId": "COPY012",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "tenor-18-C017-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C017",
+      "sourceCopyId": "COPY013",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "tenor-19-C018-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C018",
+      "sourceCopyId": "COPY014",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "tenor-20-C021-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C021",
+      "sourceCopyId": "COPY015",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "tenor-21-C023-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C023",
+      "sourceCopyId": "COPY016",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "tenor-22-C024-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C024",
+      "sourceCopyId": "COPY017",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "tenor-23-C025-quiz",
+      "sourceType": "tenor_package",
+      "destinationKey": "quiz",
+      "sourceCreativeId": "C025",
+      "sourceCopyId": "COPY018",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-01-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-02-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-03-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-04-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-05-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-06-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-07-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-08-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-09-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-10-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-11-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-12-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-13-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-14-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-15-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-16-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-17-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-18-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-19-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-20-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-21-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-22-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-23-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-24-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-25-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-26-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-27-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-28-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY001",
+      "conceptAdsetIndex": 1,
+      "conceptAdsetName": "Concept 1 - GLP Hidden Drive Drain"
+    },
+    {
+      "groupKey": "curated-29-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY002",
+      "conceptAdsetIndex": 2,
+      "conceptAdsetName": "Concept 2 - GLP Muscle + Metabolism Protection"
+    },
+    {
+      "groupKey": "curated-30-glp",
+      "sourceType": "standard_curated",
+      "destinationKey": "glp",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY003",
+      "conceptAdsetIndex": 3,
+      "conceptAdsetName": "Concept 3 - GLP Doctor-Missed Side Effect"
+    },
+    {
+      "groupKey": "curated-01-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY011",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-02-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY012",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-03-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY013",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-04-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY014",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-05-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY015",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-06-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY016",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-07-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY017",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-08-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY018",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-09-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY011",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-10-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY012",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-11-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY013",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-12-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY014",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-13-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY015",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-14-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY016",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-15-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY017",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-16-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY018",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-17-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY011",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-18-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY012",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-19-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY013",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-20-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY014",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-21-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY015",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-22-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY016",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-23-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY017",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-24-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY018",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-25-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY011",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-26-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY012",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-27-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY013",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-28-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY014",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    },
+    {
+      "groupKey": "curated-29-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY015",
+      "conceptAdsetIndex": 4,
+      "conceptAdsetName": "Concept 4 - Quiz Daily Decline / System Problem"
+    },
+    {
+      "groupKey": "curated-30-quiz",
+      "sourceType": "standard_curated",
+      "destinationKey": "quiz",
+      "sourceCreativeId": null,
+      "sourceCopyId": "COPY016",
+      "conceptAdsetIndex": 5,
+      "conceptAdsetName": "Concept 5 - Quiz Offer / Proof / Guarantee"
+    }
+  ]
+}

@@ -1,0 +1,344 @@
+{
+  "createdAt": "2026-05-01T16:47:31.834Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/generated",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "validationIntent": {
+    "inputMode": "awareness_level_only_plus_compliance",
+    "onlyKeys": [
+      "problem-aware-03",
+      "problem-aware-04",
+      "problem-aware-05",
+      "solution-aware-03",
+      "solution-aware-04",
+      "solution-aware-05"
+    ],
+    "runSuffix": "",
+    "awarenessLevels": [
+      "Problem-Aware",
+      "Solution-Aware"
+    ],
+    "productImagesAllowed": false,
+    "mechanismRevealAllowed": false,
+    "creativeGuidanceAddedByOperator": false
+  },
+  "outputs": [
+    {
+      "key": "problem-aware-03",
+      "awarenessLevel": "Problem-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "sourceSwipeTitle": "11.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Problem-Aware",
+        "swipeAngle": "Awareness level: Problem-Aware\n\nCompliance:\n- No product reveal.\n- No product object, packaging, supplement bottle, capsule, pill, powder, sachet, label, supplement facts panel, price, offer, guarantee, rating, or purchase cue.\n- No mechanism reveal.\n- Do not explain ingredients, dosage, protocol architecture, hormone pathways, biological mechanisms, root-cause diagrams, comparison grids, or how the solution works.\n\nOperator note: intentionally provide only the awareness level plus compliance so the system/workspace context drives the creative.\nRun marker: tenor-awareness-only-problem-aware-03-1777653632627.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "3f3f68f3-5271-467d-87c0-d94732a8bc77",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-33c1dc26-1c82-4081-bced-928d42b7bea4"
+      },
+      "result": {
+        "workflowRunId": "3f3f68f3-5271-467d-87c0-d94732a8bc77",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-33c1dc26-1c82-4081-bced-928d42b7bea4",
+        "assetId": "c15f6a10-78b2-48d9-861b-7cfb4eb099e4",
+        "publicId": "a8cdce1d-5092-4877-89e2-dea371889647",
+        "publicUrl": "https://api.moshq.app/public/assets/a8cdce1d-5092-4877-89e2-dea371889647",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/generated/problem-aware-03.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d5ffd37e88290d6ba4931e66a3f2e910d072e9a3fbc40510",
+          "asset_ids": [
+            "c15f6a10-78b2-48d9-861b-7cfb4eb099e4"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/workflow-problem-aware-03.json"
+      }
+    },
+    {
+      "key": "problem-aware-04",
+      "awarenessLevel": "Problem-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "sourceSwipeTitle": "fatigue.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Problem-Aware",
+        "swipeAngle": "Awareness level: Problem-Aware\n\nCompliance:\n- No product reveal.\n- No product object, packaging, supplement bottle, capsule, pill, powder, sachet, label, supplement facts panel, price, offer, guarantee, rating, or purchase cue.\n- No mechanism reveal.\n- Do not explain ingredients, dosage, protocol architecture, hormone pathways, biological mechanisms, root-cause diagrams, comparison grids, or how the solution works.\n\nOperator note: intentionally provide only the awareness level plus compliance so the system/workspace context drives the creative.\nRun marker: tenor-awareness-only-problem-aware-04-1777653699530.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "e5678051-1540-4ceb-98b6-b7fa56c1eee1",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-cd947688-64eb-441c-957c-ec730d8bd0dd"
+      },
+      "result": {
+        "workflowRunId": "e5678051-1540-4ceb-98b6-b7fa56c1eee1",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-cd947688-64eb-441c-957c-ec730d8bd0dd",
+        "assetId": "0085c264-21af-40cb-8a0e-fccf0e51318c",
+        "publicId": "14704aae-fc53-410b-aae4-1a07d8a2377e",
+        "publicUrl": "https://api.moshq.app/public/assets/14704aae-fc53-410b-aae4-1a07d8a2377e",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/generated/problem-aware-04.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:3ac4f77942d42389810199888368773b8911c0f4df61478b",
+          "asset_ids": [
+            "0085c264-21af-40cb-8a0e-fccf0e51318c"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/workflow-problem-aware-04.json"
+      }
+    },
+    {
+      "key": "problem-aware-05",
+      "awarenessLevel": "Problem-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "sourceSwipeTitle": "fb_message_ad.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_founder_authority",
+        "requirementIndex": 0,
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Problem-Aware",
+        "swipeAngle": "Awareness level: Problem-Aware\n\nCompliance:\n- No product reveal.\n- No product object, packaging, supplement bottle, capsule, pill, powder, sachet, label, supplement facts panel, price, offer, guarantee, rating, or purchase cue.\n- No mechanism reveal.\n- Do not explain ingredients, dosage, protocol architecture, hormone pathways, biological mechanisms, root-cause diagrams, comparison grids, or how the solution works.\n\nOperator note: intentionally provide only the awareness level plus compliance so the system/workspace context drives the creative.\nRun marker: tenor-awareness-only-problem-aware-05-1777653754226.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "39f5bf96-fed6-4d99-813e-7a0777e0d9a9",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-4bc03ebd-ead1-418e-a205-8e6d3d2b77b1"
+      },
+      "result": {
+        "workflowRunId": "39f5bf96-fed6-4d99-813e-7a0777e0d9a9",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-4bc03ebd-ead1-418e-a205-8e6d3d2b77b1",
+        "assetId": "aec74556-1fb7-44b5-8c97-c2b94c30a3dd",
+        "publicId": "5e0acfb0-2047-4a2b-891e-b132ddd80b72",
+        "publicUrl": "https://api.moshq.app/public/assets/5e0acfb0-2047-4a2b-891e-b132ddd80b72",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/generated/problem-aware-05.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d97ea7f0abe5c848d51b2696194ebf557cf54e13ab23fa79",
+          "asset_ids": [
+            "aec74556-1fb7-44b5-8c97-c2b94c30a3dd"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/workflow-problem-aware-05.json"
+      }
+    },
+    {
+      "key": "solution-aware-03",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "sourceSwipeTitle": "big_text.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No product object, packaging, supplement bottle, capsule, pill, powder, sachet, label, supplement facts panel, price, offer, guarantee, rating, or purchase cue.\n- No mechanism reveal.\n- Do not explain ingredients, dosage, protocol architecture, hormone pathways, biological mechanisms, root-cause diagrams, comparison grids, or how the solution works.\n\nOperator note: intentionally provide only the awareness level plus compliance so the system/workspace context drives the creative.\nRun marker: tenor-awareness-only-solution-aware-03-1777653842581.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "f7ccab4a-fd77-41b7-a40c-86c687daff90",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-a50fc781-59ea-41e7-a323-1a89dc504666"
+      },
+      "result": {
+        "workflowRunId": "f7ccab4a-fd77-41b7-a40c-86c687daff90",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-a50fc781-59ea-41e7-a323-1a89dc504666",
+        "assetId": "db85e3bc-8eb6-4d3a-941c-b20aa71cfa1d",
+        "publicId": "b1a21c72-0f0c-48ee-868e-f2815a41761f",
+        "publicUrl": "https://api.moshq.app/public/assets/b1a21c72-0f0c-48ee-868e-f2815a41761f",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/generated/solution-aware-03.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:2868eaa8e79f4749ec7a23e065d5dd650bfb81228f09af88",
+          "asset_ids": [
+            "db85e3bc-8eb6-4d3a-941c-b20aa71cfa1d"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/workflow-solution-aware-03.json"
+      }
+    },
+    {
+      "key": "solution-aware-04",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "sourceSwipeTitle": "Static #2.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_founder_authority",
+        "requirementIndex": 1,
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No product object, packaging, supplement bottle, capsule, pill, powder, sachet, label, supplement facts panel, price, offer, guarantee, rating, or purchase cue.\n- No mechanism reveal.\n- Do not explain ingredients, dosage, protocol architecture, hormone pathways, biological mechanisms, root-cause diagrams, comparison grids, or how the solution works.\n\nOperator note: intentionally provide only the awareness level plus compliance so the system/workspace context drives the creative.\nRun marker: tenor-awareness-only-solution-aware-04-1777653898547.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "aecf7e32-9ed8-4a08-9773-cab8c249b858",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-8595418e-d682-435b-b879-1bb69d2595fb"
+      },
+      "result": {
+        "workflowRunId": "aecf7e32-9ed8-4a08-9773-cab8c249b858",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-8595418e-d682-435b-b879-1bb69d2595fb",
+        "assetId": "21d0295d-d24b-4c00-b9fa-f76eb327349c",
+        "publicId": "6fd8f364-36ff-4f89-89d9-f0efd6104f89",
+        "publicUrl": "https://api.moshq.app/public/assets/6fd8f364-36ff-4f89-89d9-f0efd6104f89",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/generated/solution-aware-04.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:202641d82580b03b10c81eb66ce4a3bedf2bd3ed5e2e4a8c",
+          "asset_ids": [
+            "21d0295d-d24b-4c00-b9fa-f76eb327349c"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/workflow-solution-aware-04.json"
+      }
+    },
+    {
+      "key": "solution-aware-05",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "sourceSwipeTitle": "fb_message_ad.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_founder_authority",
+        "requirementIndex": 0,
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No product object, packaging, supplement bottle, capsule, pill, powder, sachet, label, supplement facts panel, price, offer, guarantee, rating, or purchase cue.\n- No mechanism reveal.\n- Do not explain ingredients, dosage, protocol architecture, hormone pathways, biological mechanisms, root-cause diagrams, comparison grids, or how the solution works.\n\nOperator note: intentionally provide only the awareness level plus compliance so the system/workspace context drives the creative.\nRun marker: tenor-awareness-only-solution-aware-05-1777653974793.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "d0bbe093-732c-41e2-a7fb-a86b731f35eb",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1c62bcd6-34c4-46e6-9bbb-8a55c526f084"
+      },
+      "result": {
+        "workflowRunId": "d0bbe093-732c-41e2-a7fb-a86b731f35eb",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1c62bcd6-34c4-46e6-9bbb-8a55c526f084",
+        "assetId": "3861ccfb-9785-4f6c-a8be-0e81797401c0",
+        "publicId": "4ede8efb-9b9a-4716-b58d-be8056b188b7",
+        "publicUrl": "https://api.moshq.app/public/assets/4ede8efb-9b9a-4716-b58d-be8056b188b7",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/generated/solution-aware-05.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:19c4b7e8b926fd9a83baebececc53fe1ac20f7c3177faf4f",
+          "asset_ids": [
+            "3861ccfb-9785-4f6c-a8be-0e81797401c0"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-awareness-level-only-ads-2026-05-01/workflow-solution-aware-05.json"
+      }
+    }
+  ]
+}

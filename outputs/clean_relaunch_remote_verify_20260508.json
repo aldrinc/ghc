@@ -1,0 +1,27 @@
+{
+  "campaign": {
+    "id": "120245648113780293",
+    "name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review",
+    "status": "PAUSED",
+    "effective_status": "PAUSED",
+    "configured_status": "PAUSED",
+    "daily_budget": "10000",
+    "objective": "OUTCOME_SALES"
+  },
+  "publishRun": {
+    "id": "4bbe6424-47ed-4eb5-8e3b-4773f1e3c90a",
+    "status": "published",
+    "publishedItems": 77,
+    "uniqueAdSets": 5,
+    "uniqueAds": 77
+  },
+  "adsets": [
+    {"id":"120245648114030293","name":"Concept 1 - GLP Hidden Drive Drain","status":"ACTIVE","effective_status":"CAMPAIGN_PAUSED","configured_status":"ACTIVE","start_time":"2026-05-08T22:01:00-0700","countries":["US"],"daily_budget":null,"lifetime_budget":null,"adCount":13},
+    {"id":"120245648114550293","name":"Concept 2 - GLP Muscle + Metabolism Protection","status":"ACTIVE","effective_status":"CAMPAIGN_PAUSED","configured_status":"ACTIVE","start_time":"2026-05-08T22:01:00-0700","countries":["US"],"daily_budget":null,"lifetime_budget":null,"adCount":16},
+    {"id":"120245648114910293","name":"Concept 3 - GLP Doctor-Missed Side Effect","status":"ACTIVE","effective_status":"CAMPAIGN_PAUSED","configured_status":"ACTIVE","start_time":"2026-05-08T22:01:00-0700","countries":["US"],"daily_budget":null,"lifetime_budget":null,"adCount":11},
+    {"id":"120245648115260293","name":"Concept 4 - Quiz Daily Decline / System Problem","status":"ACTIVE","effective_status":"CAMPAIGN_PAUSED","configured_status":"ACTIVE","start_time":"2026-05-08T22:01:00-0700","countries":["US"],"daily_budget":null,"lifetime_budget":null,"adCount":18},
+    {"id":"120245648115630293","name":"Concept 5 - Quiz Offer / Proof / Guarantee","status":"ACTIVE","effective_status":"CAMPAIGN_PAUSED","configured_status":"ACTIVE","start_time":"2026-05-08T22:01:00-0700","countries":["US"],"daily_budget":null,"lifetime_budget":null,"adCount":19}
+  ],
+  "excludedLogicalGroupsAbsent": true,
+  "excludedLogicalGroups": ["curated-13-glp","curated-16-glp","curated-17-glp","curated-02-quiz","curated-17-quiz","curated-24-quiz"]
+}

@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tenor: Full Drive Protocol — For Men Who've Quietly Gone Off-Key</title>
+<!-- Favicons: TENOR ALL CAPS wordmark per BRAND-DESIGN.md v2 -->
+<link href="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'&gt;&lt;rect width='64' height='64' rx='4' ry='4' fill='%230F0F0F'/&gt;&lt;text x='32' y='44' font-family='Archivo Black, Impact, Arial Black, sans-serif' font-size='24' font-weight='900' text-anchor='middle' fill='%23E51E25' letter-spacing='-1'&gt;T&lt;/text&gt;&lt;/svg&gt;" rel="icon" type="image/svg+xml"/>
+<link href="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'&gt;&lt;rect width='180' height='180' rx='12' ry='12' fill='%230F0F0F'/&gt;&lt;text x='90' y='125' font-family='Archivo Black, Impact, Arial Black, sans-serif' font-size='80' font-weight='900' text-anchor='middle' fill='%23E51E25' letter-spacing='-3'&gt;T&lt;/text&gt;&lt;/svg&gt;" rel="apple-touch-icon" sizes="180x180"/>
+<meta content="#0F0F0F" name="theme-color"/>
+<!-- Fonts: Tenor design system v2 · Archivo Black (display) + Inter (body) + JetBrains Mono (data) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            link: '#E51E25',           /* Blood Red */
+                            accent: '#E51E25',
+                            primary: '#E51E25',
+                            secondary: '#B8141A',       /* Blood Red deep */
+                            bg: '#F4F0E8',              /* Bone */
+                            text: '#0F0F0F',            /* Ink */
+                            dark: '#0F0F0F',
+                            light: '#ECE6D8',           /* Bone-deep */
+                            ink: '#0F0F0F',
+                            bone: '#F4F0E8',
+                            blood: '#E51E25',
+                            'blood-deep': '#B8141A',
+                            stone: '#8A847B',
+                            rust: '#7A2E1A'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        heading: ['Archivo Black', 'Impact', 'Helvetica Neue', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'SF Mono', 'Consolas', 'monospace'],
+                    },
+                    borderRadius: {
+                        'xl': '4px',   /* sharpened per Tenor design system */
+                        '2xl': '6px',
+                        '3xl': '8px',
+                    },
+                    boxShadow: {
+                        'card': '0 8px 24px rgba(15, 15, 15, 0.12)',
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        :root {
+            /* Tenor design system v2 — Blood Red locked 2026-04-18 */
+            --color-brand: #E51E25;
+            --color-brand-deep: #B8141A;
+            --color-ink: #0F0F0F;
+            --color-bone: #F4F0E8;
+            --color-bone-deep: #ECE6D8;
+            --color-stone: #8A847B;
+            --color-rust: #7A2E1A;
+            --color-text: #0F0F0F;
+            --color-muted: rgba(15, 15, 15, 0.72);
+            --color-bg: #FFFFFF;
+            --color-page-bg: #F4F0E8;
+            --color-page-bg-secondary: #ECE6D8;
+            --color-border: rgba(15, 15, 15, 0.14);
+            --color-cta: #E51E25;
+            --color-cta-text: #F4F0E8;
+            --color-soft: rgba(229, 30, 37, 0.06);
+            --font-heading: 'Archivo Black', Impact, 'Helvetica Neue', sans-serif;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+            --shadow-sm: 0 8px 24px rgba(15, 15, 15, 0.1);
+        }
+
+        body {
+            -webkit-font-smoothing: antialiased;
+            font-family: var(--font-sans);
+            color: var(--color-text);
+            background-color: var(--color-page-bg);
+        }
+
+        h1, h2, h3, h4 {
+            font-family: var(--font-heading);
+            letter-spacing: -0.015em;
+        }
+
+        .font-mono { font-family: var(--font-mono); }
+
+        /* Tenor pill-badge — sharp 2px corners per BRAND-DESIGN.md (Open Q #1 locked) */
+        .pill-badge {
+            border: 2px solid var(--color-brand);
+            color: var(--color-brand);
+            padding: 4px 12px;
+            border-radius: 2px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-family: var(--font-heading);
+        }
+
+        /* Tenor cta-button — sharp 2px corners, Archivo Black, uppercase tracked */
+        .cta-button {
+            background-color: var(--color-brand);
+            color: var(--color-cta-text);
+            padding: 18px 36px;
+            border-radius: 2px;
+            font-weight: 400;
+            font-size: 17px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 14px rgba(229, 30, 37, 0.25);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-family: var(--font-heading);
+            border: 2px solid var(--color-brand);
+        }
+
+        .cta-button:hover {
+            background-color: var(--color-brand-deep);
+            border-color: var(--color-brand-deep);
+            transform: translateY(-1px);
+        }
+
+        /* Mustard gold highlight — readability-optimized (Ink text on #F5B800 ≈ 11:1 contrast, WCAG AAA). Open Q #2 revised 2026-04-18 from Blood Red underline. */
+        .underline-highlight {
+            background-color: #F5B800;
+            color: #0F0F0F;
+            padding: 2px 8px;
+            font-weight: inherit;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+            border-bottom: 0;
+        }
+
+        .marquee-container {
+            display: flex;
+            overflow: hidden;
+            background-color: var(--color-brand);
+            color: white;
+            padding: 12px 0;
+            width: 100%;
+        }
+
+        .marquee-track {
+            display: flex;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            align-items: center;
+            width: max-content;
+            gap: 0;
+            animation: marquee-scroll 25s linear infinite;
+            will-change: transform;
+            backface-visibility: hidden;
+            transform: translate3d(0, 0, 0);
+        }
+
+        .marquee-content {
+            display: flex;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            gap: 48px;
+            padding-right: 48px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .marquee-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 0.03em;
+            flex-shrink: 0;
+        }
+
+        @keyframes marquee-scroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+
+        .marquee-container:hover .marquee-track {
+            animation-play-state: paused;
+        }
+
+        .marquee-mobile {
+            display: none;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .marquee-mobile-viewport {
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .marquee-mobile-track {
+            display: flex;
+            width: 100%;
+            will-change: transform;
+        }
+
+        .marquee-mobile-slide {
+            flex: 0 0 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 34px;
+            padding: 0 18px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .marquee-mobile-slide i {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        /* ═══ GLOBAL FIX: kill horizontal page scroll on all viewports ═══ */
+        html, body {
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+        * { min-width: 0; }
+
+        /* ═══ GLOBAL SECTION SPACING TIGHTEN (user notes: "too much spacing between sections") ═══
+           Compress all section vertical padding roughly 35% across the page. */
+        section.py-24 { padding-top: 60px !important; padding-bottom: 60px !important; }
+        section.py-20 { padding-top: 52px !important; padding-bottom: 52px !important; }
+        section.py-16 { padding-top: 44px !important; padding-bottom: 44px !important; }
+        @media (max-width: 767px) {
+            section.py-24 { padding-top: 40px !important; padding-bottom: 40px !important; }
+            section.py-20 { padding-top: 36px !important; padding-bottom: 36px !important; }
+            section.py-16 { padding-top: 32px !important; padding-bottom: 32px !important; }
+        }
+
+        /* Marquee strip: no vertical gap to the next section */
+        .marquee-container { padding: 10px 0; }
+
+        @media (max-width: 767px) {
+            .marquee-container {
+                padding: 8px 0;
+            }
+
+            .marquee-track {
+                display: none;
+            }
+
+            .marquee-mobile {
+                display: block;
+            }
+        }
+
+        /* Smooth scroll for all anchor jumps + scroll-margin on #shop so CTAs land cleanly */
+        html { scroll-behavior: smooth; }
+        #shop { scroll-margin-top: 16px; }
+
+        /* Supply selector — Subscribe / One-Time mode toggle */
+        #quantity-selector[data-mode="subscribe"] .one-show { display: none; }
+        #quantity-selector[data-mode="one-time"]  .sub-show { display: none; }
+        #quantity-selector .mode-btn {
+            color: #8A847B;
+            background: transparent;
+            border-radius: 2px;
+        }
+        #quantity-selector[data-mode="subscribe"] .mode-btn[data-mode="subscribe"],
+        #quantity-selector[data-mode="one-time"]  .mode-btn[data-mode="one-time"] {
+            background: #0F0F0F;
+            color: #F4F0E8;
+        }
+
+        /* Mobile sticky CTA — hidden by default, revealed via IntersectionObserver */
+        #mobile-sticky-cta {
+            transition: transform 0.25s ease;
+        }
+        #mobile-sticky-cta[data-visible="false"] {
+            transform: translateY(100%);
+            pointer-events: none;
+        }
+        #mobile-sticky-cta[data-visible="true"] {
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* PDP thumbnail row — horizontal scroll isolated from the page.
+           User note: "ensure horizontal scrolling without page moving" */
+        .pdp-thumbs-scroll {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+            overscroll-behavior-y: auto;
+            touch-action: pan-x;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        .pdp-thumbs-scroll::-webkit-scrollbar { height: 6px; }
+        .pdp-thumbs-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .pdp-thumbs-scroll::-webkit-scrollbar-track { background: transparent; }
+        .pdp-thumb img { display: block; }
+
+        .play-button-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.3);
+            backdrop-filter: blur(4px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+        }
+
+        /* Radio Card Styles */
+        .radio-card input[type="radio"] {
+            display: none;
+        }
+        .radio-card {
+            border: 2px solid var(--color-border);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .radio-card.selected {
+            border-color: var(--color-brand);
+            background-color: rgba(196, 20, 35, 0.03);
+        }
+        .radio-indicator {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #cbd5e1;
+            border-radius: 50%;
+            position: relative;
+            margin-right: 12px;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .radio-card.selected .radio-indicator {
+            border-color: var(--color-brand);
+        }
+        .radio-card.selected .radio-indicator::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background-color: var(--color-brand);
+            border-radius: 50%;
+        }
+
+        /* Heading font override */
+        .font-heading {
+            font-family: var(--font-heading);
+        }
+
+        /* Mobile typography + spacing — everything left-aligned (user notes: "everything should be left aligned") */
+        @media (max-width: 767px) {
+            /* No forced center-alignment. Let Tailwind's flex/text utilities do their job.
+               Only force-center elements that explicitly use mx-auto / text-center / justify-center classes. */
+            .cta-button { width: 100%; }
+
+            /* ═══ MOBILE TYPOGRAPHY (matches Omni mobile @ 375px) ═══ */
+
+            /* H1 hero: 64→48 */
+            section h2[class*="text-[48px]"],
+            section h2[class*="text-[64px]"] {
+                font-size: 36px !important;
+                line-height: 43.2px !important;
+            }
+
+            /* H3 stat numbers: 64→40 */
+            section h3[class*="text-[64px]"] {
+                font-size: 40px !important;
+                line-height: 48px !important;
+            }
+
+            /* H1 PDP title: 40→28 */
+            section h1[class*="text-[40px]"] {
+                font-size: 28px !important;
+                line-height: 33.6px !important;
+            }
+
+            /* Body paragraphs 20→16 */
+            section p[class*="text-[20px]"],
+            section p[class*="text-[19px]"] {
+                font-size: 16px !important;
+                line-height: 24px !important;
+            }
+
+            /* Body 18→15 */
+            section p[class*="text-[18px]"],
+            section li[class*="text-[18px]"],
+            section ul[class*="text-[18px]"],
+            section div[class*="text-[18px]"],
+            section h4[class*="text-[18px]"] {
+                font-size: 15px !important;
+                line-height: 22.5px !important;
+            }
+
+            /* Body 16→14 */
+            section p[class*="text-[16px]"] {
+                font-size: 14px !important;
+                line-height: 21px !important;
+            }
+
+            /* Stat card captions */
+            .bg-brand-primary p[class*="text-[16px]"] {
+                font-size: 14px !important;
+                line-height: 21px !important;
+            }
+
+            /* CTA buttons: 20→16 */
+            .cta-button {
+                font-size: 16px !important;
+                padding: 14px 24px !important;
+                white-space: normal !important;
+            }
+
+            /* CTA sub text: 18→14 */
+            .cta-button + div,
+            button + div[class*="text-["],
+            a + div[class*="text-["] {
+                font-size: 14px !important;
+            }
+
+            /* PDP supply selector (new tight-card sizing — keep mobile close to desktop
+               since the cards are already thin). Override any leftover rules that would shrink
+               the pack title / price too far. */
+            #quantity-selector h4 { font-size: 15px !important; }
+            #quantity-selector .text-\[16px\] { font-size: 15px !important; }
+            #quantity-selector .text-\[20px\] { font-size: 18px !important; }
+            #quantity-selector .text-\[13px\] { font-size: 12px !important; }
+
+            /* Urgency banner: 19→15 */
+            .bg-\[\#FDF0F0\] div[class*="text-[19px]"] {
+                font-size: 15px !important;
+                line-height: 22px !important;
+            }
+
+            /* Rating stars area: 20→16 */
+            div[class*="text-[20px]"][class*="font-medium"] {
+                font-size: 16px !important;
+            }
+
+            /* Bestseller banner badges: 18→13 */
+            .bg-brand-primary span[class*="text-[18px]"] {
+                font-size: 13px !important;
+            }
+
+            /* Expert top labels: 24→16 */
+            span[class*="text-[24px]"][class*="font-bold"] {
+                font-size: 16px !important;
+            }
+            span[class*="text-[20px]"][class*="font-black"] {
+                font-size: 14px !important;
+            }
+
+            /* Pill badges: 14→11 */
+            .pill-badge {
+                font-size: 11px !important;
+                padding: 3px 10px !important;
+            }
+
+            /* BEST VALUE banner: 16→13 */
+            .bg-brand-primary[class*="text-[16px]"] {
+                font-size: 13px !important;
+            }
+
+            /* Sub-CTA items below buy button: 16→13 */
+            div[class*="text-[16px]"][class*="text-gray-700"] {
+                font-size: 13px !important;
+            }
+
+            /* One-time link: 18→14 */
+            a[class*="text-[18px]"][class*="text-brand-link"] {
+                font-size: 14px !important;
+            }
+
+            /* Buy-once sub text: 16→13 */
+            .text-center p[class*="text-[16px]"] {
+                font-size: 13px !important;
+            }
+
+            /* FAQ answers: 16→14 */
+            .faq-answer {
+                font-size: 14px !important;
+                line-height: 21px !important;
+            }
+
+            /* FAQ questions: keep readable */
+            .faq-item h4 {
+                font-size: 15px !important;
+                line-height: 22px !important;
+            }
+
+            /* Footer text: 14→12 */
+            footer div[class*="text-[14px]"] {
+                font-size: 12px !important;
+            }
+
+            /* Disclaimer: 12→11 */
+            footer div[class*="text-[12px]"] {
+                font-size: 11px !important;
+            }
+
+            /* Newsletter body: 18→14 */
+            footer p[class*="text-[18px]"] {
+                font-size: 14px !important;
+            }
+
+            /* Newsletter headline: clamp */
+            footer h2[class*="text-[48px]"] {
+                font-size: 32px !important;
+                line-height: 38.4px !important;
+            }
+
+            /* Header SHOP NOW: 20→16 */
+            header a[class*="text-[20px]"] {
+                font-size: 16px !important;
+            }
+
+            /* Header Tenor logo: keep 3xl */
+
+            /* Eyebrow rating in hero: 20→14 */
+            header + section div[class*="text-[20px]"] {
+                font-size: 14px !important;
+            }
+
+            /* Max-width containers shrink */
+            div[class*="max-w-[520px]"] {
+                max-width: 100% !important;
+            }
+
+            /* Mobile icon strip: 3 on top, 2 below */
+            #icon-strip {
+                justify-content: center;
+                gap: 2rem 0;
+                max-width: 360px;
+            }
+            #icon-strip > div {
+                width: 33.333%;
+                gap: 0.75rem;
+            }
+            #icon-strip > div > div {
+                width: 3.5rem;
+                height: 3.5rem;
+                background: #ffffff;
+                border: none;
+            }
+            #icon-strip > div > div > i {
+                color: var(--color-brand);
+                font-size: 1.2rem;
+            }
+            #icon-strip > div > span {
+                font-size: 11px !important;
+            }
+
+            /* Mobile comparison table */
+            #comparison-table td,
+            #comparison-table th {
+                padding: 12px 8px !important;
+                font-size: 13px !important;
+            }
+            #comparison-table h3 {
+                font-size: 16px !important;
+            }
+
+            /* Checklist items in quality section */
+            div[class*="text-[18px]"][class*="text-gray-700"][class*="font-medium"] {
+                font-size: 14px !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-brand-bg font-sans">
+<!-- Header -->
+<header class="w-full px-4 md:px-8 py-5 flex justify-between items-center bg-brand-bg max-w-[1440px] mx-auto z-50 relative border-b-2 border-[#0F0F0F] gap-3">
+<div class="flex-1 min-w-0">
+<a class="text-brand-link font-heading text-[12px] md:text-[15px] tracking-widest uppercase hover:underline whitespace-nowrap inline-flex items-center gap-1" href="#shop" id="header-shop-link" rel="nofollow">SHOP <i class="fa-solid fa-arrow-right text-[10px] md:text-[12px]"></i></a>
+</div>
+<div class="flex justify-center shrink-0">
+<span class="font-heading text-[#0F0F0F] text-[24px] md:text-[28px] leading-none tracking-tight">TENOR</span>
+<h1 class="sr-only">Tenor — The Full Drive Protocol</h1>
+</div>
+<div class="flex-1 flex justify-end min-w-0">
+<span class="font-mono text-[11px] text-[#8A847B] tracking-widest uppercase hidden md:inline">The Full Drive Protocol</span>
+</div>
+</header>
+<!-- Social Proof Header Banner (Frankie Rule 5) — thinner + shorter on mobile -->
+<div class="w-full bg-[#0F0F0F] text-[#F4F0E8] py-1.5 md:py-3 px-4 md:px-6 text-center">
+<div class="max-w-[1440px] mx-auto">
+<span class="font-heading text-[10px] md:text-[15px] tracking-[0.14em] md:tracking-[0.24em] uppercase whitespace-nowrap">
+<span class="md:hidden">Trusted By <span class="text-[#E51E25]">14,000+</span> Men</span>
+<span class="hidden md:inline">Trusted By <span class="text-[#E51E25]">14,000+</span> Men Who Refuse To Settle For Normal Range</span>
+</span>
+</div>
+</div>
+<!-- Hero Section -->
+<section class="w-full bg-[#F4F0E8] relative overflow-hidden" id="hero-section">
+<div class="flex flex-col md:flex-row min-h-[600px]">
+<!-- Left Info -->
+<div class="w-full md:w-1/2 pl-6 md:pl-24 pr-6 md:pr-8 pt-6 pb-10 md:py-16 flex flex-col justify-center relative z-10 bg-[#F4F0E8]">
+<div class="mb-3 md:mb-4 flex items-center gap-2 text-left">
+<div class="flex text-[#E51E25] gap-0.5 text-[13px] md:text-sm shrink-0">
+<i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+</div>
+<span class="text-[12px] md:text-[16px] font-medium text-[#0F0F0F] font-mono tracking-wide">4.8 · <span class="text-[#E51E25] font-heading">14,000+</span> Men On The Protocol</span>
+</div>
+<div class="mb-7 md:mb-8">
+<span class="pill-badge">FULL DRIVE PROTOCOL · ANDROPAUSE</span>
+</div>
+<h2 class="text-[48px] md:text-[72px] leading-[0.95] font-heading text-[#0F0F0F] mb-5 md:mb-6 uppercase tracking-tight">
+                    Drive Returns.<br/>
+                    Energy Holds.<br/>
+<span class="text-[#E51E25]">Yourself, Back.</span>
+</h2>
+<p class="text-[#0F0F0F] text-[18px] leading-[1.45] mb-6 md:mb-7 max-w-[480px] font-body">
+                    For men who've noticed something's quietly shifted — and who don't want to be told they're "in the normal range." No prescription. No clinic. No needles.
+                </p>
+<ul class="text-[17px] text-[#0F0F0F] space-y-2 mb-8 md:mb-10 max-w-[480px] font-medium">
+<li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-sm"></i> Afternoon Energy That Holds Past 3pm</li>
+<li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-sm"></i> Drive, Motivation, Presence Returning</li>
+<li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-sm"></i> Show Up For Your Own Life Again</li>
+</ul>
+<div class="w-full max-w-[520px]">
+<a class="cta-button w-full text-[18px] py-5 whitespace-nowrap" href="#shop" id="hero-cta" rel="nofollow">
+                        START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[15px] text-[#8A847B] font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>Full Drive Guarantee · 90 Days · Return Even The Empty Bottles</span>
+</div>
+<!-- Tiny credibility chip, demoted from the hero eyebrow -->
+<div class="flex items-center justify-center gap-1.5 mt-2 text-[10px] md:text-[11px] text-[#8A847B] font-mono tracking-[0.18em] uppercase">
+<i class="fa-solid fa-user-doctor text-[#8A847B] text-[10px]"></i>
+<span>MD Designed · 14 Years Internal Medicine</span>
+</div>
+</div>
+</div>
+<!-- Right Image PLACEHOLDER — see IMAGE-BRIEF.md #hero-product-right -->
+<div class="w-full md:w-1/2 relative aspect-[4/5] md:aspect-auto md:min-h-[600px] bg-black overflow-hidden">
+<img alt="Tenor Full Drive Protocol bottle shot — matte black HDPE on a kitchen counter, morning light, wooden surface, bone label panel with TENOR wordmark, single Blood Red horizontal rule" class="w-full h-full object-contain" loading="lazy" src="/public/assets/8087ef36-076d-44ab-bb4f-8f877a116c29"/>
+</div>
+</div>
+</section>
+<!-- 5-Icon Verb Feature Strip (Frankie Rule 4 + Rule 11: verb-based benefits) -->
+<div class="w-full bg-[#F4F0E8] border-t-2 border-[#0F0F0F]">
+<div class="max-w-[1280px] mx-auto px-6 py-6 grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
+<div class="flex flex-col items-center gap-2">
+<i class="fa-solid fa-bolt text-[#E51E25] text-[24px]"></i>
+<span class="font-heading text-[12px] md:text-[13px] tracking-widest uppercase text-[#0F0F0F]">Hold The Thread</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<i class="fa-solid fa-gauge-high text-[#E51E25] text-[24px]"></i>
+<span class="font-heading text-[12px] md:text-[13px] tracking-widest uppercase text-[#0F0F0F]">Beat The Wall</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<i class="fa-solid fa-fire text-[#E51E25] text-[24px]"></i>
+<span class="font-heading text-[12px] md:text-[13px] tracking-widest uppercase text-[#0F0F0F]">Restore The Drive</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<i class="fa-solid fa-user-doctor text-[#E51E25] text-[24px]"></i>
+<span class="font-heading text-[12px] md:text-[13px] tracking-widest uppercase text-[#0F0F0F]">No Prescription</span>
+</div>
+<div class="flex flex-col items-center gap-2 col-span-2 md:col-span-1">
+<i class="fa-solid fa-shield-halved text-[#E51E25] text-[24px]"></i>
+<span class="font-heading text-[12px] md:text-[13px] tracking-widest uppercase text-[#0F0F0F]">Full Drive Guarantee</span>
+</div>
+</div>
+</div>
+<!-- Mini-PAS Bridge (Frankie Rule 46: warm-traffic presale acknowledgment) -->
+<section class="w-full bg-[#F4F0E8] py-10 px-6 border-b-2 border-[#0F0F0F]">
+<div class="max-w-[820px] mx-auto text-center">
+<p class="text-[18px] md:text-[20px] leading-[1.5] text-[#0F0F0F] font-body">
+                You already know about <strong>the 4-Factor Vanishing Cascade</strong>. Here's the protocol <strong>14,000+ men</strong> are using to reverse it — <span class="text-[#E51E25] font-bold">without TRT, without a clinic, without needles.</span>
+</p>
+</div>
+</section>
+<!-- Instructions · 3-step logistics (Frankie sales-page Rule 3: logistics only, no journey) -->
+<section class="w-full bg-white py-20 px-6 border-b-2 border-[#0F0F0F]">
+<div class="max-w-[1280px] mx-auto">
+<div class="text-center mb-12">
+<span class="pill-badge mb-4 inline-block">How It Works</span>
+<h2 class="text-[36px] md:text-[48px] leading-[0.95] font-heading text-[#0F0F0F] uppercase mt-3">
+                    3 Simple Steps
+                </h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="text-center">
+<div class="w-16 h-16 mx-auto mb-4 bg-[#E51E25] text-white flex items-center justify-center font-heading text-[28px]" style="border-radius:2px;">01</div>
+<h3 class="font-heading text-[20px] uppercase text-[#0F0F0F] mb-2">Choose Your Supply</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.5]">Pick 30, 60, or 90 day supply. Most men start with the 60 day cycle — long enough to feel the full arc.</p>
+</div>
+<div class="text-center">
+<div class="w-16 h-16 mx-auto mb-4 bg-[#E51E25] text-white flex items-center justify-center font-heading text-[28px]" style="border-radius:2px;">02</div>
+<h3 class="font-heading text-[20px] uppercase text-[#0F0F0F] mb-2">Take Two With Coffee</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.5]">Two capsules every morning with breakfast or your first cup. That's the entire protocol — no cycling, no stacking, no mid-day reminder.</p>
+</div>
+<div class="text-center">
+<div class="w-16 h-16 mx-auto mb-4 bg-[#E51E25] text-white flex items-center justify-center font-heading text-[28px]" style="border-radius:2px;">03</div>
+<h3 class="font-heading text-[20px] uppercase text-[#0F0F0F] mb-2">Get On With Your Day</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.5]">The hormonal cofactor stack works in the background. You'll notice the afternoon wall soften first — usually between Day 14 and Day 30.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Features Marquee -->
+<div class="marquee-container">
+<div aria-label="Product certifications and quality signals" class="marquee-mobile">
+<div class="marquee-mobile-viewport">
+<div class="marquee-mobile-track" id="mobile-marquee-track">
+<div class="marquee-mobile-slide uppercase">
+<i class="fa-solid fa-flask-vial"></i>
+                        4-FACTOR PROTOCOL
+                    </div>
+<div class="marquee-mobile-slide uppercase">
+<i class="fa-solid fa-medal"></i>
+                        cGMP FACILITY
+                    </div>
+<div class="marquee-mobile-slide uppercase">
+<i class="fa-solid fa-file-circle-check"></i>
+                        COA VERIFIED
+                    </div>
+<div class="marquee-mobile-slide uppercase">
+<i class="fa-solid fa-vial-circle-check"></i>
+                        THIRD-PARTY TESTED
+                    </div>
+<div class="marquee-mobile-slide uppercase">
+<i class="fa-solid fa-shield-halved"></i>
+                        FULL DRIVE GUARANTEE
+                    </div>
+<div class="marquee-mobile-slide uppercase">
+<i class="fa-solid fa-flag-usa"></i>
+                        MADE IN USA
+                    </div>
+<div aria-hidden="true" class="marquee-mobile-slide uppercase">
+<i class="fa-solid fa-flask-vial"></i>
+                        4-FACTOR PROTOCOL
+                    </div>
+</div>
+</div>
+</div>
+<div class="marquee-track">
+<div class="marquee-content">
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-flask-vial text-3xl"></i>
+                    4-FACTOR PROTOCOL
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-medal text-3xl"></i>
+                    cGMP FACILITY
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-file-circle-check text-3xl"></i>
+                    COA VERIFIED
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-vial-circle-check text-3xl"></i>
+                    THIRD-PARTY TESTED
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-shield-halved text-3xl"></i>
+                    90-DAY GUARANTEE
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-flag-usa text-3xl"></i>
+                    MADE IN USA
+                </div>
+</div>
+<div aria-hidden="true" class="marquee-content">
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-flask-vial text-3xl"></i>
+                    4-FACTOR PROTOCOL
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-medal text-3xl"></i>
+                    cGMP FACILITY
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-file-circle-check text-3xl"></i>
+                    COA VERIFIED
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-vial-circle-check text-3xl"></i>
+                    THIRD-PARTY TESTED
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-shield-halved text-3xl"></i>
+                    90-DAY GUARANTEE
+                </div>
+<div class="marquee-item uppercase">
+<i class="fa-solid fa-flag-usa text-3xl"></i>
+                    MADE IN USA
+                </div>
+</div>
+</div>
+</div>
+<!-- Section 1: The Reversal — experiential outcome grid (Frankie Rule 29: post-reveal = experiential, not educational) -->
+<section class="py-24 bg-brand-bg relative">
+<div class="max-w-[1280px] mx-auto px-8">
+<div class="text-center max-w-3xl mx-auto mb-16">
+<span class="pill-badge mb-4 inline-block">The Reversal</span>
+<h2 class="text-[42px] md:text-[58px] leading-[0.95] mt-4 mb-5 font-heading text-[#0F0F0F] uppercase">
+                    You Came Here Because You Already Know The Drift. <span class="underline-highlight">Here's What Reversing It Feels Like.</span>
+</h2>
+<p class="text-[#0F0F0F] text-[19px] leading-[1.5]">
+                    Not another science lesson. Not another stat about normal range. Just what happens when the floor raises on every lever at once — and you start showing up the way you used to.
+                </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-14">
+<div class="flex gap-5 items-start bg-white p-7 border-2 border-[#0F0F0F]" style="border-radius:2px;">
+<div class="w-14 h-14 shrink-0 bg-[#E51E25] flex items-center justify-center" style="border-radius:2px;">
+<span class="font-heading text-[#F4F0E8] text-[22px] leading-none">01</span>
+</div>
+<div>
+<h3 class="font-heading text-[#0F0F0F] mb-2 text-[20px] md:text-[22px] uppercase leading-tight">The Afternoon Wall Stops Being The Wall</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.55]">You hold the thread past 3pm. The last meeting doesn't cost you the evening. The 2:45 crash you'd started scheduling around quietly disappears.</p>
+</div>
+</div>
+<div class="flex gap-5 items-start bg-white p-7 border-2 border-[#0F0F0F]" style="border-radius:2px;">
+<div class="w-14 h-14 shrink-0 bg-[#E51E25] flex items-center justify-center" style="border-radius:2px;">
+<span class="font-heading text-[#F4F0E8] text-[22px] leading-none">02</span>
+</div>
+<div>
+<h3 class="font-heading text-[#0F0F0F] mb-2 text-[20px] md:text-[22px] uppercase leading-tight">Drive You Thought Was Gone Comes Back</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.55]">Motivation for the things that used to light you up returns. Your wife notices before you do. The words for what you wanted land clearly again.</p>
+</div>
+</div>
+<div class="flex gap-5 items-start bg-white p-7 border-2 border-[#0F0F0F]" style="border-radius:2px;">
+<div class="w-14 h-14 shrink-0 bg-[#E51E25] flex items-center justify-center" style="border-radius:2px;">
+<span class="font-heading text-[#F4F0E8] text-[22px] leading-none">03</span>
+</div>
+<div>
+<h3 class="font-heading text-[#0F0F0F] mb-2 text-[20px] md:text-[22px] uppercase leading-tight">Sharpness Replaces The Fog</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.55]">You finish the sentence. The word arrives. The thread holds. You stop second-guessing yourself in the meetings you used to own.</p>
+</div>
+</div>
+<div class="flex gap-5 items-start bg-white p-7 border-2 border-[#0F0F0F]" style="border-radius:2px;">
+<div class="w-14 h-14 shrink-0 bg-[#E51E25] flex items-center justify-center" style="border-radius:2px;">
+<span class="font-heading text-[#F4F0E8] text-[22px] leading-none">04</span>
+</div>
+<div>
+<h3 class="font-heading text-[#0F0F0F] mb-2 text-[20px] md:text-[22px] uppercase leading-tight">You Show Up For Your Own Life Again</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.55]">Weekends aren't just recovery. Evenings aren't just the couch. You're present at dinner, engaged on the phone with your kid, and awake for yourself on Saturday morning.</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-center text-center">
+<p class="text-[#0F0F0F] text-[17px] md:text-[19px] italic mb-6 max-w-2xl leading-[1.5]">
+                    One morning dose. Two capsules. That's the entire mechanism your mornings need to reverse it.
+                </p>
+<div class="inline-block w-full max-w-[520px]">
+<a class="cta-button w-full" href="#shop" id="benefits-cta" rel="nofollow">
+                        START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#8A847B] font-mono tracking-wide uppercase text-center">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Ingredients · 4-card breakdown (sales-page-blueprint §13) — order: Factor 01 / 02 / 03 / 04 -->
+<section class="w-full bg-[#F4F0E8] py-20 px-6 border-t-2 border-[#0F0F0F]">
+<div class="max-w-[1280px] mx-auto">
+<div class="text-center mb-12">
+<span class="pill-badge mb-4 inline-block">What's Inside</span>
+<h2 class="text-[36px] md:text-[48px] leading-[0.95] font-heading text-[#0F0F0F] uppercase mt-3">
+                    Four Factors. <span class="text-[#E51E25]">One Clinical Stack.</span>
+</h2>
+<p class="text-[17px] text-[#0F0F0F] max-w-2xl mx-auto mt-4 leading-[1.5]">
+                    Every ingredient sourced at the published dose. Every batch third-party tested. Each one pulling its own lever — so all four factors move at once.
+                </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Factor 01 · Tongkat Ali -->
+<div class="bg-white border-2 border-[#0F0F0F] p-7 flex flex-col" style="border-radius:2px;">
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-2">Factor 01 · T Decline</div>
+<h3 class="font-heading text-[22px] uppercase text-[#0F0F0F] mb-1 leading-tight">Tongkat Ali</h3>
+<div class="font-mono text-[13px] text-[#8A847B] tracking-wide uppercase mb-4">400mg · Per Serving</div>
+<ul class="text-[14px] text-[#0F0F0F] space-y-2 mb-4 flex-grow">
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Supports Leydig-cell testosterone production</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So afternoon energy holds past 3pm</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Clinically studied in men</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So the floor rises where it actually matters</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Primary dose, not under-dosed blend filler</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So you know what's moving the needle</span></div></li>
+</ul>
+<div class="pt-4 border-t-2 border-[#0F0F0F] text-[11px] font-mono text-[#8A847B] tracking-widest uppercase">✓ Clinically Studied</div>
+</div>
+<!-- Factor 02 · Zinc + Boron -->
+<div class="bg-white border-2 border-[#0F0F0F] p-7 flex flex-col" style="border-radius:2px;">
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-2">Factor 02 · Aromatase</div>
+<h3 class="font-heading text-[22px] uppercase text-[#0F0F0F] mb-1 leading-tight">Zinc + Boron</h3>
+<div class="font-mono text-[13px] text-[#8A847B] tracking-wide uppercase mb-4">Zinc 50mg · Boron (blend)</div>
+<ul class="text-[14px] text-[#0F0F0F] space-y-2 mb-4 flex-grow">
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Boron modulates aromatase conversion</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So more of the t you make stays t</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Zinc supports free-T bioavailability</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So drive doesn't get locked up unused</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Core trace-mineral pair for andropausal men</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So the hormonal floor holds</span></div></li>
+</ul>
+<div class="pt-4 border-t-2 border-[#0F0F0F] text-[11px] font-mono text-[#8A847B] tracking-widest uppercase">✓ Clinically Studied</div>
+</div>
+<!-- Factor 03 · Eleutherococcus -->
+<div class="bg-white border-2 border-[#0F0F0F] p-7 flex flex-col" style="border-radius:2px;">
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-2">Factor 03 · Cortisol</div>
+<h3 class="font-heading text-[22px] uppercase text-[#0F0F0F] mb-1 leading-tight">Eleutherococcus</h3>
+<div class="font-mono text-[13px] text-[#8A847B] tracking-wide uppercase mb-4">125mg · Ginseng Blend</div>
+<ul class="text-[14px] text-[#0F0F0F] space-y-2 mb-4 flex-grow">
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Adaptogen that supports HPA-axis cortisol balance</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So flat-and-restless turns back into calm-and-on</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Softens chronic stress load at its source</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So the 2:45pm crash doesn't define your day</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Paired with Panax ginseng in the blend</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So the effect is steady, not a stimulant spike</span></div></li>
+</ul>
+<div class="pt-4 border-t-2 border-[#0F0F0F] text-[11px] font-mono text-[#8A847B] tracking-widest uppercase">✓ Clinically Studied</div>
+</div>
+<!-- Factor 04 · Maca -->
+<div class="bg-white border-2 border-[#0F0F0F] p-7 flex flex-col" style="border-radius:2px;">
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-2">Factor 04 · DHEA</div>
+<h3 class="font-heading text-[22px] uppercase text-[#0F0F0F] mb-1 leading-tight">Maca</h3>
+<div class="font-mono text-[13px] text-[#8A847B] tracking-wide uppercase mb-4">250mg · 0.6 Extract</div>
+<ul class="text-[14px] text-[#0F0F0F] space-y-2 mb-4 flex-grow">
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Provides DHEA-precursor substrate</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So the raw material is there when your body needs it</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Traditionally used for vitality and stamina</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So drive has somewhere to come back from</span></div></li>
+<li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-[#E51E25] text-[12px] mt-1 shrink-0"></i><div><span class="text-[#0F0F0F]">Clinically dosed 0.6 extract</span><span class="block italic text-[#8A847B] text-[13px] mt-0.5">So the effect is consistent, not placebo</span></div></li>
+</ul>
+<div class="pt-4 border-t-2 border-[#0F0F0F] text-[11px] font-mono text-[#8A847B] tracking-widest uppercase">✓ Clinically Studied</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Snackable Stats -->
+<section class="py-24 bg-white text-center">
+<div class="max-w-[1280px] mx-auto px-8">
+<div class="mb-4 flex justify-center">
+<span class="pill-badge">THE NUMBERS THAT MATTER</span>
+</div>
+<h2 class="text-[48px] md:text-[58px] leading-[0.95] mb-4 font-heading text-[#0F0F0F] uppercase">
+                The Protocol <span class="underline-highlight">Men Stay On.</span>
+</h2>
+<p class="text-[#0F0F0F] max-w-2xl mx-auto mb-16 px-4 text-[19px] leading-[1.5]">
+                14,000+ men started the Full Drive Protocol. Here's what happened next.
+            </p>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
+<div class="bg-[#E51E25] p-8 text-center text-white shadow-lg flex flex-col items-center justify-center aspect-[4/3] border-2 border-[#0F0F0F]">
+<h3 class="text-[64px] leading-[0.9] mb-4 font-heading font-mono">73%</h3>
+<p class="text-[15px] text-[#F4F0E8] leading-[1.5] font-medium">reorder within 90 days. Not because we asked — because the drift didn't come back.</p>
+</div>
+<div class="bg-[#E51E25] p-8 text-center text-white shadow-lg flex flex-col items-center justify-center aspect-[4/3] border-2 border-[#0F0F0F]">
+<h3 class="text-[64px] leading-[0.9] mb-4 font-heading font-mono">89%</h3>
+<p class="text-[15px] text-[#F4F0E8] leading-[1.5] font-medium">report feeling more like themselves within their first 30 days on the protocol.</p>
+</div>
+<div class="bg-[#E51E25] p-8 text-center text-white shadow-lg flex flex-col items-center justify-center aspect-[4/3] border-2 border-[#0F0F0F]">
+<h3 class="text-[64px] leading-[0.9] mb-4 font-heading font-mono">14,000+</h3>
+<p class="text-[15px] text-[#F4F0E8] leading-[1.5] font-medium">men on the Full Drive Protocol and counting.</p>
+</div>
+<div class="bg-[#E51E25] p-8 text-center text-white shadow-lg flex flex-col items-center justify-center aspect-[4/3] border-2 border-[#0F0F0F]">
+<h3 class="text-[64px] leading-[0.9] mb-4 font-heading font-mono">4.8</h3>
+<p class="text-[15px] text-[#F4F0E8] leading-[1.5] font-medium">average star rating from verified buyers.</p>
+</div>
+</div>
+<div class="inline-block">
+<a class="cta-button px-12" href="#shop" id="stats-cta" rel="nofollow">
+                    START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: Quality Trust -->
+<section class="py-20 bg-brand-bg text-center border-t-2 border-[#0F0F0F]">
+<div class="max-w-[1280px] mx-auto px-8 flex flex-col items-center">
+<div class="mb-4">
+<span class="pill-badge">3RD-PARTY TESTED · cGMP</span>
+</div>
+<h2 class="text-[48px] md:text-[58px] leading-[0.95] mb-4 font-heading text-[#0F0F0F] uppercase">
+                Clinical Doses. <span class="underline-highlight">Nothing Hidden.</span>
+</h2>
+<p class="text-[#0F0F0F] mb-12 max-w-2xl mx-auto text-[19px] leading-[1.5]">
+                Every batch is manufactured in a cGMP-certified US facility and goes to an accredited third-party lab before it ships. Primary doses printed on the panel. No proprietary blend tricks hiding the actives.
+            </p>
+<div class="flex flex-col md:flex-row items-center justify-center gap-12 w-full mb-12">
+<div class="shrink-0 relative" style="width:192px;height:192px;">
+<div class="absolute inset-0 bg-[#E51E25] flex flex-col items-center justify-center text-white text-center border-2 border-[#0F0F0F]" style="box-shadow:0 12px 32px rgba(229,30,37,.28);">
+<div class="absolute inset-2 border-2 border-dashed border-white/45 pointer-events-none"></div>
+<div class="text-[10px] font-black uppercase tracking-[0.22em] opacity-90 mt-1">★ ★ ★</div>
+<div class="text-[11px] font-black uppercase tracking-[0.22em] mt-2 opacity-85 font-mono">3rd Party</div>
+<div class="font-heading text-[26px] leading-none my-1">LAB</div>
+<div class="font-heading text-[26px] leading-none">VERIFIED</div>
+<div class="text-[10px] font-bold uppercase tracking-[0.18em] opacity-85 mt-2 font-mono">Every Batch</div>
+<div class="text-[10px] font-black uppercase tracking-[0.22em] opacity-90 mb-1">★ ★ ★</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-x-8 gap-y-4 text-left">
+<div class="flex items-center gap-2 text-[18px] text-[#0F0F0F] font-medium">
+<i class="fa-solid fa-check text-[#E51E25]"></i> Tongkat ali 400mg verified per serving
+                    </div>
+<div class="flex items-center gap-2 text-[18px] text-[#0F0F0F] font-medium">
+<i class="fa-solid fa-check text-[#E51E25]"></i> Certificate of Analysis on every batch
+                    </div>
+<div class="flex items-center gap-2 text-[18px] text-[#0F0F0F] font-medium">
+<i class="fa-solid fa-check text-[#E51E25]"></i> Every primary dose disclosed on panel
+                    </div>
+<div class="flex items-center gap-2 text-[18px] text-[#0F0F0F] font-medium">
+<i class="fa-solid fa-check text-[#E51E25]"></i> Two capsules, one morning dose
+                    </div>
+</div>
+</div>
+<div class="inline-block">
+<a class="cta-button px-12" href="#shop" id="eurofins-cta" rel="nofollow">
+                    START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Timeline · Experiential 30/60/90-day journey (Frankie Rule 29 + sales-page §11) -->
+<section class="w-full bg-white py-20 px-6 border-b-2 border-[#0F0F0F]">
+<div class="max-w-[1100px] mx-auto">
+<div class="text-center mb-12">
+<span class="pill-badge mb-4 inline-block">The Timeline</span>
+<h2 class="text-[36px] md:text-[48px] leading-[0.95] font-heading text-[#0F0F0F] uppercase mt-3">
+                    What The Arc Looks Like
+                </h2>
+<p class="text-[17px] text-[#0F0F0F] max-w-2xl mx-auto mt-4 leading-[1.5]">
+                    Tenor is not a stimulant. It's a floor-raiser. Here's what most men feel as the cofactor stack accumulates.
+                </p>
+</div>
+<div class="relative">
+<!-- vertical rail on md+ -->
+<div class="hidden md:block absolute left-[19px] top-4 bottom-4 w-[2px] bg-[#0F0F0F]"></div>
+<div class="space-y-8">
+<div class="flex items-start gap-5">
+<div class="w-10 h-10 shrink-0 bg-[#E51E25] text-white flex items-center justify-center font-heading text-[14px] tracking-wide relative z-10" style="border-radius:2px;">D1</div>
+<div>
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-1">Day 1</div>
+<h3 class="font-heading text-[20px] uppercase text-[#0F0F0F] mb-1">Protocol Starts</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.5]">Two capsules with coffee. Nothing to feel yet. The cofactor stack begins accumulating at the cellular level.</p>
+</div>
+</div>
+<div class="flex items-start gap-5">
+<div class="w-10 h-10 shrink-0 bg-[#E51E25] text-white flex items-center justify-center font-heading text-[14px] tracking-wide relative z-10" style="border-radius:2px;">W2</div>
+<div>
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-1">Week 2 — Day 30</div>
+<h3 class="font-heading text-[20px] uppercase text-[#0F0F0F] mb-1">The Afternoon Wall Softens</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.5]">The 2:45pm crash lifts first. You hold the thread through the last meeting. You drive home still present.</p>
+</div>
+</div>
+<div class="flex items-start gap-5">
+<div class="w-10 h-10 shrink-0 bg-[#E51E25] text-white flex items-center justify-center font-heading text-[14px] tracking-wide relative z-10" style="border-radius:2px;">M2</div>
+<div>
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-1">Month 2</div>
+<h3 class="font-heading text-[20px] uppercase text-[#0F0F0F] mb-1">Drive Returns</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.5]">Motivation for the things that used to light you up comes back. The flat-and-restless feeling lifts. Presence at home improves before you realize it.</p>
+</div>
+</div>
+<div class="flex items-start gap-5">
+<div class="w-10 h-10 shrink-0 bg-[#E51E25] text-white flex items-center justify-center font-heading text-[14px] tracking-wide relative z-10" style="border-radius:2px;">M3</div>
+<div>
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mb-1">Month 3</div>
+<h3 class="font-heading text-[20px] uppercase text-[#0F0F0F] mb-1">Yourself, Back.</h3>
+<p class="text-[15px] text-[#0F0F0F] leading-[1.5]">Most men stop thinking <em>something's off</em>. The floor is raised across all four factors. If the shift hasn't landed by Day 90, the Full Drive Guarantee gives every penny back — empty bottles included.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Lead Testimonial (Frankie Rule 2: full-paragraph quote, placed ABOVE product) -->
+<section class="w-full bg-[#F4F0E8] py-16 px-6 border-t-2 border-[#0F0F0F]">
+<div class="max-w-[820px] mx-auto">
+<div class="flex items-center justify-center gap-1 mb-4 text-[#E51E25] text-[20px]">
+<i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+</div>
+<blockquote class="text-[22px] md:text-[26px] leading-[1.4] text-[#0F0F0F] text-center italic font-body mb-6">
+                "I'd been told 'normal for your age' for four years. I wasn't normal — I was slowly gone. Three weeks on Tenor the afternoon wall softened. Three months in I stopped thinking <em>something's off</em>. I showed up to my own life again. I'd forgotten what that felt like."
+            </blockquote>
+<div class="flex items-center justify-center gap-3 flex-wrap">
+<img alt="Mark T." class="w-12 h-12 rounded-full object-cover border-2 border-[#0F0F0F]" loading="lazy" src="/public/assets/abc7f030-370b-45f1-a107-22ee3f2f8b47"/>
+<div class="text-left">
+<div class="font-heading text-[14px] text-[#0F0F0F] uppercase tracking-wide">Mark T., 51 — Denver</div>
+<div class="text-[12px] font-mono text-[#8A847B] tracking-wide uppercase flex items-center gap-1.5">
+<span class="inline-flex items-center justify-center w-4 h-4 bg-[#E51E25] rounded-full text-white text-[9px] font-bold">✓</span>
+                        Verified Buyer · 3 Months On Protocol
+                    </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 5: Product Display + Pricing -->
+<section class="py-24 bg-white" id="shop">
+<div class="max-w-[1280px] mx-auto px-8 flex flex-col lg:flex-row items-start gap-4 lg:gap-16">
+<!-- Product Gallery (PDP) — 11 detail-page images with click-to-swap -->
+<div class="w-full lg:w-1/2 lg:order-1 flex flex-col gap-4">
+<div class="w-full border-2 border-[#0F0F0F] relative group aspect-[4/5] bg-white overflow-hidden" id="pdp-main">
+<img alt="Tenor Full Drive Protocol — hero product shot with coffee and cascade callout" class="w-full h-full object-contain transition-opacity duration-200" id="pdp-main-img" loading="lazy" src="/public/assets/a7f8ae93-7f92-4327-afb1-fe75ff8565b7"/>
+</div>
+<div class="pdp-thumbs-scroll flex gap-3 pb-2 overflow-x-auto flex-nowrap snap-x" id="pdp-thumbs">
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#E51E25] bg-white p-0" data-alt="Hero product shot with coffee and cascade callout" data-src="/public/assets/a7f8ae93-7f92-4327-afb1-fe75ff8565b7" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/a7f8ae93-7f92-4327-afb1-fe75ff8565b7"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Core benefits: consistent energy, sharp focus, natural drive" data-src="/public/assets/034655a5-21f6-4911-ac7f-2c613f7d21db" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/034655a5-21f6-4911-ac7f-2c613f7d21db"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Product details: Non-GMO, third-party tested, cGMP" data-src="/public/assets/8f9c32f3-e3db-4e26-ae47-9a7886ac57d7" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/8f9c32f3-e3db-4e26-ae47-9a7886ac57d7"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Testimonial: David M., verified customer" data-src="/public/assets/57dd1e1b-ae76-41ec-aa53-9f633e4416a3" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/57dd1e1b-ae76-41ec-aa53-9f633e4416a3"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="How to use: take with coffee or water each morning" data-src="/public/assets/29628d63-617b-4acb-bfd1-0c7f8ca79496" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/29628d63-617b-4acb-bfd1-0c7f8ca79496"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Tenor vs leading competitor comparison" data-src="/public/assets/2c505ff6-89be-4faa-ae47-02a44f57c963" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/2c505ff6-89be-4faa-ae47-02a44f57c963"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="90-day money-back guarantee" data-src="/public/assets/5a2e73b3-559f-47e6-b3a4-7c8402f680f3" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/5a2e73b3-559f-47e6-b3a4-7c8402f680f3"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Before and after testimonials" data-src="/public/assets/a6ff0534-8d52-4322-a15b-c724acaaba22" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/a6ff0534-8d52-4322-a15b-c724acaaba22"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Supplement Facts panel — serving size 2 tablets, 30 servings per container, full ingredient list with Zinc 50mg, Tongkat Ali 400mg, Maca 250mg, L-Arginine 250mg, Ginseng Eleutherococcus blend 125mg, proprietary blend 745mg. Contains Shellfish." data-src="/public/assets/1332d03b-7023-409d-9205-670d56a2c02b" type="button">
+<img alt="" class="w-full h-full object-contain pointer-events-none bg-white" src="/public/assets/1332d03b-7023-409d-9205-670d56a2c02b"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Timeline: vitality returns in just 2 weeks" data-src="/public/assets/ee47b5f6-9b07-46d6-88f1-2c47152a8084" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/ee47b5f6-9b07-46d6-88f1-2c47152a8084"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Tenor fit: designed for men who want to raise the hormonal floor without TRT" data-src="/public/assets/d519b948-5080-4f3c-a58e-3a8fc05a9e52" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/d519b948-5080-4f3c-a58e-3a8fc05a9e52"/>
+</button>
+<button class="pdp-thumb snap-start shrink-0 w-[72px] h-[72px] md:w-[84px] md:h-[84px] overflow-hidden border-2 border-[#0F0F0F] bg-white opacity-70 hover:opacity-100 p-0" data-alt="Lifestyle: kitchen counter, morning light, bottle with capsules" data-src="/public/assets/31f91450-3b98-44cf-b591-b3d82bdf0a3c" type="button">
+<img alt="" class="w-full h-full object-cover pointer-events-none" src="/public/assets/31f91450-3b98-44cf-b591-b3d82bdf0a3c"/>
+</button>
+</div>
+</div>
+<!-- Product Details/Form (Right) -->
+<div class="w-full lg:w-1/2 lg:order-2 flex flex-col text-left">
+<div class="flex items-center justify-start gap-2 mb-2 text-[16px] font-medium text-[#0F0F0F]">
+<div class="flex text-[#E51E25] text-[16px] gap-0.5">
+<i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star-half-stroke"></i>
+</div>
+<span class="font-mono text-[14px] tracking-wide">4.8 · 14,000+ VERIFIED BUYERS</span>
+</div>
+<h1 class="text-[36px] md:text-[48px] leading-[0.95] font-heading text-[#0F0F0F] mb-3 text-left uppercase">Tenor: Full Drive Protocol</h1>
+<p class="text-[19px] text-[#0F0F0F] mb-6 leading-[1.5]">
+                    Two capsules. One morning dose. Get the afternoon back. Feel like yourself again. Show up for the life you built — without a prescription, without a clinic, without needles.
+                </p>
+<div class="bg-[#ECE6D8] border-2 border-[#E51E25] p-5 mb-6 flex items-start gap-4">
+<span class="text-2xl">🔥</span>
+<div class="text-[18px] text-[#0F0F0F] font-bold leading-[1.4] font-heading uppercase tracking-wide">
+                        14,000+ Men on the Full Drive Protocol<br/>
+<span class="font-body text-[15px] normal-case tracking-normal font-normal text-[#0F0F0F]">Last restock sold out in 72 hours · Current batch low</span>
+</div>
+</div>
+<ul class="text-[17px] text-[#0F0F0F] space-y-2 mb-8 font-medium">
+<li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#E51E25]"></i> Full Drive Guarantee · 90 Days · Return even the empty bottles</li>
+<li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#E51E25]"></i> Four-factor botanical matrix · primary doses disclosed</li>
+<li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#E51E25]"></i> Free US shipping on all tiers · discreet brown mailer</li>
+<li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-[#E51E25]"></i> Subscribe &amp; save — pause or cancel anytime</li>
+</ul>
+<!-- Supply Selector — Subscribe/One-Time toggle, 30 / 60 / 90 Day Supply, $/day hero, total price clarity, 60-day default -->
+<div class="mb-6" data-mode="subscribe" id="quantity-selector">
+<h4 class="font-heading text-[#0F0F0F] mb-3 text-[14px] text-left uppercase tracking-widest">Choose Your Supply</h4>
+<!-- Subscribe / One-Time toggle -->
+<div class="grid grid-cols-2 gap-2 mb-4 p-1 bg-[#F4F0E8] border-2 border-[#0F0F0F]" style="border-radius:2px;">
+<button class="mode-btn py-2 px-3 font-heading text-[12px] md:text-[13px] tracking-widest uppercase transition" data-mode="subscribe" type="button">
+                            Subscribe &amp; Save
+                        </button>
+<button class="mode-btn py-2 px-3 font-heading text-[12px] md:text-[13px] tracking-widest uppercase transition" data-mode="one-time" type="button">
+                            One-Time Purchase
+                        </button>
+</div>
+<div class="space-y-2 relative">
+<!-- 30 Day Supply -->
+<label class="block cursor-pointer" onclick="selectQuantity(this, '1x')">
+<div class="radio-card border-2 border-[#0F0F0F] bg-white hover:bg-[#F4F0E8]" data-qty="1x" style="border-radius:2px;">
+<div class="px-4 py-4 grid grid-cols-[1fr_auto] items-start gap-3">
+<div class="flex items-start gap-3">
+<div class="radio-indicator shrink-0 mt-1.5"></div>
+<div>
+<div class="font-heading text-[#0F0F0F] text-[20px] md:text-[22px] leading-tight uppercase font-black tracking-tight">30 Day Supply</div>
+<div class="text-[12px] font-mono text-[#0F0F0F] tracking-wide mt-1">
+<span class="sub-show">1 bottle · 60 capsules · Bills monthly</span>
+<span class="one-show">1 bottle · 60 capsules · Ships once</span>
+</div>
+<ul class="text-[13px] text-[#0F0F0F] mt-2 space-y-0.5">
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Perfect starter supply</li>
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Full protocol guide included</li>
+</ul>
+</div>
+</div>
+<div class="flex flex-col items-end whitespace-nowrap">
+<div class="font-heading font-black text-[#0F0F0F] text-[28px] md:text-[32px] leading-none">
+<span class="sub-show">$1.40</span>
+<span class="one-show">$1.63</span>
+</div>
+<div class="text-[11px] font-mono text-[#8A847B] tracking-widest uppercase mt-0.5">per day</div>
+<div class="text-[13px] font-mono text-[#0F0F0F] mt-2">
+<span class="text-[#8A847B] line-through mr-1">$67</span>
+<span class="font-bold sub-show">$42 total</span>
+<span class="font-bold one-show">$49 total</span>
+</div>
+<div class="text-[11px] font-mono text-[#E51E25] font-bold tracking-wide mt-0.5">
+<span class="sub-show">Save $25 (37% off)</span>
+<span class="one-show">Save $18 (27% off)</span>
+</div>
+</div>
+</div>
+</div>
+</label>
+<!-- 60 Day Supply · Most Popular (DEFAULT per bundle-architecture.md L35) -->
+<label class="block cursor-pointer" onclick="selectQuantity(this, '2x')">
+<div class="radio-card selected overflow-hidden shadow-md border-2 border-[#E51E25]" data-qty="2x" style="border-radius:2px;">
+<div class="bg-[#E51E25] text-white text-[11px] font-heading py-1 text-center tracking-widest uppercase">★ Most Popular</div>
+<div class="px-4 py-4 grid grid-cols-[1fr_auto] items-start gap-3 bg-[#F4F0E8]">
+<div class="flex items-start gap-3">
+<div class="radio-indicator shrink-0 mt-1.5"></div>
+<div>
+<div class="font-heading text-[#0F0F0F] text-[20px] md:text-[22px] leading-tight uppercase font-black tracking-tight">60 Day Supply</div>
+<div class="text-[12px] font-mono text-[#0F0F0F] tracking-wide mt-1">
+<span class="sub-show">2 bottles · 120 capsules · Bills every 60 days</span>
+<span class="one-show">2 bottles · 120 capsules · Ships once</span>
+</div>
+<ul class="text-[13px] text-[#0F0F0F] mt-2 space-y-0.5">
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Complete protocol cycle</li>
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Free US shipping</li>
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Protocol habit-tracker</li>
+</ul>
+</div>
+</div>
+<div class="flex flex-col items-end whitespace-nowrap">
+<div class="font-heading font-black text-[#E51E25] text-[32px] md:text-[38px] leading-none">
+<span class="sub-show">$1.30</span>
+<span class="one-show">$1.55</span>
+</div>
+<div class="text-[11px] font-mono text-[#8A847B] tracking-widest uppercase mt-0.5">per day</div>
+<div class="text-[13px] font-mono text-[#0F0F0F] mt-2">
+<span class="text-[#8A847B] line-through mr-1">$134</span>
+<span class="font-bold sub-show">$78 total</span>
+<span class="font-bold one-show">$93 total</span>
+</div>
+<div class="text-[11px] font-mono text-[#E51E25] font-bold tracking-wide mt-0.5">
+<span class="sub-show">Save $56 (42% off)</span>
+<span class="one-show">Save $41 (31% off)</span>
+</div>
+</div>
+</div>
+</div>
+</label>
+<!-- 90 Day Supply · Best Value — matches Full Drive Guarantee window -->
+<label class="block cursor-pointer" onclick="selectQuantity(this, '3x')">
+<div class="radio-card overflow-hidden border-2 border-[#0F0F0F] bg-white hover:bg-[#F4F0E8]" data-qty="3x" style="border-radius:2px;">
+<div class="bg-[#0F0F0F] text-white text-[11px] font-heading py-1 text-center tracking-widest uppercase">★ Best Value · Matches The Full Drive Guarantee</div>
+<div class="px-4 py-4 grid grid-cols-[1fr_auto] items-start gap-3">
+<div class="flex items-start gap-3">
+<div class="radio-indicator shrink-0 mt-1.5"></div>
+<div>
+<div class="font-heading text-[#0F0F0F] text-[20px] md:text-[22px] leading-tight uppercase font-black tracking-tight">90 Day Supply</div>
+<div class="text-[12px] font-mono text-[#0F0F0F] tracking-wide mt-1">
+<span class="sub-show">3 bottles · 180 capsules · Bills quarterly</span>
+<span class="one-show">3 bottles · 180 capsules · Ships once</span>
+</div>
+<ul class="text-[13px] text-[#0F0F0F] mt-2 space-y-0.5">
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Maximum results timeline</li>
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Free US shipping + priority support</li>
+<li class="flex items-start gap-1.5"><i class="fa-solid fa-circle-check text-[#E51E25] text-[10px] mt-1.5"></i> Advanced protocol guide</li>
+</ul>
+</div>
+</div>
+<div class="flex flex-col items-end whitespace-nowrap">
+<div class="font-heading font-black text-[#0F0F0F] text-[28px] md:text-[32px] leading-none">
+<span class="sub-show">$1.17</span>
+<span class="one-show">$1.40</span>
+</div>
+<div class="text-[11px] font-mono text-[#8A847B] tracking-widest uppercase mt-0.5">per day</div>
+<div class="text-[13px] font-mono text-[#0F0F0F] mt-2">
+<span class="text-[#8A847B] line-through mr-1">$201</span>
+<span class="font-bold sub-show">$105 total</span>
+<span class="font-bold one-show">$126 total</span>
+</div>
+<div class="text-[11px] font-mono text-[#E51E25] font-bold tracking-wide mt-0.5">
+<span class="sub-show">Save $96 (48% off)</span>
+<span class="one-show">Save $75 (37% off)</span>
+</div>
+</div>
+</div>
+</div>
+</label>
+</div>
+<div class="mt-3 pl-2 text-[12px] font-mono text-[#8A847B] tracking-wide uppercase">
+<span class="sub-show">Easily Cancel Anytime</span>
+<span class="one-show">Single Charge · Ships Once</span>
+</div>
+</div>
+<button class="cta-button w-full text-[18px] py-5 shadow-lg mb-4" id="main-cta">
+                    START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</button>
+<div class="flex flex-col items-center justify-center gap-2 text-[14px] text-[#0F0F0F] font-mono tracking-wide uppercase mb-6">
+<div class="flex items-center gap-4 flex-wrap justify-center">
+<span class="flex items-center gap-1.5"><i class="fa-solid fa-box text-[#E51E25]"></i> Two capsules · morning</span>
+<span class="flex items-center gap-1.5"><i class="fa-solid fa-truck text-[#E51E25]"></i> Free US Shipping</span>
+</div>
+<span class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-[#E51E25]"></i> Easily Cancel Anytime</span>
+</div>
+<!-- Benefits Accordion · pre-CTA trust block (sales-page-blueprint §13) -->
+<div class="border-t-2 border-b-2 border-[#0F0F0F] divide-y-2 divide-[#0F0F0F]">
+<div class="faq-item cursor-pointer py-4" onclick="toggleFaq(this)">
+<div class="flex items-center justify-between gap-2">
+<h5 class="font-heading text-[#0F0F0F] uppercase text-[14px] tracking-wide flex items-center gap-2"><i class="fa-solid fa-shield-halved text-[#E51E25]"></i> The Full Drive Guarantee</h5>
+<i class="fa-solid fa-plus faq-icon text-[#E51E25] text-[14px]"></i>
+</div>
+<div class="faq-answer text-[13px] text-[#0F0F0F] leading-[1.5] mt-2" style="display:none;">Return every bottle — empty ones included — within 90 days. Full refund swiftly. No questions asked. Email and you're refunded.</div>
+</div>
+<div class="faq-item cursor-pointer py-4" onclick="toggleFaq(this)">
+<div class="flex items-center justify-between gap-2">
+<h5 class="font-heading text-[#0F0F0F] uppercase text-[14px] tracking-wide flex items-center gap-2"><i class="fa-solid fa-flask text-[#E51E25]"></i> What's Inside</h5>
+<i class="fa-solid fa-plus faq-icon text-[#E51E25] text-[14px]"></i>
+</div>
+<div class="faq-answer text-[13px] text-[#0F0F0F] leading-[1.5] mt-2" style="display:none;">Tongkat Ali 400mg, Zinc 50mg, Maca 250mg, Ginseng Eleutherococcus blend 125mg, L-Arginine 250mg, plus a supporting proprietary blend (Boron, Tribulus, Muira Puama, and more). See full Supplement Facts above. Manufactured in a cGMP facility. Every batch third-party tested.</div>
+</div>
+<div class="faq-item cursor-pointer py-4" onclick="toggleFaq(this)">
+<div class="flex items-center justify-between gap-2">
+<h5 class="font-heading text-[#0F0F0F] uppercase text-[14px] tracking-wide flex items-center gap-2"><i class="fa-solid fa-truck text-[#E51E25]"></i> Shipping &amp; Returns</h5>
+<i class="fa-solid fa-plus faq-icon text-[#E51E25] text-[14px]"></i>
+</div>
+<div class="faq-answer text-[13px] text-[#0F0F0F] leading-[1.5] mt-2" style="display:none;">Free US shipping on 60 and 90 day supply. Discreet brown mailer — no exterior branding. Ships within 24 hours. Tracking sent by email.</div>
+</div>
+<div class="faq-item cursor-pointer py-4" onclick="toggleFaq(this)">
+<div class="flex items-center justify-between gap-2">
+<h5 class="font-heading text-[#0F0F0F] uppercase text-[14px] tracking-wide flex items-center gap-2"><i class="fa-solid fa-lock text-[#E51E25]"></i> Secure Checkout</h5>
+<i class="fa-solid fa-plus faq-icon text-[#E51E25] text-[14px]"></i>
+</div>
+<div class="faq-answer text-[13px] text-[#0F0F0F] leading-[1.5] mt-2" style="display:none;">
+                            256-bit SSL encrypted. Billed through Shopify's PCI-compliant gateway. Easily cancel anytime from your account.
+                            <ul class="payment-methods__list flex items-center flex-wrap gap-2 mt-3 list-none p-0">
+<li class="payment-methods__icon"><svg aria-labelledby="pi-visa-m" class="icon icon--full-color" height="24" role="img" viewbox="0 0 38 24" width="38" xmlns="http://www.w3.org/2000/svg"><title id="pi-visa-m">Visa</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3z" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32" fill="#fff"></path><path d="M28.3 10.1H28c-.4 1-.7 1.5-1 3h1.9c-.3-1.5-.3-2.2-.6-3zm2.9 5.9h-1.7c-.1 0-.1 0-.2-.1l-.2-.9-.1-.2h-2.4c-.1 0-.2 0-.2.2l-.3.9c0 .1-.1.1-.1.1h-2.1l.2-.5L27 8.7c0-.5.3-.7.8-.7h1.5c.1 0 .2 0 .2.2l1.4 6.5c.1.4.2.7.2 1.1.1.1.1.1.1.2zm-13.4-.3l.4-1.8c.1 0 .2.1.2.1.7.3 1.4.5 2.1.4.2 0 .5-.1.7-.2.5-.2.5-.7.1-1.1-.2-.2-.5-.3-.8-.5-.4-.2-.8-.4-1.1-.7-1.2-1-.8-2.4-.1-3.1.6-.4.9-.8 1.7-.8 1.2 0 2.5 0 3.1.2h.1c-.1.6-.2 1.1-.4 1.7-.5-.2-1-.4-1.5-.4-.3 0-.6 0-.9.1-.2 0-.3.1-.4.2-.2.2-.2.5 0 .7l.5.4c.4.2.8.4 1.1.6.5.3 1 .8 1.1 1.4.2.9-.1 1.7-.9 2.3-.5.4-.7.6-1.4.6-1.4 0-2.5.1-3.4-.2-.1.2-.1.2-.2.1zm-3.5.3c.1-.7.1-.7.2-1 .5-2.2 1-4.5 1.4-6.7.1-.2.1-.3.3-.3H18c-.2 1.2-.4 2.1-.7 3.2-.3 1.5-.6 3-1 4.5 0 .2-.1.2-.3.2M5 8.2c0-.1.2-.2.3-.2h3.4c.5 0 .9.3 1 .8l.9 4.4c0 .1 0 .1.1.2 0-.1.1-.1.1-.1l2.1-5.1c-.1-.1 0-.2.1-.2h2.1c0 .1 0 .1-.1.2l-3.1 7.3c-.1.2-.1.3-.2.4-.1.1-.3 0-.5 0H9.7c-.1 0-.2 0-.2-.2L7.9 9.5c-.2-.2-.5-.5-.9-.6-.6-.3-1.7-.5-1.9-.5L5 8.2z" fill="#142688"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-master-m" class="icon icon--full-color" height="24" role="img" viewbox="0 0 38 24" width="38" xmlns="http://www.w3.org/2000/svg"><title id="pi-master-m">Mastercard</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3z" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32" fill="#fff"></path><circle cx="15" cy="12" fill="#EB001B" r="7"></circle><circle cx="23" cy="12" fill="#F79E1B" r="7"></circle><path d="M22 12c0-2.4-1.2-4.5-3-5.7-1.8 1.3-3 3.4-3 5.7s1.2 4.5 3 5.7c1.8-1.2 3-3.3 3-5.7z" fill="#FF5F00"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-amex-m" class="icon icon--full-color" height="24" role="img" viewbox="0 0 38 24" width="38" xmlns="http://www.w3.org/2000/svg"><title id="pi-amex-m">American Express</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3Z" fill="#000" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32Z" fill="#006FCF"></path><path d="M22.012 19.936v-8.421L37 11.528v2.326l-1.732 1.852L37 17.573v2.375h-2.766l-1.47-1.622-1.46 1.628-9.292-.02Z" fill="#FFF"></path><path d="M23.013 19.012v-6.57h5.572v1.513h-3.768v1.028h3.678v1.488h-3.678v1.01h3.768v1.531h-5.572Z" fill="#006FCF"></path><path d="m28.557 19.012 3.083-3.289-3.083-3.282h2.386l1.884 2.083 1.89-2.082H37v.051l-3.017 3.23L37 18.92v.093h-2.307l-1.917-2.103-1.898 2.104h-2.321Z" fill="#006FCF"></path><path d="M22.71 4.04h3.614l1.269 2.881V4.04h4.46l.77 2.159.771-2.159H37v8.421H19l3.71-8.421Z" fill="#FFF"></path><path d="m23.395 4.955-2.916 6.566h2l.55-1.315h2.98l.55 1.315h2.05l-2.904-6.566h-2.31Zm.25 3.777.875-2.09.873 2.09h-1.748Z" fill="#006FCF"></path><path d="M28.581 11.52V4.953l2.811.01L32.84 9l1.456-4.046H37v6.565l-1.74.016v-4.51l-1.644 4.494h-1.59L30.35 7.01v4.51h-1.768Z" fill="#006FCF"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-paypal-m" class="icon icon--full-color" height="24" role="img" viewbox="0 0 38 24" width="38" xmlns="http://www.w3.org/2000/svg"><title id="pi-paypal-m">PayPal</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3z" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32" fill="#fff"></path><path d="M23.9 8.3c.2-1 0-1.7-.6-2.3-.6-.7-1.7-1-3.1-1h-4.1c-.3 0-.5.2-.6.5L14 15.6c0 .2.1.4.3.4H17l.4-3.4 1.8-2.2 4.7-2.1z" fill="#003087"></path><path d="M23.9 8.3l-.2.2c-.5 2.8-2.2 3.8-4.6 3.8H18c-.3 0-.5.2-.6.5l-.6 3.9-.2 1c0 .2.1.4.3.4H19c.3 0 .5-.2.5-.4v-.1l.4-2.4v-.1c0-.2.3-.4.5-.4h.3c2.1 0 3.7-.8 4.1-3.2.2-1 .1-1.8-.4-2.4-.1-.5-.3-.7-.5-.8z" fill="#3086C8"></path><path d="M23.3 8.1c-.1-.1-.2-.1-.3-.1-.1 0-.2 0-.3-.1-.3-.1-.7-.1-1.1-.1h-3c-.1 0-.2 0-.2.1-.2.1-.3.2-.3.4l-.7 4.4v.1c0-.3.3-.5.6-.5h1.3c2.5 0 4.1-1 4.6-3.8v-.2c-.1-.1-.3-.2-.5-.2h-.1z" fill="#012169"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-applepay-m" class="icon icon--full-color" height="24" role="img" version="1.1" viewbox="0 0 165.521 105.965" width="38" x="0" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" y="0"><title id="pi-applepay-m">Apple Pay</title><path d="M150.698 0H14.823c-.566 0-1.133 0-1.698.003-.477.004-.953.009-1.43.022-1.039.028-2.087.09-3.113.274a10.51 10.51 0 0 0-2.958.975 9.932 9.932 0 0 0-4.35 4.35 10.463 10.463 0 0 0-.975 2.96C.113 9.611.052 10.658.024 11.696a70.22 70.22 0 0 0-.022 1.43C0 13.69 0 14.256 0 14.823v76.318c0 .567 0 1.132.002 1.699.003.476.009.953.022 1.43.028 1.036.09 2.084.275 3.11a10.46 10.46 0 0 0 .974 2.96 9.897 9.897 0 0 0 1.83 2.52 9.874 9.874 0 0 0 2.52 1.83c.947.483 1.917.79 2.96.977 1.025.183 2.073.245 3.112.273.477.011.953.017 1.43.02.565.004 1.132.004 1.698.004h135.875c.565 0 1.132 0 1.697-.004.476-.002.952-.009 1.431-.02 1.037-.028 2.085-.09 3.113-.273a10.478 10.478 0 0 0 2.958-.977 9.955 9.955 0 0 0 4.35-4.35c.483-.947.789-1.917.974-2.96.186-1.026.246-2.074.274-3.11.013-.477.02-.954.022-1.43.004-.567.004-1.132.004-1.699V14.824c0-.567 0-1.133-.004-1.699a63.067 63.067 0 0 0-.022-1.429c-.028-1.038-.088-2.085-.274-3.112a10.4 10.4 0 0 0-.974-2.96 9.94 9.94 0 0 0-4.35-4.35A10.52 10.52 0 0 0 156.939.3c-1.028-.185-2.076-.246-3.113-.274a71.417 71.417 0 0 0-1.431-.022C151.83 0 151.263 0 150.698 0z" fill="#000"></path><path d="M150.698 3.532l1.672.003c.452.003.905.008 1.36.02.793.022 1.719.065 2.583.22.75.135 1.38.34 1.984.648a6.392 6.392 0 0 1 2.804 2.807c.306.6.51 1.226.645 1.983.154.854.197 1.783.218 2.58.013.45.019.9.02 1.36.005.557.005 1.113.005 1.671v76.318c0 .558 0 1.114-.004 1.682-.002.45-.008.9-.02 1.35-.022.796-.065 1.725-.221 2.589a6.855 6.855 0 0 1-.645 1.975 6.397 6.397 0 0 1-2.808 2.807c-.6.306-1.228.511-1.971.645-.881.157-1.847.2-2.574.22-.457.01-.912.017-1.379.019-.555.004-1.113.004-1.669.004H14.801c-.55 0-1.1 0-1.66-.004a74.993 74.993 0 0 1-1.35-.018c-.744-.02-1.71-.064-2.584-.22a6.938 6.938 0 0 1-1.986-.65 6.337 6.337 0 0 1-1.622-1.18 6.355 6.355 0 0 1-1.178-1.623 6.935 6.935 0 0 1-.646-1.985c-.156-.863-.2-1.788-.22-2.578a66.088 66.088 0 0 1-.02-1.355l-.003-1.327V14.474l.002-1.325a66.7 66.7 0 0 1 .02-1.357c.022-.792.065-1.717.222-2.587a6.924 6.924 0 0 1 .646-1.981c.304-.598.7-1.144 1.18-1.623a6.386 6.386 0 0 1 1.624-1.18 6.96 6.96 0 0 1 1.98-.646c.865-.155 1.792-.198 2.586-.22.452-.012.905-.017 1.354-.02l1.677-.003h135.875" fill="#FFF"></path><g><path d="M43.508 35.77c1.404-1.755 2.356-4.112 2.105-6.52-2.054.102-4.56 1.355-6.012 3.112-1.303 1.504-2.456 3.959-2.156 6.266 2.306.2 4.61-1.152 6.063-2.858" fill="#000"></path><path d="M45.587 39.079c-3.35-.2-6.196 1.9-7.795 1.9-1.6 0-4.049-1.8-6.698-1.751-3.447.05-6.645 2-8.395 5.1-3.598 6.2-.95 15.4 2.55 20.45 1.699 2.5 3.747 5.25 6.445 5.151 2.55-.1 3.549-1.65 6.647-1.65 3.097 0 3.997 1.65 6.696 1.6 2.798-.05 4.548-2.5 6.247-5 1.95-2.85 2.747-5.6 2.797-5.75-.05-.05-5.396-2.101-5.446-8.251-.05-5.15 4.198-7.6 4.398-7.751-2.399-3.548-6.147-3.948-7.447-4.048" fill="#000"></path></g></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-ideal-m" class="icon icon--full-color" height="24" role="img" viewbox="0 0 38 24" width="38" xmlns="http://www.w3.org/2000/svg"><title id="pi-ideal-m">iDEAL Wero</title><path d="M35 0H3C1.3 0 0 1.3 0 3V21C0 22.7 1.4 24 3 24H35C36.7 24 38 22.7 38 21V3C38 1.3 36.6 0 35 0Z" fill="black" opacity="0.07"></path><path d="M35 1C36.1 1 37 1.9 37 3V21C37 22.1 36.1 23 35 23H3C1.9 23 1 22.1 1 21V3C1 1.9 1.9 1 3 1H35Z" fill="#FFF48D"></path><path d="M7.29413 8.95133V16.0203H10.385C13.1918 16.0203 14.4087 14.4422 14.4087 12.2112C14.4087 9.98022 13.1911 8.41901 10.385 8.41901H7.82926C7.53259 8.41901 7.29413 8.66027 7.29413 8.95204V8.95133Z" fill="#CC0066"></path><path d="M31.45 12.2209C31.45 11.1773 32.1926 10.2264 33.4749 10.2264C34.7572 10.2264 35.5053 11.178 35.5053 12.2209C35.5053 13.2638 34.7627 14.2154 33.4749 14.2154C32.1926 14.2154 31.45 13.2638 31.45 12.2209ZM30.6615 12.9619C31.0889 12.7185 31.3455 12.2537 31.3455 11.7404C31.3455 10.9784 30.7948 10.3294 29.94 10.3294H28.1452V14.1132H29.2567V13.146H29.4649L30.1006 14.1132H31.4095L30.6615 12.9619Z" fill="#1D1C1C"></path></svg></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="text-center pt-6 mt-4">
+<p class="text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">Full Drive Guarantee · 90 Days · Return even the empty bottles · Full Refund Swiftly</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 6: Icon Strip -->
+<section class="bg-brand-primary py-10 text-white">
+<div class="max-w-[1280px] mx-auto px-8 flex justify-between items-center flex-wrap gap-8" id="icon-strip">
+<div class="flex flex-col items-center gap-4 w-36">
+<div class="w-20 h-20 rounded-full border-2 border-white flex items-center justify-center bg-white/10">
+<i class="fa-solid fa-leaf text-3xl"></i>
+</div>
+<span class="text-[16px] font-bold uppercase tracking-wider text-center">GMO FREE</span>
+</div>
+<div class="flex flex-col items-center gap-4 w-36">
+<div class="w-20 h-20 rounded-full border-2 border-white flex items-center justify-center bg-white/10">
+<i class="fa-solid fa-certificate text-3xl"></i>
+</div>
+<span class="text-[16px] font-bold uppercase tracking-wider text-center">3RD PARTY TESTED</span>
+</div>
+<div class="flex flex-col items-center gap-4 w-36">
+<div class="w-20 h-20 rounded-full border-2 border-white flex items-center justify-center bg-white/10">
+<i class="fa-solid fa-seedling text-3xl"></i>
+</div>
+<span class="text-[16px] font-bold uppercase tracking-wider text-center">SOY FREE</span>
+</div>
+<div class="flex flex-col items-center gap-4 w-36">
+<div class="w-20 h-20 rounded-full border-2 border-white flex items-center justify-center bg-white/10">
+<i class="fa-solid fa-wheat-awn text-3xl"></i>
+</div>
+<span class="text-[16px] font-bold uppercase tracking-wider text-center">GLUTEN FREE</span>
+</div>
+<div class="flex flex-col items-center gap-4 w-36">
+<div class="w-20 h-20 rounded-full border-2 border-white flex items-center justify-center bg-white/10">
+<i class="fa-solid fa-carrot text-3xl"></i>
+</div>
+<span class="text-[16px] font-bold uppercase tracking-wider text-center">VEGAN</span>
+</div>
+</div>
+</section>
+<!-- Section 7: Results / Testimonials -->
+<section class="py-24 bg-brand-bg text-center">
+<div class="max-w-[1440px] mx-auto px-8">
+<div class="mb-4 flex justify-center">
+<span class="pill-badge">14,000+ MEN ON THE PROTOCOL</span>
+</div>
+<h2 class="text-[48px] md:text-[58px] leading-[0.95] mb-6 font-heading text-[#0F0F0F] uppercase">
+                Real Men, <span class="underline-highlight">Drive Coming Back</span>
+</h2>
+<p class="text-[#0F0F0F] max-w-2xl mx-auto mb-16 px-4 text-[19px] leading-[1.5]">
+                Executives. Engineers. Tradesmen. Men who built their careers on energy, drive, and presence — and watched the drift roll in. Here's what happened when they started raising the floor on all four factors at once.
+            </p>
+<!-- Testimonial grid (desktop) -->
+<div class="hidden md:grid grid-cols-2 md:grid-cols-5 gap-4 mb-16 px-4 items-start">
+<figure class="relative overflow-hidden border-2 border-[#0F0F0F] aspect-square">
+<img alt="Mark T., 51 — Executive testimonial portrait" class="w-full h-full object-cover" loading="lazy" src="/public/assets/abc7f030-370b-45f1-a107-22ee3f2f8b47"/>
+<span class="absolute top-2 right-2 bg-[#E51E25] text-white text-[8px] font-heading tracking-widest uppercase px-1.5 py-0.5 flex items-center gap-1"><i class="fa-solid fa-circle-check text-[8px]"></i> Verified</span>
+<figcaption class="absolute bottom-0 left-0 right-0 bg-[#0F0F0F]/85 text-[#F4F0E8] py-2 px-3 text-center">
+<span class="font-heading text-[14px] block leading-tight">Mark T., 51</span>
+<span class="font-mono text-[9px] opacity-70 tracking-widest uppercase">Executive · Verified Buyer</span>
+</figcaption>
+</figure>
+<figure class="relative overflow-hidden border-2 border-[#0F0F0F] aspect-square">
+<img alt="Tom, 52 — Engineer testimonial portrait" class="w-full h-full object-cover" loading="lazy" src="/public/assets/abfa1b5b-dbf6-4e37-93e4-708fd8f1d13a"/>
+<span class="absolute top-2 right-2 bg-[#E51E25] text-white text-[8px] font-heading tracking-widest uppercase px-1.5 py-0.5 flex items-center gap-1"><i class="fa-solid fa-circle-check text-[8px]"></i> Verified</span>
+<figcaption class="absolute bottom-0 left-0 right-0 bg-[#0F0F0F]/85 text-[#F4F0E8] py-2 px-3 text-center">
+<span class="font-heading text-[14px] block leading-tight">Tom, 52</span>
+<span class="font-mono text-[9px] opacity-70 tracking-widest uppercase">Engineer · Verified Buyer</span>
+</figcaption>
+</figure>
+<figure class="relative overflow-hidden border-2 border-[#0F0F0F] aspect-square">
+<img alt="Dave, 47 — Tradesman testimonial portrait" class="w-full h-full object-cover" loading="lazy" src="/public/assets/2c3550d2-ade4-4f53-8b43-cc6d6a040ca2"/>
+<span class="absolute top-2 right-2 bg-[#E51E25] text-white text-[8px] font-heading tracking-widest uppercase px-1.5 py-0.5 flex items-center gap-1"><i class="fa-solid fa-circle-check text-[8px]"></i> Verified</span>
+<figcaption class="absolute bottom-0 left-0 right-0 bg-[#0F0F0F]/85 text-[#F4F0E8] py-2 px-3 text-center">
+<span class="font-heading text-[14px] block leading-tight">Dave, 47</span>
+<span class="font-mono text-[9px] opacity-70 tracking-widest uppercase">Tradesman · Verified Buyer</span>
+</figcaption>
+</figure>
+<figure class="relative overflow-hidden border-2 border-[#0F0F0F] aspect-square">
+<img alt="Chris, 56 — Founder testimonial portrait" class="w-full h-full object-cover" loading="lazy" src="/public/assets/f267ff8d-5a09-45db-beab-fd90d2a8bd73"/>
+<span class="absolute top-2 right-2 bg-[#E51E25] text-white text-[8px] font-heading tracking-widest uppercase px-1.5 py-0.5 flex items-center gap-1"><i class="fa-solid fa-circle-check text-[8px]"></i> Verified</span>
+<figcaption class="absolute bottom-0 left-0 right-0 bg-[#0F0F0F]/85 text-[#F4F0E8] py-2 px-3 text-center">
+<span class="font-heading text-[14px] block leading-tight">Chris, 56</span>
+<span class="font-mono text-[9px] opacity-70 tracking-widest uppercase">Founder · Verified Buyer</span>
+</figcaption>
+</figure>
+<figure class="relative overflow-hidden border-2 border-[#0F0F0F] aspect-square">
+<img alt="Jim, 51 — Operations VP testimonial portrait" class="w-full h-full object-cover" loading="lazy" src="/public/assets/06b46c40-b7ea-42c3-9cf4-19e884f2c855"/>
+<span class="absolute top-2 right-2 bg-[#E51E25] text-white text-[8px] font-heading tracking-widest uppercase px-1.5 py-0.5 flex items-center gap-1"><i class="fa-solid fa-circle-check text-[8px]"></i> Verified</span>
+<figcaption class="absolute bottom-0 left-0 right-0 bg-[#0F0F0F]/85 text-[#F4F0E8] py-2 px-3 text-center">
+<span class="font-heading text-[14px] block leading-tight">Jim, 51</span>
+<span class="font-mono text-[9px] opacity-70 tracking-widest uppercase">Ops VP · Verified Buyer</span>
+</figcaption>
+</figure>
+</div>
+<!-- Mobile carousel -->
+<div class="md:hidden relative max-w-md mx-auto mb-16 px-4" id="rp-carousel">
+<figure class="relative overflow-hidden border-2 border-[#0F0F0F] aspect-square" id="rp-main-image">
+<img alt="Mark T., 51 — Executive" class="w-full h-full object-cover" id="rp-img" src="/public/assets/abc7f030-370b-45f1-a107-22ee3f2f8b47"/>
+<figcaption class="absolute bottom-0 left-0 right-0 bg-[#0F0F0F]/85 text-[#F4F0E8] py-3 px-4 text-center">
+<span class="font-heading text-[16px] block leading-tight" id="rp-name">Mark T., 51</span>
+<span class="font-mono text-[10px] opacity-70 tracking-widest uppercase" id="rp-role">Executive</span>
+</figcaption>
+<button aria-label="Previous" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#F4F0E8]/95 hover:bg-[#F4F0E8] shadow flex items-center justify-center text-[#0F0F0F]" id="rp-prev" style="border-radius:2px;" type="button">
+<i class="fa-solid fa-chevron-left"></i>
+</button>
+<button aria-label="Next" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#F4F0E8]/95 hover:bg-[#F4F0E8] shadow flex items-center justify-center text-[#0F0F0F]" id="rp-next" style="border-radius:2px;" type="button">
+<i class="fa-solid fa-chevron-right"></i>
+</button>
+</figure>
+<div class="flex justify-center gap-2 mt-4" id="rp-dots"></div>
+</div>
+<script>
+            (function(){
+                var slides = [
+                    { name: 'Mark T., 51', role: 'Executive',  src: '/public/assets/abc7f030-370b-45f1-a107-22ee3f2f8b47' },
+                    { name: 'Tom, 52',  role: 'Engineer',   src: '/public/assets/abfa1b5b-dbf6-4e37-93e4-708fd8f1d13a' },
+                    { name: 'Dave, 47', role: 'Tradesman',  src: '/public/assets/2c3550d2-ade4-4f53-8b43-cc6d6a040ca2' },
+                    { name: 'Chris, 56',role: 'Founder',    src: '/public/assets/f267ff8d-5a09-45db-beab-fd90d2a8bd73' },
+                    { name: 'Jim, 51',  role: 'Ops VP',     src: '/public/assets/06b46c40-b7ea-42c3-9cf4-19e884f2c855' }
+                ];
+                var idx = 0;
+                var img = document.getElementById('rp-img');
+                var nm = document.getElementById('rp-name');
+                var rl = document.getElementById('rp-role');
+                var dots = document.getElementById('rp-dots');
+                if (!img || !dots) return;
+                function render(){
+                    img.src = slides[idx].src;
+                    img.alt = slides[idx].name + ' — ' + slides[idx].role;
+                    nm.textContent = slides[idx].name;
+                    rl.textContent = slides[idx].role;
+                    Array.prototype.forEach.call(dots.children, function(d, i){
+                        d.className = 'w-2.5 h-2.5 transition-colors ' + (i === idx ? 'bg-[#E51E25]' : 'bg-[#8A847B]');
+                    });
+                }
+                for (var i = 0; i < slides.length; i++){
+                    (function(i){
+                        var b = document.createElement('button');
+                        b.type = 'button';
+                        b.addEventListener('click', function(){ idx = i; render(); });
+                        dots.appendChild(b);
+                    })(i);
+                }
+                var prev = document.getElementById('rp-prev');
+                var next = document.getElementById('rp-next');
+                if (prev) prev.addEventListener('click', function(){ idx = (idx - 1 + slides.length) % slides.length; render(); });
+                if (next) next.addEventListener('click', function(){ idx = (idx + 1) % slides.length; render(); });
+                render();
+            })();
+            </script>
+<div class="inline-block">
+<a class="cta-button px-12" href="#shop" id="results-cta" rel="nofollow">
+                    START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 8: Us vs Them -->
+<section class="py-24 bg-white relative">
+<div class="max-w-[1280px] mx-auto px-8">
+<h2 class="text-[42px] md:text-[58px] leading-[0.95] font-heading text-[#0F0F0F] uppercase text-center mb-12">
+                Why Choose <span class="text-[#E51E25]">Tenor?</span>
+</h2>
+</div>
+<div class="max-w-[1280px] mx-auto px-8 flex flex-col-reverse md:flex-row gap-16 items-center">
+<!-- Table Side -->
+<div class="w-full md:w-1/2">
+<table class="w-full border-2 border-[#0F0F0F] shadow-card overflow-hidden border-collapse" id="comparison-table" style="border-spacing:0;">
+<colgroup>
+<col class="w-[42%]"/>
+<col class="w-[29%]" style="background-color:#F4F0E8;"/>
+<col class="w-[29%]"/>
+</colgroup>
+<thead>
+<tr class="text-sm font-bold">
+<th class="p-6 bg-white"></th>
+<th class="p-6 text-center border-x-2 border-[#0F0F0F]">
+<span class="font-heading text-[#0F0F0F] text-[22px] tracking-tight">TENOR</span>
+<h3 class="sr-only">Tenor</h3>
+</th>
+<th class="p-6 text-center text-[#8A847B] uppercase bg-white font-mono tracking-widest text-[12px]">OTHERS</th>
+</tr>
+</thead>
+<tbody class="text-[15px] font-medium">
+<tr class="border-t-2 border-[#0F0F0F]">
+<td class="p-6 text-[#0F0F0F]">Built for the drift · andropause-aware</td>
+<td class="p-6 text-center border-x-2 border-[#0F0F0F]">
+<i class="fa-solid fa-circle-check text-[#E51E25] text-xl"></i>
+</td>
+<td class="p-6 text-center">
+<i class="fa-regular fa-circle-xmark text-[#8A847B] text-xl"></i>
+</td>
+</tr>
+<tr class="border-t-2 border-[#0F0F0F]">
+<td class="p-6 text-[#0F0F0F]">Addresses all 4 factors, not just T</td>
+<td class="p-6 text-center border-x-2 border-[#0F0F0F]">
+<i class="fa-solid fa-circle-check text-[#E51E25] text-xl"></i>
+</td>
+<td class="p-6 text-center">
+<i class="fa-regular fa-circle-xmark text-[#8A847B] text-xl"></i>
+</td>
+</tr>
+<tr class="border-t-2 border-[#0F0F0F]">
+<td class="p-6 text-[#0F0F0F]">Former Internal Medicine MD formulated</td>
+<td class="p-6 text-center border-x-2 border-[#0F0F0F]">
+<i class="fa-solid fa-circle-check text-[#E51E25] text-xl"></i>
+</td>
+<td class="p-6 text-center">
+<i class="fa-regular fa-circle-xmark text-[#8A847B] text-xl"></i>
+</td>
+</tr>
+<tr class="border-t-2 border-[#0F0F0F]">
+<td class="p-6 text-[#0F0F0F]">No prescription · no clinic · no needles</td>
+<td class="p-6 text-center border-x-2 border-[#0F0F0F]">
+<i class="fa-solid fa-circle-check text-[#E51E25] text-xl"></i>
+</td>
+<td class="p-6 text-center">
+<i class="fa-regular fa-circle-xmark text-[#8A847B] text-xl"></i>
+</td>
+</tr>
+<tr class="border-t-2 border-[#0F0F0F]">
+<td class="p-6 text-[#0F0F0F]">Full Drive Guarantee · 90 days</td>
+<td class="p-6 text-center border-x-2 border-[#0F0F0F]">
+<i class="fa-solid fa-circle-check text-[#E51E25] text-xl"></i>
+</td>
+<td class="p-6 text-center">
+<i class="fa-regular fa-circle-xmark text-[#8A847B] text-xl"></i>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Text Side -->
+<div class="w-full md:w-1/2 text-center md:text-left flex flex-col items-center md:items-start pl-0 md:pl-16">
+<div class="mb-4">
+<span class="pill-badge">WHY TENOR?</span>
+</div>
+<h2 class="text-[48px] md:text-[58px] leading-[0.95] mb-6 font-heading text-[#0F0F0F] uppercase">
+                    Us vs. <span class="underline-highlight">Them</span>
+</h2>
+<p class="text-[#0F0F0F] mb-10 max-w-md text-[19px] leading-[1.5]">
+                    Most "test boosters" target one lever. TRT replaces testosterone directly but ignores aromatase, cortisol, and DHEA. Tenor is the only protocol built around all four factors of the Vanishing Cascade — priced and formulated for the man who hasn't decided to go the clinic route.
+                </p>
+<div class="inline-block w-full max-w-[520px]">
+<a class="cta-button w-full" href="#shop" id="comparison-cta" rel="nofollow">
+                        START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 9: Bestseller Banner -->
+<section class="bg-[#0F0F0F] py-20 text-center text-white border-y-2 border-[#E51E25]">
+<div class="max-w-[800px] mx-auto px-8 flex flex-col items-center">
+<div class="flex items-center gap-4 mb-3 flex-wrap justify-center">
+<span class="text-[14px] font-heading uppercase tracking-widest text-[#E51E25]">14,000+ MEN</span>
+<span class="border-2 border-[#E51E25] text-white px-5 py-1.5 text-[14px] font-heading uppercase tracking-widest" style="border-radius:2px;">#1 Men's 4-Factor Protocol</span>
+</div>
+<h2 class="text-[48px] md:text-[64px] leading-[0.95] mb-6 font-heading uppercase">
+                Feel Like <span class="text-[#E51E25]">Yourself Again.</span>
+</h2>
+<p class="text-[#F4F0E8]/80 mb-12 max-w-xl mx-auto text-[19px] leading-[1.5]">
+                The 4-Factor Vanishing Cascade doesn't reverse on its own. Two capsules every morning raises the floor on all four levers at once. Most men feel the afternoon wall soften between Day 14 and Day 30. The full arc lands at 90 days.
+            </p>
+<div class="inline-block">
+<a class="bg-[#E51E25] text-white px-12 py-4 font-heading inline-flex items-center gap-2 hover:bg-[#B8141A] transition shadow-lg uppercase tracking-widest" href="#shop" id="bestseller-cta" rel="nofollow" style="border-radius:2px;">
+                    START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#F4F0E8]/80 font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 10: Expert Designed / Founder -->
+<section class="py-24 bg-brand-bg text-center">
+<div class="max-w-[1000px] mx-auto px-8">
+<div class="flex items-center justify-center gap-4 mb-4 uppercase tracking-wide flex-wrap">
+<span class="text-[18px] font-heading text-[#E51E25] tracking-widest">DOCTOR DESIGNED</span>
+<span class="border-2 border-[#0F0F0F] px-4 py-1.5 text-[14px] font-heading text-[#0F0F0F] tracking-widest" style="border-radius:2px;">4-FACTOR PROTOCOL</span>
+</div>
+<h2 class="text-[48px] md:text-[58px] leading-[0.95] mb-6 font-heading text-[#0F0F0F] uppercase">
+                Built By A Man Who <span class="underline-highlight">Lived It</span>
+</h2>
+<p class="text-[#0F0F0F] max-w-2xl mx-auto mb-16 px-4 text-[19px] leading-[1.5]">
+                Dr. Adam Reese spent 14 years as an internal medicine physician. At 47, his own labs came back "normal." He didn't feel normal. He became his own case study.
+            </p>
+<!-- Founder Authority Card PLACEHOLDER — see IMAGE-BRIEF.md #founder-portrait -->
+<div class="bg-[#ECE6D8] overflow-hidden flex flex-col md:flex-row max-w-4xl mx-auto mb-16 shadow-sm border-2 border-[#0F0F0F]" style="border-radius:2px;">
+<div class="w-full md:w-5/12 h-[380px] md:h-auto overflow-hidden relative">
+<img alt="Dr. Adam Reese — home office, bookshelves, pressed oxford shirt, calm composed expression" class="w-full h-full object-cover" loading="lazy" src="/public/assets/6306426d-5679-48b5-b7bd-fcdc51e84910"/>
+<div class="absolute bottom-4 left-4 bg-[#F4F0E8] px-4 py-1.5 text-[11px] font-heading text-[#0F0F0F] flex items-center gap-2 shadow-sm tracking-widest uppercase" style="border-radius:2px;">
+<i class="fa-solid fa-circle-check text-[#E51E25]"></i>
+                        14 YEARS · INTERNAL MEDICINE
+                    </div>
+</div>
+<div class="w-full md:w-7/12 p-12 flex flex-col justify-center items-start text-left relative">
+<div class="pill-badge mb-6">
+<i class="fa-solid fa-user-doctor"></i> Founder · MD · Former IM Physician
+                    </div>
+<div aria-hidden="true" class="text-[#E51E25] font-heading select-none" style="font-size:56px; line-height:0.7; margin-bottom:-18px;">“</div>
+<p class="text-[#0F0F0F] text-[22px] leading-[1.45] mt-0 mb-2 font-medium">
+                        I was 47 when my labs came back "normal." I'm an MD. I know what normal means. I also knew I didn't feel normal. The 4-Factor Vanishing Cascade was hiding in plain sight. Tenor is the protocol I built for myself first.
+                    </p>
+<div aria-hidden="true" class="text-[#E51E25] font-heading select-none mb-8 self-end" style="font-size:56px; line-height:0.7;">”</div>
+<div class="font-heading text-[#0F0F0F] text-[17px] mb-1 flex items-center gap-2 uppercase tracking-wide">
+                        Dr. Adam Reese, MD <i class="fa-solid fa-circle-check text-[#E51E25] text-sm"></i>
+</div>
+<div class="text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">Former Internal Medicine Physician · Tenor Founder</div>
+</div>
+</div>
+<div class="inline-block w-full max-w-[520px]">
+<a class="cta-button w-full whitespace-nowrap" href="#shop" id="expert-cta" rel="nofollow">
+                    START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 11: FAQ -->
+<section class="py-24 bg-white border-t-2 border-[#0F0F0F]">
+<div class="max-w-[1280px] mx-auto px-8 flex flex-col md:flex-row gap-16">
+<div class="w-full md:w-1/3">
+<h2 class="text-[48px] md:text-[58px] leading-[0.95] mb-6 font-heading text-[#0F0F0F] uppercase">
+                    Any Last <br class="hidden md:block"/> <span class="underline-highlight">Questions?</span>
+</h2>
+<p class="text-[#0F0F0F] mb-10 text-[19px] leading-[1.5]">
+                    Everything men ask before starting the Full Drive Protocol. Answered straight.
+                </p>
+<div class="w-full max-w-[520px] mx-auto md:mx-0">
+<a class="cta-button w-full" href="#shop" id="faq-cta" rel="nofollow">
+                        START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-2 mt-4 text-[13px] text-[#8A847B] font-mono tracking-wide uppercase">
+<i class="fa-regular fa-circle-check"></i>
+<span>90-Day Guarantee</span>
+</div>
+</div>
+</div>
+<div class="w-full md:w-2/3 space-y-4" id="faq-container">
+<div class="bg-[#ECE6D8] border-2 border-[#0F0F0F] p-6 faq-item" onclick="toggleFaq(this)" style="border-radius:2px;">
+<div class="flex justify-between items-center cursor-pointer mb-2">
+<h4 class="font-heading text-[#0F0F0F] pr-8 uppercase text-[17px]">Mike from Austin asks — "Isn't this just another test booster?"</h4>
+<i class="fa-solid fa-minus text-[#E51E25] faq-icon"></i>
+</div>
+<p class="text-[#0F0F0F] text-[16px] pr-12 leading-[1.55] faq-answer">
+                        Test boosters push one lever. Tenor is what we built for men who tried that route and still felt the drift roll in. Same reason you're reading this. You don't need a fifth bottle — you need the one that actually moves the needle, so you stop thinking <em>something's off</em> and get back to the life you built.
+                    </p>
+</div>
+<div class="bg-[#ECE6D8] border-2 border-[#0F0F0F] p-6 faq-item" onclick="toggleFaq(this)" style="border-radius:2px;">
+<div class="flex justify-between items-center cursor-pointer">
+<h4 class="font-heading text-[#0F0F0F] pr-8 uppercase text-[17px]">Steve from Minneapolis asks — "Will my doctor approve?"</h4>
+<i class="fa-solid fa-plus text-[#E51E25] faq-icon"></i>
+</div>
+<p class="text-[#0F0F0F] text-[16px] pr-12 leading-[1.55] faq-answer" style="display:none;">
+                        Most PCPs don't screen for the 4-Factor Cascade — they order total T and call it done. The Tenor ingredients (tongkat ali, adaptogens, zinc, boron, maca) have decades of human-trial data and no known clinically significant interaction with common medications. Show your doctor. Bring the formulation panel. Dr. Reese built this to be hand-to-any-physician ready.
+                    </p>
+</div>
+<div class="bg-[#ECE6D8] border-2 border-[#0F0F0F] p-6 faq-item" onclick="toggleFaq(this)" style="border-radius:2px;">
+<div class="flex justify-between items-center cursor-pointer">
+<h4 class="font-heading text-[#0F0F0F] pr-8 uppercase text-[17px]">Jim from Cleveland asks — "I'm on TRT. Can I take this too?"</h4>
+<i class="fa-solid fa-plus text-[#E51E25] faq-icon"></i>
+</div>
+<p class="text-[#0F0F0F] text-[16px] pr-12 leading-[1.55] faq-answer" style="display:none;">
+                        TRT directly replaces testosterone. Tenor raises the hormonal floor across all four cascade factors — aromatase balance, cortisol, DHEA substrate — independently of the T replacement itself. Many men on TRT still feel drift at 3pm because the other three factors weren't addressed. Tenor layers in cleanly. Talk to your TRT clinician if you're actively titrating dose.
+                    </p>
+</div>
+<div class="bg-[#ECE6D8] border-2 border-[#0F0F0F] p-6 faq-item" onclick="toggleFaq(this)" style="border-radius:2px;">
+<div class="flex justify-between items-center cursor-pointer">
+<h4 class="font-heading text-[#0F0F0F] pr-8 uppercase text-[17px]">Dave from Raleigh asks — "How long until I feel something?"</h4>
+<i class="fa-solid fa-plus text-[#E51E25] faq-icon"></i>
+</div>
+<p class="text-[#0F0F0F] text-[16px] pr-12 leading-[1.55] faq-answer" style="display:none;">
+                        Most men feel the afternoon wall soften between Day 14 and Day 30. That's how long it takes the hormonal cofactor stack to accumulate. Month 2, drive starts returning. Month 3 is when most men say they finally feel like themselves. This isn't a stimulant — it's a floor-raiser. If you don't feel the shift by 90 days, the guarantee gives every penny back.
+                    </p>
+</div>
+<div class="bg-[#ECE6D8] border-2 border-[#0F0F0F] p-6 faq-item" onclick="toggleFaq(this)" style="border-radius:2px;">
+<div class="flex justify-between items-center cursor-pointer">
+<h4 class="font-heading text-[#0F0F0F] pr-8 uppercase text-[17px]">Paul from Denver asks — "Just two capsules? That's serious?"</h4>
+<i class="fa-solid fa-plus text-[#E51E25] faq-icon"></i>
+</div>
+<p class="text-[#0F0F0F] text-[16px] pr-12 leading-[1.55] faq-answer" style="display:none;">
+                        Serious is the doses — primary ingredients printed on the panel, not hidden in a proprietary blend. The format is two capsules because the only protocol that works is the one you take every morning. Bro-powders sit in the cabinet. Pre-workout cycles get abandoned by week three. One morning dose with coffee doesn't.
+                    </p>
+</div>
+<div class="bg-[#ECE6D8] border-2 border-[#0F0F0F] p-6 faq-item" onclick="toggleFaq(this)" style="border-radius:2px;">
+<div class="flex justify-between items-center cursor-pointer">
+<h4 class="font-heading text-[#0F0F0F] pr-8 uppercase text-[17px]">Chris from Boston asks — "What if it doesn't work for me?"</h4>
+<i class="fa-solid fa-plus text-[#E51E25] faq-icon"></i>
+</div>
+<p class="text-[#0F0F0F] text-[16px] pr-12 leading-[1.55] faq-answer" style="display:none;">
+                        Send every bottle back — empty ones included — within 90 days. Full refund swiftly. No questions, no survey, no "what went wrong" phone call. Email and you're refunded. That's the guarantee.
+                    </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer / Newsletter -->
+<footer class="bg-[#0F0F0F] pt-20 pb-10 border-t-2 border-[#E51E25] text-[#F4F0E8]">
+<div class="max-w-[1280px] mx-auto px-8">
+<div class="text-center mb-20 max-w-xl mx-auto">
+<h2 class="text-[40px] md:text-[52px] leading-[0.95] mb-4 font-heading uppercase">
+                    Join 14,000+ Men <span class="text-[#E51E25]">Raising The Floor</span>
+</h2>
+<p class="text-[#F4F0E8]/80 mb-8 text-[17px] leading-[1.5]">
+                    Full Drive Protocol updates · restock alerts · Dr. Reese's andropause research notes
+                </p>
+<div class="flex flex-col md:flex-row gap-4">
+<input class="flex-1 border-2 border-[#E51E25] bg-[#0F0F0F] text-[#F4F0E8] placeholder-[#8A847B] px-6 py-3 outline-none focus:bg-[#1A1A1A] font-mono tracking-wide" placeholder="Email address" style="border-radius:2px;" type="email"/>
+<button class="bg-[#E51E25] text-white font-heading px-8 py-3 hover:bg-[#B8141A] transition uppercase tracking-widest" style="border-radius:2px;">
+                        Subscribe
+                    </button>
+</div>
+</div>
+<!-- Footer Links -->
+<div class="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-[#2A2A2A]">
+<div class="mb-6 md:mb-0 w-full md:w-auto text-center md:text-left">
+<span class="font-heading text-[#F4F0E8] text-[28px] tracking-tight">TENOR</span>
+<div class="font-mono text-[11px] text-[#E51E25] tracking-widest uppercase mt-1">The Full Drive Protocol</div>
+</div>
+<div class="flex gap-8 text-sm font-heading text-[#F4F0E8] uppercase tracking-widest mb-6 md:mb-0 justify-center md:justify-end w-full md:w-auto">
+<a class="hover:text-[#E51E25] text-center" href="contact-us" id="footer-contact-link" rel="nofollow">Contact</a>
+<a class="hover:text-[#E51E25] text-center" href="#shop" id="footer-shop-link" rel="nofollow">Shop</a>
+<a class="hover:text-[#E51E25] text-center" href="#" rel="nofollow">FAQ</a>
+</div>
+</div>
+<div class="flex flex-col md:flex-row justify-between items-center mt-8 text-[12px] text-[#8A847B] font-mono tracking-wide uppercase">
+<div class="text-center md:text-left">© 2026 Tenor · All rights reserved</div>
+<div class="flex gap-4 text-base my-4 md:my-0 justify-center">
+<i class="fa-brands fa-tiktok cursor-pointer hover:text-[#E51E25]"></i>
+<i class="fa-brands fa-instagram cursor-pointer hover:text-[#E51E25]"></i>
+<i class="fa-brands fa-facebook-f cursor-pointer hover:text-[#E51E25]"></i>
+</div>
+<div class="flex gap-4 justify-center">
+<a class="hover:text-[#E51E25]" href="terms-of-service" id="footer-terms-link" rel="nofollow">Terms</a>
+<a class="hover:text-[#E51E25]" href="privacy-policy" id="footer-privacy-link" rel="nofollow">Privacy</a>
+<a class="hover:text-[#E51E25]" href="refund-policy" id="footer-refunds-link" rel="nofollow">Refunds</a>
+</div>
+</div>
+<div class="text-center text-[11px] text-[#8A847B]/80 mt-8 max-w-3xl mx-auto leading-[1.65] font-body">
+                These statements have not been evaluated by the Food and Drug Administration. Tenor is not intended to diagnose, treat, cure, or prevent any disease. Tenor is not intended to replace medically prescribed testosterone replacement therapy. Consult your physician before beginning any supplement regimen, especially if you take prescription medications or have a pre-existing medical condition. Results vary.
+            </div>
+</div>
+</footer>
+<input id="mos-selected-flavor" type="hidden" value="watermelon"/>
+<input id="mos-selected-pack" type="hidden" value="3x"/>
+<!-- ============================================ -->
+<!-- JAVASCRIPT: Variant Selection + FAQ Toggle   -->
+<!-- ============================================ -->
+<script>
+        // ---- STATE ----
+        var selectedQty = '2x';  // default: 60 Day Supply · Most Popular (per bundle-architecture.md L35: "non-negotiable" middle-tier default)
+
+        function syncSelectedVariantInputs() {
+            var packInput = document.getElementById('mos-selected-pack');
+            if (packInput) packInput.value = selectedQty;
+        }
+
+        // ---- PLAN SELECTOR ----
+        function selectQuantity(labelEl, qty) {
+            selectedQty = qty;
+            var container = document.getElementById('quantity-selector');
+            var allCards = container.querySelectorAll('.radio-card');
+
+            allCards.forEach(function(card) {
+                card.classList.remove('selected', 'shadow-md');
+            });
+
+            var activeCard = labelEl.querySelector('.radio-card');
+            activeCard.classList.add('selected');
+            if (qty === '2x') activeCard.classList.add('shadow-md');
+
+            syncSelectedVariantInputs();
+            updateCTA();
+        }
+
+        // ---- UPDATE CTA BUTTON TEXT ----
+        function updateCTA() {
+            var btn = document.getElementById('main-cta');
+            if (!btn) return;
+            btn.innerHTML = 'START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>';
+        }
+
+        // ---- SUBSCRIBE / ONE-TIME MODE TOGGLE ----
+        (function() {
+            var container = document.getElementById('quantity-selector');
+            if (!container) return;
+            container.querySelectorAll('.mode-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var mode = btn.getAttribute('data-mode');
+                    container.setAttribute('data-mode', mode);
+                });
+            });
+        })();
+
+        // ---- FAQ ACCORDION ----
+        function toggleFaq(el) {
+            var answer = el.querySelector('.faq-answer');
+            var icon = el.querySelector('.faq-icon');
+
+            if (answer.style.display === 'none' || !answer.style.display) {
+                answer.style.display = 'block';
+                answer.style.marginTop = '8px';
+                icon.classList.remove('fa-plus');
+                icon.classList.add('fa-minus');
+            } else {
+                answer.style.display = 'none';
+                icon.classList.remove('fa-minus');
+                icon.classList.add('fa-plus');
+            }
+        }
+
+        // Init CTA on load
+        updateCTA();
+        syncSelectedVariantInputs();
+
+        // ---- MOBILE QUALITY BANNER ROTATOR ----
+        (function() {
+            var mobileTrack = document.getElementById('mobile-marquee-track');
+            if (!mobileTrack) return;
+
+            var slideCount = mobileTrack.children.length;
+            if (slideCount < 2) return;
+
+            var reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+            var activeIndex = 0;
+            var timerId = null;
+            var isAnimating = false;
+            var mobileBreakpoint = 767;
+
+            function isMobileViewport() {
+                return window.innerWidth <= mobileBreakpoint;
+            }
+
+            function setTrackPosition(index, animate) {
+                mobileTrack.style.transition = animate ? 'transform 320ms ease' : 'none';
+                mobileTrack.style.transform = 'translate3d(' + (-index * 100) + '%, 0, 0)';
+            }
+
+            function stopMobileMarquee() {
+                if (timerId) {
+                    window.clearInterval(timerId);
+                    timerId = null;
+                }
+            }
+
+            function resetMobileMarquee() {
+                activeIndex = 0;
+                isAnimating = false;
+                setTrackPosition(activeIndex, false);
+            }
+
+            function startMobileMarquee() {
+                stopMobileMarquee();
+                resetMobileMarquee();
+                if (!isMobileViewport() || reducedMotionQuery.matches) return;
+
+                timerId = window.setInterval(function() {
+                    if (isAnimating) return;
+                    isAnimating = true;
+                    activeIndex += 1;
+                    setTrackPosition(activeIndex, true);
+                }, 1600);
+            }
+
+            mobileTrack.addEventListener('transitionend', function() {
+                if (activeIndex >= slideCount - 1) {
+                    activeIndex = 0;
+                    setTrackPosition(activeIndex, false);
+                }
+                isAnimating = false;
+            });
+
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    stopMobileMarquee();
+                    return;
+                }
+                startMobileMarquee();
+            });
+
+            window.addEventListener('resize', function() {
+                startMobileMarquee();
+            });
+
+            if (typeof reducedMotionQuery.addEventListener === 'function') {
+                reducedMotionQuery.addEventListener('change', startMobileMarquee);
+            } else if (typeof reducedMotionQuery.addListener === 'function') {
+                reducedMotionQuery.addListener(startMobileMarquee);
+            }
+
+            startMobileMarquee();
+        })();
+
+        // ---- PDP GALLERY: click-to-swap main image ----
+        (function() {
+            var mainImg = document.getElementById('pdp-main-img');
+            var thumbs = document.querySelectorAll('#pdp-thumbs .pdp-thumb');
+            if (!mainImg || !thumbs.length) return;
+            thumbs.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var src = btn.getAttribute('data-src');
+                    var alt = btn.getAttribute('data-alt') || '';
+                    if (!src) return;
+                    mainImg.style.opacity = '0';
+                    window.setTimeout(function() {
+                        mainImg.src = src;
+                        mainImg.alt = alt;
+                        mainImg.style.opacity = '1';
+                    }, 120);
+                    thumbs.forEach(function(b) {
+                        b.classList.remove('border-[#E51E25]');
+                        b.classList.add('border-[#0F0F0F]', 'opacity-70');
+                    });
+                    btn.classList.remove('border-[#0F0F0F]', 'opacity-70');
+                    btn.classList.add('border-[#E51E25]');
+                });
+            });
+        })();
+
+    </script>
+<!-- Mobile Sticky CTA (appears after hero scrolls out; hides when user is in #shop section) -->
+<div aria-hidden="true" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t-2 border-[#0F0F0F] px-4 py-2 shadow-[0_-6px_18px_rgba(0,0,0,0.12)]" data-visible="false" id="mobile-sticky-cta">
+<a class="cta-button w-full flex items-center justify-center gap-2 py-3 text-[15px] tracking-widest uppercase font-heading" href="#shop" rel="nofollow">
+            START THE PROTOCOL <i class="fa-solid fa-circle-arrow-right"></i>
+</a>
+<div class="flex items-center justify-center gap-1.5 mt-1.5 payment-methods">
+<i aria-hidden="true" class="fa-solid fa-lock text-[#8A847B] text-[10px]"></i>
+<span class="text-[9px] text-[#8A847B] font-mono tracking-widest uppercase mr-1">Secure Checkout</span>
+<ul class="payment-methods__list flex items-center gap-1 list-none p-0 m-0">
+<li class="payment-methods__icon"><svg aria-labelledby="pi-visa-s" class="icon icon--full-color" height="18" role="img" viewbox="0 0 38 24" width="28" xmlns="http://www.w3.org/2000/svg"><title id="pi-visa-s">Visa</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3z" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32" fill="#fff"></path><path d="M28.3 10.1H28c-.4 1-.7 1.5-1 3h1.9c-.3-1.5-.3-2.2-.6-3zm2.9 5.9h-1.7c-.1 0-.1 0-.2-.1l-.2-.9-.1-.2h-2.4c-.1 0-.2 0-.2.2l-.3.9c0 .1-.1.1-.1.1h-2.1l.2-.5L27 8.7c0-.5.3-.7.8-.7h1.5c.1 0 .2 0 .2.2l1.4 6.5c.1.4.2.7.2 1.1.1.1.1.1.1.2zm-13.4-.3l.4-1.8c.1 0 .2.1.2.1.7.3 1.4.5 2.1.4.2 0 .5-.1.7-.2.5-.2.5-.7.1-1.1-.2-.2-.5-.3-.8-.5-.4-.2-.8-.4-1.1-.7-1.2-1-.8-2.4-.1-3.1.6-.4.9-.8 1.7-.8 1.2 0 2.5 0 3.1.2h.1c-.1.6-.2 1.1-.4 1.7-.5-.2-1-.4-1.5-.4-.3 0-.6 0-.9.1-.2 0-.3.1-.4.2-.2.2-.2.5 0 .7l.5.4c.4.2.8.4 1.1.6.5.3 1 .8 1.1 1.4.2.9-.1 1.7-.9 2.3-.5.4-.7.6-1.4.6-1.4 0-2.5.1-3.4-.2-.1.2-.1.2-.2.1zm-3.5.3c.1-.7.1-.7.2-1 .5-2.2 1-4.5 1.4-6.7.1-.2.1-.3.3-.3H18c-.2 1.2-.4 2.1-.7 3.2-.3 1.5-.6 3-1 4.5 0 .2-.1.2-.3.2M5 8.2c0-.1.2-.2.3-.2h3.4c.5 0 .9.3 1 .8l.9 4.4c0 .1 0 .1.1.2 0-.1.1-.1.1-.1l2.1-5.1c-.1-.1 0-.2.1-.2h2.1c0 .1 0 .1-.1.2l-3.1 7.3c-.1.2-.1.3-.2.4-.1.1-.3 0-.5 0H9.7c-.1 0-.2 0-.2-.2L7.9 9.5c-.2-.2-.5-.5-.9-.6-.6-.3-1.7-.5-1.9-.5L5 8.2z" fill="#142688"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-master-s" class="icon icon--full-color" height="18" role="img" viewbox="0 0 38 24" width="28" xmlns="http://www.w3.org/2000/svg"><title id="pi-master-s">Mastercard</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3z" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32" fill="#fff"></path><circle cx="15" cy="12" fill="#EB001B" r="7"></circle><circle cx="23" cy="12" fill="#F79E1B" r="7"></circle><path d="M22 12c0-2.4-1.2-4.5-3-5.7-1.8 1.3-3 3.4-3 5.7s1.2 4.5 3 5.7c1.8-1.2 3-3.3 3-5.7z" fill="#FF5F00"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-amex-s" class="icon icon--full-color" height="18" role="img" viewbox="0 0 38 24" width="28" xmlns="http://www.w3.org/2000/svg"><title id="pi-amex-s">American Express</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3Z" fill="#000" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32Z" fill="#006FCF"></path><path d="M22.012 19.936v-8.421L37 11.528v2.326l-1.732 1.852L37 17.573v2.375h-2.766l-1.47-1.622-1.46 1.628-9.292-.02Z" fill="#FFF"></path><path d="M23.013 19.012v-6.57h5.572v1.513h-3.768v1.028h3.678v1.488h-3.678v1.01h3.768v1.531h-5.572Z" fill="#006FCF"></path><path d="m28.557 19.012 3.083-3.289-3.083-3.282h2.386l1.884 2.083 1.89-2.082H37v.051l-3.017 3.23L37 18.92v.093h-2.307l-1.917-2.103-1.898 2.104h-2.321Z" fill="#006FCF"></path><path d="M22.71 4.04h3.614l1.269 2.881V4.04h4.46l.77 2.159.771-2.159H37v8.421H19l3.71-8.421Z" fill="#FFF"></path><path d="m23.395 4.955-2.916 6.566h2l.55-1.315h2.98l.55 1.315h2.05l-2.904-6.566h-2.31Zm.25 3.777.875-2.09.873 2.09h-1.748Z" fill="#006FCF"></path><path d="M28.581 11.52V4.953l2.811.01L32.84 9l1.456-4.046H37v6.565l-1.74.016v-4.51l-1.644 4.494h-1.59L30.35 7.01v4.51h-1.768Z" fill="#006FCF"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-paypal-s" class="icon icon--full-color" height="18" role="img" viewbox="0 0 38 24" width="28" xmlns="http://www.w3.org/2000/svg"><title id="pi-paypal-s">PayPal</title><path d="M35 0H3C1.3 0 0 1.3 0 3v18c0 1.7 1.4 3 3 3h32c1.7 0 3-1.3 3-3V3c0-1.7-1.4-3-3-3z" opacity=".07"></path><path d="M35 1c1.1 0 2 .9 2 2v18c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V3c0-1.1.9-2 2-2h32" fill="#fff"></path><path d="M23.9 8.3c.2-1 0-1.7-.6-2.3-.6-.7-1.7-1-3.1-1h-4.1c-.3 0-.5.2-.6.5L14 15.6c0 .2.1.4.3.4H17l.4-3.4 1.8-2.2 4.7-2.1z" fill="#003087"></path><path d="M23.9 8.3l-.2.2c-.5 2.8-2.2 3.8-4.6 3.8H18c-.3 0-.5.2-.6.5l-.6 3.9-.2 1c0 .2.1.4.3.4H19c.3 0 .5-.2.5-.4v-.1l.4-2.4v-.1c0-.2.3-.4.5-.4h.3c2.1 0 3.7-.8 4.1-3.2.2-1 .1-1.8-.4-2.4-.1-.5-.3-.7-.5-.8z" fill="#3086C8"></path><path d="M23.3 8.1c-.1-.1-.2-.1-.3-.1-.1 0-.2 0-.3-.1-.3-.1-.7-.1-1.1-.1h-3c-.1 0-.2 0-.2.1-.2.1-.3.2-.3.4l-.7 4.4v.1c0-.3.3-.5.6-.5h1.3c2.5 0 4.1-1 4.6-3.8v-.2c-.1-.1-.3-.2-.5-.2h-.1z" fill="#012169"></path></svg></li>
+<li class="payment-methods__icon"><svg aria-labelledby="pi-applepay-s" class="icon icon--full-color" height="18" role="img" version="1.1" viewbox="0 0 165.521 105.965" width="28" x="0" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" y="0"><title id="pi-applepay-s">Apple Pay</title><path d="M150.698 0H14.823c-.566 0-1.133 0-1.698.003-.477.004-.953.009-1.43.022-1.039.028-2.087.09-3.113.274a10.51 10.51 0 0 0-2.958.975 9.932 9.932 0 0 0-4.35 4.35 10.463 10.463 0 0 0-.975 2.96C.113 9.611.052 10.658.024 11.696a70.22 70.22 0 0 0-.022 1.43C0 13.69 0 14.256 0 14.823v76.318c0 .567 0 1.132.002 1.699.003.476.009.953.022 1.43.028 1.036.09 2.084.275 3.11a10.46 10.46 0 0 0 .974 2.96 9.897 9.897 0 0 0 1.83 2.52 9.874 9.874 0 0 0 2.52 1.83c.947.483 1.917.79 2.96.977 1.025.183 2.073.245 3.112.273.477.011.953.017 1.43.02.565.004 1.132.004 1.698.004h135.875c.565 0 1.132 0 1.697-.004.476-.002.952-.009 1.431-.02 1.037-.028 2.085-.09 3.113-.273a10.478 10.478 0 0 0 2.958-.977 9.955 9.955 0 0 0 4.35-4.35c.483-.947.789-1.917.974-2.96.186-1.026.246-2.074.274-3.11.013-.477.02-.954.022-1.43.004-.567.004-1.132.004-1.699V14.824c0-.567 0-1.133-.004-1.699a63.067 63.067 0 0 0-.022-1.429c-.028-1.038-.088-2.085-.274-3.112a10.4 10.4 0 0 0-.974-2.96 9.94 9.94 0 0 0-4.35-4.35A10.52 10.52 0 0 0 156.939.3c-1.028-.185-2.076-.246-3.113-.274a71.417 71.417 0 0 0-1.431-.022C151.83 0 151.263 0 150.698 0z" fill="#000"></path><path d="M150.698 3.532l1.672.003c.452.003.905.008 1.36.02.793.022 1.719.065 2.583.22.75.135 1.38.34 1.984.648a6.392 6.392 0 0 1 2.804 2.807c.306.6.51 1.226.645 1.983.154.854.197 1.783.218 2.58.013.45.019.9.02 1.36.005.557.005 1.113.005 1.671v76.318c0 .558 0 1.114-.004 1.682-.002.45-.008.9-.02 1.35-.022.796-.065 1.725-.221 2.589a6.855 6.855 0 0 1-.645 1.975 6.397 6.397 0 0 1-2.808 2.807c-.6.306-1.228.511-1.971.645-.881.157-1.847.2-2.574.22-.457.01-.912.017-1.379.019-.555.004-1.113.004-1.669.004H14.801c-.55 0-1.1 0-1.66-.004a74.993 74.993 0 0 1-1.35-.018c-.744-.02-1.71-.064-2.584-.22a6.938 6.938 0 0 1-1.986-.65 6.337 6.337 0 0 1-1.622-1.18 6.355 6.355 0 0 1-1.178-1.623 6.935 6.935 0 0 1-.646-1.985c-.156-.863-.2-1.788-.22-2.578a66.088 66.088 0 0 1-.02-1.355l-.003-1.327V14.474l.002-1.325a66.7 66.7 0 0 1 .02-1.357c.022-.792.065-1.717.222-2.587a6.924 6.924 0 0 1 .646-1.981c.304-.598.7-1.144 1.18-1.623a6.386 6.386 0 0 1 1.624-1.18 6.96 6.96 0 0 1 1.98-.646c.865-.155 1.792-.198 2.586-.22.452-.012.905-.017 1.354-.02l1.677-.003h135.875" fill="#FFF"></path><g><path d="M43.508 35.77c1.404-1.755 2.356-4.112 2.105-6.52-2.054.102-4.56 1.355-6.012 3.112-1.303 1.504-2.456 3.959-2.156 6.266 2.306.2 4.61-1.152 6.063-2.858" fill="#000"></path><path d="M45.587 39.079c-3.35-.2-6.196 1.9-7.795 1.9-1.6 0-4.049-1.8-6.698-1.751-3.447.05-6.645 2-8.395 5.1-3.598 6.2-.95 15.4 2.55 20.45 1.699 2.5 3.747 5.25 6.445 5.151 2.55-.1 3.549-1.65 6.647-1.65 3.097 0 3.997 1.65 6.696 1.6 2.798-.05 4.548-2.5 6.247-5 1.95-2.85 2.747-5.6 2.797-5.75-.05-.05-5.396-2.101-5.446-8.251-.05-5.15 4.198-7.6 4.398-7.751-2.399-3.548-6.147-3.948-7.447-4.048" fill="#000"></path></g></svg></li>
+</ul>
+</div>
+</div>
+<script>
+        // Mobile sticky CTA — standalone, scroll-only. Shows after hero scrolls out, hides when #shop is in viewport.
+        (function() {
+            var sticky = document.getElementById('mobile-sticky-cta');
+            var hero = document.getElementById('hero-section');
+            var shop = document.getElementById('shop');
+            if (!sticky || !hero) { return; }
+            function check() {
+                var heroBottom = hero.getBoundingClientRect().bottom;
+                var heroOut = heroBottom <= 0;
+                var inShop = false;
+                if (shop) {
+                    var s = shop.getBoundingClientRect();
+                    inShop = s.top < window.innerHeight * 0.9 && s.bottom > 0;
+                }
+                sticky.setAttribute('data-visible', (heroOut && !inShop) ? 'true' : 'false');
+                sticky.setAttribute('aria-hidden', (heroOut && !inShop) ? 'false' : 'true');
+            }
+            window.addEventListener('scroll', check, { passive: true });
+            window.addEventListener('resize', check);
+            document.addEventListener('DOMContentLoaded', check);
+            check();
+        })();
+    </script>
+</body>
+</html>

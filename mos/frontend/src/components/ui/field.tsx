@@ -9,15 +9,15 @@ export const FieldRoot = ({ className, ...props }: Field.Root.Props) => (
 );
 
 export const FieldLabel = ({ className, ...props }: Field.Label.Props) => (
-  <Field.Label {...props} className={cn("text-content font-medium leading-tight", className)} />
+  <Field.Label {...props} className={cn("text-[length:var(--text-md)] font-semibold leading-tight text-content", className)} />
 );
 
 export const FieldDescription = ({ className, ...props }: Field.Description.Props) => (
-  <Field.Description {...props} className={cn("-mt-1 text-xs text-content-muted leading-tight", className)} />
+  <Field.Description {...props} className={cn("-mt-1 text-sm leading-normal text-content-muted", className)} />
 );
 
 export const FieldError = ({ className, ...props }: Field.Error.Props) => (
-  <Field.Error {...props} className={cn("-mt-1 text-xs text-danger leading-tight", className)} />
+  <Field.Error {...props} className={cn("-mt-1 text-sm font-medium leading-normal text-danger", className)} />
 );
 
 export const FieldControl = Field.Control;

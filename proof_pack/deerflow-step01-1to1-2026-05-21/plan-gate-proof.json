@@ -1,0 +1,49 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "retrofit",
+  "created_at": "2026-05-21T18:43:26Z",
+  "daliogoals_skill_loaded": true,
+  "questions_asked": [],
+  "question_sufficiency_rationale": "No new user questions were needed because the task was an execution correction and all required inputs were available from local production exports, code, and user-provided API credentials.",
+  "owner": "Codex execution agent",
+  "review_date": "2026-05-21",
+  "stop_condition": "Stop after the DeerFlow DSV4 Pro Strategy V2 Step 1 run passes prompt parity, output-shape, citation, source manifest, provenance, lane, and plan contract verification, or after a reproducible blocker is recorded.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "plan-gate.md",
+      "summary": "Defines the measurable 1:1 Step 1 DeerFlow execution goal."
+    },
+    "problem_log": {
+      "path": "plan-gate.md",
+      "summary": "Records the wrong-prompt failure, shallow harness risk, file-write stall, and missing raw onboarding payload delta."
+    },
+    "root_cause_diagnosis": {
+      "path": "plan-gate.md",
+      "summary": "Names process-parity enforcement as the root cause and documents the 5-why chain."
+    },
+    "current_machine": {
+      "path": "plan-gate.md",
+      "summary": "Describes the prior ad hoc execution machine."
+    },
+    "designed_machine": {
+      "path": "plan-gate.md",
+      "summary": "Describes the proof-pack wrapper with prompt hashes, DeerFlow tools, external persistence, and validators."
+    },
+    "worst_day_test": {
+      "path": "plan-gate.md",
+      "summary": "Defines failure cases the validator must catch."
+    },
+    "leading_lagging_metrics": {
+      "path": "plan-gate.md",
+      "summary": "Defines prompt/tool/citation leading metrics and coverage/cost lagging metrics."
+    },
+    "owner_date_review": {
+      "path": "plan-gate.md",
+      "summary": "Names owner, date, and review point."
+    },
+    "stop_condition": {
+      "path": "plan-gate.md",
+      "summary": "Defines pass, blocker, and reproducible-failure stop states."
+    }
+  }
+}

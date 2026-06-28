@@ -20,7 +20,8 @@ import { isImportedTemplatePageData } from "@/components/agents/pageAgentAvailab
 import { useDesignSystems } from "@/api/designSystems";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
 import { createPuckFieldTypesPlugin } from "@/funnels/puckFieldTypesPlugin";
-import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
+import { FunnelRuntimeProvider } from "@/funnels/funnelRuntime";
+import { createFunnelPuckConfig, defaultFunnelPuckData } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildRuntimePageMap, buildRuntimePageStageMap, buildRuntimePageTypeMap } from "@/funnels/runtimePageMaps";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";

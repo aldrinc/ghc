@@ -1,0 +1,102 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - list [ref=e9]:
+        - listitem [ref=e10]:
+          - button "W" [ref=e205] [cursor=pointer]:
+            - generic [ref=e13]: W
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: Workspace
+          - list [ref=e23]:
+            - listitem [ref=e24]:
+              - button [ref=e206] [cursor=pointer]:
+                - img [ref=e28]
+            - listitem [ref=e34]:
+              - button [ref=e207] [cursor=pointer]:
+                - img [ref=e38]
+            - listitem [ref=e42]:
+              - button [ref=e208] [cursor=pointer]:
+                - img [ref=e46]
+            - listitem [ref=e50]:
+              - button [ref=e209] [cursor=pointer]:
+                - img [ref=e54]
+            - listitem [ref=e59]:
+              - button [ref=e210] [cursor=pointer]:
+                - img [ref=e63]
+            - listitem [ref=e67]:
+              - button [ref=e211] [cursor=pointer]:
+                - img [ref=e71]
+        - generic [ref=e76]:
+          - generic [ref=e77]: Research
+          - list [ref=e78]:
+            - listitem [ref=e79]:
+              - button [ref=e212] [cursor=pointer]:
+                - img [ref=e83]
+            - listitem [ref=e87]:
+              - button [ref=e213] [cursor=pointer]:
+                - img [ref=e91]
+            - listitem [ref=e95]:
+              - button [ref=e214] [cursor=pointer]:
+                - img [ref=e99]
+        - generic [ref=e102]:
+          - generic [ref=e103]: Execution
+          - list [ref=e104]:
+            - listitem [ref=e105]:
+              - button [ref=e215] [cursor=pointer]:
+                - img [ref=e109]
+            - listitem [ref=e114]:
+              - button [ref=e216] [cursor=pointer]:
+                - img [ref=e118]
+            - listitem [ref=e121]:
+              - button [ref=e217] [cursor=pointer]:
+                - img [ref=e125]
+        - generic [ref=e129]:
+          - generic [ref=e130]: AI
+          - list [ref=e131]:
+            - listitem [ref=e132]:
+              - button [ref=e218] [cursor=pointer]:
+                - img [ref=e136]
+        - generic [ref=e139]:
+          - generic [ref=e140]: Assets
+          - list [ref=e141]:
+            - listitem [ref=e142]:
+              - button [ref=e219] [cursor=pointer]:
+                - img [ref=e146]
+            - listitem [ref=e153]:
+              - button [ref=e220] [cursor=pointer]:
+                - img [ref=e157]
+      - list [ref=e162]:
+        - listitem [ref=e163]:
+          - button "Aldrin Clement" [ref=e221] [cursor=pointer]:
+            - img "Aldrin Clement" [ref=e167]
+      - button "Toggle Sidebar" [ref=e174]
+    - main [ref=e175]:
+      - generic [ref=e176]:
+        - generic [ref=e177]:
+          - button "Toggle Sidebar" [active] [ref=e178] [cursor=pointer]:
+            - img
+            - generic [ref=e179]: Toggle Sidebar
+          - navigation "breadcrumb" [ref=e180]:
+            - list [ref=e181]:
+              - listitem [ref=e182]:
+                - link "Workspaces" [ref=e183] [cursor=pointer]:
+                  - /url: /workspaces
+              - listitem [ref=e184]:
+                - img [ref=e185]
+              - listitem [ref=e187]:
+                - link "Workspace Overview" [disabled] [ref=e188]
+        - generic [ref=e189]:
+          - generic [ref=e190]: Workspace Product
+          - combobox [disabled] [ref=e191]:
+            - option "Select a workspace first" [selected]
+      - generic [ref=e193]:
+        - generic [ref=e196]:
+          - heading "Workspace overview" [level=2] [ref=e197]
+          - paragraph [ref=e198]: Select a workspace to view status and outputs.
+        - generic [ref=e200]:
+          - generic [ref=e201]:
+            - generic [ref=e202]: No workspace selected
+            - generic [ref=e203]: Choose a workspace to view status and outputs.
+          - generic [ref=e204]: No workspaces available.
+  - region "Notifications"

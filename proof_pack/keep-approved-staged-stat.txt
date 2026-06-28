@@ -1,0 +1,25 @@
+ .../alembic/versions/0096_site_funnel_variants.py  | 557 +++++++++++++++++++++
+ mos/backend/app/config.py                          |   2 +-
+ mos/backend/app/db/models.py                       | 336 ++++++++++++-
+ mos/backend/app/main.py                            |   2 +-
+ mos/backend/app/routers/campaigns.py               |  10 +
+ mos/backend/app/routers/public_sites.py            |  58 +++
+ mos/backend/app/routers/site_funnels.py            | 338 ++++++++++---
+ mos/backend/app/schemas/campaign_funnels.py        |  56 +++
+ mos/backend/app/schemas/site_funnels.py            |  87 ++++
+ mos/backend/app/services/deploy.py                 |  63 +++
+ mos/backend/app/services/hermes_sidecar.py         | 306 ++++++++++-
+ mos/backend/app/services/site_funnels.py           | 406 +++++++++++++--
+ mos/backend/app/services/site_publications.py      | 210 ++++++++
+ .../activities/campaign_intent_activities.py       |  21 +
+ .../temporal/activities/strategy_v2_activities.py  |   2 +-
+ .../workflows/campaign_funnel_generation.py        |  56 ++-
+ ...st_campaign_funnel_generation_request_schema.py |  46 ++
+ mos/backend/tests/test_config_env_precedence.py    |   4 +
+ mos/backend/tests/test_hermes_sidecar.py           | 116 +++++
+ mos/backend/tests/test_sites_api.py                | 158 ++++++
+ mos/frontend/src/api/siteFunnels.ts                | 171 +++++++
+ mos/frontend/src/lib/metaFunnelEvents.test.ts      |  19 +
+ mos/frontend/src/lib/metaFunnelEvents.ts           |   5 +-
+ .../workspaces/sites/SiteFunnelDetailPage.tsx      | 315 +++++++++++-
+ 24 files changed, 3224 insertions(+), 120 deletions(-)

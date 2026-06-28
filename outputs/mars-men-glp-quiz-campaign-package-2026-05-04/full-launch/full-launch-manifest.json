@@ -1,0 +1,2220 @@
+{
+  "createdAt": "2026-05-05T00:57:01.105Z",
+  "packageDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04",
+  "sourceCsv": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/glp-quiz-campaign-ready-expanded.csv",
+  "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+  "campaignName": "Tenor - GLP + Quiz - GPT Image 2 - 2026-05-05",
+  "generationKey": "batch:tenor-glp-quiz-gpt-image2-20260505",
+  "batchId": "tenor-glp-quiz-gpt-image2-20260505",
+  "stageOneModel": "gemini-3.1-pro-preview",
+  "renderModelId": "gpt-image-2",
+  "destinations": {
+    "glpPresaleUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+    "quizPresaleUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+    "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039"
+  },
+  "outputs": [
+    {
+      "rowKey": "01-TENOR-COPY001-C001",
+      "rowIndex": 1,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY001",
+      "remixCopyId": "TENOR-COPY001",
+      "creativeId": "C001",
+      "creativeReferenceTitle": "What GLP-1 Does to Your T Levels",
+      "creativeFile": "creatives/C001_9e8258a1f182_what-glp-1-does-to-your-t-levels.jpg",
+      "sourceCreativeSha256": "9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b",
+      "stagedSourceSha256": "9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "1d8d961c-0d5e-4117-8ec4-da18857a7496",
+        "publicId": "89a1cac9-07f0-43e7-bf46-7178a14b00f4",
+        "publicUrl": "https://api.moshq.app/public/assets/89a1cac9-07f0-43e7-bf46-7178a14b00f4",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "What GLP-1 Does to Your Drive",
+        "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine.",
+        "description": "Tenor's 21 active ingredients at disclosed doses support the systems GLP-1s quietly drain — energy, drive, stamina, and recovery. Two capsules every morning. No prescription. No needles.",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/89a1cac9-07f0-43e7-bf46-7178a14b00f4",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "What GLP-1 Does to Your Drive",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C001 / What GLP-1 Does to Your T Levels\nSource creative SHA-256: 9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b\nRemix copy: TENOR-COPY001 / What GLP-1 Does to Your Drive\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "8a11417e-1e11-44e3-a495-5dc834770016",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-81098ca1-8797-4823-9a81-6a094b02d08c",
+        "workflowUrl": "https://moshq.app/workflows/8a11417e-1e11-44e3-a495-5dc834770016",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-01-TENOR-COPY001-C001.json",
+        "payloadOut": {
+          "job_id": "openai:8317f3f2dae18b2093dfddd1f980e22ef2213f38767db54a6b231186aef0c683",
+          "asset_ids": [
+            "c15c98f1-f29f-4fd3-a9c2-37c2d608e970"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        }
+      },
+      "result": {
+        "assetId": "c15c98f1-f29f-4fd3-a9c2-37c2d608e970",
+        "publicId": "9ff4bfd6-9478-4e84-b0c8-a71eb1a6e275",
+        "publicUrl": "https://api.moshq.app/public/assets/9ff4bfd6-9478-4e84-b0c8-a71eb1a6e275",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/01-TENOR-COPY001-C001.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/01-TENOR-COPY001-C001.png",
+        "bytes": 2661287,
+        "sha256": "170de773b5c6f0fbac401f563cc4da664e7f0c704439ae6ae2ff2a62489fce3d",
+        "remoteJobId": "openai:8317f3f2dae18b2093dfddd1f980e22ef2213f38767db54a6b231186aef0c683",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false
+      }
+    },
+    {
+      "rowKey": "02-TENOR-COPY001-C002",
+      "rowIndex": 2,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY001",
+      "remixCopyId": "TENOR-COPY001",
+      "creativeId": "C002",
+      "creativeReferenceTitle": "What GLP-1 Does to Your T Levels",
+      "creativeFile": "creatives/C002_f8df570293df_what-glp-1-does-to-your-t-levels.jpg",
+      "sourceCreativeSha256": "f8df570293df9ce055d6b1c2482d5c4d08de741096ca0342c2dae12b7fb3cfb7",
+      "stagedSourceSha256": "f8df570293df9ce055d6b1c2482d5c4d08de741096ca0342c2dae12b7fb3cfb7",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "38efcbec-999f-41a4-ac28-d574dd50df4a",
+        "publicId": "e43fd12e-ec1a-4b26-ae8b-8c7c78ae3d2a",
+        "publicUrl": "https://api.moshq.app/public/assets/e43fd12e-ec1a-4b26-ae8b-8c7c78ae3d2a",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "What GLP-1 Does to Your Drive",
+        "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine.",
+        "description": "Tenor's 21 active ingredients at disclosed doses support the systems GLP-1s quietly drain — energy, drive, stamina, and recovery. Two capsules every morning. No prescription. No needles.",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/e43fd12e-ec1a-4b26-ae8b-8c7c78ae3d2a",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "What GLP-1 Does to Your Drive",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C002 / What GLP-1 Does to Your T Levels\nSource creative SHA-256: f8df570293df9ce055d6b1c2482d5c4d08de741096ca0342c2dae12b7fb3cfb7\nRemix copy: TENOR-COPY001 / What GLP-1 Does to Your Drive\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "1955065a-abec-4287-8a85-b4e8cdc37c8d",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-e1527fff-0842-4e68-be01-1faea3dafdbb",
+        "workflowUrl": "https://moshq.app/workflows/1955065a-abec-4287-8a85-b4e8cdc37c8d",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-02-TENOR-COPY001-C002.json",
+        "payloadOut": {
+          "job_id": "openai:7497d3d85e462a875651e44f8d2a025b02a959d455cf63eafb525dadae726183",
+          "asset_ids": [
+            "dfc8b437-2c97-4e28-9b12-80ec4822b0ee"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        }
+      },
+      "result": {
+        "assetId": "dfc8b437-2c97-4e28-9b12-80ec4822b0ee",
+        "publicId": "ce792900-8017-4b29-90ce-e56d05c62cd9",
+        "publicUrl": "https://api.moshq.app/public/assets/ce792900-8017-4b29-90ce-e56d05c62cd9",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/02-TENOR-COPY001-C002.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/02-TENOR-COPY001-C002.png",
+        "bytes": 2066779,
+        "sha256": "63f7110b83a7b0c6611b714af095e8723ae353b52140dbbfa9958f336e60366b",
+        "remoteJobId": "openai:7497d3d85e462a875651e44f8d2a025b02a959d455cf63eafb525dadae726183",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false
+      }
+    },
+    {
+      "rowKey": "03-TENOR-COPY001-C004",
+      "rowIndex": 3,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY001",
+      "remixCopyId": "TENOR-COPY001",
+      "creativeId": "C004",
+      "creativeReferenceTitle": "What GLP-1 Does to Your T Levels",
+      "creativeFile": "creatives/C004_800f664d3e77_what-glp-1-does-to-your-t-levels.jpg",
+      "sourceCreativeSha256": "800f664d3e776da3c5180980cc42e36ba5e4c3192cffe8565ebe4f4bdbe57274",
+      "stagedSourceSha256": "800f664d3e776da3c5180980cc42e36ba5e4c3192cffe8565ebe4f4bdbe57274",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "57fb2a2c-71b1-4f94-9d1b-4ac46c47800f",
+        "publicId": "c8c2885b-d73b-4eee-a4d4-6e6eb66d7c4f",
+        "publicUrl": "https://api.moshq.app/public/assets/c8c2885b-d73b-4eee-a4d4-6e6eb66d7c4f",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "What GLP-1 Does to Your Drive",
+        "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine.",
+        "description": "Tenor's 21 active ingredients at disclosed doses support the systems GLP-1s quietly drain — energy, drive, stamina, and recovery. Two capsules every morning. No prescription. No needles.",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/c8c2885b-d73b-4eee-a4d4-6e6eb66d7c4f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "What GLP-1 Does to Your Drive",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C004 / What GLP-1 Does to Your T Levels\nSource creative SHA-256: 800f664d3e776da3c5180980cc42e36ba5e4c3192cffe8565ebe4f4bdbe57274\nRemix copy: TENOR-COPY001 / What GLP-1 Does to Your Drive\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gemini-3.1-flash-image-preview",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "eb7e4444-108f-458a-9c4c-36b0467543d5",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-2aebca44-1459-4c0e-8183-ef7b5402b85e",
+        "workflowUrl": "https://moshq.app/workflows/eb7e4444-108f-458a-9c4c-36b0467543d5",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-03-TENOR-COPY001-C004.json",
+        "payloadOut": {
+          "job_id": "embedded-freestyle:158572bfcfc4f4ff5bdeee3dc923b7e52a4aecdec5d73ba2",
+          "asset_ids": [
+            "966eb954-ebcf-4a08-a1c7-b2d81668efe2"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": {
+          "workflowRunId": "5acc5885-a08e-456c-b107-6bcd8767c250",
+          "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-8404897e-55da-4ba8-8fce-572f629d7a81",
+          "workflowUrl": "https://moshq.app/workflows/5acc5885-a08e-456c-b107-6bcd8767c250",
+          "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-failed-openai-03-TENOR-COPY001-C004.json",
+          "error": "Workflow 5acc5885-a08e-456c-b107-6bcd8767c250 ended with failed: no error detail"
+        }
+      },
+      "result": {
+        "assetId": "966eb954-ebcf-4a08-a1c7-b2d81668efe2",
+        "publicId": "7fa4a14d-1985-4654-b201-de3a84761a00",
+        "publicUrl": "https://api.moshq.app/public/assets/7fa4a14d-1985-4654-b201-de3a84761a00",
+        "contentType": "image/jpeg",
+        "width": 928,
+        "height": 1152,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/03-TENOR-COPY001-C004.jpg",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/03-TENOR-COPY001-C004.jpg",
+        "bytes": 478730,
+        "sha256": "f374d1e71626ebc218b8c27abe6f8f6f0f32e13c931ac6fddcd6d905a387b60d",
+        "remoteJobId": "embedded-freestyle:158572bfcfc4f4ff5bdeee3dc923b7e52a4aecdec5d73ba2",
+        "renderProvider": "creative_service",
+        "renderModelIdRequested": "gemini-3.1-flash-image-preview",
+        "renderModelIdUsed": "models/gemini-3.1-flash-image-preview",
+        "usedAuthorizedFallback": true
+      }
+    },
+    {
+      "rowKey": "04-TENOR-COPY001-C006",
+      "rowIndex": 4,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY001",
+      "remixCopyId": "TENOR-COPY001",
+      "creativeId": "C006",
+      "creativeReferenceTitle": "What GLP-1 Does to Your T Levels",
+      "creativeFile": "creatives/C006_b2ce46c5e9a8_what-glp-1-does-to-your-t-levels.jpg",
+      "sourceCreativeSha256": "b2ce46c5e9a82c28bad64b0080fb50722e59104287bdfbfbc9ae91949d40afee",
+      "stagedSourceSha256": "b2ce46c5e9a82c28bad64b0080fb50722e59104287bdfbfbc9ae91949d40afee",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "cf7306d1-a2c0-4b5b-a285-3264983a62b1",
+        "publicId": "520b9bc9-25d8-4b85-a2ff-010136beee08",
+        "publicUrl": "https://api.moshq.app/public/assets/520b9bc9-25d8-4b85-a2ff-010136beee08",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "What GLP-1 Does to Your Drive",
+        "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine.",
+        "description": "Tenor's 21 active ingredients at disclosed doses support the systems GLP-1s quietly drain — energy, drive, stamina, and recovery. Two capsules every morning. No prescription. No needles.",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/520b9bc9-25d8-4b85-a2ff-010136beee08",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "What GLP-1 Does to Your Drive",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C006 / What GLP-1 Does to Your T Levels\nSource creative SHA-256: b2ce46c5e9a82c28bad64b0080fb50722e59104287bdfbfbc9ae91949d40afee\nRemix copy: TENOR-COPY001 / What GLP-1 Does to Your Drive\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "e597141f-6502-4e4a-9aa1-7314f103505a",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-e3a01adf-4478-4e8f-aa0c-5b665d6e9453",
+        "workflowUrl": "https://moshq.app/workflows/e597141f-6502-4e4a-9aa1-7314f103505a",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-04-TENOR-COPY001-C006.json",
+        "payloadOut": {
+          "job_id": "openai:d5596afd37f09295f919f54ee0dd2a27013012ddefa37ea65a92ff7561a9fbd3",
+          "asset_ids": [
+            "4d364a86-0dc5-496a-bf29-2e7ce3921501"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "4d364a86-0dc5-496a-bf29-2e7ce3921501",
+        "publicId": "8838bf03-331d-421a-b6a7-1c17b069045e",
+        "publicUrl": "https://api.moshq.app/public/assets/8838bf03-331d-421a-b6a7-1c17b069045e",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/04-TENOR-COPY001-C006.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/04-TENOR-COPY001-C006.png",
+        "bytes": 2122356,
+        "sha256": "18e081ecf91601971a37e049e4949870a1c3fd2839101f5e0bac39a89c2552d2",
+        "remoteJobId": "openai:d5596afd37f09295f919f54ee0dd2a27013012ddefa37ea65a92ff7561a9fbd3",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013754Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=b42cf6f6251ea1f92cf5d3fba942ef067c2b91d44648bc05641a3eaf8f6547a7",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013754Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=9ded606c65192595823f99538dbdc742c1c87820610952a66f7393b1ecdd325e",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013754Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=fda877605f25377ce58041d11855651290fd95d7d6aefb7e0dd71f834428bff1"
+        ]
+      }
+    },
+    {
+      "rowKey": "05-TENOR-COPY001-C011",
+      "rowIndex": 5,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY001",
+      "remixCopyId": "TENOR-COPY001",
+      "creativeId": "C011",
+      "creativeReferenceTitle": "What GLP-1 Does to Your T Levels",
+      "creativeFile": "creatives/C011_26669e11fb36_what-glp-1-does-to-your-t-levels.jpg",
+      "sourceCreativeSha256": "26669e11fb36cf7768d930669f1a5d888484d3076d08bc1cfa16cab50dcae065",
+      "stagedSourceSha256": "26669e11fb36cf7768d930669f1a5d888484d3076d08bc1cfa16cab50dcae065",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "43d532fb-532b-4a77-9c64-00bab83762e1",
+        "publicId": "de26805a-64a4-4064-8d3c-759a485c1583",
+        "publicUrl": "https://api.moshq.app/public/assets/de26805a-64a4-4064-8d3c-759a485c1583",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "What GLP-1 Does to Your Drive",
+        "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine.",
+        "description": "Tenor's 21 active ingredients at disclosed doses support the systems GLP-1s quietly drain — energy, drive, stamina, and recovery. Two capsules every morning. No prescription. No needles.",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/de26805a-64a4-4064-8d3c-759a485c1583",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "What GLP-1 Does to Your Drive",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C011 / What GLP-1 Does to Your T Levels\nSource creative SHA-256: 26669e11fb36cf7768d930669f1a5d888484d3076d08bc1cfa16cab50dcae065\nRemix copy: TENOR-COPY001 / What GLP-1 Does to Your Drive\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "775ab58c-ec98-4d3e-a782-5fd286b5258e",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-353b2cd8-fab0-4210-bb55-e7cdbaae157a",
+        "workflowUrl": "https://moshq.app/workflows/775ab58c-ec98-4d3e-a782-5fd286b5258e",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-05-TENOR-COPY001-C011.json",
+        "payloadOut": {
+          "job_id": "openai:fcfc5fe36ba3a51280cbcdc673570043a712f9e99e67a42c60e80b3cd004ea02",
+          "asset_ids": [
+            "f44d5a1f-91b3-45cc-949e-522b5c64e2f9"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "f44d5a1f-91b3-45cc-949e-522b5c64e2f9",
+        "publicId": "5459c4c8-8da5-477a-870c-847cb9f33a94",
+        "publicUrl": "https://api.moshq.app/public/assets/5459c4c8-8da5-477a-870c-847cb9f33a94",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/05-TENOR-COPY001-C011.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/05-TENOR-COPY001-C011.png",
+        "bytes": 1999823,
+        "sha256": "8a1a096f646f253be90ed400adfa11f0a93033d61572f18ca9524709fc145735",
+        "remoteJobId": "openai:fcfc5fe36ba3a51280cbcdc673570043a712f9e99e67a42c60e80b3cd004ea02",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false
+      }
+    },
+    {
+      "rowKey": "06-TENOR-COPY002-C008",
+      "rowIndex": 6,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY002",
+      "remixCopyId": "TENOR-COPY002",
+      "creativeId": "C008",
+      "creativeReferenceTitle": "Keep Muscle + Metabolism on GLP-1s",
+      "creativeFile": "creatives/C008_9270ea507925_keep-muscle-metabolism-on-glp-1s.jpg",
+      "sourceCreativeSha256": "9270ea507925d81a0370ac60254d47486612050af165fc81b1cf13f40241c5c9",
+      "stagedSourceSha256": "9270ea507925d81a0370ac60254d47486612050af165fc81b1cf13f40241c5c9",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "40b82eb0-5d40-4f22-b495-03e787731144",
+        "publicId": "85c1aaf4-9bea-47f0-9278-26002fb2c0f3",
+        "publicUrl": "https://api.moshq.app/public/assets/85c1aaf4-9bea-47f0-9278-26002fb2c0f3",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Keep Your Drive Steady on GLP-1s",
+        "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/85c1aaf4-9bea-47f0-9278-26002fb2c0f3",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Keep Your Drive Steady on GLP-1s",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C008 / Keep Muscle + Metabolism on GLP-1s\nSource creative SHA-256: 9270ea507925d81a0370ac60254d47486612050af165fc81b1cf13f40241c5c9\nRemix copy: TENOR-COPY002 / Keep Your Drive Steady on GLP-1s\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "9e59f458-ca20-4a40-ae36-6d73f85a76f4",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-54a02620-3b0c-4b16-94d4-201438026e78",
+        "workflowUrl": "https://moshq.app/workflows/9e59f458-ca20-4a40-ae36-6d73f85a76f4",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-06-TENOR-COPY002-C008.json",
+        "payloadOut": {
+          "job_id": "openai:3de5b0d8af6a60d9de8c635e2326b1c0d900060126ef39dba26acde499c6f00a",
+          "asset_ids": [
+            "c3544dc2-8651-4cc7-8cd4-833d065cfe7e"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "c3544dc2-8651-4cc7-8cd4-833d065cfe7e",
+        "publicId": "d6af9265-c4c2-4fa1-b7e1-a7dbe9d1d36a",
+        "publicUrl": "https://api.moshq.app/public/assets/d6af9265-c4c2-4fa1-b7e1-a7dbe9d1d36a",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/06-TENOR-COPY002-C008.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/06-TENOR-COPY002-C008.png",
+        "bytes": 1899327,
+        "sha256": "fe04afde737a54cbf7e8cce59e12cfee2da396ce83f7e3a34e612d63e00e47a0",
+        "remoteJobId": "openai:3de5b0d8af6a60d9de8c635e2326b1c0d900060126ef39dba26acde499c6f00a",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false
+      }
+    },
+    {
+      "rowKey": "07-TENOR-COPY002-C003",
+      "rowIndex": 7,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY002",
+      "remixCopyId": "TENOR-COPY002",
+      "creativeId": "C003",
+      "creativeReferenceTitle": "Keep Muscle + Metabolism on GLP-1s",
+      "creativeFile": "creatives/C003_43431105b689_keep-muscle-metabolism-on-glp-1s.jpg",
+      "sourceCreativeSha256": "43431105b689dc7a269b586d95a7729460a708fad8e6815fe767cbf58ee5b934",
+      "stagedSourceSha256": "43431105b689dc7a269b586d95a7729460a708fad8e6815fe767cbf58ee5b934",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "7d795c63-fc0a-4b91-ac7b-23f829899aec",
+        "publicId": "79e29702-df8e-464b-9572-6544ec36a2fe",
+        "publicUrl": "https://api.moshq.app/public/assets/79e29702-df8e-464b-9572-6544ec36a2fe",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Keep Your Drive Steady on GLP-1s",
+        "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/79e29702-df8e-464b-9572-6544ec36a2fe",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Keep Your Drive Steady on GLP-1s",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C003 / Keep Muscle + Metabolism on GLP-1s\nSource creative SHA-256: 43431105b689dc7a269b586d95a7729460a708fad8e6815fe767cbf58ee5b934\nRemix copy: TENOR-COPY002 / Keep Your Drive Steady on GLP-1s\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "94437959-1b04-4dbc-a706-4c347c8d8138",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-0a00036b-b1d0-4a65-9d4a-5aa5fafe6f1f",
+        "workflowUrl": "https://moshq.app/workflows/94437959-1b04-4dbc-a706-4c347c8d8138",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-07-TENOR-COPY002-C003.json",
+        "payloadOut": {
+          "job_id": "openai:bb47b049e91fe6258a786e67e018b003e3fac6d3cac9b869baf16629c8132263",
+          "asset_ids": [
+            "31ab30b5-0936-4c36-b677-4a72c9640ddc"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "31ab30b5-0936-4c36-b677-4a72c9640ddc",
+        "publicId": "16054f46-ace7-4330-8c94-c886e5d08401",
+        "publicUrl": "https://api.moshq.app/public/assets/16054f46-ace7-4330-8c94-c886e5d08401",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/07-TENOR-COPY002-C003.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/07-TENOR-COPY002-C003.png",
+        "bytes": 1741915,
+        "sha256": "11a90f4a76a56b4fbfd4c8a50ff81eee9b941f1b889bd4272417deb34ac5fd63",
+        "remoteJobId": "openai:bb47b049e91fe6258a786e67e018b003e3fac6d3cac9b869baf16629c8132263",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false
+      }
+    },
+    {
+      "rowKey": "08-TENOR-COPY002-C009",
+      "rowIndex": 8,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY002",
+      "remixCopyId": "TENOR-COPY002",
+      "creativeId": "C009",
+      "creativeReferenceTitle": "Keep Muscle + Metabolism on GLP-1s",
+      "creativeFile": "creatives/C009_7fbb027c0bfa_keep-muscle-metabolism-on-glp-1s.jpg",
+      "sourceCreativeSha256": "7fbb027c0bfacc3f56de8b178ea6f0a07b30369663ca69756fffdd0d3c391fd7",
+      "stagedSourceSha256": "7fbb027c0bfacc3f56de8b178ea6f0a07b30369663ca69756fffdd0d3c391fd7",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "b69f0146-d6ab-4c39-bb84-6c3e9d745070",
+        "publicId": "9af9bc1c-9db5-4bd8-a419-fe4b81fba968",
+        "publicUrl": "https://api.moshq.app/public/assets/9af9bc1c-9db5-4bd8-a419-fe4b81fba968",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Keep Your Drive Steady on GLP-1s",
+        "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/9af9bc1c-9db5-4bd8-a419-fe4b81fba968",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Keep Your Drive Steady on GLP-1s",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C009 / Keep Muscle + Metabolism on GLP-1s\nSource creative SHA-256: 7fbb027c0bfacc3f56de8b178ea6f0a07b30369663ca69756fffdd0d3c391fd7\nRemix copy: TENOR-COPY002 / Keep Your Drive Steady on GLP-1s\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "35e58acb-1dce-4106-8b6a-939ecaf5baf8",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-8441b635-94c8-46d5-99e0-10f231c5d820",
+        "workflowUrl": "https://moshq.app/workflows/35e58acb-1dce-4106-8b6a-939ecaf5baf8",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-08-TENOR-COPY002-C009.json",
+        "payloadOut": {
+          "job_id": "openai:99a5ddab1bf2138431f91eb76375c95ef6d6b2c1b1ba677f63c37f5cd686ce65",
+          "asset_ids": [
+            "227c2a22-0da2-47c0-8ebf-2a25ce5de8ee"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "227c2a22-0da2-47c0-8ebf-2a25ce5de8ee",
+        "publicId": "0be9dbcb-b1e8-4bff-983f-ad15d6eb7c3f",
+        "publicUrl": "https://api.moshq.app/public/assets/0be9dbcb-b1e8-4bff-983f-ad15d6eb7c3f",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/08-TENOR-COPY002-C009.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/08-TENOR-COPY002-C009.png",
+        "bytes": 2053132,
+        "sha256": "6f5cd256e06ef47b284f4942c1805288493209abeb1840bce5024010ec90202b",
+        "remoteJobId": "openai:99a5ddab1bf2138431f91eb76375c95ef6d6b2c1b1ba677f63c37f5cd686ce65",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013752Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=15af8703b097956e82ca648fc04224a015899dd18f12b2407d6080347e6e4283",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013752Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=d0fdfa20aae9f10169ad247373b782d4a800c3508922c7ff1ab5b9c63e3d6aa2",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013752Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=abc33a2e3bb7366a0d55191f95972cf28ffabbbe2ab9d0b86d587a6b0a83f0f9"
+        ]
+      }
+    },
+    {
+      "rowKey": "09-TENOR-COPY002-C007",
+      "rowIndex": 9,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY002",
+      "remixCopyId": "TENOR-COPY002",
+      "creativeId": "C007",
+      "creativeReferenceTitle": "Keep Muscle + Metabolism on GLP-1s",
+      "creativeFile": "creatives/C007_8f5d831e6729_keep-muscle-metabolism-on-glp-1s.jpg",
+      "sourceCreativeSha256": "8f5d831e67299d64fca8b22db05f1e0f237044879ac92f3bec62c01392b44cac",
+      "stagedSourceSha256": "8f5d831e67299d64fca8b22db05f1e0f237044879ac92f3bec62c01392b44cac",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "8086d9c8-da14-4449-a1db-b6ca487dda30",
+        "publicId": "80e8bb3a-a0ff-4ce8-adcc-57eb28d8f8d9",
+        "publicUrl": "https://api.moshq.app/public/assets/80e8bb3a-a0ff-4ce8-adcc-57eb28d8f8d9",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Keep Your Drive Steady on GLP-1s",
+        "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/80e8bb3a-a0ff-4ce8-adcc-57eb28d8f8d9",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Keep Your Drive Steady on GLP-1s",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C007 / Keep Muscle + Metabolism on GLP-1s\nSource creative SHA-256: 8f5d831e67299d64fca8b22db05f1e0f237044879ac92f3bec62c01392b44cac\nRemix copy: TENOR-COPY002 / Keep Your Drive Steady on GLP-1s\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "8770ffad-34c4-4fe1-b203-34397d1d0cc8",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-3fd276a1-b302-426b-83ee-bb7dd2a582fe",
+        "workflowUrl": "https://moshq.app/workflows/8770ffad-34c4-4fe1-b203-34397d1d0cc8",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-09-TENOR-COPY002-C007.json",
+        "payloadOut": {
+          "job_id": "openai:d54243f8026a3be6bde1e18ce025c40f8300e511b6a701acf4185a5ed8bc4554",
+          "asset_ids": [
+            "b8e52278-2d39-41d3-a999-7d76aeaf467f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "b8e52278-2d39-41d3-a999-7d76aeaf467f",
+        "publicId": "1d225ca3-3c13-46e2-b197-a944c4cabfc3",
+        "publicUrl": "https://api.moshq.app/public/assets/1d225ca3-3c13-46e2-b197-a944c4cabfc3",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/09-TENOR-COPY002-C007.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/09-TENOR-COPY002-C007.png",
+        "bytes": 1569195,
+        "sha256": "8383b3468a57bda483d555b087b8fefa521215b8aff239ce50d26bd45e413f2d",
+        "remoteJobId": "openai:d54243f8026a3be6bde1e18ce025c40f8300e511b6a701acf4185a5ed8bc4554",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false
+      }
+    },
+    {
+      "rowKey": "10-TENOR-COPY002-C005",
+      "rowIndex": 10,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY002",
+      "remixCopyId": "TENOR-COPY002",
+      "creativeId": "C005",
+      "creativeReferenceTitle": "Keep Muscle + Metabolism on GLP-1s",
+      "creativeFile": "creatives/C005_4fd92e9dcc86_keep-muscle-metabolism-on-glp-1s.jpg",
+      "sourceCreativeSha256": "4fd92e9dcc869f81eab44849677dae22b42a3ca0850a729e7eae11358678dda5",
+      "stagedSourceSha256": "4fd92e9dcc869f81eab44849677dae22b42a3ca0850a729e7eae11358678dda5",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "0ade7915-e7c9-4383-9f4d-59bab459b936",
+        "publicId": "0794ab8c-c9b6-4d54-8115-43cef738bfda",
+        "publicUrl": "https://api.moshq.app/public/assets/0794ab8c-c9b6-4d54-8115-43cef738bfda",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Keep Your Drive Steady on GLP-1s",
+        "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/0794ab8c-c9b6-4d54-8115-43cef738bfda",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Keep Your Drive Steady on GLP-1s",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C005 / Keep Muscle + Metabolism on GLP-1s\nSource creative SHA-256: 4fd92e9dcc869f81eab44849677dae22b42a3ca0850a729e7eae11358678dda5\nRemix copy: TENOR-COPY002 / Keep Your Drive Steady on GLP-1s\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "5c199982-a5fc-4edb-90ea-110122857263",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-e6e8de16-5642-4f64-8f8c-935abb904c7c",
+        "workflowUrl": "https://moshq.app/workflows/5c199982-a5fc-4edb-90ea-110122857263",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-10-TENOR-COPY002-C005.json",
+        "payloadOut": {
+          "job_id": "openai:9f5ef5dd6f12d3323a3c869667631baf1f4fcca2e53b6d8d6fe9fef8ee39083c",
+          "asset_ids": [
+            "2301cd59-4742-43ab-bde8-e97b353e6675"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "2301cd59-4742-43ab-bde8-e97b353e6675",
+        "publicId": "d3f42a4d-03cf-4eaa-909a-400cc5b80b61",
+        "publicUrl": "https://api.moshq.app/public/assets/d3f42a4d-03cf-4eaa-909a-400cc5b80b61",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/10-TENOR-COPY002-C005.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/10-TENOR-COPY002-C005.png",
+        "bytes": 3297756,
+        "sha256": "1e06eb169827590726b7bdc0881688bd45b5b8b20d48537aed42f4afc33908f5",
+        "remoteJobId": "openai:9f5ef5dd6f12d3323a3c869667631baf1f4fcca2e53b6d8d6fe9fef8ee39083c",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013754Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=b42cf6f6251ea1f92cf5d3fba942ef067c2b91d44648bc05641a3eaf8f6547a7",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013754Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=9ded606c65192595823f99538dbdc742c1c87820610952a66f7393b1ecdd325e",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013754Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=fda877605f25377ce58041d11855651290fd95d7d6aefb7e0dd71f834428bff1"
+        ]
+      }
+    },
+    {
+      "rowKey": "11-TENOR-COPY002-C010",
+      "rowIndex": 11,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY002",
+      "remixCopyId": "TENOR-COPY002",
+      "creativeId": "C010",
+      "creativeReferenceTitle": "Keep Muscle + Metabolism on GLP-1s",
+      "creativeFile": "creatives/C010_89f6bd96d1dc_keep-muscle-metabolism-on-glp-1s.jpg",
+      "sourceCreativeSha256": "89f6bd96d1dc039c75ad7a666799c340aef644d39932dbedab973a1872f66161",
+      "stagedSourceSha256": "89f6bd96d1dc039c75ad7a666799c340aef644d39932dbedab973a1872f66161",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "f4fbf169-d927-41f0-a8f7-f3bdf0d05468",
+        "publicId": "cd20ca4d-aa52-4f91-969c-64d68d14c0ba",
+        "publicUrl": "https://api.moshq.app/public/assets/cd20ca4d-aa52-4f91-969c-64d68d14c0ba",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Keep Your Drive Steady on GLP-1s",
+        "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/cd20ca4d-aa52-4f91-969c-64d68d14c0ba",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Keep Your Drive Steady on GLP-1s",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C010 / Keep Muscle + Metabolism on GLP-1s\nSource creative SHA-256: 89f6bd96d1dc039c75ad7a666799c340aef644d39932dbedab973a1872f66161\nRemix copy: TENOR-COPY002 / Keep Your Drive Steady on GLP-1s\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "167c775f-4e51-40c7-92ca-098fd75c192b",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-9762c3f2-66d0-4d61-b538-325a14176db5",
+        "workflowUrl": "https://moshq.app/workflows/167c775f-4e51-40c7-92ca-098fd75c192b",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-11-TENOR-COPY002-C010.json",
+        "payloadOut": {
+          "job_id": "openai:8f690b6b6990258589fadcf1138ee3846e192e3447315b2c8ed6e2fabfa3388e",
+          "asset_ids": [
+            "e674f559-7716-4c3a-b3f8-69aaf937f833"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "e674f559-7716-4c3a-b3f8-69aaf937f833",
+        "publicId": "99a336c2-a4a5-4504-8856-b2766cdd30ee",
+        "publicUrl": "https://api.moshq.app/public/assets/99a336c2-a4a5-4504-8856-b2766cdd30ee",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/11-TENOR-COPY002-C010.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/11-TENOR-COPY002-C010.png",
+        "bytes": 1164369,
+        "sha256": "d432248c5caaa1dd590cde12e8b757899d51827ab23bb9c268100ad108d51cd1",
+        "remoteJobId": "openai:8f690b6b6990258589fadcf1138ee3846e192e3447315b2c8ed6e2fabfa3388e",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false
+      }
+    },
+    {
+      "rowKey": "12-TENOR-COPY002-C012",
+      "rowIndex": 12,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY002",
+      "remixCopyId": "TENOR-COPY002",
+      "creativeId": "C012",
+      "creativeReferenceTitle": "Keep Muscle + Metabolism on GLP-1s",
+      "creativeFile": "creatives/C012_eef387130f15_keep-muscle-metabolism-on-glp-1s.jpg",
+      "sourceCreativeSha256": "eef387130f152177e922e7b8f8131a40b972218cc04633f7f77fcf8a74b293b1",
+      "stagedSourceSha256": "eef387130f152177e922e7b8f8131a40b972218cc04633f7f77fcf8a74b293b1",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "48f1db92-496f-4c4b-9316-4cf4305538e2",
+        "publicId": "a240df1c-28aa-483c-a1cb-662329182428",
+        "publicUrl": "https://api.moshq.app/public/assets/a240df1c-28aa-483c-a1cb-662329182428",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Keep Your Drive Steady on GLP-1s",
+        "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/a240df1c-28aa-483c-a1cb-662329182428",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Keep Your Drive Steady on GLP-1s",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C012 / Keep Muscle + Metabolism on GLP-1s\nSource creative SHA-256: eef387130f152177e922e7b8f8131a40b972218cc04633f7f77fcf8a74b293b1\nRemix copy: TENOR-COPY002 / Keep Your Drive Steady on GLP-1s\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "7f67db99-6641-4688-9186-8389fa5f3fcf",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-e770224d-0851-47ef-a02c-7a258adb4f9d",
+        "workflowUrl": "https://moshq.app/workflows/7f67db99-6641-4688-9186-8389fa5f3fcf",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-12-TENOR-COPY002-C012.json",
+        "payloadOut": {
+          "job_id": "openai:5687d5f6f38d07f439e88dc314b1e0dca28710d4acf4e4a03aee4dbafbd5ab93",
+          "asset_ids": [
+            "84db4755-44d8-4ae2-ada9-3987a633d2ed"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "84db4755-44d8-4ae2-ada9-3987a633d2ed",
+        "publicId": "885418e3-ab4b-47de-bff0-ae7c149f9e43",
+        "publicUrl": "https://api.moshq.app/public/assets/885418e3-ab4b-47de-bff0-ae7c149f9e43",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/12-TENOR-COPY002-C012.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/12-TENOR-COPY002-C012.png",
+        "bytes": 3206114,
+        "sha256": "656e937b3715c8dc905bfc6df7981acdf7b8440a993e0aa90df40114f38f65e7",
+        "remoteJobId": "openai:5687d5f6f38d07f439e88dc314b1e0dca28710d4acf4e4a03aee4dbafbd5ab93",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013753Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=5b9b2d24a36b6352ebc49d913a54fcc3c0f52e7834f231c2ee46db6d19fa3102",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013753Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=e2fa64edffa44d2233812d816b84ab8f3d0d56e37bdd3f837585fe87c3847fcd",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013753Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=d22f3b2035788b161b4d3d3fdb567d23c986b145d4c2627fc4e762b711669eba"
+        ]
+      }
+    },
+    {
+      "rowKey": "13-TENOR-COPY003-C013",
+      "rowIndex": 13,
+      "launchSlot": "GLP lander",
+      "sourceCopyId": "COPY003",
+      "remixCopyId": "TENOR-COPY003",
+      "creativeId": "C013",
+      "creativeReferenceTitle": "The GLP-1 Side Effect No One Mentions",
+      "creativeFile": "creatives/C013_be538fae84b8_the-glp-1-side-effect-no-one-mentions.jpg",
+      "sourceCreativeSha256": "be538fae84b81faef7637c31829f4f7595777ba3266359b19b0b3d43135c0d9f",
+      "stagedSourceSha256": "be538fae84b81faef7637c31829f4f7595777ba3266359b19b0b3d43135c0d9f",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "928ab37b-75a0-49f8-bda3-9b39c49e9bd9",
+        "publicId": "629fbc41-09c2-4db6-8d3b-ac4c4653610c",
+        "publicUrl": "https://api.moshq.app/public/assets/629fbc41-09c2-4db6-8d3b-ac4c4653610c",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "The GLP-1 Side Effect No One Mentions",
+        "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nSave 52% on the 90-day supply. 90-day empty-bottle guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends.",
+        "description": "By Dr. Adam Reese, MD | Tenor Founder",
+        "sourceCta": "See Details",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/629fbc41-09c2-4db6-8d3b-ac4c4653610c",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "The GLP-1 Side Effect No One Mentions",
+        "swipeAngle": "Launch slot: GLP lander\nSource creative: C013 / The GLP-1 Side Effect No One Mentions\nSource creative SHA-256: be538fae84b81faef7637c31829f4f7595777ba3266359b19b0b3d43135c0d9f\nRemix copy: TENOR-COPY003 / The GLP-1 Side Effect No One Mentions\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: See Details\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "f3425e20-16ab-4947-8203-8683e0ad68df",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-8f6b0701-e0d3-4eb2-9661-b6908d911752",
+        "workflowUrl": "https://moshq.app/workflows/f3425e20-16ab-4947-8203-8683e0ad68df",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-13-TENOR-COPY003-C013.json",
+        "payloadOut": {
+          "job_id": "openai:1a945b551df544d5674ed8ca9b116ff11c38663bc438b613ed752f6533c658cb",
+          "asset_ids": [
+            "07ba2922-3dd3-4945-b9e4-72258f13ade5"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "07ba2922-3dd3-4945-b9e4-72258f13ade5",
+        "publicId": "8ac492db-eebf-44d4-90cd-b76f28756d19",
+        "publicUrl": "https://api.moshq.app/public/assets/8ac492db-eebf-44d4-90cd-b76f28756d19",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/13-TENOR-COPY003-C013.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/13-TENOR-COPY003-C013.png",
+        "bytes": 1412943,
+        "sha256": "167ea4ac448c780dc1a3298e883127f3ef68b44c78102447bc9bdc52ee9370c8",
+        "remoteJobId": "openai:1a945b551df544d5674ed8ca9b116ff11c38663bc438b613ed752f6533c658cb",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013957Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=f5ea20e73d1a266b3d2d01b739eb3a57f062efb0892594f9a0cb2b652342764e",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013957Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=b91f28b38af73dcc66278ae9bafeaafeea50f604fb92a6e116210bac5ba25c31",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013957Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=bc1177e9a460b7c8a5780351e57b2d82bdb1a8e9f036fd90c5c76ccc5a362f91"
+        ]
+      }
+    },
+    {
+      "rowKey": "14-TENOR-COPY011-C022",
+      "rowIndex": 14,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY011",
+      "remixCopyId": "TENOR-COPY011",
+      "creativeId": "C022",
+      "creativeReferenceTitle": "Stop Losing T. Start Today.",
+      "creativeFile": "creatives/C022_b8ae6309e669_stop-losing-t-start-today.jpg",
+      "sourceCreativeSha256": "b8ae6309e669eac9a34f5ec66463581b8e1b9783bda3ee0cc426ccd0550852c5",
+      "stagedSourceSha256": "b8ae6309e669eac9a34f5ec66463581b8e1b9783bda3ee0cc426ccd0550852c5",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "f3116bc1-b126-4255-a95a-958b8954d51d",
+        "publicId": "41bd5884-a13d-4f4a-8518-3141b605b98d",
+        "publicUrl": "https://api.moshq.app/public/assets/41bd5884-a13d-4f4a-8518-3141b605b98d",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Stop Losing Drive. Start Today.",
+        "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nSave 52% on your 90-day supply — plus a $62 Welcome Kit and free shipping. Every bottle backed by a 90-day empty-bottle guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\"",
+        "description": "-",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/41bd5884-a13d-4f4a-8518-3141b605b98d",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Stop Losing Drive. Start Today.",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C022 / Stop Losing T. Start Today.\nSource creative SHA-256: b8ae6309e669eac9a34f5ec66463581b8e1b9783bda3ee0cc426ccd0550852c5\nRemix copy: TENOR-COPY011 / Stop Losing Drive. Start Today.\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "80c74cd6-25b4-4ee3-b6eb-d949b4e18d9f",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-e5c0a324-d9b9-41b6-ac7f-3cc19d39dfaa",
+        "workflowUrl": "https://moshq.app/workflows/80c74cd6-25b4-4ee3-b6eb-d949b4e18d9f",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-14-TENOR-COPY011-C022.json",
+        "payloadOut": {
+          "job_id": "openai:0272220020fe9737ed43aa5ae6c68cd4d91e431ca9a76b41b054230224335a38",
+          "asset_ids": [
+            "32595c8b-c450-4489-a63f-1cb65fe17a8b"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "32595c8b-c450-4489-a63f-1cb65fe17a8b",
+        "publicId": "1644af07-3c2b-4f2a-b636-d9a8bb1d6d5c",
+        "publicUrl": "https://api.moshq.app/public/assets/1644af07-3c2b-4f2a-b636-d9a8bb1d6d5c",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/14-TENOR-COPY011-C022.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/14-TENOR-COPY011-C022.png",
+        "bytes": 1371454,
+        "sha256": "9be4ca890eca99fecd8a6ee6fa4586114c2cb5835a96c8dd63dba66cf0550309",
+        "remoteJobId": "openai:0272220020fe9737ed43aa5ae6c68cd4d91e431ca9a76b41b054230224335a38",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013957Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=f5ea20e73d1a266b3d2d01b739eb3a57f062efb0892594f9a0cb2b652342764e",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013957Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=b91f28b38af73dcc66278ae9bafeaafeea50f604fb92a6e116210bac5ba25c31",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T013957Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=bc1177e9a460b7c8a5780351e57b2d82bdb1a8e9f036fd90c5c76ccc5a362f91"
+        ]
+      }
+    },
+    {
+      "rowKey": "15-TENOR-COPY011-C019",
+      "rowIndex": 15,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY011",
+      "remixCopyId": "TENOR-COPY011",
+      "creativeId": "C019",
+      "creativeReferenceTitle": "Stop Losing T. Start Today.",
+      "creativeFile": "creatives/C019_0ad348f58649_stop-losing-t-start-today.jpg",
+      "sourceCreativeSha256": "0ad348f5864908afb9c39fffb644b259cc03ba313cd38043d648ea520c8f185d",
+      "stagedSourceSha256": "0ad348f5864908afb9c39fffb644b259cc03ba313cd38043d648ea520c8f185d",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "7ea15754-5c83-4d54-be97-05642f5d0d22",
+        "publicId": "26fe67ca-5ad8-44de-aff1-853e52813516",
+        "publicUrl": "https://api.moshq.app/public/assets/26fe67ca-5ad8-44de-aff1-853e52813516",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Stop Losing Drive. Start Today.",
+        "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nSave 52% on your 90-day supply — plus a $62 Welcome Kit and free shipping. Every bottle backed by a 90-day empty-bottle guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\"",
+        "description": "-",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/26fe67ca-5ad8-44de-aff1-853e52813516",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Stop Losing Drive. Start Today.",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C019 / Stop Losing T. Start Today.\nSource creative SHA-256: 0ad348f5864908afb9c39fffb644b259cc03ba313cd38043d648ea520c8f185d\nRemix copy: TENOR-COPY011 / Stop Losing Drive. Start Today.\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "c1922af0-8e68-4242-baeb-fc83987e6915",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-2972607e-b2ce-4ac1-87ea-6d9d4c849350",
+        "workflowUrl": "https://moshq.app/workflows/c1922af0-8e68-4242-baeb-fc83987e6915",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-15-TENOR-COPY011-C019.json",
+        "payloadOut": {
+          "job_id": "openai:a63ddfaa7837d49ff8a2999669c287be8f0e16744e03378ed72227b4b575d871",
+          "asset_ids": [
+            "63fb117b-6cae-43f6-ae93-18774e7cf14a"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "63fb117b-6cae-43f6-ae93-18774e7cf14a",
+        "publicId": "9e640f61-42a0-4908-ad3f-48140072bc05",
+        "publicUrl": "https://api.moshq.app/public/assets/9e640f61-42a0-4908-ad3f-48140072bc05",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/15-TENOR-COPY011-C019.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/15-TENOR-COPY011-C019.png",
+        "bytes": 1439417,
+        "sha256": "061c98d36d27bc1a34fa5480e370d40c37c7d455cf0874a707216a592bd5af7f",
+        "remoteJobId": "openai:a63ddfaa7837d49ff8a2999669c287be8f0e16744e03378ed72227b4b575d871",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014027Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=df70a1494923a19ad9096e5f2043d7351c8d2741958bd18474921b325c69bf67",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014027Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=068c65fbc4d29acbf482b5975075cf2676504df57e0a81fe424214d941256d14",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014027Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=7600fef11a4f50dc5a151123b576568f90695bb8185cc19db935863bf0378451"
+        ]
+      }
+    },
+    {
+      "rowKey": "16-TENOR-COPY011-C020",
+      "rowIndex": 16,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY011",
+      "remixCopyId": "TENOR-COPY011",
+      "creativeId": "C020",
+      "creativeReferenceTitle": "Stop Losing T. Start Today.",
+      "creativeFile": "creatives/C020_a69854ae5386_stop-losing-t-start-today.jpg",
+      "sourceCreativeSha256": "a69854ae53866acd6408d00f6ec52096df7ba64f0c2bc2f110a55546c390e64b",
+      "stagedSourceSha256": "a69854ae53866acd6408d00f6ec52096df7ba64f0c2bc2f110a55546c390e64b",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "1097be2b-ad63-4b14-ae5d-4294f3722a1c",
+        "publicId": "f4494afe-e3e5-43ec-955c-69357c962bf7",
+        "publicUrl": "https://api.moshq.app/public/assets/f4494afe-e3e5-43ec-955c-69357c962bf7",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Stop Losing Drive. Start Today.",
+        "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nSave 52% on your 90-day supply — plus a $62 Welcome Kit and free shipping. Every bottle backed by a 90-day empty-bottle guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\"",
+        "description": "-",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/f4494afe-e3e5-43ec-955c-69357c962bf7",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Stop Losing Drive. Start Today.",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C020 / Stop Losing T. Start Today.\nSource creative SHA-256: a69854ae53866acd6408d00f6ec52096df7ba64f0c2bc2f110a55546c390e64b\nRemix copy: TENOR-COPY011 / Stop Losing Drive. Start Today.\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "f01f43ca-6820-40eb-9cdf-cf765ff0c0bd",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-b4a3fde4-4c5e-4e76-bab5-9e4fff067904",
+        "workflowUrl": "https://moshq.app/workflows/f01f43ca-6820-40eb-9cdf-cf765ff0c0bd",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-16-TENOR-COPY011-C020.json",
+        "payloadOut": {
+          "job_id": "openai:83a988410e85e97bf2e0edc921c9589053fec6a010fb2ef12f34915b099ce337",
+          "asset_ids": [
+            "8d347990-2392-471c-b5c0-caa9ffa23513"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "8d347990-2392-471c-b5c0-caa9ffa23513",
+        "publicId": "78bbb7dd-df15-4ac4-92ea-fa6aabb3506b",
+        "publicUrl": "https://api.moshq.app/public/assets/78bbb7dd-df15-4ac4-92ea-fa6aabb3506b",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/16-TENOR-COPY011-C020.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/16-TENOR-COPY011-C020.png",
+        "bytes": 1508473,
+        "sha256": "9d96ce6d22e1022ddb2d7d54af54af50bc6b23b32163253ba09ffb8b9508313e",
+        "remoteJobId": "openai:83a988410e85e97bf2e0edc921c9589053fec6a010fb2ef12f34915b099ce337",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014027Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=df70a1494923a19ad9096e5f2043d7351c8d2741958bd18474921b325c69bf67",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014027Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=068c65fbc4d29acbf482b5975075cf2676504df57e0a81fe424214d941256d14",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014027Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=7600fef11a4f50dc5a151123b576568f90695bb8185cc19db935863bf0378451"
+        ]
+      }
+    },
+    {
+      "rowKey": "17-TENOR-COPY012-C016",
+      "rowIndex": 17,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY012",
+      "remixCopyId": "TENOR-COPY012",
+      "creativeId": "C016",
+      "creativeReferenceTitle": "50% Off + Free Gifts 🚀",
+      "creativeFile": "creatives/C016_600c32d629a3_50-off-free-gifts.jpg",
+      "sourceCreativeSha256": "600c32d629a3a69a4176f7fac6201031439408088243d78272be3bc195ad0437",
+      "stagedSourceSha256": "600c32d629a3a69a4176f7fac6201031439408088243d78272be3bc195ad0437",
+      "aspectRatio": "1:1",
+      "sourceAttachment": {
+        "assetId": "da9fc37b-1830-4ece-9e06-7efb5befa6ca",
+        "publicId": "6a3579a4-9afb-4c3d-af4d-48c0c2a19aa0",
+        "publicUrl": "https://api.moshq.app/public/assets/6a3579a4-9afb-4c3d-af4d-48c0c2a19aa0",
+        "width": 1080,
+        "height": 1080,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Save 52% + Free $62 Welcome Kit 🚀",
+        "primaryText": "You eat clean. You move daily. You're STILL crashing by 3 p.m. and gaining weight.\n\nHere's why.\n\nIf you're over 40 and constantly dragging through the day, or frustrated that workouts feel flat…\n\nIt's not willpower.\n\nIt's your systems.\n\nThe pathways behind energy, drive, and stamina start declining around 30. And that slow drain robs you of presence, focus, endurance, and the feeling that your body is actually responding.\n\nOne day you look up and wonder:\n\n\"What happened?\"\n\nMost guys try to fix it by training harder… eating cleaner… drinking more coffee…\n\nAnd when that doesn't work?\n\nA cabinet full of overpriced, under-dosed supplements with hidden blends. Or worse — considering a clinic, a prescription, needles.\n\nHere's the truth:\n\nYou don't need a prescription.\n\nYou need a daily protocol that supports what your body is quietly losing.\n\nThat's what Tenor Daily Drive Essentials was built for.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports drive, stress response, and morning energy\n🪨 Maca (250mg) — supports stamina so you don't crash mid-day\n🛡️ Zinc (50mg) — supports the pathway behind hormone balance\n⚙️ Boron — supports free hormone levels your body can actually use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and mental focus\n☀️ Botanical matrix (745mg) — nine adaptogens supporting daily vitality\n\nNo proprietary blends. No fairy dust. Just disclosed doses your body can feel.\n\nIn a survey of 1,203 men using Tenor for 90 days:\n\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nNo needles. No stacking. No cycling. Just a daily ritual.\n\nSave 52% on the 90-Day Supply — plus a $62 Welcome Kit (Pill Caddy, Shaker Bottle, Baseball Cap) and free shipping.\n\n810,000+ men have already made this their morning protocol.\n\nIf you don't feel steadier, sharper, and more present in 90 days — return even the empty bottles for a full refund. No questions asked.\n\n👉 Support your drive. Naturally. Two capsules every morning.",
+        "description": "-",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/6a3579a4-9afb-4c3d-af4d-48c0c2a19aa0",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Save 52% + Free $62 Welcome Kit 🚀",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C016 / 50% Off + Free Gifts 🚀\nSource creative SHA-256: 600c32d629a3a69a4176f7fac6201031439408088243d78272be3bc195ad0437\nRemix copy: TENOR-COPY012 / Save 52% + Free $62 Welcome Kit 🚀\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "401b6c2f-aa64-4919-a0d8-ee0cd04f6d1d",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-c5303d76-a303-47bb-8725-db51150c7f1a",
+        "workflowUrl": "https://moshq.app/workflows/401b6c2f-aa64-4919-a0d8-ee0cd04f6d1d",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-17-TENOR-COPY012-C016.json",
+        "payloadOut": {
+          "job_id": "openai:8bf2215bd50ddc53d44b2055c1e47d225231c5a0780d3af755536014a13f4ce4",
+          "asset_ids": [
+            "69d6856c-0ce8-49ec-84a7-374d4847913f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "69d6856c-0ce8-49ec-84a7-374d4847913f",
+        "publicId": "6cdcba10-4361-4f36-a643-eb4af45b865b",
+        "publicUrl": "https://api.moshq.app/public/assets/6cdcba10-4361-4f36-a643-eb4af45b865b",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/17-TENOR-COPY012-C016.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/17-TENOR-COPY012-C016.png",
+        "bytes": 922144,
+        "sha256": "48fa9fc0bfec193e8eca49d5a74c66ed09d7aa9ecd556e5cd6e1355e036d0e3d",
+        "remoteJobId": "openai:8bf2215bd50ddc53d44b2055c1e47d225231c5a0780d3af755536014a13f4ce4",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": false,
+        "productReferenceAttached": false,
+        "productReferenceRenderAssetIds": [],
+        "productReferenceImageUrlsSelected": []
+      }
+    },
+    {
+      "rowKey": "18-TENOR-COPY013-C017",
+      "rowIndex": 18,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY013",
+      "remixCopyId": "TENOR-COPY013",
+      "creativeId": "C017",
+      "creativeReferenceTitle": "50% Off — 90-Day Guarantee",
+      "creativeFile": "creatives/C017_bd88ee3de1b4_50-off-90-day-guarantee.jpg",
+      "sourceCreativeSha256": "bd88ee3de1b4a648785d4a6b1d7b4d8fd7b1e3e72ff7c1e3556bf09ef29bff96",
+      "stagedSourceSha256": "bd88ee3de1b4a648785d4a6b1d7b4d8fd7b1e3e72ff7c1e3556bf09ef29bff96",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "1af4e531-57b9-481d-8949-e0025b4e6cab",
+        "publicId": "17dbc455-6ba7-48b3-a2ef-ca0017d359fe",
+        "publicUrl": "https://api.moshq.app/public/assets/17dbc455-6ba7-48b3-a2ef-ca0017d359fe",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Save 52% — 90-Day Guarantee",
+        "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nSave 52% on the 90-day supply. Plus a 90-day empty-bottle guarantee. No risk. Just results or a full refund.",
+        "description": "-",
+        "sourceCta": "See Details",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/17dbc455-6ba7-48b3-a2ef-ca0017d359fe",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Save 52% — 90-Day Guarantee",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C017 / 50% Off — 90-Day Guarantee\nSource creative SHA-256: bd88ee3de1b4a648785d4a6b1d7b4d8fd7b1e3e72ff7c1e3556bf09ef29bff96\nRemix copy: TENOR-COPY013 / Save 52% — 90-Day Guarantee\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: See Details\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "bef04564-edb3-4ff9-aa70-0f966e21cb01",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-ca4c790c-99ce-4fda-871c-0944b01b8ba2",
+        "workflowUrl": "https://moshq.app/workflows/bef04564-edb3-4ff9-aa70-0f966e21cb01",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-18-TENOR-COPY013-C017.json",
+        "payloadOut": {
+          "job_id": "openai:88ba9ded8b699219fab6954743b88659ec77c07424b6e601c8132c70ac7462fe",
+          "asset_ids": [
+            "aefb8f8b-9bd8-4c18-928f-c8b15c8c5c9e"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "aefb8f8b-9bd8-4c18-928f-c8b15c8c5c9e",
+        "publicId": "657f4d8f-670f-4ea2-843c-92f82e977cdc",
+        "publicUrl": "https://api.moshq.app/public/assets/657f4d8f-670f-4ea2-843c-92f82e977cdc",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/18-TENOR-COPY013-C017.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/18-TENOR-COPY013-C017.png",
+        "bytes": 2640142,
+        "sha256": "7092e6feeddf5acb8ae641c9c02e4b4cfea298c924467bf8d34b85b8711285cd",
+        "remoteJobId": "openai:88ba9ded8b699219fab6954743b88659ec77c07424b6e601c8132c70ac7462fe",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014159Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=982d9c760418d0cf256104b8ccb64d2102595df740f713677d7606acec7bb023",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014159Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=95f0bf81cf8dfe32f27538cdf4db67f70a00ad5eeeb495c50f25f62dbd0a2698",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014159Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=9178b7ac283f55dda29d9593ec052d1d6ee0cd04e9c973f005bc8e8c032ddb60"
+        ]
+      }
+    },
+    {
+      "rowKey": "19-TENOR-COPY014-C018",
+      "rowIndex": 19,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY014",
+      "remixCopyId": "TENOR-COPY014",
+      "creativeId": "C018",
+      "creativeReferenceTitle": "50% Off — 90-Day Guarantee",
+      "creativeFile": "creatives/C018_4904e53d1981_50-off-90-day-guarantee.jpg",
+      "sourceCreativeSha256": "4904e53d19812c8acb63efa4bf0e6f75c85cba805c2ca06bf264c21f4c5fb506",
+      "stagedSourceSha256": "4904e53d19812c8acb63efa4bf0e6f75c85cba805c2ca06bf264c21f4c5fb506",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "a3bdaa8d-c9fe-4bab-ae60-5485dccd23bd",
+        "publicId": "3fe5dbf0-6ab3-4f89-81fc-7856ea153bda",
+        "publicUrl": "https://api.moshq.app/public/assets/3fe5dbf0-6ab3-4f89-81fc-7856ea153bda",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Save 52% — 90-Day Guarantee",
+        "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nSave 52% on the 90-day supply. Plus a 90-day empty-bottle guarantee. No risk. Just results or a full refund.",
+        "description": "-",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/3fe5dbf0-6ab3-4f89-81fc-7856ea153bda",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Save 52% — 90-Day Guarantee",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C018 / 50% Off — 90-Day Guarantee\nSource creative SHA-256: 4904e53d19812c8acb63efa4bf0e6f75c85cba805c2ca06bf264c21f4c5fb506\nRemix copy: TENOR-COPY014 / Save 52% — 90-Day Guarantee\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "4bdbdd2c-b4ba-4c4d-8b1a-d8f8d16fec7d",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-df4cf560-75bc-4b6f-8af6-fd6946b655db",
+        "workflowUrl": "https://moshq.app/workflows/4bdbdd2c-b4ba-4c4d-8b1a-d8f8d16fec7d",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-19-TENOR-COPY014-C018.json",
+        "payloadOut": {
+          "job_id": "openai:73e74394a019b42a193298b559b65693186634c56ea11ccb05f7cc8cfe0e19da",
+          "asset_ids": [
+            "cfd7b074-c1f3-47e3-8824-c37e47b282e7"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "cfd7b074-c1f3-47e3-8824-c37e47b282e7",
+        "publicId": "772b1f5a-e73e-4ba9-8343-e74bc0fec5a0",
+        "publicUrl": "https://api.moshq.app/public/assets/772b1f5a-e73e-4ba9-8343-e74bc0fec5a0",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/19-TENOR-COPY014-C018.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/19-TENOR-COPY014-C018.png",
+        "bytes": 3160072,
+        "sha256": "9a6b907a44538f9994d4622889b6f8468fcce416d3b2a66702fbdd2cd053b767",
+        "remoteJobId": "openai:73e74394a019b42a193298b559b65693186634c56ea11ccb05f7cc8cfe0e19da",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014653Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=2f3bd51d4337665688c9b830cae8efb1eae43cbb571f8e302501917d14eba550",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014653Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=8761bf82054f812541167a6050f41ab5fe73b28cebfee286687fee86408dbd9c",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014653Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=c3bbc0cd84fa54734841754122bce17fb4a1d011b3ba28395d98672f5b34b54c"
+        ]
+      }
+    },
+    {
+      "rowKey": "20-TENOR-COPY015-C021",
+      "rowIndex": 20,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY015",
+      "remixCopyId": "TENOR-COPY015",
+      "creativeId": "C021",
+      "creativeReferenceTitle": "90-Day Guarantee Because We Know It Works.",
+      "creativeFile": "creatives/C021_4f989b90bfd4_90-day-guarantee-because-we-know-it-works.jpg",
+      "sourceCreativeSha256": "4f989b90bfd46bd5418b1cf461dbf28a651c13ce78652605d08c75f174238b23",
+      "stagedSourceSha256": "4f989b90bfd46bd5418b1cf461dbf28a651c13ce78652605d08c75f174238b23",
+      "aspectRatio": "1:1",
+      "sourceAttachment": {
+        "assetId": "b93a4dcb-7187-4c1c-917e-476afb7ef6a4",
+        "publicId": "7c27bc77-795f-4cb8-9960-501b20401bfe",
+        "publicUrl": "https://api.moshq.app/public/assets/7c27bc77-795f-4cb8-9960-501b20401bfe",
+        "width": 1080,
+        "height": 1080,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "90-Day Guarantee. Because It Works.",
+        "primaryText": "Your dad wasn't crashing at 3 p.m. every afternoon.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Deadlines. A phone in his hand from 6 a.m. to midnight.\nStress that never stops — quietly draining the signal behind your drive.\n\n❌ Seed oils. Plastics. Tap water.\nA food system working against your hormonal balance at every meal.\n\n❌ Sitting. Commuting. Sleeping five hours.\nA lifestyle that chokes circulation and recovery before your body even has a chance.\n\nYou're not broken.\n\nYou're unsupported.\n\nQuietly. Steadily. For years.\n\nTenor Daily Drive Essentials was built to plug the leaks:\n\n💪 Tongkat Ali (400mg) — supports the pathway your body forgot how to use\n\n💪 Zinc (50mg) — feeds the system behind healthy hormone metabolism\n\n💪 21 active ingredients — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nJust disclosed doses.\nTwo capsules.\nEvery morning.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nStop waiting for it to fix itself.\n\nStart supporting what's been declining.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/7c27bc77-795f-4cb8-9960-501b20401bfe",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "90-Day Guarantee. Because It Works.",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C021 / 90-Day Guarantee Because We Know It Works.\nSource creative SHA-256: 4f989b90bfd46bd5418b1cf461dbf28a651c13ce78652605d08c75f174238b23\nRemix copy: TENOR-COPY015 / 90-Day Guarantee. Because It Works.\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "45ca2eb8-0ca1-49d0-99c5-083be3a04060",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-565b2920-c4f9-4335-8051-b963d251bc04",
+        "workflowUrl": "https://moshq.app/workflows/45ca2eb8-0ca1-49d0-99c5-083be3a04060",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-20-TENOR-COPY015-C021.json",
+        "payloadOut": {
+          "job_id": "openai:264a265fde2ebaafc78cb9612fa44e754566d0585d8b69739d81138bb8eb3687",
+          "asset_ids": [
+            "06811533-9733-4c7f-a256-9776d12f52c6"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "06811533-9733-4c7f-a256-9776d12f52c6",
+        "publicId": "7cc5b179-bae7-4d45-b5af-5b82f548ea05",
+        "publicUrl": "https://api.moshq.app/public/assets/7cc5b179-bae7-4d45-b5af-5b82f548ea05",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/20-TENOR-COPY015-C021.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/20-TENOR-COPY015-C021.png",
+        "bytes": 2003488,
+        "sha256": "c6cbf9cebdf7556007ed64ec69a25a72d78ff0d386a1f2b0467ed1d95cb57a45",
+        "remoteJobId": "openai:264a265fde2ebaafc78cb9612fa44e754566d0585d8b69739d81138bb8eb3687",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014222Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=95dde01f3ada57dfed5b1e1dbd47120840fcfa98bc328102f42bd88ad8309cbd",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014222Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=bb6c9b6bb4163aed43df422b19a0c4eda5f4d439494b3a4b8e2214e2152b800c",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014222Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=d963f6f571ad942125e600973ea150ec3baa4973a66d1d183c47421d427dfa9d"
+        ]
+      }
+    },
+    {
+      "rowKey": "21-TENOR-COPY016-C023",
+      "rowIndex": 21,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY016",
+      "remixCopyId": "TENOR-COPY016",
+      "creativeId": "C023",
+      "creativeReferenceTitle": "50% off + Free Gifts 🚀",
+      "creativeFile": "creatives/C023_41f6bdf8f198_50-off-free-gifts.jpg",
+      "sourceCreativeSha256": "41f6bdf8f198d6a7b23d1e737161e0d79dfdc7f5218063c1038cc182a82db47e",
+      "stagedSourceSha256": "41f6bdf8f198d6a7b23d1e737161e0d79dfdc7f5218063c1038cc182a82db47e",
+      "aspectRatio": "1:1",
+      "sourceAttachment": {
+        "assetId": "88db8739-4d1a-4d45-9509-7fbffecb9df1",
+        "publicId": "e2abcc60-b7d5-43f0-b435-10987d140f20",
+        "publicUrl": "https://api.moshq.app/public/assets/e2abcc60-b7d5-43f0-b435-10987d140f20",
+        "width": 1080,
+        "height": 1080,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Save 52% + Free $62 Welcome Kit 🚀",
+        "primaryText": "SAVE 52% + FREE $62 WELCOME KIT 🔥\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol — save 52% + free Welcome Kit + free shipping.",
+        "description": "✅ 90-Day Empty-Bottle Guarantee",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/e2abcc60-b7d5-43f0-b435-10987d140f20",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Save 52% + Free $62 Welcome Kit 🚀",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C023 / 50% off + Free Gifts 🚀\nSource creative SHA-256: 41f6bdf8f198d6a7b23d1e737161e0d79dfdc7f5218063c1038cc182a82db47e\nRemix copy: TENOR-COPY016 / Save 52% + Free $62 Welcome Kit 🚀\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "9f2ef408-793d-4f46-befd-0e5b616e2d3d",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-9eddc8c1-d24c-4058-8c7d-8d19a0baac9b",
+        "workflowUrl": "https://moshq.app/workflows/9f2ef408-793d-4f46-befd-0e5b616e2d3d",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-21-TENOR-COPY016-C023.json",
+        "payloadOut": {
+          "job_id": "openai:8f95161f9d6bb4ccffc4ea460b2ad1f85375c95e4f398ae1f3c4b42cef151f08",
+          "asset_ids": [
+            "9c883199-146f-4859-a150-65b6c99801f9"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "9c883199-146f-4859-a150-65b6c99801f9",
+        "publicId": "bbbc06b0-7226-4b48-9071-d1f7962f27c4",
+        "publicUrl": "https://api.moshq.app/public/assets/bbbc06b0-7226-4b48-9071-d1f7962f27c4",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/21-TENOR-COPY016-C023.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/21-TENOR-COPY016-C023.png",
+        "bytes": 1485144,
+        "sha256": "562c242c5156e3850cb27cd8af0e7e2a2820376b8c8e02fcd5585748355a0420",
+        "remoteJobId": "openai:8f95161f9d6bb4ccffc4ea460b2ad1f85375c95e4f398ae1f3c4b42cef151f08",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014322Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=3a691b21743ab2eeaaf7a785d36d4a9c485733ad36ecc4714f167ff426e6bc05",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014322Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=b877f55ad6cd919aae0b4729af3d8ff2dc9b649ef9f4394796d24f8f2c50c2e3",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014322Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=d98a3acd86a2e5e439e12a562dad9dec32eaffeda2094a6b5ee69cf764c814d7"
+        ]
+      }
+    },
+    {
+      "rowKey": "22-TENOR-COPY017-C024",
+      "rowIndex": 22,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY017",
+      "remixCopyId": "TENOR-COPY017",
+      "creativeId": "C024",
+      "creativeReferenceTitle": "90-Day Guarantee Because We Know It Works.",
+      "creativeFile": "creatives/C024_0db88035984e_90-day-guarantee-because-we-know-it-works.jpg",
+      "sourceCreativeSha256": "0db88035984e3eda4a39d9f48d7c81d4e0e5f5cd2146bedd0c083777b1224d6f",
+      "stagedSourceSha256": "0db88035984e3eda4a39d9f48d7c81d4e0e5f5cd2146bedd0c083777b1224d6f",
+      "aspectRatio": "9:16",
+      "sourceAttachment": {
+        "assetId": "ba035f3f-ecf3-4c21-b7cd-d6a062aa811b",
+        "publicId": "6a85d59c-8538-4602-89e8-10d7d6326c6f",
+        "publicUrl": "https://api.moshq.app/public/assets/6a85d59c-8538-4602-89e8-10d7d6326c6f",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "90-Day Guarantee. Because It Works.",
+        "primaryText": "Your dad wasn't dragging through every afternoon at 55.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Notifications. Blue light at 11 p.m.\nA nervous system that never gets to rest.\n\n❌ Seed oils. Plastics. Processed everything.\nA food system turning your body against itself — one meal at a time.\n\n❌ Deadlines. Commutes. Kids. Bills.\nStress that chokes the signal behind your drive. Slowly. For years.\n\nYou're not failing.\n\nYou're unsupported.\n\nTenor Daily Drive Essentials was built to support what's been quietly declining:\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways\n\n💪 Zinc (50mg) — feeds the system behind daily drive and focus\n\n💪 21 active ingredients at disclosed doses — no proprietary blends, no hidden formulas\n\nNo guessing.\nNo fairy dust.\nNo tricks.\n\nJust two capsules.\nEvery morning.\nDisclosed doses your body can feel.\n\nSave 52% on your 90-day supply. 90-day empty-bottle guarantee.\n\nStop waiting.\n\nStart supporting.",
+        "description": "-",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/6a85d59c-8538-4602-89e8-10d7d6326c6f",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "90-Day Guarantee. Because It Works.",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C024 / 90-Day Guarantee Because We Know It Works.\nSource creative SHA-256: 0db88035984e3eda4a39d9f48d7c81d4e0e5f5cd2146bedd0c083777b1224d6f\nRemix copy: TENOR-COPY017 / 90-Day Guarantee. Because It Works.\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "84f23627-e4c3-4ca4-acee-8228a1bea30e",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-f8ee7f1a-a096-48ef-8cb8-cf6d8c58a162",
+        "workflowUrl": "https://moshq.app/workflows/84f23627-e4c3-4ca4-acee-8228a1bea30e",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-22-TENOR-COPY017-C024.json",
+        "payloadOut": {
+          "job_id": "openai:d06ada4d85f967f4c9a793b382327ad2a7be59ad875cb6d4eed79fe57201c493",
+          "asset_ids": [
+            "6cb144d9-cf9a-4bf8-9ce7-649dbb20bdb5"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "6cb144d9-cf9a-4bf8-9ce7-649dbb20bdb5",
+        "publicId": "2d3dd8d1-6495-44e4-8194-597ddac16006",
+        "publicUrl": "https://api.moshq.app/public/assets/2d3dd8d1-6495-44e4-8194-597ddac16006",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/22-TENOR-COPY017-C024.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/22-TENOR-COPY017-C024.png",
+        "bytes": 2072440,
+        "sha256": "346140329830420d61b264fc92263911f735f693ea640ee733aa653447de2b42",
+        "remoteJobId": "openai:d06ada4d85f967f4c9a793b382327ad2a7be59ad875cb6d4eed79fe57201c493",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014654Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=7fba19a690d7a046f9adcbf0e4f4ee685ebd2e1093fd6e8dfaf12634897ca5ca",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014654Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=0b253df073bb151ffb3cb328b3bda689be6e022fe79fc8ca40ce3070db0ab6f4",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014654Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=ffffbce734a96e4c25f2756030fca08f3e8bdd94e4b8c30682674acfec1042bc"
+        ]
+      }
+    },
+    {
+      "rowKey": "23-TENOR-COPY018-C025",
+      "rowIndex": 23,
+      "launchSlot": "Quiz funnel",
+      "sourceCopyId": "COPY018",
+      "remixCopyId": "TENOR-COPY018",
+      "creativeId": "C025",
+      "creativeReferenceTitle": "50% Off + Free Gifts 🚀",
+      "creativeFile": "creatives/C025_86d6b35dc719_50-off-free-gifts.jpg",
+      "sourceCreativeSha256": "86d6b35dc7190f20ae4344c7397985db397ddad5c855822cde9ab655671f86e2",
+      "stagedSourceSha256": "86d6b35dc7190f20ae4344c7397985db397ddad5c855822cde9ab655671f86e2",
+      "aspectRatio": "4:5",
+      "sourceAttachment": {
+        "assetId": "d8f95aeb-2b66-4a36-9f7a-d734e2a16753",
+        "publicId": "126898a9-215c-4559-b063-a7fd2dc34f5a",
+        "publicUrl": "https://api.moshq.app/public/assets/126898a9-215c-4559-b063-a7fd2dc34f5a",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "meta": {
+        "headline": "Save 52% + Free $62 Welcome Kit 🚀",
+        "primaryText": "Noticed your midsection holding on — no matter what you do?\n\nThat's not just extra calories. It's a visible sign of what's shifting inside.\n\nLet's talk about something most men quietly notice but never say out loud…\n\nThe soft tissue where definition used to be.\n\nHere's the truth: it's not about skipping workouts or eating too much.\n\nIt's what happens when the systems behind your drive start declining.\n\nWhen those pathways slow — which research shows starts around 30 — your body's balance shifts. The result? Stored fat where lean tissue should be.\n\nAnd that same shift is why you feel drained by 3 p.m. Why workouts feel flat. Why your drive isn't what it used to be.\n\nYou can try everything…\n\nMore reps. Cutting carbs. Fat burners. Another supplement with a hidden formula.\n\nBut if you don't support the underlying systems, you're wasting time and money.\n\nThat's why Dr. Adam Reese built Tenor Daily Drive Essentials.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n🪨 Maca (250mg) — supports stamina and endocrine balance\n🛡️ Zinc (50mg) — supports the pathway behind hormone production\n⚙️ Boron — supports free hormone levels your body can use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and daily focus\n☀️ Botanical Matrix (745mg) — nine adaptogens for energy, mood, and balance\n\nIn a survey of 1,203 Tenor customers:\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nTwo capsules every morning. That's it.\n\nNo needles. No prescription. No clinic. Just a simple daily protocol that supports your body's systems.\n\nSave 52% on the 90-Day Supply — plus a $62 Welcome Kit and free shipping.\n\nIf it doesn't work for you? Return even the empty bottles. Full refund.\n\nSupport your drive. Naturally.",
+        "description": "-",
+        "sourceCta": "Get The Protocol",
+        "callToActionType": "LEARN_MORE",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/126898a9-215c-4559-b063-a7fd2dc34f5a",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Save 52% + Free $62 Welcome Kit 🚀",
+        "swipeAngle": "Launch slot: Quiz funnel\nSource creative: C025 / 50% Off + Free Gifts 🚀\nSource creative SHA-256: 86d6b35dc7190f20ae4344c7397985db397ddad5c855822cde9ab655671f86e2\nRemix copy: TENOR-COPY018 / Save 52% + Free $62 Welcome Kit 🚀\nDestination URL for this row: https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/\nSales URL: https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039\nCSV CTA: Get The Protocol\nUse the attached source creative as the composition and design reference.\nReplace source brand identity with Tenor using the supplied row context.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1
+      },
+      "workflow": {
+        "workflowRunId": "276e1e65-a5d4-460c-b13a-dd3f1ceff5bd",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-0c99d325-e1a6-4599-b22f-03f11e13f388",
+        "workflowUrl": "https://moshq.app/workflows/276e1e65-a5d4-460c-b13a-dd3f1ceff5bd",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/workflow-23-TENOR-COPY018-C025.json",
+        "payloadOut": {
+          "job_id": "openai:542cbf8a2fd6537b1f9bbdffea979930b9f639672ce4fa53d0f16a0f3265b42a",
+          "asset_ids": [
+            "5baf5743-a96c-4622-aa82-fe5cc2c6d702"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "primaryOpenAiFailure": null
+      },
+      "result": {
+        "assetId": "5baf5743-a96c-4622-aa82-fe5cc2c6d702",
+        "publicId": "05c5a5d9-e2af-42a0-b9db-d928425869ca",
+        "publicUrl": "https://api.moshq.app/public/assets/05c5a5d9-e2af-42a0-b9db-d928425869ca",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/23-TENOR-COPY018-C025.png",
+        "reviewPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/review/23-TENOR-COPY018-C025.png",
+        "bytes": 1425520,
+        "sha256": "80cf29f0d8585b8d6d3db8af8bd6e66ec425fd412e254bbcd6bee3e6f4aec1af",
+        "remoteJobId": "openai:542cbf8a2fd6537b1f9bbdffea979930b9f639672ce4fa53d0f16a0f3265b42a",
+        "renderProvider": "openai",
+        "renderModelIdRequested": "gpt-image-2",
+        "renderModelIdUsed": "gpt-image-2",
+        "usedAuthorizedFallback": false,
+        "productReferenceRequired": true,
+        "productReferenceAttached": true,
+        "productReferenceRenderAssetIds": [
+          "d49bcd03-8a49-4263-9c5f-00ea23d25ee7",
+          "37dd79c3-90af-4ffc-a99c-8d911d20bab8",
+          "c13356ac-e41a-4cbf-98c6-16d250677216"
+        ],
+        "productReferenceImageUrlsSelected": [
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/eb/eb565bf0e71d7bd4267b80c485ae158acf73c80d8c4f51f8a6b6c3a0444378b5.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014649Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=cca95320676d0210e6a0998d0b50c45a6554646cec7ad9070f4c0f664c5522cf",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/2d/2d918385644a2cb43bbb659bb1ec0ebd3c2c6978c4f12469f2ed02373d433e44.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014649Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=c07c0390974cb5617387c93dc3080629a5b74abc93113039ab76dc1798012f6c",
+          "https://hel1.your-objectstorage.com/ghc-media/dev/orig/49/49f6492f8d9663d59f6eca0b81af16fa83e647eba669dfb624e6510f5107f7d7.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=4PAHSDDK5UEJT9U82ER9%2F20260505%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260505T014649Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=d7c00482aa853bd5366bdd50e0faa079d5ada66b83b094a239e389c2d21f523f"
+        ]
+      }
+    }
+  ],
+  "updatedAt": "2026-05-05T01:51:02.748Z",
+  "productReferenceRegeneration": {
+    "updatedAt": "2026-05-05T01:37:02.262Z",
+    "reason": "Removed generated product-bearing rows that were created before swipeRequiresProductImage was enabled.",
+    "productCreativeIds": [
+      "C005",
+      "C006",
+      "C009",
+      "C012",
+      "C013",
+      "C017",
+      "C018",
+      "C019",
+      "C020",
+      "C021",
+      "C022",
+      "C023",
+      "C024",
+      "C025"
+    ],
+    "removedRows": [
+      {
+        "rowKey": "04-TENOR-COPY001-C006",
+        "creativeId": "C006",
+        "assetId": "1f495f84-abe7-4295-892c-01dd8d046c75",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/04-TENOR-COPY001-C006.png"
+      },
+      {
+        "rowKey": "08-TENOR-COPY002-C009",
+        "creativeId": "C009",
+        "assetId": "1a1da36c-dbc7-4ea8-ac76-2f2b5fc8dffe",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/08-TENOR-COPY002-C009.png"
+      },
+      {
+        "rowKey": "10-TENOR-COPY002-C005",
+        "creativeId": "C005",
+        "assetId": "87243a7c-ed63-4a92-975f-bdd5cea71fe4",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/10-TENOR-COPY002-C005.png"
+      },
+      {
+        "rowKey": "12-TENOR-COPY002-C012",
+        "creativeId": "C012",
+        "assetId": "948fc9ad-190b-493d-8a4d-81fae0c5b4a2",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/12-TENOR-COPY002-C012.png"
+      },
+      {
+        "rowKey": "13-TENOR-COPY003-C013",
+        "creativeId": "C013",
+        "assetId": "676d1224-3bff-460d-a2a3-44e154a76631",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/13-TENOR-COPY003-C013.png"
+      },
+      {
+        "rowKey": "14-TENOR-COPY011-C022",
+        "creativeId": "C022",
+        "assetId": "8c01a85e-0d25-4b30-871d-48020e8b21e1",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/14-TENOR-COPY011-C022.png"
+      },
+      {
+        "rowKey": "15-TENOR-COPY011-C019",
+        "creativeId": "C019",
+        "assetId": "fa30df9a-b21e-4e45-8afa-d5e5a6f53608",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/generated/15-TENOR-COPY011-C019.png"
+      }
+    ],
+    "supersededDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/superseded-no-product-reference"
+  },
+  "batchStamp": {
+    "status": "ok",
+    "batchId": "tenor-glp-quiz-gpt-image2-20260505",
+    "assetCount": 23
+  }
+}

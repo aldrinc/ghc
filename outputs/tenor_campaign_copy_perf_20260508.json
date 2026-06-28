@@ -1,0 +1,1946 @@
+{
+  "campaignSummaries": [
+    {
+      "label": "current_review_v3_glp_quiz",
+      "campaignId": "120245546805940293",
+      "campaign": {
+        "id": "120245546805940293",
+        "name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-06 - Review v3",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "created_time": "2026-05-07T07:36:09-0700",
+        "start_time": "2026-05-08T00:01:00-0700",
+        "objective": "OUTCOME_SALES",
+        "buying_type": "AUCTION",
+        "daily_budget": "10000"
+      },
+      "adStatusCounts": {
+        "ACTIVE": 83,
+        "PAUSED": 66
+      },
+      "adEffectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 77,
+        "DISAPPROVED": 6,
+        "PAUSED": 63,
+        "WITH_ISSUES": 3
+      },
+      "adsWithIssues": 3,
+      "insights": [
+        {
+          "campaign_id": "120245546805940293",
+          "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-06 - Review v3",
+          "spend": "40.45",
+          "impressions": "183",
+          "reach": "174",
+          "frequency": "1.051724",
+          "cpm": "221.038251",
+          "cpc": "3.370833",
+          "ctr": "6.557377",
+          "clicks": "12",
+          "inline_link_clicks": "6",
+          "inline_link_click_ctr": "3.278689",
+          "actions": [
+            {
+              "action_type": "link_click",
+              "value": "6"
+            },
+            {
+              "action_type": "page_engagement",
+              "value": "7"
+            },
+            {
+              "action_type": "landing_page_view",
+              "value": "5"
+            },
+            {
+              "action_type": "omni_landing_page_view",
+              "value": "5"
+            },
+            {
+              "action_type": "post_engagement",
+              "value": "7"
+            },
+            {
+              "action_type": "post_interaction_gross",
+              "value": "1"
+            },
+            {
+              "action_type": "post_interaction_net",
+              "value": "1"
+            },
+            {
+              "action_type": "onsite_conversion.post_net_like",
+              "value": "1"
+            },
+            {
+              "action_type": "post_reaction",
+              "value": "1"
+            },
+            {
+              "action_type": "offsite_conversion.fb_pixel_custom",
+              "value": "14"
+            },
+            {
+              "action_type": "offsite_conversion.custom.1498235888522157",
+              "value": "8"
+            },
+            {
+              "action_type": "offsite_conversion.custom.4455407368061391",
+              "value": "5"
+            }
+          ],
+          "cost_per_action_type": [
+            {
+              "action_type": "offsite_conversion.fb_pixel_custom",
+              "value": "2.889286"
+            },
+            {
+              "action_type": "link_click",
+              "value": "6.741667"
+            },
+            {
+              "action_type": "post_interaction_gross",
+              "value": "40.45"
+            },
+            {
+              "action_type": "post_engagement",
+              "value": "5.778571"
+            },
+            {
+              "action_type": "landing_page_view",
+              "value": "8.09"
+            },
+            {
+              "action_type": "page_engagement",
+              "value": "5.778571"
+            },
+            {
+              "action_type": "omni_landing_page_view",
+              "value": "8.09"
+            },
+            {
+              "action_type": "offsite_conversion.custom.1498235888522157",
+              "value": "5.05625"
+            },
+            {
+              "action_type": "offsite_conversion.custom.4455407368061391",
+              "value": "8.09"
+            }
+          ],
+          "date_start": "2026-05-08",
+          "date_stop": "2026-05-08"
+        }
+      ],
+      "adInsightsCount": 20,
+      "adInsightsError": null
+    },
+    {
+      "label": "previous_problem_aware_20260505",
+      "campaignId": "120245434499120293",
+      "campaign": {
+        "id": "120245434499120293",
+        "name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-05",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "created_time": "2026-05-05T18:41:55-0700",
+        "start_time": "2026-05-05T18:41:56-0700",
+        "objective": "OUTCOME_SALES",
+        "buying_type": "AUCTION",
+        "daily_budget": "10000"
+      },
+      "adStatusCounts": {
+        "PAUSED": 83
+      },
+      "adEffectiveStatusCounts": {
+        "PAUSED": 83
+      },
+      "adsWithIssues": 0,
+      "insights": [],
+      "adInsightsCount": 0,
+      "adInsightsError": null
+    },
+    {
+      "label": "gpt_image2_pilot_20260505",
+      "campaignId": "120245374665090293",
+      "campaign": {
+        "id": "120245374665090293",
+        "name": "Tenor - GLP + Quiz - GPT Image 2 - 2026-05-05",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "created_time": "2026-05-04T18:51:34-0700",
+        "start_time": "2026-05-04T18:51:35-0700",
+        "objective": "OUTCOME_SALES",
+        "buying_type": "AUCTION",
+        "daily_budget": "10000"
+      },
+      "adStatusCounts": {
+        "PAUSED": 23
+      },
+      "adEffectiveStatusCounts": {
+        "PAUSED": 23
+      },
+      "adsWithIssues": 0,
+      "insights": [],
+      "adInsightsCount": 0,
+      "adInsightsError": null
+    },
+    {
+      "label": "trt_product_removed_20260503",
+      "campaignId": "120245292268820293",
+      "campaign": {
+        "id": "120245292268820293",
+        "name": "Tenor - Walk Away From TRT - Product Removed - 2026-05-03",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "created_time": "2026-05-03T09:04:00-0700",
+        "start_time": "2026-05-03T09:04:01-0700",
+        "objective": "OUTCOME_SALES",
+        "buying_type": "AUCTION",
+        "daily_budget": "10000"
+      },
+      "adStatusCounts": {
+        "PAUSED": 30
+      },
+      "adEffectiveStatusCounts": {
+        "PAUSED": 30
+      },
+      "adsWithIssues": 0,
+      "insights": [],
+      "adInsightsCount": 0,
+      "adInsightsError": null
+    },
+    {
+      "label": "trt_no_product_20260503",
+      "campaignId": "120245259412930293",
+      "campaign": {
+        "id": "120245259412930293",
+        "name": "Tenor - Walk Away From TRT - No Product - 2026-05-03",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "created_time": "2026-05-02T20:48:41-0700",
+        "start_time": "2026-05-02T20:48:42-0700",
+        "objective": "OUTCOME_SALES",
+        "buying_type": "AUCTION",
+        "daily_budget": "10000"
+      },
+      "adStatusCounts": {
+        "PAUSED": 30
+      },
+      "adEffectiveStatusCounts": {
+        "PAUSED": 30
+      },
+      "adsWithIssues": 0,
+      "insights": [],
+      "adInsightsCount": 0,
+      "adInsightsError": null
+    },
+    {
+      "label": "trt_updated_copy_20260503",
+      "campaignId": "120245256104700293",
+      "campaign": {
+        "id": "120245256104700293",
+        "name": "Tenor - Walk Away From TRT - Meta Launch - Updated Copy - 2026-05-03",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "created_time": "2026-05-02T18:55:22-0700",
+        "start_time": "2026-05-02T18:55:22-0700",
+        "objective": "OUTCOME_SALES",
+        "buying_type": "AUCTION",
+        "daily_budget": "10000"
+      },
+      "adStatusCounts": {
+        "PAUSED": 30
+      },
+      "adEffectiveStatusCounts": {
+        "PAUSED": 30
+      },
+      "adsWithIssues": 0,
+      "insights": [],
+      "adInsightsCount": 0,
+      "adInsightsError": null
+    },
+    {
+      "label": "vanishing_man_20260424",
+      "campaignId": "120244361432940293",
+      "campaign": {
+        "id": "120244361432940293",
+        "name": "[4/24/26] - [Tenor - The Vanishing Man] - [CBO] - [8 Presell URL Buckets]",
+        "status": "PAUSED",
+        "effective_status": "PAUSED",
+        "created_time": "2026-04-23T19:42:03-0700",
+        "start_time": "2026-04-23T19:42:04-0700",
+        "objective": "OUTCOME_SALES",
+        "buying_type": "AUCTION",
+        "daily_budget": "5000"
+      },
+      "adStatusCounts": {
+        "ACTIVE": 29
+      },
+      "adEffectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 29
+      },
+      "adsWithIssues": 0,
+      "insights": [
+        {
+          "campaign_id": "120244361432940293",
+          "campaign_name": "[4/24/26] - [Tenor - The Vanishing Man] - [CBO] - [8 Presell URL Buckets]",
+          "spend": "135.66",
+          "impressions": "1875",
+          "reach": "1670",
+          "frequency": "1.122754",
+          "cpm": "72.352",
+          "cpc": "0.91047",
+          "ctr": "7.946667",
+          "clicks": "149",
+          "inline_link_clicks": "108",
+          "inline_link_click_ctr": "5.76",
+          "actions": [
+            {
+              "action_type": "link_click",
+              "value": "108"
+            },
+            {
+              "action_type": "page_engagement",
+              "value": "114"
+            },
+            {
+              "action_type": "landing_page_view",
+              "value": "39"
+            },
+            {
+              "action_type": "omni_landing_page_view",
+              "value": "39"
+            },
+            {
+              "action_type": "post_engagement",
+              "value": "114"
+            },
+            {
+              "action_type": "post_interaction_gross",
+              "value": "6"
+            },
+            {
+              "action_type": "post_interaction_net",
+              "value": "6"
+            },
+            {
+              "action_type": "onsite_conversion.post_net_like",
+              "value": "6"
+            },
+            {
+              "action_type": "post_reaction",
+              "value": "6"
+            }
+          ],
+          "cost_per_action_type": [
+            {
+              "action_type": "link_click",
+              "value": "1.256111"
+            },
+            {
+              "action_type": "post_interaction_gross",
+              "value": "22.61"
+            },
+            {
+              "action_type": "post_engagement",
+              "value": "1.19"
+            },
+            {
+              "action_type": "landing_page_view",
+              "value": "3.478462"
+            },
+            {
+              "action_type": "page_engagement",
+              "value": "1.19"
+            },
+            {
+              "action_type": "omni_landing_page_view",
+              "value": "3.478462"
+            }
+          ],
+          "date_start": "2026-04-23",
+          "date_stop": "2026-05-08"
+        }
+      ],
+      "adInsightsCount": 27,
+      "adInsightsError": null
+    }
+  ],
+  "currentCopySummary": [
+    {
+      "copyId": "COPY001",
+      "ads": 15,
+      "effectiveStatusCounts": {
+        "DISAPPROVED": 2,
+        "CAMPAIGN_PAUSED": 13
+      },
+      "destinationCounts": {
+        "glp": 15
+      },
+      "spend": 4.79,
+      "impressions": 42,
+      "cpm": 114.05,
+      "clicks": 2,
+      "inlineLinkClicks": 0,
+      "sampleNames": [
+        "ProblemAware GLP curated-16-glp - What GLP-1 Does to Your Drive",
+        "ProblemAware GLP curated-10-glp - What GLP-1 Does to Your Drive",
+        "ProblemAware GLP tenor-01-C001-glp - What GLP-1 Does to Your Drive",
+        "ProblemAware GLP curated-04-glp - What GLP-1 Does to Your Drive",
+        "ProblemAware GLP tenor-02-C002-glp - What GLP-1 Does to Your Drive"
+      ]
+    },
+    {
+      "copyId": "COPY002",
+      "ads": 17,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 16,
+        "DISAPPROVED": 1
+      },
+      "destinationCounts": {
+        "glp": 17
+      },
+      "spend": 6.05,
+      "impressions": 39,
+      "cpm": 155.13,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "sampleNames": [
+        "ProblemAware GLP curated-05-glp - Keep Your Drive Steady on GLP-1s",
+        "ProblemAware GLP curated-26-glp - Keep Your Drive Steady on GLP-1s",
+        "ProblemAware GLP curated-17-glp - Keep Your Drive Steady on GLP-1s",
+        "ProblemAware GLP tenor-11-C010-glp - Keep Your Drive Steady on GLP-1s",
+        "ProblemAware GLP tenor-06-C008-glp - Keep Your Drive Steady on GLP-1s"
+      ]
+    },
+    {
+      "copyId": "COPY003",
+      "ads": 11,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 11
+      },
+      "destinationCounts": {
+        "glp": 11
+      },
+      "spend": 10.34,
+      "impressions": 31,
+      "cpm": 333.55,
+      "clicks": 2,
+      "inlineLinkClicks": 1,
+      "sampleNames": [
+        "ProblemAware GLP tenor-13-C013-glp - The GLP-1 Side Effect No One Mentions",
+        "ProblemAware GLP curated-03-glp - The GLP-1 Side Effect No One Mentions",
+        "ProblemAware GLP curated-27-glp - The GLP-1 Side Effect No One Mentions",
+        "ProblemAware GLP curated-15-glp - The GLP-1 Side Effect No One Mentions",
+        "ProblemAware GLP curated-21-glp - The GLP-1 Side Effect No One Mentions"
+      ]
+    },
+    {
+      "copyId": "COPY011",
+      "ads": 7,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 6,
+        "DISAPPROVED": 1
+      },
+      "destinationCounts": {
+        "quiz": 7
+      },
+      "spend": 8.04,
+      "impressions": 25,
+      "cpm": 321.6,
+      "clicks": 2,
+      "inlineLinkClicks": 1,
+      "sampleNames": [
+        "ProblemAware QUIZ tenor-16-C020-quiz - Stop Losing Drive. Start Today.",
+        "ProblemAware QUIZ tenor-14-C022-quiz - Stop Losing Drive. Start Today.",
+        "ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.",
+        "ProblemAware QUIZ curated-25-quiz - Stop Losing Drive. Start Today.",
+        "ProblemAware QUIZ tenor-15-C019-quiz - Stop Losing Drive. Start Today."
+      ]
+    },
+    {
+      "copyId": "COPY012",
+      "ads": 5,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 4,
+        "DISAPPROVED": 1
+      },
+      "destinationCounts": {
+        "quiz": 5
+      },
+      "spend": 1.11,
+      "impressions": 2,
+      "cpm": 555.0,
+      "clicks": 2,
+      "inlineLinkClicks": 1,
+      "sampleNames": [
+        "ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-18-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-02-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-10-quiz - 52% Off Limited-Time Welcome Offer"
+      ]
+    },
+    {
+      "copyId": "COPY013",
+      "ads": 5,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 5
+      },
+      "destinationCounts": {
+        "quiz": 5
+      },
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "sampleNames": [
+        "ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ curated-11-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee"
+      ]
+    },
+    {
+      "copyId": "COPY014",
+      "ads": 5,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 5
+      },
+      "destinationCounts": {
+        "quiz": 5
+      },
+      "spend": 9.77,
+      "impressions": 36,
+      "cpm": 271.39,
+      "clicks": 4,
+      "inlineLinkClicks": 3,
+      "sampleNames": [
+        "ProblemAware QUIZ curated-28-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ curated-20-quiz - 52% Off + 90-Day Guarantee",
+        "ProblemAware QUIZ curated-04-quiz - 52% Off + 90-Day Guarantee"
+      ]
+    },
+    {
+      "copyId": "COPY015",
+      "ads": 5,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 5
+      },
+      "destinationCounts": {
+        "quiz": 5
+      },
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "sampleNames": [
+        "ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.",
+        "ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.",
+        "ProblemAware QUIZ curated-29-quiz - 90-Day Guarantee. Because It Works.",
+        "ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.",
+        "ProblemAware QUIZ tenor-20-C021-quiz - 90-Day Guarantee. Because It Works."
+      ]
+    },
+    {
+      "copyId": "COPY016",
+      "ads": 5,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 5
+      },
+      "destinationCounts": {
+        "quiz": 5
+      },
+      "spend": 0.06,
+      "impressions": 2,
+      "cpm": 30.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "sampleNames": [
+        "ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-30-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer"
+      ]
+    },
+    {
+      "copyId": "COPY017",
+      "ads": 4,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 4
+      },
+      "destinationCounts": {
+        "quiz": 4
+      },
+      "spend": 0.29,
+      "impressions": 4,
+      "cpm": 72.5,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "sampleNames": [
+        "ProblemAware QUIZ curated-15-quiz - 90-Day Guarantee. Because It Works.",
+        "ProblemAware QUIZ tenor-22-C024-quiz - 90-Day Guarantee. Because It Works.",
+        "ProblemAware QUIZ curated-07-quiz - 90-Day Guarantee. Because It Works.",
+        "ProblemAware QUIZ curated-23-quiz - 90-Day Guarantee. Because It Works."
+      ]
+    },
+    {
+      "copyId": "COPY018",
+      "ads": 4,
+      "effectiveStatusCounts": {
+        "CAMPAIGN_PAUSED": 3,
+        "DISAPPROVED": 1
+      },
+      "destinationCounts": {
+        "quiz": 4
+      },
+      "spend": 0.0,
+      "impressions": 2,
+      "cpm": 0.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "sampleNames": [
+        "ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-24-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-08-quiz - 52% Off Limited-Time Welcome Offer",
+        "ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer"
+      ]
+    }
+  ],
+  "currentAdRows": [
+    {
+      "adId": "120245565654400293",
+      "name": "ProblemAware GLP curated-05-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245548839200293",
+      "name": "ProblemAware GLP tenor-13-C013-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 5.14,
+      "impressions": 16,
+      "cpm": 321.25,
+      "clicks": 1,
+      "inlineLinkClicks": 1,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565383840293",
+      "name": "ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY013",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565466100293",
+      "name": "ProblemAware QUIZ curated-11-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY013",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245548456240293",
+      "name": "ProblemAware GLP curated-16-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "DISAPPROVED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565546590293",
+      "name": "ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY013",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565583300293",
+      "name": "ProblemAware GLP curated-26-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565668440293",
+      "name": "ProblemAware GLP curated-03-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.89,
+      "impressions": 8,
+      "cpm": 111.25,
+      "clicks": 1,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565625290293",
+      "name": "ProblemAware GLP curated-17-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "DISAPPROVED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565728830293",
+      "name": "ProblemAware QUIZ tenor-16-C020-quiz - Stop Losing Drive. Start Today.",
+      "copyId": "COPY011",
+      "destinationKey": "quiz",
+      "headline": "Stop Losing Drive. Start Today.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value. Every order is backed by a 90-day guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\""
+    },
+    {
+      "adId": "120245548634220293",
+      "name": "ProblemAware GLP curated-10-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.78,
+      "impressions": 5,
+      "cpm": 156.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565745320293",
+      "name": "ProblemAware GLP tenor-11-C010-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565701550293",
+      "name": "ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY016",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.06,
+      "impressions": 2,
+      "cpm": 30.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "SAVE 52% + $35 WELCOME KIT VALUE\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value."
+    },
+    {
+      "adId": "120245548941330293",
+      "name": "ProblemAware GLP tenor-01-C001-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565770990293",
+      "name": "ProblemAware GLP tenor-06-C008-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565495300293",
+      "name": "ProblemAware QUIZ curated-15-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY017",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't dragging through every afternoon at 55.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Notifications. Blue light at 11 p.m.\nA nervous system that never gets to rest.\n\n❌ Seed oils. Plastics. Processed everything.\nA food system turning your body against itself — one meal at a time.\n\n❌ Deadlines. Commutes. Kids. Bills.\nStress that chokes the signal behind your drive. Slowly. For years.\n\nYou're not failing.\n\nYou're unsupported.\n\nTenor Daily Drive Essentials was built to support what's been quietly declining:\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways\n\n💪 Zinc (50mg) — feeds the system behind daily drive and focus\n\n💪 21 active ingredients at disclosed doses — no proprietary blends, no hidden formulas\n\nNo guessing.\nNo fairy dust.\nNo tricks.\n\nJust two capsules.\nEvery morning.\nDisclosed doses your body can feel.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting.\n\nStart supporting."
+    },
+    {
+      "adId": "120245565575660293",
+      "name": "ProblemAware GLP curated-27-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565660530293",
+      "name": "ProblemAware GLP curated-04-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565697080293",
+      "name": "ProblemAware QUIZ tenor-22-C024-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY017",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.29,
+      "impressions": 4,
+      "cpm": 72.5,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't dragging through every afternoon at 55.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Notifications. Blue light at 11 p.m.\nA nervous system that never gets to rest.\n\n❌ Seed oils. Plastics. Processed everything.\nA food system turning your body against itself — one meal at a time.\n\n❌ Deadlines. Commutes. Kids. Bills.\nStress that chokes the signal behind your drive. Slowly. For years.\n\nYou're not failing.\n\nYou're unsupported.\n\nTenor Daily Drive Essentials was built to support what's been quietly declining:\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways\n\n💪 Zinc (50mg) — feeds the system behind daily drive and focus\n\n💪 21 active ingredients at disclosed doses — no proprietary blends, no hidden formulas\n\nNo guessing.\nNo fairy dust.\nNo tricks.\n\nJust two capsules.\nEvery morning.\nDisclosed doses your body can feel.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting.\n\nStart supporting."
+    },
+    {
+      "adId": "120245565794240293",
+      "name": "ProblemAware GLP tenor-02-C002-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245548619770293",
+      "name": "ProblemAware GLP curated-08-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245548847040293",
+      "name": "ProblemAware GLP tenor-12-C012-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245548559220293",
+      "name": "ProblemAware GLP curated-20-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565724660293",
+      "name": "ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY012",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "You eat clean. You move daily. You're STILL crashing by 3 p.m. and gaining weight.\n\nHere's why.\n\nIf you're over 40 and constantly dragging through the day, or frustrated that workouts feel flat…\n\nIt's not willpower.\n\nIt's your systems.\n\nThe pathways behind energy, drive, and stamina start declining around 30. And that slow drain robs you of presence, focus, endurance, and the feeling that your body is actually responding.\n\nOne day you look up and wonder:\n\n\"What happened?\"\n\nMost guys try to fix it by training harder… eating cleaner… drinking more coffee…\n\nAnd when that doesn't work?\n\nA cabinet full of overpriced, under-dosed supplements with hidden blends. Or worse — considering a clinic, a prescription, needles.\n\nHere's the truth:\n\nYou don't need a prescription.\n\nYou need a daily protocol that supports what your body is quietly losing.\n\nThat's what Tenor Daily Drive Essentials was built for.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports drive, stress response, and morning energy\n🪨 Maca (250mg) — supports stamina so you don't crash mid-day\n🛡️ Zinc (50mg) — supports the pathway behind hormone balance\n⚙️ Boron — supports free hormone levels your body can actually use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and mental focus\n☀️ Botanical matrix (745mg) — nine adaptogens supporting daily vitality\n\nNo proprietary blends. No fairy dust. Just disclosed doses your body can feel.\n\nIn a survey of 1,203 men using Tenor for 90 days:\n\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nNo needles. No stacking. No cycling. Just a daily ritual.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\n810,000+ men have already made this their morning protocol.\n\nIf you don't feel steadier, sharper, and more present in 90 days — return even the empty bottles for a full refund. No questions asked.\n\n👉 Support your drive. Naturally. Two capsules every morning."
+    },
+    {
+      "adId": "120245565489550293",
+      "name": "ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY016",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "SAVE 52% + $35 WELCOME KIT VALUE\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value."
+    },
+    {
+      "adId": "120245565529250293",
+      "name": "ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY015",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't crashing at 3 p.m. every afternoon.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Deadlines. A phone in his hand from 6 a.m. to midnight.\nStress that never stops — quietly draining the signal behind your drive.\n\n❌ Seed oils. Plastics. Tap water.\nA food system working against your hormonal balance at every meal.\n\n❌ Sitting. Commuting. Sleeping five hours.\nA lifestyle that chokes circulation and recovery before your body even has a chance.\n\nYou're not broken.\n\nYou're unsupported.\n\nQuietly. Steadily. For years.\n\nTenor Daily Drive Essentials was built to plug the leaks:\n\n💪 Tongkat Ali (400mg) — supports the pathway your body forgot how to use\n\n💪 Zinc (50mg) — feeds the system behind healthy hormone metabolism\n\n💪 21 active ingredients — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nJust disclosed doses.\nTwo capsules.\nEvery morning.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting for it to fix itself.\n\nStart supporting what's been declining."
+    },
+    {
+      "adId": "120245548379050293",
+      "name": "ProblemAware GLP curated-15-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565686290293",
+      "name": "ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY018",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Noticed your midsection holding on — no matter what you do?\n\nThat's not just extra calories. It's a visible sign of what's shifting inside.\n\nLet's talk about something most men quietly notice but never say out loud…\n\nThe soft tissue where definition used to be.\n\nHere's the truth: it's not about skipping workouts or eating too much.\n\nIt's what happens when the systems behind your drive start declining.\n\nWhen those pathways slow — which research shows starts around 30 — your body's balance shifts. The result? Stored fat where lean tissue should be.\n\nAnd that same shift is why you feel drained by 3 p.m. Why workouts feel flat. Why your drive isn't what it used to be.\n\nYou can try everything…\n\nMore reps. Cutting carbs. Fat burners. Another supplement with a hidden formula.\n\nBut if you don't support the underlying systems, you're wasting time and money.\n\nThat's why Dr. Adam Reese built Tenor Daily Drive Essentials.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n🪨 Maca (250mg) — supports stamina and endocrine balance\n🛡️ Zinc (50mg) — supports the pathway behind hormone production\n⚙️ Boron — supports free hormone levels your body can use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and daily focus\n☀️ Botanical Matrix (745mg) — nine adaptogens for energy, mood, and balance\n\nIn a survey of 1,203 Tenor customers:\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nTwo capsules every morning. That's it.\n\nNo needles. No prescription. No clinic. Just a simple daily protocol that supports your body's systems.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\nIf it doesn't work for you? Return even the empty bottles. Full refund.\n\nSupport your drive. Naturally."
+    },
+    {
+      "adId": "120245565567510293",
+      "name": "ProblemAware GLP curated-28-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.62,
+      "impressions": 4,
+      "cpm": 155.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565765270293",
+      "name": "ProblemAware GLP tenor-08-C009-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565520720293",
+      "name": "ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY016",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "SAVE 52% + $35 WELCOME KIT VALUE\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value."
+    },
+    {
+      "adId": "120245548546910293",
+      "name": "ProblemAware GLP curated-21-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565598110293",
+      "name": "ProblemAware GLP curated-24-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.1,
+      "impressions": 1,
+      "cpm": 100.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565679490293",
+      "name": "ProblemAware GLP curated-01-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565482270293",
+      "name": "ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY013",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565616550293",
+      "name": "ProblemAware GLP curated-07-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245547857090293",
+      "name": "ProblemAware QUIZ curated-18-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY012",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "You eat clean. You move daily. You're STILL crashing by 3 p.m. and gaining weight.\n\nHere's why.\n\nIf you're over 40 and constantly dragging through the day, or frustrated that workouts feel flat…\n\nIt's not willpower.\n\nIt's your systems.\n\nThe pathways behind energy, drive, and stamina start declining around 30. And that slow drain robs you of presence, focus, endurance, and the feeling that your body is actually responding.\n\nOne day you look up and wonder:\n\n\"What happened?\"\n\nMost guys try to fix it by training harder… eating cleaner… drinking more coffee…\n\nAnd when that doesn't work?\n\nA cabinet full of overpriced, under-dosed supplements with hidden blends. Or worse — considering a clinic, a prescription, needles.\n\nHere's the truth:\n\nYou don't need a prescription.\n\nYou need a daily protocol that supports what your body is quietly losing.\n\nThat's what Tenor Daily Drive Essentials was built for.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports drive, stress response, and morning energy\n🪨 Maca (250mg) — supports stamina so you don't crash mid-day\n🛡️ Zinc (50mg) — supports the pathway behind hormone balance\n⚙️ Boron — supports free hormone levels your body can actually use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and mental focus\n☀️ Botanical matrix (745mg) — nine adaptogens supporting daily vitality\n\nNo proprietary blends. No fairy dust. Just disclosed doses your body can feel.\n\nIn a survey of 1,203 men using Tenor for 90 days:\n\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nNo needles. No stacking. No cycling. Just a daily ritual.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\n810,000+ men have already made this their morning protocol.\n\nIf you don't feel steadier, sharper, and more present in 90 days — return even the empty bottles for a full refund. No questions asked.\n\n👉 Support your drive. Naturally. Two capsules every morning."
+    },
+    {
+      "adId": "120245565559840293",
+      "name": "ProblemAware GLP curated-30-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.15,
+      "impressions": 4,
+      "cpm": 37.5,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565647410293",
+      "name": "ProblemAware GLP curated-06-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565758330293",
+      "name": "ProblemAware GLP tenor-09-C007-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 2.14,
+      "impressions": 12,
+      "cpm": 178.333333,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565635240293",
+      "name": "ProblemAware GLP curated-13-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "DISAPPROVED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245548830990293",
+      "name": "ProblemAware QUIZ tenor-14-C022-quiz - Stop Losing Drive. Start Today.",
+      "copyId": "COPY011",
+      "destinationKey": "quiz",
+      "headline": "Stop Losing Drive. Start Today.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value. Every order is backed by a 90-day guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\""
+    },
+    {
+      "adId": "120245565474940293",
+      "name": "ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY015",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't crashing at 3 p.m. every afternoon.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Deadlines. A phone in his hand from 6 a.m. to midnight.\nStress that never stops — quietly draining the signal behind your drive.\n\n❌ Seed oils. Plastics. Tap water.\nA food system working against your hormonal balance at every meal.\n\n❌ Sitting. Commuting. Sleeping five hours.\nA lifestyle that chokes circulation and recovery before your body even has a chance.\n\nYou're not broken.\n\nYou're unsupported.\n\nQuietly. Steadily. For years.\n\nTenor Daily Drive Essentials was built to plug the leaks:\n\n💪 Tongkat Ali (400mg) — supports the pathway your body forgot how to use\n\n💪 Zinc (50mg) — feeds the system behind healthy hormone metabolism\n\n💪 21 active ingredients — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nJust disclosed doses.\nTwo capsules.\nEvery morning.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting for it to fix itself.\n\nStart supporting what's been declining."
+    },
+    {
+      "adId": "120245565783080293",
+      "name": "ProblemAware GLP tenor-04-C006-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 3.34,
+      "impressions": 29,
+      "cpm": 115.172414,
+      "clicks": 2,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565554300293",
+      "name": "ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.",
+      "copyId": "COPY011",
+      "destinationKey": "quiz",
+      "headline": "Stop Losing Drive. Start Today.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 1.43,
+      "impressions": 2,
+      "cpm": 715.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value. Every order is backed by a 90-day guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\""
+    },
+    {
+      "adId": "120245565370170293",
+      "name": "ProblemAware QUIZ curated-25-quiz - Stop Losing Drive. Start Today.",
+      "copyId": "COPY011",
+      "destinationKey": "quiz",
+      "headline": "Stop Losing Drive. Start Today.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 6.61,
+      "impressions": 23,
+      "cpm": 287.391304,
+      "clicks": 2,
+      "inlineLinkClicks": 1,
+      "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value. Every order is backed by a 90-day guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\""
+    },
+    {
+      "adId": "120245565391920293",
+      "name": "ProblemAware QUIZ curated-28-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY014",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 9.77,
+      "impressions": 35,
+      "cpm": 279.142857,
+      "clicks": 4,
+      "inlineLinkClicks": 3,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565737940293",
+      "name": "ProblemAware QUIZ tenor-15-C019-quiz - Stop Losing Drive. Start Today.",
+      "copyId": "COPY011",
+      "destinationKey": "quiz",
+      "headline": "Stop Losing Drive. Start Today.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value. Every order is backed by a 90-day guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\""
+    },
+    {
+      "adId": "120245565356280293",
+      "name": "ProblemAware QUIZ curated-07-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY017",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't dragging through every afternoon at 55.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Notifications. Blue light at 11 p.m.\nA nervous system that never gets to rest.\n\n❌ Seed oils. Plastics. Processed everything.\nA food system turning your body against itself — one meal at a time.\n\n❌ Deadlines. Commutes. Kids. Bills.\nStress that chokes the signal behind your drive. Slowly. For years.\n\nYou're not failing.\n\nYou're unsupported.\n\nTenor Daily Drive Essentials was built to support what's been quietly declining:\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways\n\n💪 Zinc (50mg) — feeds the system behind daily drive and focus\n\n💪 21 active ingredients at disclosed doses — no proprietary blends, no hidden formulas\n\nNo guessing.\nNo fairy dust.\nNo tricks.\n\nJust two capsules.\nEvery morning.\nDisclosed doses your body can feel.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting.\n\nStart supporting."
+    },
+    {
+      "adId": "120245565360230293",
+      "name": "ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today.",
+      "copyId": "COPY011",
+      "destinationKey": "quiz",
+      "headline": "Stop Losing Drive. Start Today.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value. Every order is backed by a 90-day guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\""
+    },
+    {
+      "adId": "120245565375630293",
+      "name": "ProblemAware QUIZ curated-30-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY016",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "SAVE 52% + $35 WELCOME KIT VALUE\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value."
+    },
+    {
+      "adId": "120245565353430293",
+      "name": "ProblemAware GLP curated-22-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565364870293",
+      "name": "ProblemAware GLP curated-11-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565675360293",
+      "name": "ProblemAware GLP curated-02-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565777310293",
+      "name": "ProblemAware GLP tenor-05-C011-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.05,
+      "impressions": 4,
+      "cpm": 12.5,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245547655270293",
+      "name": "ProblemAware QUIZ curated-02-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY012",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "DISAPPROVED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "You eat clean. You move daily. You're STILL crashing by 3 p.m. and gaining weight.\n\nHere's why.\n\nIf you're over 40 and constantly dragging through the day, or frustrated that workouts feel flat…\n\nIt's not willpower.\n\nIt's your systems.\n\nThe pathways behind energy, drive, and stamina start declining around 30. And that slow drain robs you of presence, focus, endurance, and the feeling that your body is actually responding.\n\nOne day you look up and wonder:\n\n\"What happened?\"\n\nMost guys try to fix it by training harder… eating cleaner… drinking more coffee…\n\nAnd when that doesn't work?\n\nA cabinet full of overpriced, under-dosed supplements with hidden blends. Or worse — considering a clinic, a prescription, needles.\n\nHere's the truth:\n\nYou don't need a prescription.\n\nYou need a daily protocol that supports what your body is quietly losing.\n\nThat's what Tenor Daily Drive Essentials was built for.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports drive, stress response, and morning energy\n🪨 Maca (250mg) — supports stamina so you don't crash mid-day\n🛡️ Zinc (50mg) — supports the pathway behind hormone balance\n⚙️ Boron — supports free hormone levels your body can actually use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and mental focus\n☀️ Botanical matrix (745mg) — nine adaptogens supporting daily vitality\n\nNo proprietary blends. No fairy dust. Just disclosed doses your body can feel.\n\nIn a survey of 1,203 men using Tenor for 90 days:\n\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nNo needles. No stacking. No cycling. Just a daily ritual.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\n810,000+ men have already made this their morning protocol.\n\nIf you don't feel steadier, sharper, and more present in 90 days — return even the empty bottles for a full refund. No questions asked.\n\n👉 Support your drive. Naturally. Two capsules every morning."
+    },
+    {
+      "adId": "120245565404140293",
+      "name": "ProblemAware QUIZ curated-24-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY018",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "DISAPPROVED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Noticed your midsection holding on — no matter what you do?\n\nThat's not just extra calories. It's a visible sign of what's shifting inside.\n\nLet's talk about something most men quietly notice but never say out loud…\n\nThe soft tissue where definition used to be.\n\nHere's the truth: it's not about skipping workouts or eating too much.\n\nIt's what happens when the systems behind your drive start declining.\n\nWhen those pathways slow — which research shows starts around 30 — your body's balance shifts. The result? Stored fat where lean tissue should be.\n\nAnd that same shift is why you feel drained by 3 p.m. Why workouts feel flat. Why your drive isn't what it used to be.\n\nYou can try everything…\n\nMore reps. Cutting carbs. Fat burners. Another supplement with a hidden formula.\n\nBut if you don't support the underlying systems, you're wasting time and money.\n\nThat's why Dr. Adam Reese built Tenor Daily Drive Essentials.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n🪨 Maca (250mg) — supports stamina and endocrine balance\n🛡️ Zinc (50mg) — supports the pathway behind hormone production\n⚙️ Boron — supports free hormone levels your body can use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and daily focus\n☀️ Botanical Matrix (745mg) — nine adaptogens for energy, mood, and balance\n\nIn a survey of 1,203 Tenor customers:\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nTwo capsules every morning. That's it.\n\nNo needles. No prescription. No clinic. Just a simple daily protocol that supports your body's systems.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\nIf it doesn't work for you? Return even the empty bottles. Full refund.\n\nSupport your drive. Naturally."
+    },
+    {
+      "adId": "120245547710850293",
+      "name": "ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY012",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "You eat clean. You move daily. You're STILL crashing by 3 p.m. and gaining weight.\n\nHere's why.\n\nIf you're over 40 and constantly dragging through the day, or frustrated that workouts feel flat…\n\nIt's not willpower.\n\nIt's your systems.\n\nThe pathways behind energy, drive, and stamina start declining around 30. And that slow drain robs you of presence, focus, endurance, and the feeling that your body is actually responding.\n\nOne day you look up and wonder:\n\n\"What happened?\"\n\nMost guys try to fix it by training harder… eating cleaner… drinking more coffee…\n\nAnd when that doesn't work?\n\nA cabinet full of overpriced, under-dosed supplements with hidden blends. Or worse — considering a clinic, a prescription, needles.\n\nHere's the truth:\n\nYou don't need a prescription.\n\nYou need a daily protocol that supports what your body is quietly losing.\n\nThat's what Tenor Daily Drive Essentials was built for.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports drive, stress response, and morning energy\n🪨 Maca (250mg) — supports stamina so you don't crash mid-day\n🛡️ Zinc (50mg) — supports the pathway behind hormone balance\n⚙️ Boron — supports free hormone levels your body can actually use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and mental focus\n☀️ Botanical matrix (745mg) — nine adaptogens supporting daily vitality\n\nNo proprietary blends. No fairy dust. Just disclosed doses your body can feel.\n\nIn a survey of 1,203 men using Tenor for 90 days:\n\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nNo needles. No stacking. No cycling. Just a daily ritual.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\n810,000+ men have already made this their morning protocol.\n\nIf you don't feel steadier, sharper, and more present in 90 days — return even the empty bottles for a full refund. No questions asked.\n\n👉 Support your drive. Naturally. Two capsules every morning."
+    },
+    {
+      "adId": "120245565411660293",
+      "name": "ProblemAware QUIZ curated-23-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY017",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't dragging through every afternoon at 55.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Notifications. Blue light at 11 p.m.\nA nervous system that never gets to rest.\n\n❌ Seed oils. Plastics. Processed everything.\nA food system turning your body against itself — one meal at a time.\n\n❌ Deadlines. Commutes. Kids. Bills.\nStress that chokes the signal behind your drive. Slowly. For years.\n\nYou're not failing.\n\nYou're unsupported.\n\nTenor Daily Drive Essentials was built to support what's been quietly declining:\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways\n\n💪 Zinc (50mg) — feeds the system behind daily drive and focus\n\n💪 21 active ingredients at disclosed doses — no proprietary blends, no hidden formulas\n\nNo guessing.\nNo fairy dust.\nNo tricks.\n\nJust two capsules.\nEvery morning.\nDisclosed doses your body can feel.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting.\n\nStart supporting."
+    },
+    {
+      "adId": "120245565398730293",
+      "name": "ProblemAware QUIZ curated-29-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY015",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't crashing at 3 p.m. every afternoon.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Deadlines. A phone in his hand from 6 a.m. to midnight.\nStress that never stops — quietly draining the signal behind your drive.\n\n❌ Seed oils. Plastics. Tap water.\nA food system working against your hormonal balance at every meal.\n\n❌ Sitting. Commuting. Sleeping five hours.\nA lifestyle that chokes circulation and recovery before your body even has a chance.\n\nYou're not broken.\n\nYou're unsupported.\n\nQuietly. Steadily. For years.\n\nTenor Daily Drive Essentials was built to plug the leaks:\n\n💪 Tongkat Ali (400mg) — supports the pathway your body forgot how to use\n\n💪 Zinc (50mg) — feeds the system behind healthy hormone metabolism\n\n💪 21 active ingredients — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nJust disclosed doses.\nTwo capsules.\nEvery morning.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting for it to fix itself.\n\nStart supporting what's been declining."
+    },
+    {
+      "adId": "120245547775070293",
+      "name": "ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY016",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "SAVE 52% + $35 WELCOME KIT VALUE\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence — naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol — start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value."
+    },
+    {
+      "adId": "120245565457710293",
+      "name": "ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY014",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565433800293",
+      "name": "ProblemAware GLP curated-29-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565511890293",
+      "name": "ProblemAware QUIZ curated-08-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY018",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 2,
+      "cpm": 0.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Noticed your midsection holding on — no matter what you do?\n\nThat's not just extra calories. It's a visible sign of what's shifting inside.\n\nLet's talk about something most men quietly notice but never say out loud…\n\nThe soft tissue where definition used to be.\n\nHere's the truth: it's not about skipping workouts or eating too much.\n\nIt's what happens when the systems behind your drive start declining.\n\nWhen those pathways slow — which research shows starts around 30 — your body's balance shifts. The result? Stored fat where lean tissue should be.\n\nAnd that same shift is why you feel drained by 3 p.m. Why workouts feel flat. Why your drive isn't what it used to be.\n\nYou can try everything…\n\nMore reps. Cutting carbs. Fat burners. Another supplement with a hidden formula.\n\nBut if you don't support the underlying systems, you're wasting time and money.\n\nThat's why Dr. Adam Reese built Tenor Daily Drive Essentials.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n🪨 Maca (250mg) — supports stamina and endocrine balance\n🛡️ Zinc (50mg) — supports the pathway behind hormone production\n⚙️ Boron — supports free hormone levels your body can use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and daily focus\n☀️ Botanical Matrix (745mg) — nine adaptogens for energy, mood, and balance\n\nIn a survey of 1,203 Tenor customers:\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nTwo capsules every morning. That's it.\n\nNo needles. No prescription. No clinic. Just a simple daily protocol that supports your body's systems.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\nIf it doesn't work for you? Return even the empty bottles. Full refund.\n\nSupport your drive. Naturally."
+    },
+    {
+      "adId": "120245547787990293",
+      "name": "ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY015",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't crashing at 3 p.m. every afternoon.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Deadlines. A phone in his hand from 6 a.m. to midnight.\nStress that never stops — quietly draining the signal behind your drive.\n\n❌ Seed oils. Plastics. Tap water.\nA food system working against your hormonal balance at every meal.\n\n❌ Sitting. Commuting. Sleeping five hours.\nA lifestyle that chokes circulation and recovery before your body even has a chance.\n\nYou're not broken.\n\nYou're unsupported.\n\nQuietly. Steadily. For years.\n\nTenor Daily Drive Essentials was built to plug the leaks:\n\n💪 Tongkat Ali (400mg) — supports the pathway your body forgot how to use\n\n💪 Zinc (50mg) — feeds the system behind healthy hormone metabolism\n\n💪 21 active ingredients — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nJust disclosed doses.\nTwo capsules.\nEvery morning.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting for it to fix itself.\n\nStart supporting what's been declining."
+    },
+    {
+      "adId": "120245565712310293",
+      "name": "ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY014",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 1,
+      "cpm": 0.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565629900293",
+      "name": "ProblemAware GLP curated-14-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.91,
+      "impressions": 5,
+      "cpm": 182.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565417630293",
+      "name": "ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY018",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Noticed your midsection holding on — no matter what you do?\n\nThat's not just extra calories. It's a visible sign of what's shifting inside.\n\nLet's talk about something most men quietly notice but never say out loud…\n\nThe soft tissue where definition used to be.\n\nHere's the truth: it's not about skipping workouts or eating too much.\n\nIt's what happens when the systems behind your drive start declining.\n\nWhen those pathways slow — which research shows starts around 30 — your body's balance shifts. The result? Stored fat where lean tissue should be.\n\nAnd that same shift is why you feel drained by 3 p.m. Why workouts feel flat. Why your drive isn't what it used to be.\n\nYou can try everything…\n\nMore reps. Cutting carbs. Fat burners. Another supplement with a hidden formula.\n\nBut if you don't support the underlying systems, you're wasting time and money.\n\nThat's why Dr. Adam Reese built Tenor Daily Drive Essentials.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n🪨 Maca (250mg) — supports stamina and endocrine balance\n🛡️ Zinc (50mg) — supports the pathway behind hormone production\n⚙️ Boron — supports free hormone levels your body can use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and daily focus\n☀️ Botanical Matrix (745mg) — nine adaptogens for energy, mood, and balance\n\nIn a survey of 1,203 Tenor customers:\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nTwo capsules every morning. That's it.\n\nNo needles. No prescription. No clinic. Just a simple daily protocol that supports your body's systems.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\nIf it doesn't work for you? Return even the empty bottles. Full refund.\n\nSupport your drive. Naturally."
+    },
+    {
+      "adId": "120245565503270293",
+      "name": "ProblemAware QUIZ curated-10-quiz - 52% Off Limited-Time Welcome Offer",
+      "copyId": "COPY012",
+      "destinationKey": "quiz",
+      "headline": "52% Off Limited-Time Welcome Offer",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 1.11,
+      "impressions": 2,
+      "cpm": 555.0,
+      "clicks": 2,
+      "inlineLinkClicks": 1,
+      "primaryText": "You eat clean. You move daily. You're STILL crashing by 3 p.m. and gaining weight.\n\nHere's why.\n\nIf you're over 40 and constantly dragging through the day, or frustrated that workouts feel flat…\n\nIt's not willpower.\n\nIt's your systems.\n\nThe pathways behind energy, drive, and stamina start declining around 30. And that slow drain robs you of presence, focus, endurance, and the feeling that your body is actually responding.\n\nOne day you look up and wonder:\n\n\"What happened?\"\n\nMost guys try to fix it by training harder… eating cleaner… drinking more coffee…\n\nAnd when that doesn't work?\n\nA cabinet full of overpriced, under-dosed supplements with hidden blends. Or worse — considering a clinic, a prescription, needles.\n\nHere's the truth:\n\nYou don't need a prescription.\n\nYou need a daily protocol that supports what your body is quietly losing.\n\nThat's what Tenor Daily Drive Essentials was built for.\n\n21 active ingredients. Disclosed doses. Two capsules every morning:\n\n🌿 Tongkat Ali (400mg) — supports drive, stress response, and morning energy\n🪨 Maca (250mg) — supports stamina so you don't crash mid-day\n🛡️ Zinc (50mg) — supports the pathway behind hormone balance\n⚙️ Boron — supports free hormone levels your body can actually use\n🌾 L-Arginine (250mg) — supports circulation and physical drive\n⚡ Ginseng-Eleutherococcus (125mg) — supports recovery and mental focus\n☀️ Botanical matrix (745mg) — nine adaptogens supporting daily vitality\n\nNo proprietary blends. No fairy dust. Just disclosed doses your body can feel.\n\nIn a survey of 1,203 men using Tenor for 90 days:\n\n✅ 94% reported sustained morning energy\n✅ 81% noticed improved endurance\n✅ 87% felt more focused and present\n✅ 92% said they felt more like themselves\n\nNo needles. No stacking. No cycling. Just a daily ritual.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.\n\n810,000+ men have already made this their morning protocol.\n\nIf you don't feel steadier, sharper, and more present in 90 days — return even the empty bottles for a full refund. No questions asked.\n\n👉 Support your drive. Naturally. Two capsules every morning."
+    },
+    {
+      "adId": "120245565444020293",
+      "name": "ProblemAware QUIZ curated-20-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY014",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565537520293",
+      "name": "ProblemAware QUIZ curated-04-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY014",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565425580293",
+      "name": "ProblemAware QUIZ curated-17-quiz - Stop Losing Drive. Start Today.",
+      "copyId": "COPY011",
+      "destinationKey": "quiz",
+      "headline": "Stop Losing Drive. Start Today.",
+      "status": "ACTIVE",
+      "effectiveStatus": "DISAPPROVED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your energy is dropping right now.\n\nAnd it's not \"just getting older.\"\n\nEvery month you put off doing something about it, three systems keep declining together:\n\nYour stress response stays elevated — draining the signal that keeps you sharp.\n\nThe pathway your body uses to produce drive gets quieter.\n\nAnd circulation — the thing behind stamina, recovery, and presence — slows down.\n\nThat brain fog at 2 p.m.?\n\nThe gut that won't budge no matter what you eat?\n\nThe fact that you'd rather scroll your phone than do anything with your evening?\n\nThat's not laziness.\n\nThat's a system problem. And it compounds the longer you wait.\n\nTenor Daily Drive Essentials was built to support all three systems at once:\n\n💪 Tongkat Ali (400mg) — supports healthy hormone pathways and stress response\n\n💪 Zinc (50mg) — feeds the system your body relies on for daily drive\n\n💪 L-Arginine (250mg) — supports nitric oxide and healthy circulation\n\nAnd 21 total active ingredients working across three pathways — supporting what your body makes, keeping what you've got, and protecting the systems that produce it.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 87% felt more focused and present. Not a vague \"maybe.\" Real, steady energy.\n\nGet your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value. Every order is backed by a 90-day guarantee.\n\nIf you don't feel the difference, you get every cent back.\n\nBut here's the thing — your drive isn't going to support itself while you \"think about it.\""
+    },
+    {
+      "adId": "120245565603120293",
+      "name": "ProblemAware GLP curated-19-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245565450770293",
+      "name": "ProblemAware GLP curated-23-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565641800293",
+      "name": "ProblemAware GLP curated-09-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565589240293",
+      "name": "ProblemAware GLP curated-25-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245548603810293",
+      "name": "ProblemAware GLP curated-12-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 4.06,
+      "impressions": 2,
+      "cpm": 2030.0,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565609280293",
+      "name": "ProblemAware GLP curated-18-glp - The GLP-1 Side Effect No One Mentions",
+      "copyId": "COPY003",
+      "destinationKey": "glp",
+      "headline": "The GLP-1 Side Effect No One Mentions",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "What did they NOT tell you when they prescribed your GLP-1?\n\nThey told you about the nausea.\nThe injection schedule.\nThe dietary changes.\n\nBut nobody mentioned what's happening to your drive.\n\nHere's the gap:\n\nGLP-1 meds trigger rapid weight loss. Your body doesn't care whether it burns fat or lean tissue when it's shedding that fast.\n\nYou're losing the exact tissue that keeps your metabolism steady — and your hormone pathways healthy.\n\nSo the number on the scale drops.\n\nBut so does the thing behind your energy. Your focus. Your stamina. Your presence in every room that matters.\n\nThere's a reason you feel lighter but not better.\n\nDr. Adam Reese has seen this pattern hundreds of times. An MD who built Tenor specifically for the gap between \"your labs are normal\" and \"I don't feel like myself anymore.\"\n\nHis recommendation for every man currently on a GLP-1:\n\nA daily protocol. Two capsules every morning. 21 active ingredients at disclosed doses — supporting what rapid weight loss quietly drains.\n\n💪 Tongkat Ali (400mg) — supports the stress response and healthy hormone pathways during rapid weight loss\n\n💪 Zinc (50mg) — feeds the system your body relies on for testosterone metabolism\n\n💪 Maca (250mg) + L-Arginine (250mg) — supports energy, circulation, and drive from two angles\n\nNo proprietary blends. Third-party tested. cGMP US facility.\n\nIn a survey of 1,203 men: 94% reported sustained morning energy. 81% noticed improved endurance. 87% felt more focused and present.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nRead Dr. Reese's protocol for what GLP-1s are quietly doing to men's drive — and the daily support he recommends."
+    },
+    {
+      "adId": "120245565708740293",
+      "name": "ProblemAware QUIZ tenor-20-C021-quiz - 90-Day Guarantee. Because It Works.",
+      "copyId": "COPY015",
+      "destinationKey": "quiz",
+      "headline": "90-Day Guarantee. Because It Works.",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "Your dad wasn't crashing at 3 p.m. every afternoon.\n\nYou are. At 47.\n\nHe didn't have:\n\n❌ Screens. Deadlines. A phone in his hand from 6 a.m. to midnight.\nStress that never stops — quietly draining the signal behind your drive.\n\n❌ Seed oils. Plastics. Tap water.\nA food system working against your hormonal balance at every meal.\n\n❌ Sitting. Commuting. Sleeping five hours.\nA lifestyle that chokes circulation and recovery before your body even has a chance.\n\nYou're not broken.\n\nYou're unsupported.\n\nQuietly. Steadily. For years.\n\nTenor Daily Drive Essentials was built to plug the leaks:\n\n💪 Tongkat Ali (400mg) — supports the pathway your body forgot how to use\n\n💪 Zinc (50mg) — feeds the system behind healthy hormone metabolism\n\n💪 21 active ingredients — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nJust disclosed doses.\nTwo capsules.\nEvery morning.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nStop waiting for it to fix itself.\n\nStart supporting what's been declining."
+    },
+    {
+      "adId": "120245565717600293",
+      "name": "ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee",
+      "copyId": "COPY013",
+      "destinationKey": "quiz",
+      "headline": "52% Off + 90-Day Guarantee",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements — spent hundreds — before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n→ 94% reported sustained morning energy\n\n→ 81% noticed improved endurance\n\n→ 87% felt more focused and present\n\n→ 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles — healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund."
+    },
+    {
+      "adId": "120245565751690293",
+      "name": "ProblemAware GLP tenor-10-C005-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 3.0,
+      "impressions": 22,
+      "cpm": 136.363636,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    },
+    {
+      "adId": "120245565787480293",
+      "name": "ProblemAware GLP tenor-03-C004-glp - What GLP-1 Does to Your Drive",
+      "copyId": "COPY001",
+      "destinationKey": "glp",
+      "headline": "What GLP-1 Does to Your Drive",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nGet your 30-day supply for $44 at 52% off. 90-day guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine."
+    },
+    {
+      "adId": "120245548889430293",
+      "name": "ProblemAware GLP tenor-07-C003-glp - Keep Your Drive Steady on GLP-1s",
+      "copyId": "COPY002",
+      "destinationKey": "glp",
+      "headline": "Keep Your Drive Steady on GLP-1s",
+      "status": "ACTIVE",
+      "effectiveStatus": "CAMPAIGN_PAUSED",
+      "issuesInfo": null,
+      "spend": 0.0,
+      "impressions": 0,
+      "cpm": null,
+      "clicks": 0,
+      "inlineLinkClicks": 0,
+      "primaryText": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Get your 30-day supply for $44 at 52% off. 90-day guarantee."
+    }
+  ]
+}

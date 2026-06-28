@@ -1,0 +1,24 @@
+{
+  "thread_id": "marketi-strategy-v2-step01-dsv4-1779388218",
+  "status": "completed",
+  "error": null,
+  "elapsed_seconds": 629.112,
+  "event_count": 9816,
+  "tool_counts": {
+    "web_search": 40,
+    "unknown": 64,
+    "web_fetch": 4,
+    "calculator": 2
+  },
+  "usage": {
+    "input_tokens": 673970,
+    "output_tokens": 18463,
+    "total_tokens": 692433
+  },
+  "events_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/outputs/deerflow-dsv4-step01-events.jsonl",
+  "raw_output_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/outputs/deerflow-dsv4-step01-raw.md",
+  "summary_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/outputs/deerflow-dsv4-step01-summary.md",
+  "content_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/outputs/deerflow-dsv4-step01-content.md",
+  "prompt_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/outputs/rendered-strategy-v2-step01-prompt.md",
+  "no_output_token_cap": true
+}

@@ -1,0 +1,173 @@
+{
+  "summary": {
+    "campaigns": {
+      "ok": true,
+      "totalReturned": 13,
+      "matchingCampaign": 1,
+      "matches": [
+        {
+          "id": "120245292268820293",
+          "name": "Tenor - Walk Away From TRT - Product Removed - 2026-05-03",
+          "status": "PAUSED",
+          "effective_status": "PAUSED",
+          "objective": "OUTCOME_SALES",
+          "created_time": "2026-05-03T09:04:00-0700",
+          "updated_time": "2026-05-03T09:04:00-0700"
+        }
+      ]
+    },
+    "adsets": {
+      "ok": false,
+      "status": 500,
+      "text": "{\"detail\":\"Internal server error.\"}"
+    },
+    "ads": {
+      "ok": false,
+      "status": 500,
+      "text": "{\"detail\":\"Internal server error.\"}"
+    }
+  },
+  "checks": {
+    "campaigns": {
+      "ok": true,
+      "status": 200,
+      "json": {
+        "data": [
+          {
+            "id": "120245292268820293",
+            "name": "Tenor - Walk Away From TRT - Product Removed - 2026-05-03",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-05-03T09:04:00-0700",
+            "updated_time": "2026-05-03T09:04:00-0700"
+          },
+          {
+            "id": "120245259412930293",
+            "name": "Tenor - Walk Away From TRT - No Product - 2026-05-03",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-05-02T20:48:41-0700",
+            "updated_time": "2026-05-02T20:48:41-0700"
+          },
+          {
+            "id": "120245256563710293",
+            "name": "[4/20/26] - [Tenor - The Vanishing Man] - [CBO] - [Broad/Int] - Batch 29 - Copy 2",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-05-02T19:07:06-0700",
+            "updated_time": "2026-05-02T19:07:06-0700"
+          },
+          {
+            "id": "120245256319830293",
+            "name": "Tenor - Walk Away From TRT - Meta Launch - Updated Copy - 2026-05-03 - Copy",
+            "status": "ACTIVE",
+            "effective_status": "ACTIVE",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-05-02T19:05:40-0700",
+            "updated_time": "2026-05-02T19:05:40-0700"
+          },
+          {
+            "id": "120245256104700293",
+            "name": "Tenor - Walk Away From TRT - Meta Launch - Updated Copy - 2026-05-03",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-05-02T18:55:22-0700",
+            "updated_time": "2026-05-02T18:55:22-0700"
+          },
+          {
+            "id": "120245249113480293",
+            "name": "Tenor - Walk Away From TRT - Meta Launch - 2026-05-02",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-05-02T13:56:13-0700",
+            "updated_time": "2026-05-02T13:56:13-0700"
+          },
+          {
+            "id": "120245249095480293",
+            "name": "Tenor - Walk Away From TRT - Meta Launch - 2026-05-02",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-05-02T13:53:40-0700",
+            "updated_time": "2026-05-02T13:53:40-0700"
+          },
+          {
+            "id": "120245038391240293",
+            "name": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - Approved 28",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-04-29T21:28:15-0700",
+            "updated_time": "2026-04-30T06:13:05-0700"
+          },
+          {
+            "id": "120244361432940293",
+            "name": "[4/24/26] - [Tenor - The Vanishing Man] - [CBO] - [8 Presell URL Buckets]",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-04-23T19:42:03-0700",
+            "updated_time": "2026-04-26T09:25:42-0700"
+          },
+          {
+            "id": "120244083647600293",
+            "name": "[4/20/26] - [Tenor - The Vanishing Man] - [CBO] - [Broad/Int] - Batch 29 - Copy",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-04-20T17:59:48-0700",
+            "updated_time": "2026-05-02T19:00:40-0700"
+          },
+          {
+            "id": "120244080572690293",
+            "name": "[4/20/26] - [Tenor - The Vanishing Man] - [CBO] - [Broad/Int] - Batch 29",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-04-20T15:22:15-0700",
+            "updated_time": "2026-04-20T17:58:38-0700"
+          },
+          {
+            "id": "120244078262240293",
+            "name": "[4/20/26] - [Tenor - The Vanishing Man] - [CBO] - [Broad/Int]",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-04-20T13:31:01-0700",
+            "updated_time": "2026-04-20T13:31:01-0700"
+          },
+          {
+            "id": "120244078209360293",
+            "name": "[4/20/26] - [Tenor - The Vanishing Man] - [CBO] - [Broad/Int]",
+            "status": "PAUSED",
+            "effective_status": "PAUSED",
+            "objective": "OUTCOME_SALES",
+            "created_time": "2026-04-20T13:28:53-0700",
+            "updated_time": "2026-04-20T13:28:53-0700"
+          }
+        ],
+        "paging": {
+          "cursors": {
+            "before": "QVFIU0V2QXBDaEdtTmdFY3pIOWdwcWtLdHgxRjVQemI4QkNlRTNRc0JfSVg5N3hKTm9jdkNEOThWQnVpZAGk0VDhIN1dqdkFCektGTGJ1WXFSZADRlS1ZAIUDVn",
+            "after": "QVFIU3I4bDBSOWZAEOHZAFM0gyRllHUEZAQUE9KMW9LYjZAwdHIzSWRzU1ROVE8ta1MydTVUMlhtN2dJYm1meGhJbWNNc1ZAfNHIyRW5GOFpOckhXOU51QlhybG9n"
+          }
+        }
+      }
+    },
+    "adsets": {
+      "ok": false,
+      "status": 500,
+      "text": "{\"detail\":\"Internal server error.\"}"
+    },
+    "ads": {
+      "ok": false,
+      "status": 500,
+      "text": "{\"detail\":\"Internal server error.\"}"
+    }
+  }
+}

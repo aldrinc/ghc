@@ -1,0 +1,176 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - button "H Higgsfield Workspace" [ref=e12] [cursor=pointer]:
+              - generic [ref=e13]: H
+              - generic [ref=e14]:
+                - generic [ref=e15]: Higgsfield
+                - generic [ref=e16]: Workspace
+              - img [ref=e17]
+        - generic [ref=e22]: Strategy complete — ready to launch
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e25]: Workspace
+          - list [ref=e26]:
+            - listitem [ref=e27]:
+              - button "Overview" [ref=e29] [cursor=pointer]:
+                - img [ref=e31]
+                - generic [ref=e36]: Overview
+            - listitem [ref=e37]:
+              - button "Strategy" [ref=e39] [cursor=pointer]:
+                - img [ref=e41]
+                - generic [ref=e44]: Strategy
+            - listitem [ref=e45]:
+              - button "Brand" [ref=e47] [cursor=pointer]:
+                - img [ref=e49]
+                - generic [ref=e52]: Brand
+            - listitem [ref=e53]:
+              - button "Sites" [ref=e55] [cursor=pointer]:
+                - img [ref=e57]
+                - generic [ref=e61]: Sites
+            - listitem [ref=e62]:
+              - button "Commerce" [ref=e64] [cursor=pointer]:
+                - img [ref=e66]
+                - generic [ref=e69]: Commerce
+            - listitem [ref=e70]:
+              - button "Products" [ref=e72] [cursor=pointer]:
+                - img [ref=e74]
+                - generic [ref=e78]: Products
+        - generic [ref=e79]:
+          - generic [ref=e80]: Research
+          - list [ref=e81]:
+            - listitem [ref=e82]:
+              - button "Documents" [ref=e84] [cursor=pointer]:
+                - img [ref=e86]
+                - generic [ref=e89]: Documents
+            - listitem [ref=e90]:
+              - button "Ads & Brands" [ref=e92] [cursor=pointer]:
+                - img [ref=e94]
+                - generic [ref=e97]: Ads & Brands
+            - listitem [ref=e98]:
+              - button "Funnels" [ref=e100] [cursor=pointer]:
+                - img [ref=e102]
+                - generic [ref=e104]: Funnels
+        - generic [ref=e105]:
+          - generic [ref=e106]: Execution
+          - list [ref=e107]:
+            - listitem [ref=e108]:
+              - button "Campaigns" [ref=e110] [cursor=pointer]:
+                - img [ref=e112]
+                - generic [ref=e116]: Campaigns
+            - listitem [ref=e117]:
+              - button "Analytics" [ref=e119] [cursor=pointer]:
+                - img [ref=e121]
+                - generic [ref=e123]: Analytics
+            - listitem [ref=e124]:
+              - button "Postiz" [ref=e126] [cursor=pointer]:
+                - img [ref=e128]
+                - generic [ref=e131]: Postiz
+            - listitem [ref=e132]:
+              - button "Social Agents" [ref=e134] [cursor=pointer]:
+                - img [ref=e136]
+                - generic [ref=e139]: Social Agents
+        - generic [ref=e140]:
+          - generic [ref=e141]: AI
+          - list [ref=e142]:
+            - listitem [ref=e143]:
+              - button "Assistant Chat" [ref=e145] [cursor=pointer]:
+                - img [ref=e147]
+                - generic [ref=e149]: Assistant Chat
+        - generic [ref=e150]:
+          - generic [ref=e151]: Assets
+          - list [ref=e152]:
+            - listitem [ref=e153]:
+              - button "Creative Library" [ref=e155] [cursor=pointer]:
+                - img [ref=e157]
+                - generic [ref=e163]: Creative Library
+            - listitem [ref=e164]:
+              - button "Meta Ads" [ref=e166] [cursor=pointer]:
+                - img [ref=e168]
+                - generic [ref=e171]: Meta Ads
+      - list [ref=e173]:
+        - listitem [ref=e174]:
+          - button "Aldrin Clement Aldrin Clement aldrin.clement@gmail.com" [ref=e176] [cursor=pointer]:
+            - img "Aldrin Clement" [ref=e178]
+            - generic [ref=e179]:
+              - generic [ref=e180]: Aldrin Clement
+              - generic [ref=e181]: aldrin.clement@gmail.com
+            - img [ref=e182]
+      - button "Toggle Sidebar" [ref=e185] [cursor=pointer]
+    - main [ref=e186]:
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - button "Toggle Sidebar" [ref=e189] [cursor=pointer]:
+            - img
+            - generic [ref=e190]: Toggle Sidebar
+          - navigation "breadcrumb" [ref=e191]:
+            - list [ref=e192]:
+              - listitem [ref=e193]:
+                - link "Workspaces" [ref=e194] [cursor=pointer]:
+                  - /url: /workspaces
+              - listitem [ref=e195]:
+                - img [ref=e196]
+              - listitem [ref=e198]:
+                - link "Social Agents" [disabled] [ref=e199]
+        - generic [ref=e200]:
+          - generic [ref=e201]: Workspace Product
+          - combobox [ref=e202]:
+            - option "Select workspace product"
+            - option "Higgsfield AI Platform" [selected]
+      - generic [ref=e204]:
+        - generic [ref=e206]:
+          - generic [ref=e207]:
+            - heading "Marketing Agent" [level=2] [ref=e208]
+            - paragraph [ref=e209]: Approval-gated TikTok carousel work for Higgsfield.
+          - link "Postiz" [ref=e211] [cursor=pointer]:
+            - /url: /workspaces/execution/postiz
+            - img
+            - text: Postiz
+        - generic [ref=e212]:
+          - generic [ref=e213]:
+            - generic [ref=e214]:
+              - img [ref=e215]
+              - text: Postiz needs channels
+            - generic [ref=e218]: 0 channels, 0 profiles
+          - generic [ref=e219]:
+            - button "Approvals 0" [ref=e220] [cursor=pointer]:
+              - img
+              - text: Approvals
+              - generic [ref=e221]: "0"
+            - button "Channels" [ref=e222] [cursor=pointer]:
+              - img
+              - text: Channels
+            - button "Agent" [ref=e223] [cursor=pointer]:
+              - img
+              - text: Agent
+        - generic [ref=e225]:
+          - generic [ref=e227]:
+            - generic [ref=e228]:
+              - generic [ref=e229]:
+                - generic [ref=e230]: Step 2 of 2
+                - generic [ref=e231]: Test needed
+              - heading "Review carousel" [level=2] [ref=e297]
+            - generic [ref=e233]:
+              - button "Setup screen" [ref=e234] [cursor=pointer]:
+                - generic [ref=e235]: Setup
+                - generic [ref=e236]: Needs mission
+              - button "Review screen" [active] [pressed] [ref=e237] [cursor=pointer]:
+                - generic [ref=e238]: Review
+                - generic [ref=e239]: Test needed
+          - generic [ref=e298]:
+            - generic [ref=e299]:
+              - generic [ref=e300]:
+                - generic [ref=e301]: No test
+                - generic [ref=e302]: Draft
+                - generic [ref=e303]: 0/6
+                - generic [ref=e304]: Postiz
+              - button "Set mission" [ref=e305] [cursor=pointer]:
+                - img
+                - text: Setup
+            - generic [ref=e306]:
+              - heading "Mission needed" [level=3] [ref=e307]
+              - paragraph [ref=e308]: Set the mission before reviewing drafts, assets, or Postiz delivery.
+  - region "Notifications"

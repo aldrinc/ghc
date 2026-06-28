@@ -1,0 +1,125 @@
+{
+  "createdAt": "2026-05-05T00:56:50.373Z",
+  "campaignAction": "created",
+  "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+  "campaign": {
+    "id": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "channels": [
+      "facebook"
+    ],
+    "status": "draft",
+    "objective_type": "sales",
+    "baseline": null,
+    "budget_min": 100,
+    "default_swipe_collection_id": null,
+    "name": "Tenor - GLP + Quiz - GPT Image 2 - 2026-05-05",
+    "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+    "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "asset_brief_types": [
+      "image"
+    ],
+    "goal_description": "Launch the supplied Tenor GLP + quiz Meta campaign package.",
+    "numeric_target": null,
+    "timeframe_days": null,
+    "budget_max": 100,
+    "created_at": "2026-05-05T00:56:14.500094+00:00"
+  },
+  "creativeContext": {
+    "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "provider": "manual",
+    "creativeContextArtifactId": "cf2327aa-a49c-417a-aad8-53288b1156ed",
+    "experimentSpecArtifactId": "e105ec3a-6129-4548-bdda-30ce3219ee6f",
+    "artifactIds": {
+      "campaign_loaded_angles": "32835644-5e48-4f8e-89c4-b55cfbf2066c",
+      "campaign_loaded_offer": "30153aa2-4548-4b86-b919-a651fb34d081",
+      "campaign_loaded_copy": "02b7d87c-197b-428b-a044-1caddca15f71",
+      "campaign_loaded_copy_context": "141e6851-b300-45d3-b617-ca9bcb885e76",
+      "campaign_creative_context": "cf2327aa-a49c-417a-aad8-53288b1156ed"
+    },
+    "uploadedDocKeys": [
+      "campaign_loaded_angles",
+      "campaign_loaded_offer",
+      "campaign_loaded_copy",
+      "campaign_loaded_copy_context",
+      "campaign_creative_context",
+      "experiment_specs:426afe15-ac66-436c-910d-2a1259597bf3"
+    ],
+    "checkedAt": "2026-05-05T00:56:14.656759+00:00"
+  },
+  "assetBriefSeed": {
+    "status": "created",
+    "artifactId": "dff48434-34ca-423d-87b1-8e12e385237a",
+    "briefIds": [
+      "brief_glp_listicle_swipe_image2",
+      "brief_quiz_funnel_swipe_image2"
+    ]
+  },
+  "delivery": {
+    "id": "4eea156d-750b-44a7-97a1-d067a8e7f04c",
+    "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "deliveryMode": "external_urls",
+    "preSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+    "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039",
+    "checkoutUrl": null,
+    "thankYouUrl": null,
+    "validationStatus": "not_validated",
+    "validationError": null,
+    "validatedAt": null,
+    "createdAt": "2026-05-05T00:56:14.514584+00:00",
+    "updatedAt": "2026-05-05T00:56:48.999894+00:00"
+  },
+  "deliveryValidation": {
+    "checkedAt": "2026-05-05T00:56:50.452829+00:00",
+    "validationStatus": "valid",
+    "validationError": null,
+    "results": [
+      {
+        "field": "preSalesUrl",
+        "url": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "statusCode": 200,
+        "passed": true,
+        "checks": [
+          "public_http_https",
+          "fetchable",
+          "not_under_construction"
+        ],
+        "issues": []
+      },
+      {
+        "field": "salesUrl",
+        "url": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039",
+        "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039",
+        "statusCode": 200,
+        "passed": true,
+        "checks": [
+          "public_http_https",
+          "fetchable",
+          "not_under_construction",
+          "privacy_marker",
+          "contact_marker"
+        ],
+        "issues": []
+      }
+    ],
+    "delivery": {
+      "id": "4eea156d-750b-44a7-97a1-d067a8e7f04c",
+      "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "deliveryMode": "external_urls",
+      "preSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+      "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039",
+      "checkoutUrl": null,
+      "thankYouUrl": null,
+      "validationStatus": "valid",
+      "validationError": null,
+      "validatedAt": "2026-05-05T00:56:50.445843+00:00",
+      "createdAt": "2026-05-05T00:56:14.514584+00:00",
+      "updatedAt": "2026-05-05T00:56:50.445852+00:00"
+    }
+  },
+  "generationKey": "batch:tenor-glp-quiz-gpt-image2-20260505",
+  "batchId": "tenor-glp-quiz-gpt-image2-20260505"
+}

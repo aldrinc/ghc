@@ -1,0 +1,32 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/plan.contract.json",
+  "verified_at": "2026-05-21T20:14:58.986950+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [],
+  "run_logs": [
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-test--s-outputs-rendered-step03-prompt.md.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-jq--e-.prompt_source_path-contains-03_deep_research_meta_prompt_v2.md-outputs-re.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-jq--e-.gpt_step01_artifact-contains-9349e0ba-outputs-rendered-step03-prompt.meta.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-jq--e-.step06_run-false-outputs-dsv4-foundational-03-04-validation.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-jq--e-.status-completed-and-.no_output_token_cap-true-outputs-dsv4-step03-run.me.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-test--s-outputs-dsv4-step03-summary.md.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-test--s-outputs-dsv4-step03-content.md.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151456-test--s-outputs-dsv4-step03-step4-prompt.md.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151457-jq--e-.step03.step4_prompt_chars-10000-outputs-dsv4-foundational-03-04-validatio.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-jq--e-.status-completed-and-.tool_counts.web_search-69-and-.tool_counts.web_fetc.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-rg--q-I-now-have-enough-data-to-produce-the-comprehensive-report-runs-dsv4-found.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-jq--e-.step04.status-fail-and-.step04_continuation.status-fail-outputs-dsv4-foun.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-jq--e-.step06_run-false-outputs-dsv4-foundational-03-04-validation.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-rg--q-Step-03-PASS-outputs-dsv4-vs-gpt-foundational-03-04-comparison.md.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-rg--q-Step-04-FAIL-outputs-dsv4-vs-gpt-foundational-03-04-comparison.md.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-rg--q-Do-not-default-Step-04-outputs-dsv4-vs-gpt-foundational-03-04-comparison.m.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-jq--e-.pass-false-outputs-dsv4-foundational-03-04-validation.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-Users-aldrinclement-.codex-bin-capturectl-verify-sources-run-evidence-source_ma.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-rg--q-status-pass-capturectl-verify.log.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-rg--q-status-pass-provcheck-comparison.log.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-jq--e-.costs.total_promo_usd-0-and-.costs.total_promo_usd-1-outputs-dsv4-foundat.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-uv-run-python--m-py_compile-run_steps03_04_dsv4.py-continue_step04_dsv4.py-postp.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/proof_pack/verify-20260521-151458-uv-run-ruff-check-run_steps03_04_dsv4.py-continue_step04_dsv4.py-postprocess_ste.log"
+  ]
+}

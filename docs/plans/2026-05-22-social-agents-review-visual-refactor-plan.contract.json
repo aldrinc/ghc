@@ -1,0 +1,1131 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-22-social-agents-review-visual-refactor-plan",
+  "created_at": "2026-05-22T22:53:36.374773+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Put the six-slide carousel workspace first.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P02",
+      "objective": "Treat each slide card as the unit of work.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P03",
+      "objective": "Move slide actions onto or directly below each image with icon buttons.",
+      "source_line": 21,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P04",
+      "objective": "Collapse Test, Draft, Assets, Postiz, and URL fields into one advanced editor panel.",
+      "source_line": 22,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P05",
+      "objective": "Keep one primary gated action for the whole workflow.",
+      "source_line": 23,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P06",
+      "objective": "Keep Postiz handoff proposal-only behavior unchanged.",
+      "source_line": 24,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P07",
+      "objective": "`/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx`",
+      "source_line": 32,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P08",
+      "objective": "`/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx`",
+      "source_line": 33,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P09",
+      "objective": "Unit tests for SocialAgentsPage.",
+      "source_line": 37,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P10",
+      "objective": "Production frontend build.",
+      "source_line": 38,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P11",
+      "objective": "Semantic UI and design system checks.",
+      "source_line": 39,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P12",
+      "objective": "Browser validation on `/workspaces/execution/social-agents`.",
+      "source_line": 40,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P13",
+      "objective": "Kimi K2.6 `omp` implementation guidance log.",
+      "source_line": 41,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-review-screen-plan.log"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P14",
+      "objective": "Review screen defaults to visual slide cards, not visible form sections.",
+      "source_line": 45,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P15",
+      "objective": "The default Review state has fewer visible textareas than before.",
+      "source_line": 46,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P16",
+      "objective": "Each slide card has icon actions for edit, asset, regenerate, and approval-related review.",
+      "source_line": 47,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P17",
+      "objective": "The advanced editor exposes the existing Test, Draft, Assets, and Postiz fields without making them the default surface.",
+      "source_line": 48,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P18",
+      "objective": "The screen keeps one primary CTA for the workflow state.",
+      "source_line": 49,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P19",
+      "objective": "Postiz handoff mutation payload remains unchanged.",
+      "source_line": 50,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P20",
+      "objective": "Browser validation shows no horizontal overflow at desktop and mobile sizes.",
+      "source_line": 51,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P21",
+      "objective": "Kimi via `omp`: implementation guidance and acceptance risks.",
+      "source_line": 59,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-review-screen-plan.log"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P22",
+      "objective": "Main lane: React/Tailwind implementation.",
+      "source_line": 60,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P23",
+      "objective": "Verification lane: tests, build, browser evidence, plan contract.",
+      "source_line": 61,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P24",
+      "objective": "Main lane edits `SocialAgentsPage.tsx` and `SocialAgentsPage.test.tsx`.",
+      "source_line": 69,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P25",
+      "objective": "Verification lane writes proof artifacts only.",
+      "source_line": 70,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    },
+    {
+      "id": "P26",
+      "objective": "Kimi lane writes logs only.",
+      "source_line": 71,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md"
+      ],
+      "acceptance": [
+        "Review defaults to six visual slide cards.",
+        "Default Review screen exposes zero textareas.",
+        "Review screen has one primary workflow CTA.",
+        "Slide actions are icon buttons on or directly below each card.",
+        "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+        "Postiz handoff still creates a proposal instead of publishing directly.",
+        "Desktop and mobile Browser checks report no horizontal overflow.",
+        "Kimi K2.6 omp guidance was captured and used."
+      ],
+      "verify_commands": [
+        "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json\""
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-review-screen-plan.log"
+      ],
+      "notes": "Implemented and verified in the actual MOS app. See proof artifacts for browser metrics, screenshots, Kimi omp guidance, and command logs."
+    }
+  ],
+  "global_verify_commands": [
+    "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-review-screen-plan.log\"",
+    "test -s \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-implementation-guidance.log\"",
+    "cd \"/Users/aldrinclement/Documents/programming/marketi/mos/frontend\" && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+    "cd \"/Users/aldrinclement/Documents/programming/marketi/mos/frontend\" && npm run build",
+    "cd \"/Users/aldrinclement/Documents/programming/marketi/mos/frontend\" && npm run check:semantic-ui",
+    "cd \"/Users/aldrinclement/Documents/programming/marketi/mos/frontend\" && npm run check:design-system",
+    "node -e \"const fs=require('fs');const p='/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));for (const k of ['desktop','mobile']) { const m=d[k]; if (m.horizontalOverflow) throw new Error(k+' overflow'); if (m.slideCards!==6) throw new Error(k+' slideCards '+m.slideCards); if (m.visibleTextareas!==0) throw new Error(k+' textareas '+m.visibleTextareas); if (m.primaryCount!==1) throw new Error(k+' primaryCount '+m.primaryCount); if (m.exactAssetsButtonCount!==0) throw new Error(k+' duplicate Assets button'); } console.log('browser metrics pass');\"",
+    "/Users/aldrinclement/.codex/bin/capturectl verify \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json\"",
+    "/Users/aldrinclement/.codex/bin/plangatecheck \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json\"",
+    "/Users/aldrinclement/.codex/bin/lanecheck \"/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json\""
+  ],
+  "global_acceptance": [
+    "Review defaults to six visual slide cards.",
+    "Default Review screen exposes zero textareas.",
+    "Review screen has one primary workflow CTA.",
+    "Slide actions are icon buttons on or directly below each card.",
+    "Advanced Test, Draft, Assets, and Postiz fields remain available through the editor.",
+    "Postiz handoff still creates a proposal instead of publishing directly.",
+    "Desktop and mobile Browser checks report no horizontal overflow.",
+    "Kimi K2.6 omp guidance was captured and used."
+  ],
+  "plan_gate_required": true,
+  "plan_gate_proof": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+  "lane_proof": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json",
+  "source_manifest": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json"
+}

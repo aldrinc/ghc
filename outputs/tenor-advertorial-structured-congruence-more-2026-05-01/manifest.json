@@ -1,0 +1,187 @@
+{
+  "createdAt": "2026-05-01T19:57:30.008Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01",
+  "reviewDir": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-more-review-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01/generated",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "destinationContext": {
+    "headline": "Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First",
+    "subheadline": "Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.",
+    "primaryProblem": "Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.",
+    "promise": "A daily protocol to consider before making a long-term TRT decision.",
+    "mechanismDisclosureLevel": "Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.",
+    "proofType": "Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.",
+    "ctaUrgency": "Article-read CTA before committing to needles or a long-term TRT relationship.",
+    "compliancePosture": "Matches the downstream advertorial posture and funnel stage.",
+    "assetStage": "Ad to advertorial/listicle, before the sales page."
+  },
+  "outputs": [
+    {
+      "key": "01-old-school",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "sourceSwipeTitle": "old_school.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.\nPrimary problem: Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.\nPromise: A daily protocol to consider before making a long-term TRT decision.\nMechanism disclosure level: Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.\nProof type: Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read CTA before committing to needles or a long-term TRT relationship.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\n\nRun marker: tenor-advertorial-structured-congruence-more-01-old-school-1777665257496.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "ce7962c8-e768-4f55-8e8a-f4816f5310ab",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e6c3c513-b4b9-4a4a-927a-42c57e9cae12"
+      },
+      "result": {
+        "workflowRunId": "ce7962c8-e768-4f55-8e8a-f4816f5310ab",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e6c3c513-b4b9-4a4a-927a-42c57e9cae12",
+        "assetId": "7e4665f5-3b03-4528-a535-2f74ac7e034d",
+        "publicId": "21d028b8-ff18-4545-96b4-5add0db9bce6",
+        "publicUrl": "https://api.moshq.app/public/assets/21d028b8-ff18-4545-96b4-5add0db9bce6",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01/generated/01-old-school.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-more-review-2026-05-01/generated/01-old-school.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:3e292d22967a69751bd443f1d2aacb89ed823a1c65d01b86",
+          "asset_ids": [
+            "7e4665f5-3b03-4528-a535-2f74ac7e034d"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01/workflow-01-old-school.json"
+      }
+    },
+    {
+      "key": "02-raise-a-winner",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "sourceSwipeTitle": "raise_a_winner.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.\nPrimary problem: Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.\nPromise: A daily protocol to consider before making a long-term TRT decision.\nMechanism disclosure level: Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.\nProof type: Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read CTA before committing to needles or a long-term TRT relationship.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\n\nRun marker: tenor-advertorial-structured-congruence-more-02-raise-a-winner-1777665313972.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "ae03e14e-9528-4cb0-9af4-abd9246c6193",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-913e7c03-8036-4ff9-9ba2-1dc46a7021e4"
+      },
+      "result": {
+        "workflowRunId": "ae03e14e-9528-4cb0-9af4-abd9246c6193",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-913e7c03-8036-4ff9-9ba2-1dc46a7021e4",
+        "assetId": "474cdcdb-442f-4b2f-9b85-3e4a7dcffe9f",
+        "publicId": "eb4af57b-76ca-413c-994a-e8e8e0c4e663",
+        "publicUrl": "https://api.moshq.app/public/assets/eb4af57b-76ca-413c-994a-e8e8e0c4e663",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01/generated/02-raise-a-winner.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-more-review-2026-05-01/generated/02-raise-a-winner.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:56578efa1770e008021362e38422fd8c57bca2f903c816d7",
+          "asset_ids": [
+            "474cdcdb-442f-4b2f-9b85-3e4a7dcffe9f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01/workflow-02-raise-a-winner.json"
+      }
+    },
+    {
+      "key": "03-drawing",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "sourceSwipeTitle": "drawing.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.\nPrimary problem: Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.\nPromise: A daily protocol to consider before making a long-term TRT decision.\nMechanism disclosure level: Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.\nProof type: Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read CTA before committing to needles or a long-term TRT relationship.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\n\nRun marker: tenor-advertorial-structured-congruence-more-03-drawing-1777665380882.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "3dd0910c-c385-4e0a-b710-3e486fde4074",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-6d39aae2-5793-4909-a519-86a5b56de259"
+      },
+      "result": {
+        "workflowRunId": "3dd0910c-c385-4e0a-b710-3e486fde4074",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-6d39aae2-5793-4909-a519-86a5b56de259",
+        "assetId": "d58e2bc7-1ffb-4618-a9c3-ba4de8743f07",
+        "publicId": "9c208fbd-f501-4e8b-b9af-353bec8b8b48",
+        "publicUrl": "https://api.moshq.app/public/assets/9c208fbd-f501-4e8b-b9af-353bec8b8b48",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01/generated/03-drawing.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-more-review-2026-05-01/generated/03-drawing.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d2d342b923ae4b3c1d677e253b6f53a5527ab83186f047cf",
+          "asset_ids": [
+            "d58e2bc7-1ffb-4618-a9c3-ba4de8743f07"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-more-2026-05-01/workflow-03-drawing.json"
+      }
+    }
+  ]
+}

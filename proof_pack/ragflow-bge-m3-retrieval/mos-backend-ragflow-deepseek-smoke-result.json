@@ -1,0 +1,12 @@
+{
+  "answer": "MOS_RAGFLOW_BGE_M3_LOCAL_VECTOR_BRIDGE_20260527",
+  "answer_sentinel_found": true,
+  "dataset_id": "fc9b56f059fb11f18c4395dfede317ef",
+  "document_id": "fc9ee20c59fb11f18c4395dfede317ef",
+  "finished_at": "2026-05-27T13:45:17-0500",
+  "model": "deepseek:deepseek-v4-pro",
+  "retrieval_sentinel_found": true,
+  "retrieved_chunk_count": 1,
+  "started_at": "2026-05-27T13:43:43-0500",
+  "status": "PASS"
+}

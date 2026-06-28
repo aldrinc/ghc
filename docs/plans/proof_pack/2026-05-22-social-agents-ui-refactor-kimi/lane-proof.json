@@ -1,0 +1,165 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Parallelism: blocked by tool policy for native sub-agents. The user approved implementation but did not explicitly request sub-agents in this turn, so the implementation stayed in the main lane and used local parallel tool groups for reads and verification.",
+  "lanes": [
+    {
+      "lane_id": "lane_harness_setup",
+      "objective": "Clone and configure oh-my-pi locally with DeepInfra Kimi K2.6.",
+      "role": "local harness setup",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T19:00:00Z",
+      "ended_at": "2026-05-22T19:06:00Z",
+      "summary": "Cloned can1357/oh-my-pi under .local, installed dependencies, copied the cached native addon, patched only the local harness Bun version guard, and verified model discovery plus a Kimi smoke response.",
+      "read_scope": [
+        ".local/oh-my-pi/README.md",
+        ".local/oh-my-pi/docs/models.md",
+        ".local/oh-my-pi/docs/environment-variables.md"
+      ],
+      "write_scope": [
+        ".local/omp-agent/models.yml",
+        ".local/omp-agent/config.yml",
+        ".local/oh-my-pi/packages/natives/native/pi_natives.darwin-arm64.node",
+        ".local/oh-my-pi/packages/utils/package.json"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/oh-my-pi-revision.txt",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/source-capture/source_manifest.json"
+      ]
+    },
+    {
+      "lane_id": "lane_code_context",
+      "objective": "Inspect Social Agents UI code and build a source packet for Kimi.",
+      "role": "local explorer",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T19:01:00Z",
+      "ended_at": "2026-05-22T19:08:00Z",
+      "summary": "Inspected SocialAgentsPage, tests, API/types, route, and app shell; summarized current UI shape and constraints for Kimi.",
+      "read_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "mos/frontend/src/api/socialAgents.ts",
+        "mos/frontend/src/types/socialAgents.ts",
+        "mos/frontend/src/app/AppShell.tsx",
+        "mos/frontend/src/app/routes.tsx"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md"
+      ]
+    },
+    {
+      "lane_id": "lane_plan_and_proof",
+      "objective": "Run Kimi through OMP, write the plan, and validate proof gates.",
+      "role": "main thread planner",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-22T19:08:00Z",
+      "ended_at": "2026-05-22T19:15:00Z",
+      "summary": "Captured Kimi raw output, wrote the final plan, created plan gate proof and planctl contract, and verified plangatecheck, capturectl, planctl, and lanecheck.",
+      "read_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md"
+      ],
+      "write_scope": [
+        "docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json"
+      ]
+    },
+    {
+      "lane_id": "lane_ui_refactor_implementation",
+      "objective": "Implement the Social Agents UI refactor while preserving existing API behavior.",
+      "role": "main thread implementer",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-22T19:23:00Z",
+      "ended_at": "2026-05-22T19:34:00Z",
+      "summary": "Converted the Social Agents surface from a staged workbench into a six-step wizard with Program, Source, Experiment, Carousel, Media, and Handoff screens.",
+      "read_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "mos/frontend/src/components/ui/badge.tsx",
+        "mos/frontend/src/components/ui/button.tsx",
+        "mos/frontend/src/components/ui/select.tsx",
+        "mos/frontend/src/components/ui/table.tsx"
+      ],
+      "write_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png"
+      ]
+    },
+    {
+      "lane_id": "lane_validation",
+      "objective": "Run local verification gates for the refactored Social Agents page.",
+      "role": "local verifier",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T19:31:00Z",
+      "ended_at": "2026-05-22T19:36:00Z",
+      "summary": "Focused unit tests, Vite build, semantic UI token check, design-system scan, and browser overflow proof passed.",
+      "read_scope": [
+        "mos/frontend/package.json",
+        "mos/frontend/src/contexts/WorkspaceContext.tsx",
+        "mos/frontend/src/lib/workspaces.ts"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ]
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main_thread",
+    "summary": "Implementation and local validation are integrated. The UI is now a six-step single-purpose wizard; tests/build/style checks pass; browser proof confirms no horizontal overflow."
+  },
+  "token_time_proxy": {
+    "native_subagents": 0,
+    "local_parallel_tool_groups": 11,
+    "omp_model_discovery": "pass: deepinfra/moonshotai/Kimi-K2.6 visible",
+    "kimi_smoke": "pass: Kimi harness online",
+    "plangatecheck": "pass: 0 errors",
+    "capturectl": "pass",
+    "planctl": "pass: 0 errors, warnings only for raw brittle marker text",
+    "implementation": "pass: SocialAgentsPage refactor and focused tests updated",
+    "unit_tests": "pass: 7 tests",
+    "build": "pass: Vite production build",
+    "semantic_ui": "pass",
+    "design_system": "pass",
+    "browser_smoke": "pass: wizard route rendered with no horizontal overflow"
+  }
+}

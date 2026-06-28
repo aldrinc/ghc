@@ -1,0 +1,84 @@
+{
+  "configuredAt": "2026-04-30T03:22:48.457Z",
+  "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+  "rationale": "Use one representative listicle as v1 preSalesUrl and the supplied sales page as salesUrl.",
+  "selectedPreSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+  "selectedSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+  "updateResponse": {
+    "id": "df1cd3df-c9b9-4a25-ae69-3cf3084c914e",
+    "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "deliveryMode": "external_urls",
+    "preSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+    "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+    "checkoutUrl": null,
+    "thankYouUrl": null,
+    "validationStatus": "not_validated",
+    "validationError": null,
+    "validatedAt": null,
+    "createdAt": "2026-04-30T02:12:41.789078+00:00",
+    "updatedAt": "2026-04-30T03:22:46.975272+00:00"
+  },
+  "validation": {
+    "errorStatus": 409,
+    "errorBody": {
+      "detail": {
+        "checkedAt": "2026-04-30T03:22:48.394352+00:00",
+        "validationStatus": "invalid",
+        "validationError": "preSalesUrl does not visibly reference privacy handling.; preSalesUrl does not visibly expose contact or support information.; salesUrl does not visibly reference privacy handling.",
+        "results": [
+          {
+            "field": "preSalesUrl",
+            "url": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+            "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+            "statusCode": 200,
+            "passed": false,
+            "checks": [
+              "public_http_https",
+              "fetchable",
+              "privacy_marker",
+              "contact_marker",
+              "not_under_construction"
+            ],
+            "issues": [
+              "preSalesUrl does not visibly reference privacy handling.",
+              "preSalesUrl does not visibly expose contact or support information."
+            ]
+          },
+          {
+            "field": "salesUrl",
+            "url": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+            "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+            "statusCode": 200,
+            "passed": false,
+            "checks": [
+              "public_http_https",
+              "fetchable",
+              "privacy_marker",
+              "contact_marker",
+              "not_under_construction"
+            ],
+            "issues": [
+              "salesUrl does not visibly reference privacy handling."
+            ]
+          }
+        ],
+        "delivery": {
+          "id": "df1cd3df-c9b9-4a25-ae69-3cf3084c914e",
+          "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+          "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+          "deliveryMode": "external_urls",
+          "preSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+          "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+          "checkoutUrl": null,
+          "thankYouUrl": null,
+          "validationStatus": "invalid",
+          "validationError": "preSalesUrl does not visibly reference privacy handling.; preSalesUrl does not visibly expose contact or support information.; salesUrl does not visibly reference privacy handling.",
+          "validatedAt": "2026-04-30T03:22:48.388056+00:00",
+          "createdAt": "2026-04-30T02:12:41.789078+00:00",
+          "updatedAt": "2026-04-30T03:22:48.388063+00:00"
+        }
+      }
+    }
+  }
+}

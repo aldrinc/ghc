@@ -1,0 +1,120 @@
+{
+  "campaign": {
+    "id": "120245038828230293",
+    "name": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - User Approved Addendum 13",
+    "status": "ARCHIVED",
+    "effective_status": "ARCHIVED"
+  },
+  "adsets": [
+    {
+      "id": "120245038829160293",
+      "name": "CBO Bucket 1",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038830340293",
+      "name": "CBO Bucket 2",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038831590293",
+      "name": "CBO Bucket 3",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038832470293",
+      "name": "CBO Bucket 4",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038833560293",
+      "name": "CBO Bucket 5",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    }
+  ],
+  "ads": [
+    {
+      "id": "120245038836160293",
+      "name": "PDP5 - Morning Energy That Lasts",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038838770293",
+      "name": "PDP4 - Every Dose. Right There.",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038842570293",
+      "name": "PDP3 - Check Your Label First",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038845340293",
+      "name": "PDP1 - $35/mo. 90-Day Guarantee.",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038848260293",
+      "name": "L6 - Backed by Research",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038851750293",
+      "name": "L5 - 1,203 Men. 4 Results.",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038854910293",
+      "name": "L1 - Stop Boosting. Start Supporting.",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038856670293",
+      "name": "AV-C4 - Three Systems, One Protocol",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038859410293",
+      "name": "AV-C3 - 3 Steps, Not 1",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038862390293",
+      "name": "AV-B3 - Half the Science",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038864480293",
+      "name": "AV-B2 - It's Not Just Production",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038867610293",
+      "name": "AV-B1 - Two Pathways They Missed",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038869310293",
+      "name": "AV-A3 - The Missing Pathway",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    }
+  ]
+}

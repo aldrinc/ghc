@@ -1,0 +1,8 @@
+{
+  "thread_id": "marketi-step01-final-only-2026-05-21",
+  "status": "completed",
+  "error": null,
+  "elapsed_seconds": 175.839,
+  "events_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl",
+  "final_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md"
+}

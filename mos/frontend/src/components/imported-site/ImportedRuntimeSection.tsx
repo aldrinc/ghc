@@ -7,7 +7,7 @@ import {
   normalizeImportedHeadAssets,
 } from "@/components/imported-site/importedRuntime";
 import { useImportedRuntimeContext } from "@/components/imported-site/ImportedTemplateBlocks";
-import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/funnelRuntime";
 import { toast } from "@/components/ui/toast";
 import type { MedusaProduct, MedusaProductVariant } from "@/types/commerce";
 import type { ProductAsset, ProductDetail } from "@/types/products";

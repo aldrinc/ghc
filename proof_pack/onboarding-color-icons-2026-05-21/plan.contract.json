@@ -1,0 +1,211 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-21-onboarding-color-icons-plan",
+  "created_at": "2026-05-21T14:43:41.433992+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-onboarding-color-icons-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/onboarding-color-icons-2026-05-21",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Add original reusable onboarding SVG icons.",
+      "source_line": 20,
+      "expected_files": [
+        "mos/frontend/src/components/onboarding/OnboardingIcon.tsx",
+        "mos/frontend/src/components/onboarding/index.ts"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/index.html"
+      ],
+      "status": "done",
+      "acceptance": [
+        "Onboarding uses original colorful SVG icons for business stage, business model, offering kind, pricing, and setup progress.",
+        "ChoiceList color icon mode preserves icon colors in selected, hover, and disabled states.",
+        "SetupChecklist accepts optional semantic icons without removing status labels.",
+        "Existing onboarding navigation, validation, review, and success flows remain covered by tests.",
+        "Frontend build and planctl verification pass."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "notes": "Verified locally on 2026-05-21: targeted tests passed, frontend build passed, color icon QA passed, lanecheck passed."
+    },
+    {
+      "id": "P02",
+      "objective": "Add color icon mode to ChoiceList and design-system CSS.",
+      "source_line": 22,
+      "expected_files": [
+        "mos/frontend/src/components/onboarding/ChoiceList.tsx",
+        "mos/frontend/src/styles/design-system.css"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/index.html"
+      ],
+      "status": "done",
+      "acceptance": [
+        "Onboarding uses original colorful SVG icons for business stage, business model, offering kind, pricing, and setup progress.",
+        "ChoiceList color icon mode preserves icon colors in selected, hover, and disabled states.",
+        "SetupChecklist accepts optional semantic icons without removing status labels.",
+        "Existing onboarding navigation, validation, review, and success flows remain covered by tests.",
+        "Frontend build and planctl verification pass."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "notes": "Verified locally on 2026-05-21: targeted tests passed, frontend build passed, color icon QA passed, lanecheck passed."
+    },
+    {
+      "id": "P03",
+      "objective": "Wire colorful icons into onboarding business, offering, and pricing choices.",
+      "source_line": 23,
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/index.html"
+      ],
+      "status": "done",
+      "acceptance": [
+        "Onboarding uses original colorful SVG icons for business stage, business model, offering kind, pricing, and setup progress.",
+        "ChoiceList color icon mode preserves icon colors in selected, hover, and disabled states.",
+        "SetupChecklist accepts optional semantic icons without removing status labels.",
+        "Existing onboarding navigation, validation, review, and success flows remain covered by tests.",
+        "Frontend build and planctl verification pass."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "notes": "Verified locally on 2026-05-21: targeted tests passed, frontend build passed, color icon QA passed, lanecheck passed."
+    },
+    {
+      "id": "P04",
+      "objective": "Add optional colorful icons to setup checklist rows.",
+      "source_line": 24,
+      "expected_files": [
+        "mos/frontend/src/components/onboarding/SetupChecklist.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/index.html"
+      ],
+      "status": "done",
+      "acceptance": [
+        "Onboarding uses original colorful SVG icons for business stage, business model, offering kind, pricing, and setup progress.",
+        "ChoiceList color icon mode preserves icon colors in selected, hover, and disabled states.",
+        "SetupChecklist accepts optional semantic icons without removing status labels.",
+        "Existing onboarding navigation, validation, review, and success flows remain covered by tests.",
+        "Frontend build and planctl verification pass."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "notes": "Verified locally on 2026-05-21: targeted tests passed, frontend build passed, color icon QA passed, lanecheck passed."
+    },
+    {
+      "id": "P05",
+      "objective": "Update tests for icon presence while preserving onboarding and toast behavior.",
+      "source_line": 25,
+      "expected_files": [
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/ui/toast.test.tsx"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/index.html"
+      ],
+      "status": "done",
+      "acceptance": [
+        "Onboarding uses original colorful SVG icons for business stage, business model, offering kind, pricing, and setup progress.",
+        "ChoiceList color icon mode preserves icon colors in selected, hover, and disabled states.",
+        "SetupChecklist accepts optional semantic icons without removing status labels.",
+        "Existing onboarding navigation, validation, review, and success flows remain covered by tests.",
+        "Frontend build and planctl verification pass."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "notes": "Verified locally on 2026-05-21: targeted tests passed, frontend build passed, color icon QA passed, lanecheck passed."
+    },
+    {
+      "id": "P06",
+      "objective": "Verify targeted tests, frontend build, QA artifact, lane proof, and proof dashboard.",
+      "source_line": 26,
+      "expected_files": [
+        "docs/plans/2026-05-21-onboarding-color-icons-plan.md",
+        "proof_pack/onboarding-color-icons-2026-05-21"
+      ],
+      "artifacts": [
+        "proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json",
+        "proof_pack/onboarding-color-icons-2026-05-21/index.html"
+      ],
+      "status": "done",
+      "acceptance": [
+        "Onboarding uses original colorful SVG icons for business stage, business model, offering kind, pricing, and setup progress.",
+        "ChoiceList color icon mode preserves icon colors in selected, hover, and disabled states.",
+        "SetupChecklist accepts optional semantic icons without removing status labels.",
+        "Existing onboarding navigation, validation, review, and success flows remain covered by tests.",
+        "Frontend build and planctl verification pass."
+      ],
+      "verify_commands": [
+        "test -f proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "notes": "Verified locally on 2026-05-21: targeted tests passed, frontend build passed, color icon QA passed, lanecheck passed."
+    }
+  ],
+  "global_verify_commands": [
+    "cd mos/frontend && npm test -- --run src/components/clients/OnboardingWizard.test.tsx src/components/ui/toast.test.tsx",
+    "cd mos/frontend && npm run build",
+    "test -f proof_pack/onboarding-color-icons-2026-05-21/color-icons-qa.json",
+    "/Users/aldrinclement/.codex/bin/lanecheck proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json"
+  ],
+  "global_acceptance": [
+    "Onboarding uses original colorful SVG icons for business stage, business model, offering kind, pricing, and setup progress.",
+    "ChoiceList color icon mode preserves icon colors in selected, hover, and disabled states.",
+    "SetupChecklist accepts optional semantic icons without removing status labels.",
+    "Existing onboarding navigation, validation, review, and success flows remain covered by tests.",
+    "Frontend build and planctl verification pass."
+  ],
+  "lane_evidence_required": true,
+  "lane_proof": "proof_pack/onboarding-color-icons-2026-05-21/lane-proof.json",
+  "parallelism_mode": "single_lane"
+}

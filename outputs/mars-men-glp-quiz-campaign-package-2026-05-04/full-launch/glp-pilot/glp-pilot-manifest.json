@@ -1,0 +1,258 @@
+{
+  "createdAt": "2026-05-05T23:21:18.352Z",
+  "note": "GLP-only pilot. No publishing. Curated row reuses GLP copy only; generation payload omits swipeHook and uses only the GLP congruence block as swipeAngle.",
+  "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+  "targetPublishPlan": {
+    "geography": "US only",
+    "targeting": {
+      "geo_locations": {
+        "countries": [
+          "US"
+        ],
+        "location_types": [
+          "home",
+          "recent"
+        ]
+      }
+    }
+  },
+  "destination": {
+    "label": "GLP listicle",
+    "presaleUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+    "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039",
+    "congruenceBlock": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly."
+  },
+  "sourceCollections": {
+    "standardCurated": {
+      "collectionId": "b89e89f4-2565-4b5d-afd1-195532613bfb",
+      "collectionName": "Tenor initial swipe collection"
+    }
+  },
+  "entries": [
+    {
+      "key": "curated-green-glp",
+      "sourceType": "standard_curated",
+      "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+      "sourceTitle": "green.jpg",
+      "productReferencePolicy": "never_for_curated",
+      "productReferenceRequired": false,
+      "aspectRatio": "1:1",
+      "adCopy": {
+        "sourceCopyId": "COPY002",
+        "remixCopyId": "TENOR-COPY002",
+        "title": "Keep Your Drive Steady on GLP-1s",
+        "body": "GLP-1s cut appetite so hard your body starts burning muscle for fuel — not fat.\n\nTenor Daily Drive Essentials supports muscle preservation, steady metabolism, and healthy hormone pathways as the weight drops.\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nNo needles. No prescription. No shutdown.\n\nTwo capsules every morning.\n\nSupport your drive while the fat comes off.\n\n👉 Save 52% — 90-day empty-bottle guarantee.",
+        "cta": "Get The Protocol",
+        "linkDescription": "✅ 90-Day Empty-Bottle Guarantee",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeAngle": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "1:1",
+        "count": 1,
+        "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef"
+      },
+      "workflow": {
+        "workflowRunId": "db3b3e63-d6d8-44d9-8d48-9b910c20a9d5",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-ecdebf18-02cc-4331-b6a0-c36d0320a7da",
+        "workflowUrl": "https://moshq.app/workflows/db3b3e63-d6d8-44d9-8d48-9b910c20a9d5",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/glp-pilot/workflow-curated-green-glp.json",
+        "payloadOut": {
+          "job_id": "openai:ee06339f2008aff01ec869132ac83328a1a0758b51ffb92f0fe4fda1aee27a63",
+          "asset_ids": [
+            "443652e6-f10f-4cea-89cb-b3ecf18f39fb"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        }
+      },
+      "result": {
+        "assetId": "443652e6-f10f-4cea-89cb-b3ecf18f39fb",
+        "publicId": "1b302e9d-b598-4821-9489-8286c5ff2b13",
+        "publicUrl": "https://api.moshq.app/public/assets/1b302e9d-b598-4821-9489-8286c5ff2b13",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/glp-pilot/generated/curated-green-glp.png",
+        "remoteJobId": "openai:ee06339f2008aff01ec869132ac83328a1a0758b51ffb92f0fe4fda1aee27a63",
+        "renderProvider": "openai",
+        "renderModelIdUsed": "gpt-image-2"
+      }
+    },
+    {
+      "key": "tenor-c001-non-product-glp",
+      "sourceType": "tenor_package",
+      "sourceCreativeId": "C001",
+      "sourceTitle": "What GLP-1 Does to Your T Levels",
+      "sourcePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/creatives/C001_9e8258a1f182_what-glp-1-does-to-your-t-levels.jpg",
+      "productReferencePolicy": "dynamic_by_tenor_reference",
+      "productReferenceRequired": false,
+      "aspectRatio": "9:16",
+      "adCopy": {
+        "sourceCopyId": "COPY001",
+        "remixCopyId": "TENOR-COPY001",
+        "title": "What GLP-1 Does to Your Drive",
+        "body": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine.",
+        "cta": "Get The Protocol",
+        "linkDescription": "Tenor's 21 active ingredients at disclosed doses support the systems GLP-1s quietly drain — energy, drive, stamina, and recovery. Two capsules every morning. No prescription. No needles.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039"
+      },
+      "sourceCreativeSha256": "9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b",
+      "sourceAttachment": {
+        "assetId": "38f3c746-061e-4c12-9c91-9260f3c81679",
+        "publicId": "6fae12ab-5551-4c6f-be07-dccef91a50be",
+        "publicUrl": "https://api.moshq.app/public/assets/6fae12ab-5551-4c6f-be07-dccef91a50be",
+        "width": 1080,
+        "height": 1920,
+        "contentType": "image/jpeg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeAngle": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/6fae12ab-5551-4c6f-be07-dccef91a50be"
+      },
+      "workflow": {
+        "workflowRunId": "81ecc4d5-7b5d-4035-add5-cd957beea268",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-0f04f41d-20aa-49c7-b820-678c438e9369",
+        "workflowUrl": "https://moshq.app/workflows/81ecc4d5-7b5d-4035-add5-cd957beea268",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/glp-pilot/workflow-tenor-c001-non-product-glp.json",
+        "payloadOut": {
+          "job_id": "openai:4970decc3cc1ac2d8187c14f55e12dae409845478f80fe320ca6e7e044ea67ca",
+          "asset_ids": [
+            "7ec65615-f9d5-4f95-86fd-6ac37871fed7"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        }
+      },
+      "result": {
+        "assetId": "7ec65615-f9d5-4f95-86fd-6ac37871fed7",
+        "publicId": "d1d087e7-4b33-4ab6-9b37-14788d813ab6",
+        "publicUrl": "https://api.moshq.app/public/assets/d1d087e7-4b33-4ab6-9b37-14788d813ab6",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1824,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/glp-pilot/generated/tenor-c001-non-product-glp.png",
+        "remoteJobId": "openai:4970decc3cc1ac2d8187c14f55e12dae409845478f80fe320ca6e7e044ea67ca",
+        "renderProvider": "openai",
+        "renderModelIdUsed": "gpt-image-2"
+      }
+    },
+    {
+      "key": "tenor-c006-product-bearing-glp",
+      "sourceType": "tenor_package",
+      "sourceCreativeId": "C006",
+      "sourceTitle": "What GLP-1 Does to Your T Levels",
+      "sourcePath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/creatives/C006_b2ce46c5e9a8_what-glp-1-does-to-your-t-levels.jpg",
+      "productReferencePolicy": "dynamic_by_tenor_reference",
+      "productReferenceRequired": true,
+      "aspectRatio": "4:5",
+      "adCopy": {
+        "sourceCopyId": "COPY001",
+        "remixCopyId": "TENOR-COPY001",
+        "title": "What GLP-1 Does to Your Drive",
+        "body": "The weight's coming off.\n\nBut something else is going with it.\n\nGLP-1 meds work. Nobody's arguing that.\n\nBut here's what your prescribing doctor didn't mention:\n\nRapid weight loss floods your system with cortisol.\n\nCortisol chokes the signal that keeps your energy steady. Your body burns lean tissue for fuel — instead of protecting it.\n\nYour mornings get heavier.\nYour afternoons disappear.\nYour presence fades.\n\nYou're lighter on the scale — but foggier, flatter, and running on fumes.\n\nThat's not progress. That's a trade you didn't agree to.\n\nTenor Daily Drive Essentials was built to support what GLP-1s quietly drain:\n\n💪 Tongkat Ali (400mg) — supports the stress response that rapid weight loss disrupts\n\n💪 Zinc (50mg) — feeds the pathway your body needs to maintain healthy hormone levels\n\n💪 21 active ingredients at disclosed doses — supporting drive, stamina, and recovery from every angle\n\nNo proprietary blends.\nNo hidden doses.\nNo guessing.\n\nIn a survey of 1,203 men, 94% reported sustained morning energy. 87% felt more focused and present. Results you can feel — backed by transparent dosing, not promises.\n\nSave 52% on your first 90-day supply. 90-day empty-bottle guarantee.\n\nSee why men on GLP-1s are adding this two-capsule morning protocol to their daily routine.",
+        "cta": "Get The Protocol",
+        "linkDescription": "Tenor's 21 active ingredients at disclosed doses support the systems GLP-1s quietly drain — energy, drive, stamina, and recovery. Two capsules every morning. No prescription. No needles.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039"
+      },
+      "sourceCreativeSha256": "b2ce46c5e9a82c28bad64b0080fb50722e59104287bdfbfbc9ae91949d40afee",
+      "sourceAttachment": {
+        "assetId": "520aaf5a-4876-4053-87cf-1302bc596cd5",
+        "publicId": "a9bf25d1-9e29-490c-91a7-92bbf986e54e",
+        "publicUrl": "https://api.moshq.app/public/assets/a9bf25d1-9e29-490c-91a7-92bbf986e54e",
+        "width": 1080,
+        "height": 1350,
+        "contentType": "image/jpeg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeAngle": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "4:5",
+        "count": 1,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/a9bf25d1-9e29-490c-91a7-92bbf986e54e"
+      },
+      "workflow": {
+        "workflowRunId": "4defe261-a3ea-4922-99f4-3b7226451d5c",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-bcbe7de4-cbf3-4382-8ead-4868b5a23b9a",
+        "workflowUrl": "https://moshq.app/workflows/4defe261-a3ea-4922-99f4-3b7226451d5c",
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/glp-pilot/workflow-tenor-c006-product-bearing-glp.json",
+        "payloadOut": {
+          "job_id": "openai:3313bf12ba9021009a00f19a8003d7222da74978dbcf0c317be240ae2011dc07",
+          "asset_ids": [
+            "8734f820-c917-4637-aebe-1857aebdd762"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "gpt-image-2",
+          "swipe_render_provider": "openai",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        }
+      },
+      "result": {
+        "assetId": "8734f820-c917-4637-aebe-1857aebdd762",
+        "publicId": "48abde6e-a4f4-463d-8521-f57dc6ba2e2a",
+        "publicUrl": "https://api.moshq.app/public/assets/48abde6e-a4f4-463d-8521-f57dc6ba2e2a",
+        "contentType": "image/png",
+        "width": 1024,
+        "height": 1280,
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/glp-pilot/generated/tenor-c006-product-bearing-glp.png",
+        "remoteJobId": "openai:3313bf12ba9021009a00f19a8003d7222da74978dbcf0c317be240ae2011dc07",
+        "renderProvider": "openai",
+        "renderModelIdUsed": "gpt-image-2"
+      }
+    }
+  ],
+  "updatedAt": "2026-05-05T23:27:10.746Z"
+}

@@ -1,0 +1,457 @@
+{
+  "data": [
+    {
+      "type": "flow-action",
+      "id": "105690567",
+      "attributes": {
+        "created": "2026-05-04T18:56:50+00:00",
+        "updated": "2026-05-04T18:56:50+00:00",
+        "definition": {
+          "id": "105690567",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shoptenorco.com",
+              "from_label": "Dr. Adam Reese, Tenor",
+              "reply_to_email": "support@shoptenorco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "It's not just you",
+              "preview_text": "The shift most men don't name out loud",
+              "template_id": "WHtqs3",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[TENOR] DDE Welcome E01 - Orientation — Day 0",
+              "id": "UV3wVy"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "105690568"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690567/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690567/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690567/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690567/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690567/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690568",
+      "attributes": {
+        "created": "2026-05-04T18:56:50+00:00",
+        "updated": "2026-05-04T18:56:50+00:00",
+        "definition": {
+          "id": "105690568",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 1,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "105690569"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690568/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690568/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690568/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690568/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690568/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690569",
+      "attributes": {
+        "created": "2026-05-04T18:56:50+00:00",
+        "updated": "2026-05-04T18:56:50+00:00",
+        "definition": {
+          "id": "105690569",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shoptenorco.com",
+              "from_label": "Dr. Adam Reese, Tenor",
+              "reply_to_email": "support@shoptenorco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "Three things that fall together",
+              "preview_text": "Why fixing one doesn't fix the rest",
+              "template_id": "XSSfjT",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[TENOR] DDE Welcome E02 - Story / Mechanism Tease — Day 1",
+              "id": "W6smPq"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "105690570"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690569/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690569/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690569/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690569/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690569/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690570",
+      "attributes": {
+        "created": "2026-05-04T18:56:51+00:00",
+        "updated": "2026-05-04T18:56:51+00:00",
+        "definition": {
+          "id": "105690570",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 2,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "105690571"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690570/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690570/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690570/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690570/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690570/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690571",
+      "attributes": {
+        "created": "2026-05-04T18:56:51+00:00",
+        "updated": "2026-05-04T18:56:51+00:00",
+        "definition": {
+          "id": "105690571",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shoptenorco.com",
+              "from_label": "Dr. Adam Reese, Tenor",
+              "reply_to_email": "support@shoptenorco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "21 ingredients, zero secrets",
+              "preview_text": "The label most brands hope you never ask for",
+              "template_id": "Rfyvzc",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[TENOR] DDE Welcome E03 - Transparency / Proof — Day 3",
+              "id": "XfRcHg"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "105690572"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690571/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690571/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690571/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690571/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690571/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690572",
+      "attributes": {
+        "created": "2026-05-04T18:56:51+00:00",
+        "updated": "2026-05-04T18:56:51+00:00",
+        "definition": {
+          "id": "105690572",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 2,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "105690573"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690572/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690572/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690572/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690572/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690572/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690573",
+      "attributes": {
+        "created": "2026-05-04T18:56:51+00:00",
+        "updated": "2026-05-04T18:56:51+00:00",
+        "definition": {
+          "id": "105690573",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shoptenorco.com",
+              "from_label": "Dr. Adam Reese, Tenor",
+              "reply_to_email": "support@shoptenorco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "The Triad most men don't know exists",
+              "preview_text": "Why three systems matter more than any single number",
+              "template_id": "Yrg3B8",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[TENOR] DDE Welcome E04 - Full Mechanism + Soft Offer — Day 5",
+              "id": "UQqgAa"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": "105690575"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690573/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690573/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690573/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690573/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690573/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690575",
+      "attributes": {
+        "created": "2026-05-04T18:56:52+00:00",
+        "updated": "2026-05-04T18:56:52+00:00",
+        "definition": {
+          "id": "105690575",
+          "type": "time-delay",
+          "data": {
+            "unit": "days",
+            "value": 2,
+            "secondary_value": null,
+            "timezone": "profile",
+            "delay_until_weekdays": [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday"
+            ]
+          },
+          "links": {
+            "next": "105690576"
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690575/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690575/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690575/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690575/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690575/"
+      }
+    },
+    {
+      "type": "flow-action",
+      "id": "105690576",
+      "attributes": {
+        "created": "2026-05-04T18:56:52+00:00",
+        "updated": "2026-05-04T18:56:52+00:00",
+        "definition": {
+          "id": "105690576",
+          "type": "send-email",
+          "data": {
+            "message": {
+              "from_email": "support@shoptenorco.com",
+              "from_label": "Dr. Adam Reese, Tenor",
+              "reply_to_email": "support@shoptenorco.com",
+              "cc_email": null,
+              "bcc_email": null,
+              "subject_line": "The protocol, the guarantee, and the math",
+              "preview_text": "90 days, $1.17 a serving, empty bottles OK",
+              "template_id": "RMWhQr",
+              "smart_sending_enabled": true,
+              "transactional": false,
+              "add_tracking_params": false,
+              "custom_tracking_params": null,
+              "additional_filters": null,
+              "name": "[TENOR] DDE Welcome E05 - Full Offer + Guarantee — Day 7",
+              "id": "XNeYYv"
+            },
+            "status": "draft"
+          },
+          "links": {
+            "next": null
+          }
+        }
+      },
+      "relationships": {
+        "flow": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690576/relationships/flow/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690576/flow/"
+          }
+        },
+        "flow-messages": {
+          "links": {
+            "self": "https://a.klaviyo.com/api/flow-actions/105690576/relationships/flow-messages/",
+            "related": "https://a.klaviyo.com/api/flow-actions/105690576/flow-messages/"
+          }
+        }
+      },
+      "links": {
+        "self": "https://a.klaviyo.com/api/flow-actions/105690576/"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://a.klaviyo.com/api/flows/Vy4zyb/flow-actions?page[size]=50",
+    "next": null,
+    "prev": null
+  }
+}

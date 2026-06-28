@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-22T23:05:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-review-visual-refactor-plan.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user supplied the specific failing surface, the desired direction, the app route, prior mock feedback, and the requirement to use Kimi K2.6 through omp. Local code inspection and Browser validation supplied the remaining implementation evidence.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Goal is a visual-first Review screen where the customer can review marketing carousel work with one next action."
+    },
+    "problem_log": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Problem is visible backend-shaped review machinery, unclear CTA hierarchy, and too much copy."
+    },
+    "root_cause_diagnosis": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Root cause is mapping internal data objects onto the main canvas instead of the creative review job."
+    },
+    "current_machine": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Current machine made Review feel like a form console."
+    },
+    "designed_machine": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Designed machine puts six visual slide cards first and collapses advanced fields."
+    },
+    "worst_day_test": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Worst-day test covers missing assets, missing approval, missing channels, and mobile width."
+    },
+    "leading_lagging_metrics": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Metrics are slide-card count, hidden textareas, primary CTA count, responsive overflow, tests, build, and UI guardrails."
+    },
+    "owner_date_review": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Owner is Codex main thread, dated 2026-05-22, with review after verification gates pass."
+    },
+    "stop_condition": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/planning/plan-gate.md",
+      "summary": "Stop when the real app is visual-first and all proof gates pass."
+    }
+  },
+  "owner": "Codex main thread",
+  "review_date": "2026-05-22",
+  "stop_condition": "Actual app refactor is complete only after Browser proof, tests, guardrails, Kimi omp log, source manifest, lanecheck, plangatecheck, planctl verify, and proof dashboard pass."
+}

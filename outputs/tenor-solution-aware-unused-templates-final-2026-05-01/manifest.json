@@ -1,0 +1,354 @@
+{
+  "createdAt": "2026-05-01T18:09:24.116Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/generated",
+  "sourceTemplateDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/source-templates",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "validationIntent": {
+    "inputMode": "solution_aware_only_plus_approved_compliance_lines",
+    "awarenessLevel": "Solution-Aware",
+    "forbiddenSourceTemplates": [
+      "11.png",
+      "fatigue.jpg",
+      "fb_message_ad.jpg",
+      "big_text.jpg",
+      "Static #2.png",
+      "5.png",
+      "6.png",
+      "7.png",
+      "8.png",
+      "9.png",
+      "10.png"
+    ],
+    "selectedSourceTemplates": [
+      "old_school.jpg",
+      "raise_a_winner.jpg",
+      "researchers.jpg",
+      "drawing.jpg",
+      "boss_babe.jpg",
+      "health_cute_advertorial.jpg"
+    ],
+    "productImagesAllowed": false,
+    "mechanismRevealAllowed": false,
+    "creativeGuidanceAddedByOperator": false
+  },
+  "outputs": [
+    {
+      "key": "solution-aware-unused-final-01",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "sourceSwipeTitle": "old_school.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-final-solution-aware-unused-final-01-1777658545665.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "0c131dfd-cfd0-4fa6-ac95-be36f466ea92",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-4d98294f-ca01-4dd5-b8d0-a6e53a857188"
+      },
+      "result": {
+        "workflowRunId": "0c131dfd-cfd0-4fa6-ac95-be36f466ea92",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-4d98294f-ca01-4dd5-b8d0-a6e53a857188",
+        "assetId": "49e225bb-8921-4709-9178-a69c60494dd2",
+        "publicId": "43e0a322-22c5-4daa-bb6c-bd6d07fd990d",
+        "publicUrl": "https://api.moshq.app/public/assets/43e0a322-22c5-4daa-bb6c-bd6d07fd990d",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/generated/solution-aware-unused-final-01.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:c976e26147925d26665256a03f95a79bf0a5b2cebb56e265",
+          "asset_ids": [
+            "49e225bb-8921-4709-9178-a69c60494dd2"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/workflow-solution-aware-unused-final-01.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-final-02",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "sourceSwipeTitle": "raise_a_winner.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-final-solution-aware-unused-final-02-1777658617032.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "4fda9179-89f1-463c-948b-3344aa6b1e19",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1de5f4c3-f1a8-4f52-a428-f6e5fa7ff199"
+      },
+      "result": {
+        "workflowRunId": "4fda9179-89f1-463c-948b-3344aa6b1e19",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1de5f4c3-f1a8-4f52-a428-f6e5fa7ff199",
+        "assetId": "2b79e9af-a984-4589-a8ed-40b9be5fd23c",
+        "publicId": "bc61ada2-5c4f-434c-90ad-02cbea71e31b",
+        "publicUrl": "https://api.moshq.app/public/assets/bc61ada2-5c4f-434c-90ad-02cbea71e31b",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/generated/solution-aware-unused-final-02.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:e306f2cf5cd9f5fb227cadc287f00882ecc25a72f68aa586",
+          "asset_ids": [
+            "2b79e9af-a984-4589-a8ed-40b9be5fd23c"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/workflow-solution-aware-unused-final-02.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-final-03",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "sourceSwipeTitle": "researchers.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-final-solution-aware-unused-final-03-1777658687375.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "6bc63bcd-66e9-4bb3-9aa6-9618c9702cee",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-d4b494b3-67ce-4112-acbb-64d4b1c976ba"
+      },
+      "result": {
+        "workflowRunId": "6bc63bcd-66e9-4bb3-9aa6-9618c9702cee",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-d4b494b3-67ce-4112-acbb-64d4b1c976ba",
+        "assetId": "b9eee9b9-714a-48e0-b68c-cc1a94aa1d87",
+        "publicId": "abd698ed-39c3-412d-a964-4a1fcbdc93e5",
+        "publicUrl": "https://api.moshq.app/public/assets/abd698ed-39c3-412d-a964-4a1fcbdc93e5",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/generated/solution-aware-unused-final-03.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:b99716714cfbe17db423b8341d44fffe60fde848143ab258",
+          "asset_ids": [
+            "b9eee9b9-714a-48e0-b68c-cc1a94aa1d87"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/workflow-solution-aware-unused-final-03.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-final-04",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "sourceSwipeTitle": "drawing.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-final-solution-aware-unused-final-04-1777658745919.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "a833c2fb-d785-4d5b-a804-5976cfb5a46b",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-14951a9c-9e5f-403e-bbed-fa25cd153472"
+      },
+      "result": {
+        "workflowRunId": "a833c2fb-d785-4d5b-a804-5976cfb5a46b",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-14951a9c-9e5f-403e-bbed-fa25cd153472",
+        "assetId": "f474f65f-df90-4126-83ab-32a18ea37e9f",
+        "publicId": "8ca4795b-e1a9-4474-8d4b-db65ca371f17",
+        "publicUrl": "https://api.moshq.app/public/assets/8ca4795b-e1a9-4474-8d4b-db65ca371f17",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/generated/solution-aware-unused-final-04.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:1216c4896db13349fadb6bf8af7636f65da9457ec28347b8",
+          "asset_ids": [
+            "f474f65f-df90-4126-83ab-32a18ea37e9f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/workflow-solution-aware-unused-final-04.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-final-05",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "sourceSwipeTitle": "boss_babe.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-final-solution-aware-unused-final-05-1777658819519.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "0966b656-fd36-477f-8dc2-722c02bb7fe5",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1320a18a-e040-45d9-98ef-8a90430121fe"
+      },
+      "result": {
+        "workflowRunId": "0966b656-fd36-477f-8dc2-722c02bb7fe5",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1320a18a-e040-45d9-98ef-8a90430121fe",
+        "assetId": "4ca40897-7837-489c-97e5-f66ba525d572",
+        "publicId": "5508f093-dd95-4ff6-9562-c2920b6ec29d",
+        "publicUrl": "https://api.moshq.app/public/assets/5508f093-dd95-4ff6-9562-c2920b6ec29d",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/generated/solution-aware-unused-final-05.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:0cd204019d7efdd17e6172b3d22d39b55fa02f0e1b24a0bd",
+          "asset_ids": [
+            "4ca40897-7837-489c-97e5-f66ba525d572"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/workflow-solution-aware-unused-final-05.json"
+      }
+    },
+    {
+      "key": "solution-aware-unused-final-06",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "collectionName": "Default",
+        "companySwipeId": "f1921084-1850-53af-8cc3-ae44c9691320",
+        "sourceSwipeTitle": "health_cute_advertorial.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f1921084-1850-53af-8cc3-ae44c9691320",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nCompliance:\n- No product reveal.\n- No mechanism reveal.\n\nOperator note: intentionally provide only the awareness level plus the approved compliance lines so the system/workspace context drives the creative.\nRun marker: tenor-solution-aware-unused-template-final-solution-aware-unused-final-06-1777658882367.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "be090fb2-33e4-4e8a-a7ef-00a835e366ee",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-bbbe67e7-cd0d-40c8-aaaa-3d2d91e8ed56"
+      },
+      "result": {
+        "workflowRunId": "be090fb2-33e4-4e8a-a7ef-00a835e366ee",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-bbbe67e7-cd0d-40c8-aaaa-3d2d91e8ed56",
+        "assetId": "290abf25-707a-422e-95e1-4662b38b3536",
+        "publicId": "42d10f3d-5288-49e5-a3ae-764dfe578e44",
+        "publicUrl": "https://api.moshq.app/public/assets/42d10f3d-5288-49e5-a3ae-764dfe578e44",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/generated/solution-aware-unused-final-06.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:051f4f55322d6cbd9227170830503617c9e2dd7e871c485b",
+          "asset_ids": [
+            "290abf25-707a-422e-95e1-4662b38b3536"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-solution-aware-unused-templates-final-2026-05-01/workflow-solution-aware-unused-final-06.json"
+      }
+    }
+  ]
+}

@@ -25,10 +25,10 @@ export function Callout({
 }: CalloutProps) {
   const containerVariant: Record<CalloutVariant, string> = {
     neutral: "border-border bg-surface text-content",
-    info: "border-accent/30 bg-accent/10 text-content",
-    success: "border-success/30 bg-success/5 text-content",
-    warning: "border-warning/30 bg-warning/5 text-content",
-    danger: "border-danger/30 bg-danger/5 text-content",
+    info: "border-info/25 bg-info-bg text-content",
+    success: "border-success/25 bg-success-bg text-content",
+    warning: "border-warning/25 bg-warning-bg text-content",
+    danger: "border-danger/25 bg-danger-bg text-content",
   };
 
   const accentText: Record<CalloutVariant, string> = {
@@ -40,13 +40,13 @@ export function Callout({
   };
 
   const padding: Record<CalloutSize, string> = {
-    sm: "px-3 py-2",
-    md: "px-4 py-3",
+    sm: "px-4 py-3",
+    md: "px-5 py-4",
   };
 
   return (
     <div
-      className={cn("rounded-md border", padding[size], containerVariant[variant], className)}
+      className={cn("rounded-[12px] border-[1.5px]", padding[size], containerVariant[variant], className)}
       {...props}
     >
       <div className={cn("flex flex-col gap-2", actions ? "sm:flex-row sm:items-center sm:justify-between" : "")}>
@@ -54,10 +54,10 @@ export function Callout({
           {icon ? <div className={cn("mt-0.5 shrink-0", accentText[variant])}>{icon}</div> : null}
           <div className="min-w-0">
             {title ? (
-              <div className={cn("font-semibold leading-tight", accentText[variant])}>{title}</div>
+              <div className={cn("text-md font-semibold leading-tight tracking-normal", accentText[variant])}>{title}</div>
             ) : null}
             {children ? (
-              <div className={cn(title ? "mt-0.5 text-xs text-content-muted" : "text-sm text-content")}>
+              <div className={cn(title ? "mt-1 text-sm leading-normal text-content-muted" : "text-sm text-content")}>
                 {children}
               </div>
             ) : null}
@@ -68,4 +68,3 @@ export function Callout({
     </div>
   );
 }
-

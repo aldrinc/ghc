@@ -20,7 +20,7 @@ import type {
   MedusaPaymentCollection,
   SiteCommerceCompleteResponse,
 } from "@/types/commerce";
-import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/funnelRuntime";
 
 // =============================================================================
 // Commerce Runtime Context

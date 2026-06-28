@@ -1,0 +1,98 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "ragflow-bge-m3-retrieval",
+  "created_at": "2026-05-27T15:49:05.372857+00:00",
+  "source_type": "documentation",
+  "source": "https://github.com/infiniflow/ragflow",
+  "operator_notes": "RAGFlow API and supported model docs used to implement local BGE-M3/RAGFlow retrieval path.",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/ragflow-http-api-reference-8deb3640aa.md",
+      "kind": "raw_files",
+      "sha256": "c750b458fffa6437b7e7c0b8e6e2bfcdc0e2dbf71d8ee8f59f5e8487abb904e3",
+      "bytes": 217696,
+      "captured_at": "2026-05-27T15:49:24.951554+00:00",
+      "source": "https://raw.githubusercontent.com/infiniflow/ragflow/refs/heads/main/docs/references/http_api_reference.md",
+      "notes": "HTTP retrieval endpoint and parameter contract."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/ragflow-supported-models-b805f6ac67.mdx",
+      "kind": "raw_files",
+      "sha256": "ec4a197a7ca8ce27bb5fd1701014daad7f0e7399b2dabf3476c984627b9cea9c",
+      "bytes": 11205,
+      "captured_at": "2026-05-27T15:49:24.976933+00:00",
+      "source": "https://raw.githubusercontent.com/infiniflow/ragflow/refs/heads/main/docs/guides/models/supported_models.mdx",
+      "notes": "Supported providers for LLM, embedding, and rerank."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/__init__.py",
+      "kind": "raw_files",
+      "sha256": "720ce133fc37ce5539b95be234ce228cf6fb0a276ebbda011dffb40511ef8c7e",
+      "bytes": 13193,
+      "captured_at": "2026-05-27T18:46:07.687473+00:00",
+      "source": "https://github.com/infiniflow/ragflow",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/system_api.py",
+      "kind": "raw_files",
+      "sha256": "d039aac1dcbda6831a779303a8ad75288a606f074a4fdbdcad990b474d02c12d",
+      "bytes": 12698,
+      "captured_at": "2026-05-27T18:46:11.315835+00:00",
+      "source": "https://github.com/infiniflow/ragflow",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/dataset_api.py",
+      "kind": "raw_files",
+      "sha256": "ba7978e773cf7874ee4f79af76efd17422bb54bf3edba270ae0a199d7413d067",
+      "bytes": 28243,
+      "captured_at": "2026-05-27T18:46:14.616340+00:00",
+      "source": "https://github.com/infiniflow/ragflow",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/chunk_api.py",
+      "kind": "raw_files",
+      "sha256": "570b1da2f69efd1f5531866b5830e0863d20a60bab7c1d39f4025529b3108494",
+      "bytes": 33584,
+      "captured_at": "2026-05-27T18:46:17.896048+00:00",
+      "source": "https://github.com/infiniflow/ragflow",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/embedding_model.py",
+      "kind": "raw_files",
+      "sha256": "f7f2c7dd689167214c5d4bfa425847c57bf265626810c66fbc4da063075ae711",
+      "bytes": 48431,
+      "captured_at": "2026-05-27T18:46:21.387770+00:00",
+      "source": "https://github.com/infiniflow/ragflow",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/service_conf.yaml.template",
+      "kind": "raw_files",
+      "sha256": "b4a5cd7a19ac668a8cd03f83f58c86dd3bfbf66749ea3c7095e4f019d1a952ef",
+      "bytes": 5469,
+      "captured_at": "2026-05-27T18:46:24.621385+00:00",
+      "source": "https://github.com/infiniflow/ragflow",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/ragflow-bge-m3-retrieval/raw/deploy_local_llm.mdx",
+      "kind": "raw_files",
+      "sha256": "6bfe3ff3ec483a48028ffcf3b0a6d863134df170a5392fa955342109cf108db3",
+      "bytes": 14396,
+      "captured_at": "2026-05-27T18:46:31.387901+00:00",
+      "source": "https://github.com/infiniflow/ragflow",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-27T18:47:30.700834+00:00",
+    "errors": []
+  }
+}

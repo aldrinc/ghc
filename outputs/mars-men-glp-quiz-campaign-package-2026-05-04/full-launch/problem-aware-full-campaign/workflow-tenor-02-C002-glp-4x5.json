@@ -1,0 +1,545 @@
+{
+  "run": {
+    "id": "e7e8a8f6-1b4e-40b3-b70b-ec72c99e402f",
+    "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-426afe15-ac66-436c-910d-2a1259597bf3-0c6bd5b4-8990-466e-9969-e20779aded20",
+    "kind": "swipe_image_ad",
+    "started_at": "2026-05-06T21:02:43.788820+00:00",
+    "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+    "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "temporal_run_id": "019dff19-a45d-79d7-b28a-5bdc50c0e268",
+    "status": "completed",
+    "finished_at": "2026-05-06T21:04:11.736976+00:00"
+  },
+  "logs": [
+    {
+      "payload_in": null,
+      "workflow_run_id": "e7e8a8f6-1b4e-40b3-b70b-ec72c99e402f",
+      "step": "swipe_image_ad",
+      "error": null,
+      "id": "8bd3f6e7-4ace-4235-9c47-7015df53be53",
+      "status": "succeeded",
+      "payload_out": {
+        "job_id": "openai:c0e0ddfddee34da1d20e1a042f887d572b25fe9207f180b149b1a86ef23d5c61",
+        "asset_ids": [
+          "04a5afea-cc07-41d9-83bd-da0f2dab4cc1"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "gpt-image-2",
+        "swipe_render_provider": "openai",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      },
+      "created_at": "2026-05-06T21:04:11.712609+00:00"
+    },
+    {
+      "payload_in": {
+        "count": 1,
+        "model": "gemini-3.1-pro-preview",
+        "swipe_hook": null,
+        "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "swipe_angle": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly.\n\nBrand color policy:\nUse Tenor primary red #ee1f2d for brand accents and CTA accents in the generated ad image.\nDo not reproduce the orange accent color from the source reference.",
+        "aspect_ratio": "4:5",
+        "render_count": 1,
+        "asset_brief_id": "brief_glp_listicle_swipe_image2",
+        "render_provider": "openai",
+        "swipe_image_url": "https://api.moshq.app/public/assets/e3e68c5b-4753-475f-88fa-c6615c755a8a",
+        "company_swipe_id": null,
+        "swipe_brand_name": "Tenor",
+        "requirement_index": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_product_name": "Daily Drive Essentials",
+        "render_model_id_used": "gpt-image-2",
+        "render_model_id_requested": "gpt-image-2",
+        "swipe_requires_product_image": false
+      },
+      "workflow_run_id": "e7e8a8f6-1b4e-40b3-b70b-ec72c99e402f",
+      "step": "swipe_image_ad",
+      "error": null,
+      "id": "cbd041f1-c0fd-4ed4-94b7-9d552cc7fa17",
+      "status": "started",
+      "payload_out": null,
+      "created_at": "2026-05-06T21:02:43.856804+00:00"
+    },
+    {
+      "payload_in": {
+        "count": 1,
+        "model": "gemini-3.1-pro-preview",
+        "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "swipe_hook": null,
+        "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "swipe_angle": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly.\n\nBrand color policy:\nUse Tenor primary red #ee1f2d for brand accents and CTA accents in the generated ad image.\nDo not reproduce the orange accent color from the source reference.",
+        "aspect_ratio": "4:5",
+        "asset_brief_id": "brief_glp_listicle_swipe_image2",
+        "render_model_id": "gpt-image-2",
+        "swipe_image_url": "https://api.moshq.app/public/assets/e3e68c5b-4753-475f-88fa-c6615c755a8a",
+        "company_swipe_id": null,
+        "swipe_brand_name": "Tenor",
+        "max_output_tokens": null,
+        "requirement_index": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_product_name": "Daily Drive Essentials",
+        "swipe_requires_product_image": false
+      },
+      "workflow_run_id": "e7e8a8f6-1b4e-40b3-b70b-ec72c99e402f",
+      "step": "swipe_image_ad",
+      "error": null,
+      "id": "5af71221-a60f-4ab4-9be4-01a202cc13f1",
+      "status": "started",
+      "payload_out": null,
+      "created_at": "2026-05-06T21:02:43.818585+00:00"
+    }
+  ],
+  "client_canon": {
+    "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+    "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "campaign_id": null,
+    "version": 1,
+    "created_by_user": null,
+    "id": "14d25cfa-96f3-4c5c-a1e0-da6b04ea24f4",
+    "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "type": "client_canon",
+    "data": {
+      "icps": [
+        {
+          "id": "tenor-men-40-60",
+          "name": "Men 40–60 who feel something has quietly dimmed — the drive, the fire, the presence.",
+          "gains": [
+            "Afternoon energy that doesn't collapse (VERBATIM: \"no crash\", \"cleaner boost\")",
+            "Drive and motivation restored (VERBATIM: \"drive is back\", \"motivation again\")",
+            "Mental sharpness in meetings and conversations (VERBATIM: \"brain fog\", \"more focused\")",
+            "Libido as a natural outcome of feeling well (NOT as a standalone gym-bro pursuit) (VERBATIM: \"sex drive is back as a welcome bonus\")",
+            "His wife to notice the return, without him having to announce it (VERBATIM: \"he's feeling like his old self now\", wife Amazon review)"
+          ],
+          "pains": [
+            "Afternoon energy collapses and meetings blur by mid-afternoon.",
+            "Loses his thread in conversations or meetings and feels less sharp than before.",
+            "Workouts take longer to recover from and drive feels flat.",
+            "A partner has started asking quietly if he is okay."
+          ],
+          "segments": [
+            "men 40-60",
+            "midlife",
+            "pre-TRT"
+          ],
+          "jobsToBeDone": [
+            "Feel like himself again without a prescription, clinic, or needle.",
+            "Hold energy and focus through the afternoon workday.",
+            "Restore drive, presence, and confidence at home and at work."
+          ]
+        }
+      ],
+      "brand": {
+        "story": "\"I'm an MD. At 47, my labs came back 'normal.' I didn't feel normal. That's why I built Tenor.\"",
+        "values": [
+          "**Confident, not loud.** Never yells. Never hypes. Trusts the reader to get it.",
+          "**Informed, not clinical.** Uses the science when relevant. Refuses jargon unless it IS the story.",
+          "**Warm, not bro-y.** No \"crush it\", no \"dominate\", no \"unlock\". Addresses the reader as a peer, not a prospect.",
+          "**Honest about limits.** \"From low to even\" — not \"from low to superhuman\". Acknowledges competitor skepticism upfront.",
+          "**Quiet humor.** The kind of dry, observational wit a 45-year-old uses."
+        ],
+        "mission": "Feel like yourself again without a prescription, a clinic, or a needle.",
+        "manifesto": "For men 40–60 who notice something has quietly dimmed — the drive, the fire, the presence — Tenor is a daily protocol that raises the hormonal floor four ways, so you don't have to accept \"normal for your age\" as the end of feeling like you.",
+        "toneOfVoice": {
+          "do": [
+            "**Confident, not loud.** Never yells. Never hypes. Trusts the reader to get it.",
+            "**Informed, not clinical.** Uses the science when relevant. Refuses jargon unless it IS the story.",
+            "**Warm, not bro-y.** No \"crush it\", no \"dominate\", no \"unlock\". Addresses the reader as a peer, not a prospect.",
+            "**Honest about limits.** \"From low to even\" — not \"from low to superhuman\". Acknowledges competitor skepticism upfront.",
+            "**Quiet humor.** The kind of dry, observational wit a 45-year-old uses."
+          ],
+          "dont": [
+            "Speaks in **lowered voice**, never shouts (audio/video pacing)",
+            "Uses **clinical terms ONLY when reframing them** (\"andropause\" is a term he'll define for you; \"aromatase\" he'll explain once and move on)",
+            "Admits what he doesn't know (strengthens trust)",
+            "Refuses to over-promise (echoes the CSO's \"low-to-even not low-to-superhuman\" positioning)",
+            "Mentions his wife by role, not name, rarely (respects her privacy but confirms family/partnership is real)",
+            "Never: \"broooo\", \"listen up\", \"here's the truth the industry won't tell you\" (MLM-coded)",
+            "Not TRT — not a prescription, not a clinic, not a needle",
+            "Not a gym brand — not targeting the 25-year-old who wants \"GAINS\"",
+            "Not a hormone-replacement service — this is a daily protocol, not a medical intervention",
+            "Not a \"superhuman\" promise — explicitly positions against over-promising"
+          ],
+          "examples": {
+            "bad": [],
+            "good": []
+          }
+        },
+        "visualStyleRefs": {
+          "docUrls": [],
+          "logoUrl": null,
+          "palette": null
+        }
+      },
+      "offers": [
+        {
+          "id": "offer-90-day-plan",
+          "name": "90-Day Plan",
+          "guarantee": "The 90-Day Tenor Guarantee",
+          "description": "Feel like yourself again without a prescription, a clinic, or a needle.",
+          "businessModel": "subscription",
+          "differentiation": [
+            "\"The 4-Factor Vanishing Cascade\" The reason men don't feel like themselves between 40 and 60 is not age, not stress, not their marriage — it's a named four-factor hormonal cascade that compounds silently until it's already 30–40% complete.",
+            "\"The Four-Factor Protocol\" (or \"Four-Corner Reset\" — secondary label) Because the cascade has four inputs, a solution that only targets one of them leaves three levers untouched. The Tenor Protocol addresses each factor with the specific ingredient + clinical dose that the published research supported — one capsule stack, taken daily.",
+            "Tenor: Full Drive Protocol is a daily 4-factor andropause protocol for men who've noticed the drift and don't want TRT. Three subscription tiers (N / 2N / 3N per Rule 6.2): **30-Day Plan $42/mo · 60-Day Plan $39/mo · 90-Day Plan $35/mo ★**. Subscription-only display — one-time purchase not surfaced. Max tier (90-day) aligns exactly with the 90-day money-back guarantee (\"return even the empty bottles\") so buyer can exhaust the full supply inside the guarantee window. Cancel anytime from account dashboard, no email or phone required. Launches at full price (no launch-promo cohort — per Gate 7b decisions). Priced against TRT clinic cost ($200–400/mo) as the \"try this first\" positioning. Founder persona: Adam Reese, MD (composite)."
+          ]
+        }
+      ],
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "constraints": {
+        "legal": [
+          "DSHEA structure/function claims only",
+          "\"Supports healthy testosterone levels\" allowed",
+          "\"Raises testosterone by X%\" NOT allowed",
+          "\"Andropause\" can be named as a concept; cannot be treated/cured/diagnosed",
+          "Full DSHEA disclaimer on packaging and LP footer",
+          "audience_state, problem_moment (afternoon-slump + approaching-50 + wife-noticed scenes)",
+          "desired_outcome, belief_shift, felt_symptom_language",
+          "top_objections (all 5 primary objections sourced to verbatim)",
+          "proof_stack (all 4 VERBATIM transformation arcs)",
+          "The 3am wake-and-google scene (Stage 4 training-knowledge inference)",
+          "The \"photo from 5 years ago\" visual scene (Stage 4 inference)",
+          "The \"meeting and lost-word\" specific variant (not verbatim; adjacent \"more tired at times\" is verbatim)",
+          "Specific headline phrasings that use phrases we constructed vs phrases from VOC",
+          "Any specific claims about *\"raises testosterone by X%\"* — structure/function language only",
+          "Any claim that references disease states, prescription alternatives, or cures"
+        ],
+        "compliance": [
+          "Use DSHEA structure/function language only.",
+          "Do not claim to treat, cure, or diagnose andropause.",
+          "Do not claim specific testosterone increases."
+        ],
+        "bannedTopics": [
+          "disease claims",
+          "prescription replacement claims"
+        ],
+        "bannedPhrases": [
+          "UNLEASH your TESTOSTERONE",
+          "clinically proven",
+          "superhuman"
+        ]
+      },
+      "contentPatterns": {
+        "hooks": [
+          "The afternoon slump men in their 40s ignore is the same 4-factor collapse that wrecks marriages, careers, and identity by 55. It has a name — and most doctors won't use it.",
+          "For men 40–60 who notice something has quietly dimmed — the drive, the fire, the presence — Tenor is a daily protocol that raises the hormonal floor four ways, so you don't have to accept \"normal for your age\" as the end of feeling like you."
+        ],
+        "angles": [
+          "The Vanishing Man",
+          "The 4-Factor Vanishing Cascade",
+          "The Four-Factor Protocol"
+        ],
+        "formats": [
+          "advertorial",
+          "sales-page",
+          "image_ad"
+        ],
+        "badAssetIds": [],
+        "goodAssetIds": []
+      },
+      "voiceOfCustomer": {
+        "quotes": [
+          "Travison et al. 2007 MMAS — 1.6% annual within-person T decline (VERIFIED)",
+          "Ambiye et al. 2013 — ashwagandha 600mg/day → 14.7% T increase in men (PLAUSIBLE for healthy men)"
+        ],
+        "triggers": [
+          "The afternoon slump that never recovers.",
+          "A younger colleague finishing the sentence you started.",
+          "Your wife quietly asking if you are okay."
+        ],
+        "objections": [
+          "My labs came back normal twice.",
+          "I was out of options that were not needles.",
+          "I do not want a clinic, a prescription, or a needle."
+        ],
+        "languagePatterns": [
+          "feel like yourself again",
+          "normal for your age",
+          "something has shifted",
+          "the afternoon wall"
+        ]
+      }
+    },
+    "created_at": "2026-04-19T15:42:35.035550+00:00"
+  },
+  "metric_schema": null,
+  "strategy_sheet": null,
+  "experiment_specs": [
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "version": 1,
+      "created_by_user": null,
+      "id": "1309147b-8cf8-41d3-bac8-c2baf1ef9336",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "experimentSpecs": [
+          {
+            "id": "tenor-glp-quiz-problem-aware-expansion",
+            "name": "Tenor GLP + Quiz Problem-Aware Expansion",
+            "variants": [
+              {
+                "id": "glp-listicle",
+                "name": "GLP Listicle",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the GLP listicle presale."
+              },
+              {
+                "id": "quiz-funnel",
+                "name": "Quiz Funnel",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the quiz presale."
+              }
+            ],
+            "metricIds": [],
+            "hypothesis": "Problem-aware congruence, grouped aspect-ratio siblings, and destination-matched copy can support a combined Tenor package plus curated swipe campaign.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-06T20:41:24.469247+00:00"
+    },
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "version": 1,
+      "created_by_user": null,
+      "id": "9ca5ae56-bf4d-4a1c-80e7-d6f522b31387",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "experimentSpecs": [
+          {
+            "id": "tenor-glp-quiz-problem-aware-expansion",
+            "name": "Tenor GLP + Quiz Problem-Aware Expansion",
+            "variants": [
+              {
+                "id": "glp-listicle",
+                "name": "GLP Listicle",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the GLP listicle presale."
+              },
+              {
+                "id": "quiz-funnel",
+                "name": "Quiz Funnel",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the quiz presale."
+              }
+            ],
+            "metricIds": [],
+            "hypothesis": "Problem-aware congruence, grouped aspect-ratio siblings, and destination-matched copy can support a combined Tenor package plus curated swipe campaign.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-06T19:51:54.032841+00:00"
+    },
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "version": 1,
+      "created_by_user": null,
+      "id": "0b36560b-271f-49fa-9687-dabe6d50b877",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "experimentSpecs": [
+          {
+            "id": "tenor-glp-quiz-problem-aware-expansion",
+            "name": "Tenor GLP + Quiz Problem-Aware Expansion",
+            "variants": [
+              {
+                "id": "glp-listicle",
+                "name": "GLP Listicle",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the GLP listicle presale."
+              },
+              {
+                "id": "quiz-funnel",
+                "name": "Quiz Funnel",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the quiz presale."
+              }
+            ],
+            "metricIds": [],
+            "hypothesis": "Problem-aware congruence and destination-matched copy can support a combined Tenor package plus curated swipe campaign.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-06T00:18:52.866355+00:00"
+    },
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "version": 1,
+      "created_by_user": null,
+      "id": "e105ec3a-6129-4548-bdda-30ce3219ee6f",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "experimentSpecs": [
+          {
+            "id": "tenor-glp-quiz-gpt-image2",
+            "name": "Tenor GLP + Quiz",
+            "variants": [
+              {
+                "id": "glp-listicle",
+                "name": "GLP Listicle",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the GLP listicle presale."
+              },
+              {
+                "id": "quiz-funnel",
+                "name": "Quiz Funnel",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [],
+                "description": "Rows routed to the quiz presale."
+              }
+            ],
+            "metricIds": [
+              "ctr",
+              "cvr"
+            ],
+            "hypothesis": "The supplied GLP and quiz creative/copy rows can be launched through one MOS-managed CBO Meta campaign.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-05T00:56:14.687155+00:00"
+    }
+  ],
+  "asset_briefs": [
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "version": 1,
+      "created_by_user": null,
+      "id": "dff48434-34ca-423d-87b1-8e12e385237a",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "asset_brief",
+      "data": {
+        "source": "tenor-glp-quiz-problem-aware-expansion",
+        "packageDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04",
+        "asset_briefs": [
+          {
+            "id": "brief_glp_listicle_swipe_image2",
+            "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+            "funnelId": null,
+            "variantId": "glp-listicle",
+            "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+            "constraints": [],
+            "variantName": "GLP Listicle",
+            "deliveryMode": "external_urls",
+            "experimentId": "tenor-glp-quiz-problem-aware-expansion",
+            "requirements": [
+              {
+                "hook": "Destination congruence block",
+                "angle": "Use the supplied destination congruence block and selected swipe source.",
+                "format": "image",
+                "channel": "meta",
+                "funnelStage": "pre-sales",
+                "destinationType": "pre-sales"
+              }
+            ],
+            "toneGuidelines": [],
+            "creativeConcept": "Problem-aware swipe remixes routed to the GLP listicle presale.",
+            "destinationType": "pre-sales",
+            "destinationLabel": "GLP listicle presale",
+            "visualGuidelines": []
+          },
+          {
+            "id": "brief_quiz_funnel_swipe_image2",
+            "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+            "funnelId": null,
+            "variantId": "quiz-funnel",
+            "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+            "constraints": [],
+            "variantName": "Quiz Funnel",
+            "deliveryMode": "external_urls",
+            "experimentId": "tenor-glp-quiz-problem-aware-expansion",
+            "requirements": [
+              {
+                "hook": "Destination congruence block",
+                "angle": "Use the supplied destination congruence block and selected swipe source.",
+                "format": "image",
+                "channel": "meta",
+                "funnelStage": "pre-sales",
+                "destinationType": "pre-sales"
+              }
+            ],
+            "toneGuidelines": [],
+            "creativeConcept": "Problem-aware swipe remixes routed to the quiz presale.",
+            "destinationType": "pre-sales",
+            "destinationLabel": "Quiz presale",
+            "visualGuidelines": []
+          }
+        ]
+      },
+      "created_at": "2026-05-05T00:56:48.440170+00:00"
+    }
+  ],
+  "precanon_research": null,
+  "research_artifacts": [],
+  "research_highlights": null,
+  "temporal_status": "COMPLETED",
+  "pending_activity_progress": [],
+  "strategy_v2_state": null,
+  "strategy_v2_stage3": null,
+  "strategy_v2_offer": null,
+  "strategy_v2_copy": null,
+  "strategy_v2_copy_canonical": null,
+  "strategy_v2_copy_context": null,
+  "strategy_v2_awareness_angle_matrix": null,
+  "strategy_v2_launches": []
+}

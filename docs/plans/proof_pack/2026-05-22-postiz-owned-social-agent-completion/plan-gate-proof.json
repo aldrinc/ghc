@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "retrofit",
+  "created_at": "2026-05-22T16:29:16Z",
+  "daliogoals_skill_loaded": true,
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user provided a direct correction: keep posting and Postiz-owned work in Postiz, not replicated in mOS. The implementation boundary was therefore clear and low-risk: remove duplicate growth-program posting state and add Postiz handoff proposals.",
+  "owner": "Codex / Aldrin",
+  "review_date": "2026-05-22",
+  "stop_condition": "Targeted tests, compile, migration head, ownership guard, lane proof, source manifests, dashboard, and contract pass.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "plan-gate.md",
+      "summary": "Goal is to complete the implementation correction with Postiz as posting system of record."
+    },
+    "problem_log": {
+      "path": "plan-gate.md",
+      "summary": "Problem is the duplicate growth-program posting ledger introduced in the first pass."
+    },
+    "root_cause_diagnosis": {
+      "path": "plan-gate.md",
+      "summary": "Root cause is an ownership-boundary miss between content experiment state and Postiz posting state."
+    },
+    "current_machine": {
+      "path": "plan-gate.md",
+      "summary": "Current machine had both mOS growth state and Postiz posting state."
+    },
+    "designed_machine": {
+      "path": "plan-gate.md",
+      "summary": "Designed machine keeps mOS to strategy, approvals, handoff proposals, and conversions while Postiz owns posting."
+    },
+    "worst_day_test": {
+      "path": "plan-gate.md",
+      "summary": "Worst-day cases cover unapproved variants, missing media, missing channels, Postiz status changes, and late conversion data."
+    },
+    "leading_lagging_metrics": {
+      "path": "plan-gate.md",
+      "summary": "Metrics track handoff proposals, rejected handoffs, concrete references, report sourcing, and reduced drift."
+    },
+    "owner_date_review": {
+      "path": "plan-gate.md",
+      "summary": "Owner/date/review point captured for the next live executor or UI pass."
+    },
+    "stop_condition": {
+      "path": "plan-gate.md",
+      "summary": "Stop condition requires all proof gates and contract verification to pass."
+    }
+  }
+}
+

@@ -1,0 +1,17 @@
+{
+  "url": "http://localhost:5275/workspaces",
+  "viewportWidth": 1440,
+  "scrollWidth": 1440,
+  "horizontalOverflow": false,
+  "hasOpenWorkspaceText": false,
+  "cards": [
+    {
+      "text": "New workspaceLaunch onboarding flowStart setup",
+      "width": 373,
+      "height": 210,
+      "borderRadius": "14px",
+      "borderWidth": "1px",
+      "borderColor": "color(srgb 0.901961 0.913725 0.941176)"
+    }
+  ]
+}

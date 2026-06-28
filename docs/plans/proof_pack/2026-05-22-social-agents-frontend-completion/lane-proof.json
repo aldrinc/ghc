@@ -1,0 +1,109 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Native sub-agents were not explicitly requested for this turn. The frontend page, route wiring, hooks, and tests were tightly coupled, so implementation stayed in the main thread while reads and verification used local parallel tools.",
+  "lanes": [
+    {
+      "lane_id": "lane_main_frontend",
+      "objective": "Add Social Agents frontend types, hooks, page, route, navigation, and targeted tests.",
+      "role": "main thread implementer",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-22T16:37:00Z",
+      "ended_at": "2026-05-22T16:46:00Z",
+      "summary": "Implemented the Social Agents execution page and connected it to the growth-program, connected-social, and Postiz readiness APIs.",
+      "read_scope": [
+        "mos/frontend/src/App.tsx",
+        "mos/frontend/src/app/AppShell.tsx",
+        "mos/frontend/src/app/routes.tsx",
+        "mos/frontend/src/api/clients.ts",
+        "mos/frontend/src/pages/workspaces/PostizPage.tsx",
+        "mos/frontend/src/pages/workspaces/SitesPage.test.tsx"
+      ],
+      "write_scope": [
+        "mos/frontend/src/types/socialAgents.ts",
+        "mos/frontend/src/api/socialAgents.ts",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "mos/frontend/src/App.tsx",
+        "mos/frontend/src/app/AppShell.tsx",
+        "mos/frontend/src/app/routes.tsx"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/frontend-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/frontend-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/browser-smoke.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/chrome-flow-result.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/chrome-flow-final.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/chrome-flow-check.log"
+      ]
+    },
+    {
+      "lane_id": "lane_backend_boundary_verification",
+      "objective": "Verify existing backend slice and Postiz ownership boundary after frontend completion.",
+      "role": "local verifier",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T16:44:00Z",
+      "ended_at": "2026-05-22T16:45:00Z",
+      "summary": "Targeted backend tests, compile check, alembic head check, and Postiz duplication guard passed.",
+      "read_scope": [
+        "mos/backend/app",
+        "mos/backend/tests",
+        "mos/backend/alembic"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/backend-test.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/backend-py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/postiz-ownership-guard.log"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/backend-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/backend-py-compile.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/alembic-heads.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/postiz-ownership-guard.log"
+      ]
+    },
+    {
+      "lane_id": "lane_source_and_contract",
+      "objective": "Verify source manifests and machine-checkable contract.",
+      "role": "local proof verifier",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T16:46:00Z",
+      "ended_at": "2026-05-22T16:49:00Z",
+      "summary": "Source manifests, lane proof, plan gate proof, proof dashboard, and planctl verification were prepared for the final proof pass.",
+      "read_scope": [
+        "captures/facebook_ads_agent_notion/source_manifest.json",
+        "captures/meta_api_docs/source_manifest.json",
+        "captures/larry_agent_workflow/source_manifest.json",
+        "docs/plans/2026-05-22-social-agents-frontend-completion-plan.contract.json"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/source-manifests-verify.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/planctl-verify.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/index.html"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/source-manifests-verify.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/planctl-verify.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-frontend-completion/index.html"
+      ]
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main_thread",
+    "summary": "Main thread integrated the frontend surface and proofed it with targeted frontend tests, build, Chrome local end-to-end flow, backend tests, boundary guard, source manifests, and planctl."
+  },
+  "token_time_proxy": {
+    "native_subagents": 0,
+    "local_parallel_tool_groups": 3,
+    "frontend_tests": "3 passed",
+    "backend_tests": "4 passed, 3 warnings",
+    "frontend_build": "pass",
+    "chrome_flow": "pass: create program, source, experiment, variant, approval, media-gated handoff, action queue, proposal approval, 0 console errors",
+    "planctl": "pass: 0 errors"
+  }
+}

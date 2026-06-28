@@ -117,6 +117,11 @@ from app.strategy_v2.template_bridge import (
     validate_strategy_v2_template_payload_fields,
 )
 from app.services.claude_files import call_claude_structured_message
+from app.services.deerflow_foundational import (
+    DeerFlowFoundationalError,
+    run_deerflow_foundational_step,
+    run_deerflow_foundational_step04,
+)
 from app.strategy_v2.step_keys import (
     V2_STEP_APIFY_COLLECTION,
     V2_STEP_APIFY_INGESTION,
@@ -163,7 +168,10 @@ _FOUNDTN_STEP04_SUMMARY_MAX = 1800
 _FOUNDTN_STEP06_SUMMARY_MAX = 1500
 
 _FOUNDTN_STEP01_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP01_MODEL", settings.STRATEGY_V2_VOC_MODEL)
-_FOUNDTN_STEP03_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP03_MODEL", settings.STRATEGY_V2_VOC_MODEL)
+_FOUNDTN_STEP03_MODEL = os.getenv(
+    "STRATEGY_V2_FOUNDATIONAL_STEP03_MODEL",
+    settings.STRATEGY_V2_FOUNDATIONAL_STEP03_MODEL,
+)
 _FOUNDTN_STEP04_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP04_MODEL", settings.STRATEGY_V2_VOC_MODEL)
 _FOUNDTN_STEP06_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP06_MODEL", settings.STRATEGY_V2_VOC_MODEL)
 _FOUNDTN_STEP04_MAX_TOKENS = int(os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP04_MAX_TOKENS", "64000"))
@@ -2540,6 +2548,8 @@ _ANGLE_SELECTION_MIN_EVIDENCE_QUALITY = float(
 )
 
 _FOUNDATIONAL_STEP_KEYS = ("01", "02", "03", "04", "06")
+_FOUNDATIONAL_ONBOARDING_STEP_KEYS = ("01", "03", "04")
+_FOUNDATIONAL_RESEARCH_STEP_KEYS = ("01", "03", "04", "06")
 _FOUNDATIONAL_STEP_ARTIFACT_META: dict[str, dict[str, str]] = {
     "01": {
         "title": "Strategy V2 Foundational Step 01 Raw Output",
@@ -8460,6 +8470,221 @@ def _run_tagged_foundational_step(
     }
 
 
+def _foundational_step01_provider() -> str:
+    provider = str(settings.STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER or "").strip().lower()
+    if provider in {"gpt", "openai", "llm"}:
+        return "gpt"
+    if provider == "deerflow":
+        return "deerflow"
+    raise StrategyV2MissingContextError(
+        "STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER must be 'deerflow' or 'gpt'. "
+        f"Received: {provider or '(empty)'}."
+    )
+
+
+def _foundational_step01_model_name_for_logs() -> str:
+    if _foundational_step01_provider() == "deerflow":
+        return settings.STRATEGY_V2_FOUNDATIONAL_STEP01_DEERFLOW_MODEL
+    return _FOUNDTN_STEP01_MODEL
+
+
+def _foundational_step04_provider() -> str:
+    provider = str(settings.STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER or "").strip().lower()
+    if provider in {"gpt", "openai", "llm"}:
+        return "gpt"
+    if provider == "deerflow":
+        return "deerflow"
+    raise StrategyV2MissingContextError(
+        "STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER must be 'deerflow' or 'gpt'. "
+        f"Received: {provider or '(empty)'}."
+    )
+
+
+def _foundational_step04_model_name_for_logs() -> str:
+    if _foundational_step04_provider() == "deerflow":
+        return settings.STRATEGY_V2_FOUNDATIONAL_STEP04_DEERFLOW_MODEL
+    return _FOUNDTN_STEP04_MODEL
+
+
+def _run_foundational_step01(
+    *,
+    prompt_text: str,
+    workflow_run_id: str,
+) -> dict[str, Any]:
+    provider = _foundational_step01_provider()
+    if provider == "gpt":
+        return _run_tagged_foundational_step(
+            step_key="01",
+            prompt_text=prompt_text,
+            model=_FOUNDTN_STEP01_MODEL,
+            summary_max_chars=_FOUNDTN_STEP01_SUMMARY_MAX,
+            use_reasoning=True,
+            use_web_search=True,
+        )
+
+    model = settings.STRATEGY_V2_FOUNDATIONAL_STEP01_DEERFLOW_MODEL.strip()
+    if not model:
+        raise StrategyV2MissingContextError(
+            "STRATEGY_V2_FOUNDATIONAL_STEP01_DEERFLOW_MODEL is required when "
+            "STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER=deerflow."
+        )
+    guarded_prompt = _append_tagged_output_guardrails(prompt_text=prompt_text)
+    heartbeat_context = {
+        "activity": "strategy_v2.run_voc_angle_pipeline",
+        "phase": "foundational",
+        "step_key": "01",
+        "provider": "deerflow",
+        "model": model,
+    }
+
+    try:
+        result = _run_with_activity_heartbeats(
+            phase="foundational",
+            operation="foundational_step_01_deerflow",
+            heartbeat_payload=heartbeat_context,
+            fn=lambda: run_deerflow_foundational_step(
+                prompt=guarded_prompt,
+                step_key="01",
+                model=model,
+                workflow_run_id=workflow_run_id,
+                deerflow_backend_dir=settings.STRATEGY_V2_DEERFLOW_BACKEND_DIR,
+                deerflow_config_path=settings.STRATEGY_V2_DEERFLOW_CONFIG_PATH,
+                timeout_seconds=settings.STRATEGY_V2_DEERFLOW_TIMEOUT_SECONDS,
+                extra_metadata={
+                    "workflow_run_id": workflow_run_id,
+                    "strategy_v2_step": "v2-02.foundation.01",
+                },
+            ),
+        )
+    except DeerFlowFoundationalError as exc:
+        remediation = (
+            "Remediation: fix the DeerFlow sidecar or set "
+            "STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER=gpt for an explicit GPT run."
+        )
+        raise StrategyV2ExternalDependencyError(
+            f"DeerFlow foundational Step 01 failed: {exc}. {remediation}"
+        ) from exc
+
+    completed_payload = dict(heartbeat_context)
+    completed_payload.update(
+        {
+            "status": "completed",
+            "provider": "deerflow",
+            "output_chars": len(result.content),
+            "summary_chars": len(result.summary),
+        }
+    )
+    run_meta = result.run_meta
+    if isinstance(run_meta.get("deduped_usage"), dict):
+        deduped_usage = run_meta["deduped_usage"]
+        usage_fields = (
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "cache_read",
+            "cache_miss_input_tokens",
+        )
+        for field in usage_fields:
+            value = deduped_usage.get(field)
+            if isinstance(value, int):
+                completed_payload[field] = value
+    _heartbeat_safe(completed_payload)
+    return {
+        "summary": result.summary,
+        "content": result.content,
+        "handoff": result.handoff,
+    }
+
+
+def _run_foundational_step04(
+    *,
+    prompt_text: str,
+    workflow_run_id: str,
+) -> dict[str, Any]:
+    provider = _foundational_step04_provider()
+    if provider == "gpt":
+        return _run_tagged_foundational_step(
+            step_key="04",
+            prompt_text=prompt_text,
+            model=_FOUNDTN_STEP04_MODEL,
+            summary_max_chars=_FOUNDTN_STEP04_SUMMARY_MAX,
+            use_reasoning=True,
+            use_web_search=True,
+            max_tokens=_FOUNDTN_STEP04_MAX_TOKENS,
+        )
+
+    model = settings.STRATEGY_V2_FOUNDATIONAL_STEP04_DEERFLOW_MODEL.strip()
+    if not model:
+        raise StrategyV2MissingContextError(
+            "STRATEGY_V2_FOUNDATIONAL_STEP04_DEERFLOW_MODEL is required when "
+            "STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER=deerflow."
+        )
+    guarded_prompt = _append_tagged_output_guardrails(prompt_text=prompt_text)
+    heartbeat_context = {
+        "activity": "strategy_v2.run_voc_angle_pipeline",
+        "phase": "foundational",
+        "step_key": "04",
+        "provider": "deerflow",
+        "model": model,
+    }
+    try:
+        result = _run_with_activity_heartbeats(
+            phase="foundational",
+            operation="foundational_step_04_deerflow",
+            heartbeat_payload=heartbeat_context,
+            fn=lambda: run_deerflow_foundational_step04(
+                prompt=guarded_prompt,
+                model=model,
+                workflow_run_id=workflow_run_id,
+                deerflow_backend_dir=settings.STRATEGY_V2_DEERFLOW_BACKEND_DIR,
+                deerflow_config_path=settings.STRATEGY_V2_DEERFLOW_CONFIG_PATH,
+                timeout_seconds=settings.STRATEGY_V2_DEERFLOW_TIMEOUT_SECONDS,
+                extra_metadata={
+                    "workflow_run_id": workflow_run_id,
+                    "strategy_v2_step": "v2-02.foundation.04",
+                    "provider": "deerflow",
+                },
+            ),
+        )
+    except DeerFlowFoundationalError as exc:
+        remediation = (
+            "Remediation: fix the DeerFlow Step 04 sidecar harness or set "
+            "STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER=gpt for the existing GPT path."
+        )
+        raise StrategyV2ExternalDependencyError(
+            f"DeerFlow foundational Step 04 failed: {exc}. {remediation}"
+        ) from exc
+
+    completed_payload = dict(heartbeat_context)
+    completed_payload.update(
+        {
+            "status": "completed",
+            "provider": "deerflow",
+            "output_chars": len(result.content),
+            "summary_chars": len(result.summary),
+        }
+    )
+    run_meta = result.run_meta
+    if isinstance(run_meta.get("deduped_usage"), dict):
+        deduped_usage = run_meta["deduped_usage"]
+        for field in (
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "cache_read",
+            "cache_miss_input_tokens",
+        ):
+            value = deduped_usage.get(field)
+            if isinstance(value, int):
+                completed_payload[field] = value
+    _heartbeat_safe(completed_payload)
+    return {
+        "summary": result.summary,
+        "content": result.content,
+        "handoff": result.handoff,
+    }
+
+
 def _generate_competitor_analysis_json(
     *,
     stage0: ProductBriefStage0,
@@ -8611,6 +8836,7 @@ def _run_foundational_research_without_step02(
     onboarding_payload: Mapping[str, Any],
     product: Product,
     workflow_run_id: str,
+    include_step06: bool = True,
 ) -> dict[str, Any]:
     _log_workflow_activity_safe(
         workflow_run_id=workflow_run_id,
@@ -8691,15 +8917,12 @@ def _run_foundational_research_without_step02(
         variables=variables,
         context="foundational step 01",
     )
-    step_01_started = _log_step_start("01", model=_FOUNDTN_STEP01_MODEL, use_web_search=True)
-    step01 = _run_tagged_foundational_step(
-        step_key="01",
-        prompt_text=prompt_01,
-        model=_FOUNDTN_STEP01_MODEL,
-        summary_max_chars=_FOUNDTN_STEP01_SUMMARY_MAX,
-        use_reasoning=True,
+    step_01_started = _log_step_start(
+        "01",
+        model=_foundational_step01_model_name_for_logs(),
         use_web_search=True,
     )
+    step01 = _run_foundational_step01(prompt_text=prompt_01, workflow_run_id=workflow_run_id)
     _log_step_done("01", step_01_started, summary=str(step01["summary"]), content=str(step01["content"]))
 
     vars_03 = dict(variables)
@@ -8729,61 +8952,62 @@ def _run_foundational_research_without_step02(
             "Foundational step 03 did not produce STEP4_PROMPT content. "
             "Remediation: rerun step 03 with valid tagged output blocks."
         )
-    step_04_started = _log_step_start("04", model=_FOUNDTN_STEP04_MODEL, use_web_search=True)
-    step04 = _run_tagged_foundational_step(
-        step_key="04",
-        prompt_text=step4_prompt,
-        model=_FOUNDTN_STEP04_MODEL,
-        summary_max_chars=_FOUNDTN_STEP04_SUMMARY_MAX,
-        use_reasoning=True,
+    step_04_started = _log_step_start(
+        "04",
+        model=_foundational_step04_model_name_for_logs(),
         use_web_search=True,
-        max_tokens=_FOUNDTN_STEP04_MAX_TOKENS,
     )
+    step04 = _run_foundational_step04(prompt_text=step4_prompt, workflow_run_id=workflow_run_id)
     _log_step_done("04", step_04_started, summary=str(step04["summary"]), content=str(step04["content"]))
 
-    vars_06 = dict(variables)
-    vars_06["STEP4_SUMMARY"] = step04["summary"]
-    vars_06["STEP4_CONTENT"] = step04["content"]
-    prompt_06 = _render_prompt_template(
-        template=_read_v2_prompt(pattern=_FOUNDATIONAL_PROMPT_06_PATTERN, context="foundational step 06"),
-        variables=vars_06,
-        context="foundational step 06",
-    )
-    step_06_started = _log_step_start("06", model=_FOUNDTN_STEP06_MODEL, use_web_search=False)
-    step06 = _run_tagged_foundational_step(
-        step_key="06",
-        prompt_text=prompt_06,
-        model=_FOUNDTN_STEP06_MODEL,
-        summary_max_chars=_FOUNDTN_STEP06_SUMMARY_MAX,
-        use_reasoning=True,
-        use_web_search=False,
-    )
-    _log_step_done("06", step_06_started, summary=str(step06["summary"]), content=str(step06["content"]))
+    step_keys = ["01", "03", "04"]
+    step_summaries = {
+        "01": str(step01["summary"]),
+        "03": str(step03["summary"]),
+        "04": str(step04["summary"]),
+    }
+    step_contents = {
+        "01": str(step01["content"]),
+        "03": str(step03["content"]),
+        "04": str(step04["content"]),
+    }
+    if include_step06:
+        vars_06 = dict(variables)
+        vars_06["STEP4_SUMMARY"] = step04["summary"]
+        vars_06["STEP4_CONTENT"] = step04["content"]
+        prompt_06 = _render_prompt_template(
+            template=_read_v2_prompt(pattern=_FOUNDATIONAL_PROMPT_06_PATTERN, context="foundational step 06"),
+            variables=vars_06,
+            context="foundational step 06",
+        )
+        step_06_started = _log_step_start("06", model=_FOUNDTN_STEP06_MODEL, use_web_search=False)
+        step06 = _run_tagged_foundational_step(
+            step_key="06",
+            prompt_text=prompt_06,
+            model=_FOUNDTN_STEP06_MODEL,
+            summary_max_chars=_FOUNDTN_STEP06_SUMMARY_MAX,
+            use_reasoning=True,
+            use_web_search=False,
+        )
+        _log_step_done("06", step_06_started, summary=str(step06["summary"]), content=str(step06["content"]))
+        step_keys.append("06")
+        step_summaries["06"] = str(step06["summary"])
+        step_contents["06"] = str(step06["content"])
 
     _log_workflow_activity_safe(
         workflow_run_id=workflow_run_id,
         step="v2-02.foundation",
         status="completed",
         payload_out={
-            "step_keys": ["01", "03", "04", "06"],
+            "step_keys": step_keys,
             "category_niche": category_niche,
         },
     )
     return {
         "category_niche": category_niche,
         "asset_data_context": asset_data_context,
-        "step_summaries": {
-            "01": str(step01["summary"]),
-            "03": str(step03["summary"]),
-            "04": str(step04["summary"]),
-            "06": str(step06["summary"]),
-        },
-        "step_contents": {
-            "01": str(step01["content"]),
-            "03": str(step03["content"]),
-            "04": str(step04["content"]),
-            "06": str(step06["content"]),
-        },
+        "step_summaries": step_summaries,
+        "step_contents": step_contents,
     }
 
 
@@ -8896,15 +9120,12 @@ def _run_foundational_research_from_onboarding(
         variables=variables,
         context="foundational step 01",
     )
-    step_01_started = _log_step_start("01", model=_FOUNDTN_STEP01_MODEL, use_web_search=True)
-    step01 = _run_tagged_foundational_step(
-        step_key="01",
-        prompt_text=prompt_01,
-        model=_FOUNDTN_STEP01_MODEL,
-        summary_max_chars=_FOUNDTN_STEP01_SUMMARY_MAX,
-        use_reasoning=True,
+    step_01_started = _log_step_start(
+        "01",
+        model=_foundational_step01_model_name_for_logs(),
         use_web_search=True,
     )
+    step01 = _run_foundational_step01(prompt_text=prompt_01, workflow_run_id=workflow_run_id)
     _log_step_done("01", step_01_started, summary=str(step01["summary"]), content=str(step01["content"]))
 
     vars_03 = dict(variables)
@@ -8934,16 +9155,12 @@ def _run_foundational_research_from_onboarding(
             "Foundational step 03 did not produce STEP4_PROMPT content. "
             "Remediation: rerun step 03 with valid tagged output blocks."
         )
-    step_04_started = _log_step_start("04", model=_FOUNDTN_STEP04_MODEL, use_web_search=True)
-    step04 = _run_tagged_foundational_step(
-        step_key="04",
-        prompt_text=step4_prompt,
-        model=_FOUNDTN_STEP04_MODEL,
-        summary_max_chars=_FOUNDTN_STEP04_SUMMARY_MAX,
-        use_reasoning=True,
+    step_04_started = _log_step_start(
+        "04",
+        model=_foundational_step04_model_name_for_logs(),
         use_web_search=True,
-        max_tokens=_FOUNDTN_STEP04_MAX_TOKENS,
     )
+    step04 = _run_foundational_step04(prompt_text=step4_prompt, workflow_run_id=workflow_run_id)
     _log_step_done("04", step_04_started, summary=str(step04["summary"]), content=str(step04["content"]))
 
     vars_06 = dict(variables)
@@ -12908,20 +13125,13 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
         if provided_precanon_research is not None
         else None
     )
-    provided_stage1_payload = params.get("stage1")
-    provided_stage1_artifact_id = (
-        str(params["stage1_artifact_id"])
-        if isinstance(params.get("stage1_artifact_id"), str) and str(params.get("stage1_artifact_id")).strip()
-        else None
-    )
+    foundation_only = params.get("foundation_only") is True
     existing_step_payload_artifact_ids_raw = params.get("existing_step_payload_artifact_ids")
     existing_step_payload_artifact_ids: dict[str, str] = {}
     if isinstance(existing_step_payload_artifact_ids_raw, dict):
         for key, value in existing_step_payload_artifact_ids_raw.items():
             if isinstance(key, str) and isinstance(value, str) and value.strip():
                 existing_step_payload_artifact_ids[key] = value.strip()
-    apify_context: dict[str, Any] = {}
-
     with session_scope() as session:
         if precanon_research is None:
             onboarding_payload = _load_onboarding_payload(
@@ -12941,20 +13151,25 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
                 onboarding_payload=onboarding_payload,
                 product=product,
                 workflow_run_id=workflow_run_id,
+                include_step06=not foundation_only,
             )
 
         step_contents_raw = _require_dict(
             payload=precanon_research.get("step_contents"),
             field_name="precanon_research.step_contents",
         )
-        foundational_keys = ("01", "03", "04", "06")
+        foundational_keys = (
+            _FOUNDATIONAL_ONBOARDING_STEP_KEYS
+            if foundation_only
+            else _FOUNDATIONAL_RESEARCH_STEP_KEYS
+        )
         foundational_step_contents: dict[str, str] = {}
         for step_key in foundational_keys:
             content = step_contents_raw.get(step_key)
             if not isinstance(content, str) or not content.strip():
                 raise StrategyV2MissingContextError(
                     f"Missing foundational step content '{step_key}' required for H1 review. "
-                    "Remediation: rerun foundational research and include steps 01/03/04/06."
+                    f"Remediation: rerun foundational research and include steps {','.join(foundational_keys)}."
                 )
             foundational_step_contents[step_key] = content
 
@@ -12963,29 +13178,32 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
             field_name="precanon_research.step_summaries",
         )
 
-        stage1 = translate_stage1(
-            stage0=stage0,
-            precanon_research={
-                "category_niche": precanon_research.get("category_niche"),
-                "step_contents": {
-                    "01": foundational_step_contents["01"],
-                    "04": foundational_step_contents["04"],
-                    "06": foundational_step_contents["06"],
-                },
-            },
-        )
-        _require_stage1_quality(stage1)
-        stage1_data = stage1.model_dump(mode="python")
-
         artifacts_repo = ArtifactsRepository(session)
-        stage1_artifact = artifacts_repo.insert(
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-            campaign_id=campaign_id,
-            artifact_type=ArtifactTypeEnum.strategy_v2_stage1,
-            data=stage1_data,
-        )
+        stage1_data: dict[str, Any] | None = None
+        stage1_artifact_id: str | None = None
+        if not foundation_only:
+            stage1 = translate_stage1(
+                stage0=stage0,
+                precanon_research={
+                    "category_niche": precanon_research.get("category_niche"),
+                    "step_contents": {
+                        "01": foundational_step_contents["01"],
+                        "04": foundational_step_contents["04"],
+                        "06": foundational_step_contents["06"],
+                    },
+                },
+            )
+            _require_stage1_quality(stage1)
+            stage1_data = stage1.model_dump(mode="python")
+            stage1_artifact = artifacts_repo.insert(
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                artifact_type=ArtifactTypeEnum.strategy_v2_stage1,
+                data=stage1_data,
+            )
+            stage1_artifact_id = str(stage1_artifact.id)
         foundational_step_payload_artifact_ids = _persist_foundational_step_payloads(
             session=session,
             org_id=org_id,
@@ -12999,7 +13217,7 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
 
         return {
             "stage1": stage1_data,
-            "stage1_artifact_id": str(stage1_artifact.id),
+            "stage1_artifact_id": stage1_artifact_id,
             "precanon_research": {
                 "category_niche": precanon_research.get("category_niche"),
                 "step_summaries": dict(foundational_step_summaries),
@@ -13012,6 +13230,93 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
             },
             "step_payload_artifact_ids": foundational_step_payload_artifact_ids,
         }
+
+
+@activity.defn(name="strategy_v2.persist_foundation_bundle")
+def persist_strategy_v2_foundation_bundle_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    onboarding_payload_id = (
+        str(params["onboarding_payload_id"])
+        if isinstance(params.get("onboarding_payload_id"), str)
+        else None
+    )
+    stage0 = _require_dict(payload=params.get("stage0"), field_name="stage0")
+    stage1_raw = params.get("stage1")
+    stage1 = (
+        _require_dict(payload=stage1_raw, field_name="stage1")
+        if stage1_raw is not None
+        else None
+    )
+    precanon_research = _require_dict(
+        payload=params.get("precanon_research"),
+        field_name="precanon_research",
+    )
+    step_payload_artifact_ids = _require_dict(
+        payload=params.get("step_payload_artifact_ids", {}),
+        field_name="step_payload_artifact_ids",
+    )
+
+    with session_scope() as session:
+        onboarding_payload = _load_onboarding_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            onboarding_payload_id=onboarding_payload_id,
+        )
+        artifact = ArtifactsRepository(session).insert(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            artifact_type=ArtifactTypeEnum.foundation_research_bundle,
+            data={
+                "schema_version": "foundation_research_bundle.v1",
+                "workflow_run_id": workflow_run_id,
+                "onboarding_payload_id": onboarding_payload_id,
+                "onboarding_payload": dict(onboarding_payload) if isinstance(onboarding_payload, Mapping) else None,
+                "stage0": dict(stage0),
+                "stage0_artifact_id": params.get("stage0_artifact_id"),
+                "stage1": dict(stage1) if isinstance(stage1, Mapping) else None,
+                "stage1_artifact_id": params.get("stage1_artifact_id"),
+                "precanon_research": {
+                    "category_niche": precanon_research.get("category_niche"),
+                    "step_summaries": (
+                        dict(precanon_research.get("step_summaries"))
+                        if isinstance(precanon_research.get("step_summaries"), Mapping)
+                        else {}
+                    ),
+                    "step_contents": (
+                        dict(precanon_research.get("step_contents"))
+                        if isinstance(precanon_research.get("step_contents"), Mapping)
+                        else {}
+                    ),
+                    "asset_data_context": (
+                        dict(precanon_research.get("asset_data_context"))
+                        if isinstance(precanon_research.get("asset_data_context"), Mapping)
+                        else None
+                    ),
+                },
+                "step_payload_artifact_ids": dict(step_payload_artifact_ids),
+            },
+        )
+        workflows_repo = WorkflowsRepository(session)
+        workflows_repo.log_activity(
+            workflow_run_id=workflow_run_id,
+            step="foundation_research_bundle",
+            status="completed",
+            payload_out={"foundation_bundle_artifact_id": str(artifact.id)},
+        )
+        workflows_repo.set_status(
+            org_id=org_id,
+            workflow_run_id=workflow_run_id,
+            status=WorkflowStatusEnum.completed,
+            finished_at=datetime.now(timezone.utc),
+        )
+        return {"foundation_bundle_artifact_id": str(artifact.id)}
 
 
 def _parse_step_payload_artifact_ids(

@@ -1,0 +1,58 @@
+{
+  "asset_briefs": [
+    {
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "experimentId": "tenor-glp-quiz-problem-aware-expansion",
+      "funnelId": null,
+      "deliveryMode": "external_urls",
+      "requirements": [
+        {
+          "channel": "meta",
+          "format": "image",
+          "funnelStage": "pre-sales",
+          "destinationType": "pre-sales",
+          "hook": "Destination congruence block",
+          "angle": "Use the supplied destination congruence block and selected swipe source."
+        }
+      ],
+      "constraints": [],
+      "toneGuidelines": [],
+      "visualGuidelines": [],
+      "id": "brief_glp_listicle_swipe_image2",
+      "variantId": "glp-listicle",
+      "variantName": "GLP Listicle",
+      "destinationType": "pre-sales",
+      "destinationLabel": "GLP listicle presale",
+      "creativeConcept": "Problem-aware swipe remixes routed to the GLP listicle presale."
+    },
+    {
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "experimentId": "tenor-glp-quiz-problem-aware-expansion",
+      "funnelId": null,
+      "deliveryMode": "external_urls",
+      "requirements": [
+        {
+          "channel": "meta",
+          "format": "image",
+          "funnelStage": "pre-sales",
+          "destinationType": "pre-sales",
+          "hook": "Destination congruence block",
+          "angle": "Use the supplied destination congruence block and selected swipe source."
+        }
+      ],
+      "constraints": [],
+      "toneGuidelines": [],
+      "visualGuidelines": [],
+      "id": "brief_quiz_funnel_swipe_image2",
+      "variantId": "quiz-funnel",
+      "variantName": "Quiz Funnel",
+      "destinationType": "pre-sales",
+      "destinationLabel": "Quiz presale",
+      "creativeConcept": "Problem-aware swipe remixes routed to the quiz presale."
+    }
+  ],
+  "source": "tenor-glp-quiz-problem-aware-expansion",
+  "packageDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04"
+}

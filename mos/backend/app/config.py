@@ -64,6 +64,14 @@ class Settings(BaseSettings):
     CAMPAIGN_FUNNEL_VARIANT_ACTIVITY_CONCURRENCY: int = 3
     STRATEGY_V2_DEFAULT_ENABLED: bool = False
     STRATEGY_V2_VOC_MODEL: str = "gpt-5.5"
+    STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER: str = "deerflow"
+    STRATEGY_V2_FOUNDATIONAL_STEP01_DEERFLOW_MODEL: str = "deepseek-v4-pro"
+    STRATEGY_V2_FOUNDATIONAL_STEP03_MODEL: str = "deepseek:deepseek-v4-pro"
+    STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER: str = "deerflow"
+    STRATEGY_V2_FOUNDATIONAL_STEP04_DEERFLOW_MODEL: str = "deepseek-v4-pro"
+    STRATEGY_V2_DEERFLOW_BACKEND_DIR: str = ".local/deer-flow/backend"
+    STRATEGY_V2_DEERFLOW_CONFIG_PATH: str = ".local/deer-flow/config.yaml"
+    STRATEGY_V2_DEERFLOW_TIMEOUT_SECONDS: int = 3600
     STRATEGY_V2_OFFER_MODEL: str = "gpt-5.5"
     STRATEGY_V2_COPY_MODEL: str = "claude-opus-4-6"
     STRATEGY_V2_COPY_QA_MODEL: str = "claude-opus-4-6"
@@ -89,6 +97,10 @@ class Settings(BaseSettings):
     )
 
     OPENAI_API_KEY: str | None = None
+    CONTEXT_DEV_API_KEY: str | None = None
+    CONTEXT_DEV_BASE_URL: str = "https://api.context.dev/v1"
+    CONTEXT_DEV_REQUEST_TIMEOUT_SECONDS: float = 90.0
+    CONTEXT_DEV_PREFETCH_ENABLED: bool = False
     OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS: float | None = 180.0
     PAID_ADS_QA_LLM_MODEL: str = "gpt-5.5"
     PAID_ADS_QA_LLM_REASONING_EFFORT: str = "high"
@@ -101,6 +113,20 @@ class Settings(BaseSettings):
     GEMINI_FILE_SEARCH_STORE_PREFIX: str = "mos"
     GEMINI_FILE_SEARCH_POLL_INTERVAL_SECONDS: float = 2.0
     GEMINI_FILE_SEARCH_POLL_TIMEOUT_SECONDS: float = 300.0
+    RAGFLOW_RETRIEVAL_ENABLED: bool = False
+    RAGFLOW_BASE_URL: str = "http://127.0.0.1:9380"
+    RAGFLOW_API_KEY: str | None = None
+    RAGFLOW_DEFAULT_DATASET_IDS: Annotated[list[str], NoDecode] = []
+    RAGFLOW_DEFAULT_DOCUMENT_IDS: Annotated[list[str], NoDecode] = []
+    RAGFLOW_DEFAULT_RERANK_ID: str | None = None
+    RAGFLOW_RETRIEVAL_TIMEOUT_SECONDS: float = 60.0
+    RAGFLOW_RETRIEVAL_PAGE_SIZE: int = 8
+    RAGFLOW_RETRIEVAL_TOP_K: int = 1024
+    RAGFLOW_RETRIEVAL_SIMILARITY_THRESHOLD: float = 0.2
+    RAGFLOW_RETRIEVAL_VECTOR_SIMILARITY_WEIGHT: float = 0.3
+    RAGFLOW_RETRIEVAL_KEYWORD_ENABLED: bool = False
+    RAGFLOW_RETRIEVAL_HIGHLIGHT_ENABLED: bool = False
+    RAGFLOW_GENERATION_MODEL: str = "deepseek:deepseek-v4-pro"
     SWIPE_GEMINI_TIMEOUT_SECONDS: int = 300
     SWIPE_TAXONOMY_MODEL: str | None = None
     AGENTA_ENABLED: bool = False
@@ -273,6 +299,11 @@ class Settings(BaseSettings):
     @field_validator("CLERK_AUDIENCE", mode="before")
     @classmethod
     def split_audience(cls, value: str | list[str]) -> list[str]:
+        return _parse_string_list(value)
+
+    @field_validator("RAGFLOW_DEFAULT_DATASET_IDS", "RAGFLOW_DEFAULT_DOCUMENT_IDS", mode="before")
+    @classmethod
+    def split_ragflow_ids(cls, value: str | list[str]) -> list[str]:
         return _parse_string_list(value)
 
     model_config = SettingsConfigDict(env_file=".env", env_json_loads=_coerce_json, extra="ignore")

@@ -1,0 +1,135 @@
+{
+  "createdAt": "2026-05-01T22:31:34.801Z",
+  "reason": "Replacement examples for source-template-driven failures in care_bag and green outputs.",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-replacements-2026-05-01",
+  "reviewDir": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-visual-replacements-review-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-replacements-2026-05-01/generated",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "destinationContext": {
+    "headline": "Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First",
+    "subheadline": "Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.",
+    "primaryProblem": "Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.",
+    "promise": "A daily protocol to consider before making a long-term TRT decision.",
+    "mechanismDisclosureLevel": "Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.",
+    "proofType": "Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.",
+    "ctaUrgency": "Article-read CTA before committing to needles or a long-term TRT relationship.",
+    "compliancePosture": "Matches the downstream advertorial posture and funnel stage.",
+    "assetStage": "Ad to advertorial/listicle, before the sales page.",
+    "visualEmphasis": "Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly."
+  },
+  "outputs": [
+    {
+      "key": "replacement-02-boss-babe",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "sourceSwipeTitle": "boss_babe.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.\nPrimary problem: Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.\nPromise: A daily protocol to consider before making a long-term TRT decision.\nMechanism disclosure level: Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.\nProof type: Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read CTA before committing to needles or a long-term TRT relationship.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-advertorial-structured-congruence-visual-replacement-replacement-02-boss-babe-1777674582509.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "f49e76b7-32bb-49e3-b46e-758e3f305770",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-c170f734-0e24-49a1-877c-d7e927ebe765"
+      },
+      "result": {
+        "workflowRunId": "f49e76b7-32bb-49e3-b46e-758e3f305770",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-c170f734-0e24-49a1-877c-d7e927ebe765",
+        "assetId": "b8306881-8be4-4ed7-b736-4d5cdbacf8fb",
+        "publicId": "33f4b0ba-941a-40f1-826f-f2a7b451f2ed",
+        "publicUrl": "https://api.moshq.app/public/assets/33f4b0ba-941a-40f1-826f-f2a7b451f2ed",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-replacements-2026-05-01/generated/replacement-02-boss-babe.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-visual-replacements-review-2026-05-01/generated/replacement-02-boss-babe.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:0f3a389983b495464c9e75267c93d6875107eabafac814b4",
+          "asset_ids": [
+            "b8306881-8be4-4ed7-b736-4d5cdbacf8fb"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-replacements-2026-05-01/workflow-replacement-02-boss-babe.json"
+      }
+    },
+    {
+      "key": "replacement-03-spanish-doctor-cta",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+        "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: Normal labs may not reflect how different a man feels; understand the step to try before committing to a long-term TRT decision.\nPrimary problem: Men who do not feel like themselves anymore can feel stuck between weak booster pills and a permanent TRT/needle relationship.\nPromise: A daily protocol to consider before making a long-term TRT decision.\nMechanism disclosure level: Partial mechanism; the destination article introduces why one-lever boosters are incomplete and why a fuller daily protocol may be different.\nProof type: Editorial/advisory article using personal story, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read CTA before committing to needles or a long-term TRT relationship.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-advertorial-structured-congruence-visual-replacement-replacement-03-spanish-doctor-cta-1777674649397.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "143ea7ba-55dd-49d3-958a-9a9da8f1b1ed",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-08cc7bd3-1d4d-4488-9776-18b9d062a459"
+      },
+      "result": {
+        "workflowRunId": "143ea7ba-55dd-49d3-958a-9a9da8f1b1ed",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-08cc7bd3-1d4d-4488-9776-18b9d062a459",
+        "assetId": "3934fc44-7de9-449f-8e28-8792757b6acb",
+        "publicId": "b4f7f231-22ea-4c51-85f8-0c1430f12b1c",
+        "publicUrl": "https://api.moshq.app/public/assets/b4f7f231-22ea-4c51-85f8-0c1430f12b1c",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-replacements-2026-05-01/generated/replacement-03-spanish-doctor-cta.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-visual-replacements-review-2026-05-01/generated/replacement-03-spanish-doctor-cta.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:61e73225ef665b0e6940100036a70fe28d923054c5fe2aed",
+          "asset_ids": [
+            "3934fc44-7de9-449f-8e28-8792757b6acb"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-visual-replacements-2026-05-01/workflow-replacement-03-spanish-doctor-cta.json"
+      }
+    }
+  ]
+}

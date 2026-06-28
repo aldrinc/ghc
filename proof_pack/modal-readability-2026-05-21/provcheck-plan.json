@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-modal-readability-plan.md:234: factual-looking value lacks nearby source/provenance",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-modal-readability-plan.md:239: factual-looking value lacks nearby source/provenance"
+  ]
+}

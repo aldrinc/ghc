@@ -1,0 +1,265 @@
+{
+  "bodyStart": "A\nasdasd\nWorkspace\nWorkspace\nOverview\nStrategy\nBrand\nSites\nCommerce\nProducts\nResearch\nDocuments\nAds & Brands\nFunnels\nExecution\nCampaigns\nAnalytics\nPostiz\nAI\nAssistant Chat\nAssets\nCreative Library\nMeta Ads\nAldrin Clement\naldrin.clement@gmail.com\nToggle Sidebar\nWorkspaces\nWorkspace Overview\nWorkspace Product\nLoading products…\nWorkspace overview\n\nSelect a product to view product-scoped research.\n\nNo product selected\nChoose a product from the header to view research and onboarding outputs.",
+  "buttonMetrics": [
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 48,
+      "radius": "10px",
+      "text": "AasdasdWorkspace",
+      "width": 207
+    },
+    {
+      "background": "color(srgb 0.937255 0.956863 1)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "height": 32,
+      "radius": "10px",
+      "text": "Overview",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Strategy",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Brand",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Sites",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Commerce",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Products",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Documents",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Ads & Brands",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Funnels",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Campaigns",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Analytics",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Postiz",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Assistant Chat",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Creative Library",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 32,
+      "radius": "10px",
+      "text": "Meta Ads",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "height": 48,
+      "radius": "10px",
+      "text": "Aldrin Clementaldrin.clement@gmail.com",
+      "width": 207
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": 1100,
+      "radius": "0px",
+      "text": "",
+      "width": 16
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(0, 0, 0, 0)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Toggle Sidebar",
+      "width": 46
+    }
+  ],
+  "componentMetrics": [
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "cls": "group peer text-sidebar-foreground hidden md:block",
+      "height": 1100,
+      "radius": "0px",
+      "tag": "div",
+      "text": "AasdasdWorkspaceWorkspaceOverviewStrategyBrandSitesCommerceProductsResearchDocumentsAds & BrandsFunnelsExecutionCampaign",
+      "width": 224
+    }
+  ],
+  "counts": {
+    "buttons": 19,
+    "fields": 1,
+    "headings": 1
+  },
+  "fieldMetrics": [
+    {
+      "background": "color(srgb 0.941176 0.94902 0.964706)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "",
+      "radius": "12px",
+      "tag": "select",
+      "type": "",
+      "width": 256
+    }
+  ],
+  "headingMetrics": [
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "26px",
+      "fontWeight": "600",
+      "lineHeight": "29.9px",
+      "tag": "h2",
+      "text": "Workspace overview",
+      "width": 380
+    }
+  ],
+  "horizontalOverflow": false,
+  "offenders": [],
+  "title": "mOS Frontend",
+  "url": "http://localhost:5275/workspaces/overview",
+  "viewport": {
+    "height": 1100,
+    "scrollHeight": 1100,
+    "scrollWidth": 1412,
+    "width": 1412
+  }
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Proof Dashboard</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172026; background: #f7f8fa; }
+    header { padding: 24px 28px; background: #172026; color: white; }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    h2 { margin: 26px 0 10px; font-size: 17px; }
+    main { padding: 22px 28px 36px; max-width: 1180px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .card { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 14px; }
+    .label { color: #5b6875; font-size: 12px; text-transform: uppercase; }
+    .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pass { background: #d9f4e4; color: #146c3c; }
+    .fail { background: #ffe1df; color: #9c231e; }
+    .warn { background: #fff1c7; color: #7b5600; }
+    .neutral { background: #e9edf2; color: #4b5663; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d9dee5; border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e7ebef; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #eef2f6; font-size: 12px; color: #394653; }
+    tr:last-child td { border-bottom: 0; }
+    code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Codex Proof Dashboard</h1>
+    <div>TikTok Carousel Agent PRD</div>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="card"><div class="label">Plan Contract</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Source Manifest</div><div class="value"><span class="pill pass">pass</span></div></div>
+      <div class="card"><div class="label">Provenance</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Planning Gate</div><div class="value"><span class="pill pass">full</span></div></div>
+      <div class="card"><div class="label">Plan Questions</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Parallelism</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Lanes</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Proof Files</div><div class="value">10</div></div>
+    </section>
+
+    <h2>Plan Items</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Status</th><th>Objective</th><th>Expected Files</th><th>Artifacts</th></tr></thead>
+      <tbody><tr><td colspan='5'>No contract loaded.</td></tr></tbody>
+    </table>
+
+    <h2>Plan Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Plan Warnings</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Provenance Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Blocked Source Items</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Planning Gate Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> full</div>
+      <div><strong>Skill loaded:</strong> True</div>
+      <div><strong>Questions:</strong> 0</div>
+      <div><strong>Question rationale:</strong> The user requested a reviewable senior-engineer design, not implementation. The provided Larry package, existing repo Postiz implementation, and standing mOS constraints were enough to produce a draft with explicit open decisions rather than blocking on questions.</div>
+      <div><strong>Owner:</strong> Aldrin / mOS</div>
+      <div><strong>Review:</strong> 2026-05-22</div>
+      <div><strong>Stop:</strong> PRD and proof artifacts exist, source capture verifies, plangatecheck passes, and implementation has not started.</div>
+    </div>
+    <table>
+      <thead><tr><th>Artifact</th><th>Path</th><th>Summary</th></tr></thead>
+      <tbody><tr><td>goal_artifact</td><td>planning/goal.md</td><td>Goal for Larry-style TikTok carousel and conversion-loop support.</td></tr>
+<tr><td>problem_log</td><td>planning/problem-log.md</td><td>Observable gaps between Larry package and mOS product architecture.</td></tr>
+<tr><td>root_cause_diagnosis</td><td>planning/root-cause.md</td><td>Need to separate creative production, provider publication, and conversion feedback.</td></tr>
+<tr><td>current_machine</td><td>planning/current-machine.md</td><td>Current mOS Postiz/Hermes/assets state.</td></tr>
+<tr><td>designed_machine</td><td>planning/designed-machine.md</td><td>Target content growth program loop.</td></tr>
+<tr><td>worst_day_test</td><td>planning/worst-day.md</td><td>Failure modes and safe behavior.</td></tr>
+<tr><td>leading_lagging_metrics</td><td>planning/metrics.md</td><td>Leading and lagging metrics without fabricated targets.</td></tr>
+<tr><td>owner_date_review</td><td>planning/owner-review.md</td><td>Owner, date, and review point.</td></tr>
+<tr><td>stop_condition</td><td>planning/stop-condition.md</td><td>Design completion criteria.</td></tr></tbody>
+    </table>
+
+    <h2>Parallel Lane Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> unknown</div>
+      <div><strong>Reason:</strong> </div>
+      <div><strong>Fan-in:</strong> unknown</div>
+      <ul><li>none</li></ul>
+    </div>
+    <table>
+      <thead><tr><th>Lane</th><th>Role</th><th>Mode</th><th>Status</th><th>Write Scope</th><th>Artifacts</th><th>Summary</th></tr></thead>
+      <tbody><tr><td colspan='7'>No lane proof loaded.</td></tr></tbody>
+    </table>
+
+    <h2>Proof Files</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Type</th><th>Path</th></tr></thead>
+      <tbody><tr><td>plan-gate-proof.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/plan-gate-proof.json'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/plan-gate-proof.json</a></td></tr>
+<tr><td>current-machine.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/current-machine.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/current-machine.md</a></td></tr>
+<tr><td>designed-machine.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/designed-machine.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/designed-machine.md</a></td></tr>
+<tr><td>goal.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/goal.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/goal.md</a></td></tr>
+<tr><td>metrics.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/metrics.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/metrics.md</a></td></tr>
+<tr><td>owner-review.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/owner-review.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/owner-review.md</a></td></tr>
+<tr><td>problem-log.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/problem-log.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/problem-log.md</a></td></tr>
+<tr><td>root-cause.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/root-cause.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/root-cause.md</a></td></tr>
+<tr><td>stop-condition.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/stop-condition.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/stop-condition.md</a></td></tr>
+<tr><td>worst-day.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/worst-day.md'>/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-larry-tiktok-carousel-agent-prd/planning/worst-day.md</a></td></tr></tbody>
+    </table>
+  </main>
+</body>
+</html>

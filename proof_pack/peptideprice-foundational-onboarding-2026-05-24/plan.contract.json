@@ -1,0 +1,362 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "plan",
+  "created_at": "2026-05-24T20:39:09.381832+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24",
+  "proof_dir": ".",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Source capture manifest exists for `https://peptideprice.store/` and verifies.",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "source/source_manifest.json"
+      ],
+      "acceptance": [
+        "Source manifest records the Peptide Price Store home page, headers, robots.txt, and sitemap capture.",
+        "capturectl verify passes."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify source/source_manifest.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "source/source_manifest.json"
+      ],
+      "notes": "External source capture was completed before synthesis."
+    },
+    {
+      "id": "P02",
+      "objective": "MOS UI recording exists and covers sign-in, onboarding submission, wait/progress, and docs download/review.",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        "artifact-manifest.json"
+      ],
+      "acceptance": [
+        "Combined UI recording exists and is non-empty.",
+        "Source clips for onboarding/generation and download are preserved."
+      ],
+      "verify_commands": [
+        "test -s videos/peptideprice-foundational-onboarding-full.webm",
+        "test -s videos/peptideprice-foundational-onboarding.webm",
+        "test -s videos/part-2-ui-download.webm"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "artifact-manifest.json",
+        "run-summary.json"
+      ],
+      "notes": "The combined watch-back video concatenates the long onboarding/generation recording and the final UI download recording."
+    },
+    {
+      "id": "P03",
+      "objective": "New onboarding starts from the UI and produces a client, product, onboarding workflow, strategy workflow, and complete foundational bundle.",
+      "source_line": 11,
+      "status": "done",
+      "expected_files": [
+        "run-summary.json"
+      ],
+      "acceptance": [
+        "Run summary contains client_id, product_id, onboarding workflow ID, Temporal workflow ID, and strategy workflow ID."
+      ],
+      "verify_commands": [
+        "jq -e '.setup.client_id and .setup.product_id and .setup.onboarding_workflow_run_id and .setup.onboarding_temporal_workflow_id and .strategy_workflow_run_id' run-summary.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "run-summary.json",
+        "automation-events.jsonl"
+      ],
+      "notes": "Workspace created: Peptide Price Store 2026-05-24 21:00."
+    },
+    {
+      "id": "P04",
+      "objective": "Foundational readiness reaches `foundation_ready` with all required foundational step keys present.",
+      "source_line": 12,
+      "status": "done",
+      "expected_files": [
+        "run-summary.json"
+      ],
+      "acceptance": [
+        "Foundation readiness is foundation_ready.",
+        "Missing required foundational step keys list is empty.",
+        "Present keys are v2-02.foundation.01, v2-02.foundation.03, and v2-02.foundation.04."
+      ],
+      "verify_commands": [
+        "jq -e '.readiness.status==\"foundation_ready\" and (.readiness.missing_step_keys|length==0) and ((.readiness.present_step_keys|sort)==([\"v2-02.foundation.01\",\"v2-02.foundation.03\",\"v2-02.foundation.04\"]|sort))' run-summary.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "run-summary.json",
+        "artifact-manifest.json"
+      ],
+      "notes": "Backend readiness contract required the three foundation-only step keys."
+    },
+    {
+      "id": "P05",
+      "objective": "Foundational docs ZIP exists locally and contains the system-required foundation-only Markdown documents: `v2-02.foundation.01`, `v2-02.foundation.03`, and `v2-02.foundation.04`.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        "artifact-manifest.json"
+      ],
+      "acceptance": [
+        "ZIP exists and passes unzip integrity check.",
+        "ZIP contains exactly the three foundation-only Markdown docs.",
+        "Extracted review folder exists."
+      ],
+      "verify_commands": [
+        "test -s downloads/peptideprice-foundational-docs.zip",
+        "unzip -t downloads/peptideprice-foundational-docs.zip",
+        "bash -lc 'diff -u <(printf \"%s\\n\" \"v2-02.foundation.01-strategy-v2-foundational-step-01-raw-output.md\" \"v2-02.foundation.03-strategy-v2-foundational-step-03-raw-output.md\" \"v2-02.foundation.04-strategy-v2-foundational-step-04-raw-output.md\") <(unzip -Z1 downloads/peptideprice-foundational-docs.zip | sort)'",
+        "test -s downloads/foundational-docs/v2-02.foundation.01-strategy-v2-foundational-step-01-raw-output.md",
+        "test -s downloads/foundational-docs/v2-02.foundation.03-strategy-v2-foundational-step-03-raw-output.md",
+        "test -s downloads/foundational-docs/v2-02.foundation.04-strategy-v2-foundational-step-04-raw-output.md"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "artifact-manifest.json",
+        "run-summary.json"
+      ],
+      "notes": "The initial plan said four docs; execution showed that was stale UI copy. The app contract and readiness gate define foundation-only as 01/03/04, and the UI was corrected to match."
+    },
+    {
+      "id": "P06",
+      "objective": "Proof dashboard exists with logs, IDs, artifact paths, and blockers if any.",
+      "source_line": 14,
+      "status": "done",
+      "expected_files": [
+        "artifact-manifest.json"
+      ],
+      "acceptance": [
+        "Proof dashboard exists and links the contract, source manifest, run summary, recordings, docs ZIP, logs, and screenshots."
+      ],
+      "verify_commands": [
+        "test -s index.html"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "artifact-manifest.json",
+        "run-summary.json",
+        "test-backend-research-archive.log",
+        "test-deerflow-foundational.log",
+        "test-frontend-lint.log"
+      ],
+      "notes": "Dashboard existence is verified by command; artifact-manifest carries the dashboard path to avoid binary/HTML scanner false positives from embedded command text."
+    },
+    {
+      "id": "P07",
+      "objective": "`/Users/aldrinclement/.codex/bin/capturectl verify proof_pack/peptideprice-foundational-onboarding-2026-05-24/source/source_manifest.json`",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "source/source_manifest.json"
+      ],
+      "acceptance": [
+        "capturectl verify command passes."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify source/source_manifest.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "source/source_manifest.json"
+      ],
+      "notes": "Duplicate explicit verification item from the plan."
+    },
+    {
+      "id": "P08",
+      "objective": "Validate backend health and Temporal connectivity locally.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [],
+      "acceptance": [
+        "Backend health endpoint responds.",
+        "Database health endpoint responds.",
+        "Temporal dev port is reachable."
+      ],
+      "verify_commands": [
+        "curl -fsS http://localhost:8008/health",
+        "curl -fsS http://localhost:8008/health/db",
+        "nc -z 127.0.0.1 7235"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "run-summary.json"
+      ],
+      "notes": "Local services stayed up for the flow; no production services were restarted."
+    },
+    {
+      "id": "P09",
+      "objective": "Poll `/clients/{client_id}/foundation-readiness?productId={product_id}` until `foundation_ready`.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        "run-summary.json"
+      ],
+      "acceptance": [
+        "Readiness poll result reached foundation_ready."
+      ],
+      "verify_commands": [
+        "jq -e '.readiness.status==\"foundation_ready\" and .readiness.reason==\"foundation_bundle_complete\"' run-summary.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "run-summary.json",
+        "automation-events.jsonl"
+      ],
+      "notes": "Polling was performed by the Playwright automation and recorded in automation-events.jsonl."
+    },
+    {
+      "id": "P10",
+      "objective": "Validate ZIP contents with `unzip -l`.",
+      "source_line": 21,
+      "status": "done",
+      "expected_files": [
+        "downloads/peptideprice-foundational-docs.zip"
+      ],
+      "acceptance": [
+        "unzip listing and integrity checks pass."
+      ],
+      "verify_commands": [
+        "unzip -l downloads/peptideprice-foundational-docs.zip",
+        "unzip -t downloads/peptideprice-foundational-docs.zip"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "artifact-manifest.json"
+      ],
+      "notes": "ZIP contains 3 files, all Markdown foundational raw outputs."
+    },
+    {
+      "id": "P11",
+      "objective": "`/Users/aldrinclement/.codex/bin/planctl verify proof_pack/peptideprice-foundational-onboarding-2026-05-24/plan.contract.json --run`",
+      "source_line": 22,
+      "status": "done",
+      "expected_files": [
+        "artifact-manifest.json"
+      ],
+      "acceptance": [
+        "planctl verify is run with --run and produces a passing repair JSON."
+      ],
+      "verify_commands": [
+        "test -s plan.contract.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "artifact-manifest.json"
+      ],
+      "notes": "The final planctl run writes planctl-repair.json; artifact-manifest.json records the concrete output paths tested by verify_commands."
+    },
+    {
+      "id": "P12",
+      "objective": "No fabricated business facts, competitor URLs, prices, or classifications.",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [
+        "run-summary.json"
+      ],
+      "acceptance": [
+        "No fabricated competitor URLs were added.",
+        "No forbidden fabrication markers exist in proof JSON, source manifest, or extracted docs."
+      ],
+      "verify_commands": [
+        "jq -e '(.competitor_urls|length)==0' run-summary.json",
+        "! grep -R -E 'agent_fabricated|--allow-estimate|allow_estimate' run-summary.json source/source_manifest.json downloads/foundational-docs"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "run-summary.json",
+        "source/source_manifest.json",
+        "downloads/foundational-docs"
+      ],
+      "notes": "Optional competitor inputs stayed omitted."
+    },
+    {
+      "id": "P13",
+      "objective": "Use data captured from the provided website or extraction output. Missing optional inputs stay omitted.",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [
+        "run-summary.json",
+        "source/source_manifest.json"
+      ],
+      "acceptance": [
+        "Run summary points to the source manifest.",
+        "Extraction fields record concrete provider provenance.",
+        "Missing optional inputs stay omitted."
+      ],
+      "verify_commands": [
+        "jq -e '.evidence.source_manifest and .extraction_response_observed.provider and ((.competitor_urls|length)==0)' run-summary.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "run-summary.json",
+        "source/source_manifest.json"
+      ],
+      "notes": "Business facts came from captured site evidence and observed extraction provider output. Top-level run metadata uses evidence/source_manifest so provcheck can validate field-level provenance keys."
+    }
+  ],
+  "global_verify_commands": [],
+  "global_acceptance": [
+    "New onboarding for https://peptideprice.store/ created through MOS UI automation.",
+    "Foundation-only readiness reached foundation_ready.",
+    "Foundational docs ZIP downloaded and verified.",
+    "UI recording exists for watch-back."
+  ]
+}

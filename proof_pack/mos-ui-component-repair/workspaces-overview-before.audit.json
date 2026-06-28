@@ -1,0 +1,23 @@
+{
+  "buttons": [],
+  "cards": [
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "rgb(229, 231, 235)",
+      "className": "",
+      "height": 1100,
+      "radius": "0px",
+      "tag": "div",
+      "text": "",
+      "width": 1860
+    }
+  ],
+  "headings": [],
+  "overflow": [],
+  "title": "mOS Frontend",
+  "url": "http://localhost:5275/workspaces/overview",
+  "viewport": {
+    "height": 1100,
+    "width": 1860
+  }
+}

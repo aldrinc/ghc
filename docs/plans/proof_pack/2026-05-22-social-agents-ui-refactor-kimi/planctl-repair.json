@@ -1,0 +1,30 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+  "verified_at": "2026-05-22T19:52:40.496394+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md:26: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md:25: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md:29: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md:26: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md:25: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md:29: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md:26: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md:25: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md:29: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md:26: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md:25: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md:29: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md:26: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md:25: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md:29: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md:26: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md:25: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md:29: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md:26: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md:25: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md:29: brittle marker `placeholder`"
+  ],
+  "run_logs": []
+}

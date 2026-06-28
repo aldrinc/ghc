@@ -1,0 +1,315 @@
+{
+  "mode": "plan_only",
+  "generatedAt": "2026-05-03T16:13:03.864347+00:00",
+  "window": {
+    "datePreset": "last_3d"
+  },
+  "campaign": {
+    "id": "120245292268820293",
+    "name": "Tenor - Walk Away From TRT - Product Removed - 2026-05-03",
+    "objective": "OUTCOME_SALES",
+    "status": "PAUSED",
+    "effective_status": "PAUSED",
+    "daily_budget": "10000",
+    "buying_type": "AUCTION",
+    "special_ad_categories": [],
+    "is_adset_budget_sharing_enabled": false
+  },
+  "adsets": [
+    {
+      "id": "120245292274280293",
+      "name": "CBO Bucket 5",
+      "optimization_goal": "OFFSITE_CONVERSIONS",
+      "billing_event": "IMPRESSIONS",
+      "status": "PAUSED",
+      "effective_status": "PAUSED",
+      "promoted_object": {
+        "pixel_id": "4578413032424797",
+        "custom_event_type": "PURCHASE",
+        "smart_pse_enabled": false
+      },
+      "start_time": "2026-05-03T09:04:08-0700"
+    },
+    {
+      "id": "120245292272330293",
+      "name": "CBO Bucket 4",
+      "optimization_goal": "OFFSITE_CONVERSIONS",
+      "billing_event": "IMPRESSIONS",
+      "status": "PAUSED",
+      "effective_status": "PAUSED",
+      "promoted_object": {
+        "pixel_id": "4578413032424797",
+        "custom_event_type": "PURCHASE",
+        "smart_pse_enabled": false
+      },
+      "start_time": "2026-05-03T09:04:06-0700"
+    },
+    {
+      "id": "120245292271770293",
+      "name": "CBO Bucket 3",
+      "optimization_goal": "OFFSITE_CONVERSIONS",
+      "billing_event": "IMPRESSIONS",
+      "status": "PAUSED",
+      "effective_status": "PAUSED",
+      "promoted_object": {
+        "pixel_id": "4578413032424797",
+        "custom_event_type": "PURCHASE",
+        "smart_pse_enabled": false
+      },
+      "start_time": "2026-05-03T09:04:05-0700"
+    },
+    {
+      "id": "120245292271180293",
+      "name": "CBO Bucket 2",
+      "optimization_goal": "OFFSITE_CONVERSIONS",
+      "billing_event": "IMPRESSIONS",
+      "status": "PAUSED",
+      "effective_status": "PAUSED",
+      "promoted_object": {
+        "pixel_id": "4578413032424797",
+        "custom_event_type": "PURCHASE",
+        "smart_pse_enabled": false
+      },
+      "start_time": "2026-05-03T09:04:03-0700"
+    },
+    {
+      "id": "120245292270450293",
+      "name": "CBO Bucket 1",
+      "optimization_goal": "OFFSITE_CONVERSIONS",
+      "billing_event": "IMPRESSIONS",
+      "status": "PAUSED",
+      "effective_status": "PAUSED",
+      "promoted_object": {
+        "pixel_id": "4578413032424797",
+        "custom_event_type": "PURCHASE",
+        "smart_pse_enabled": false
+      },
+      "start_time": "2026-05-03T09:04:01-0700"
+    }
+  ],
+  "objectState": {
+    "campaignStatus": "PAUSED",
+    "campaignEffectiveStatus": "PAUSED",
+    "adsetCount": 5,
+    "adCount": 30,
+    "insightsRowCount": 0,
+    "deliveryState": "paused",
+    "deliverySummary": "This campaign is paused in Meta, so the selected window returned no ad-level delivery rows.",
+    "adsetStatusCounts": [
+      {
+        "value": "PAUSED",
+        "count": 5
+      }
+    ],
+    "adsetEffectiveStatusCounts": [
+      {
+        "value": "PAUSED",
+        "count": 5
+      }
+    ],
+    "adStatusCounts": [
+      {
+        "value": "PAUSED",
+        "count": 30
+      }
+    ],
+    "adEffectiveStatusCounts": [
+      {
+        "value": "PAUSED",
+        "count": 30
+      }
+    ],
+    "issueCount": 0,
+    "reviewPendingCount": 0,
+    "issueSamples": []
+  },
+  "observedActionTypes": {
+    "actions": [],
+    "action_values": []
+  },
+  "rows": [],
+  "actions": [],
+  "appliedActions": [],
+  "warnings": [
+    "no_delivery_rows.paused"
+  ],
+  "managementScope": "meta_only",
+  "benchmarkStatus": {
+    "requestedMode": "disabled",
+    "available": false,
+    "reasonCode": "disabled_by_request",
+    "reason": "Benchmark evaluation was not requested."
+  },
+  "benchmarkContext": null,
+  "funnelSnapshot": null,
+  "benchmarkEvaluations": [],
+  "customMetricDefinitions": [
+    {
+      "metricId": "meta_atc_ratio_pct",
+      "label": "ATC Ratio",
+      "description": "Adds to cart divided by website landing page views. This shows whether the landing page is converting paid visitors into shopping intent.",
+      "formula": "Adds to cart / Landing page views",
+      "sourcePlane": "meta_ads",
+      "sourceClass": "meta_estimated",
+      "unit": "pct",
+      "numeratorLabel": "Adds to cart",
+      "denominatorLabel": "Landing page views",
+      "minimum": 10,
+      "target": null,
+      "good": null
+    },
+    {
+      "metricId": "meta_conversion_rate_pct",
+      "label": "Conversion Rate",
+      "description": "Purchases divided by website landing page views. This is the Meta-estimated end-to-end conversion rate from ad visit to order.",
+      "formula": "Purchases / Landing page views",
+      "sourcePlane": "meta_ads",
+      "sourceClass": "meta_estimated",
+      "unit": "pct",
+      "numeratorLabel": "Purchases",
+      "denominatorLabel": "Landing page views",
+      "minimum": 1,
+      "target": null,
+      "good": 3
+    },
+    {
+      "metricId": "meta_ic_ratio_pct",
+      "label": "IC Ratio",
+      "description": "Initiated checkouts divided by website landing page views. This shows how many landing page visitors reach checkout start.",
+      "formula": "Initiated checkouts / Landing page views",
+      "sourcePlane": "meta_ads",
+      "sourceClass": "meta_estimated",
+      "unit": "pct",
+      "numeratorLabel": "Initiated checkouts",
+      "denominatorLabel": "Landing page views",
+      "minimum": null,
+      "target": null,
+      "good": null
+    },
+    {
+      "metricId": "meta_purchase_ratio_pct",
+      "label": "Purchase Ratio",
+      "description": "Purchases divided by adds to cart. This is a checkout-efficiency read on how many carts finish as orders.",
+      "formula": "Purchases / Adds to cart",
+      "sourcePlane": "meta_ads",
+      "sourceClass": "meta_estimated",
+      "unit": "pct",
+      "numeratorLabel": "Purchases",
+      "denominatorLabel": "Adds to cart",
+      "minimum": 30,
+      "target": null,
+      "good": null
+    },
+    {
+      "metricId": "meta_video_hold_rate_pct",
+      "label": "Video Hold Rate",
+      "description": "50% video plays divided by impressions. This shows whether the body of the ad holds attention after the hook.",
+      "formula": "Video plays at 50% / Impressions",
+      "sourcePlane": "meta_ads",
+      "sourceClass": "meta_estimated",
+      "unit": "pct",
+      "numeratorLabel": "Video plays at 50%",
+      "denominatorLabel": "Impressions",
+      "minimum": 25,
+      "target": null,
+      "good": null
+    }
+  ],
+  "customMetricSummary": [
+    {
+      "metricId": "meta_atc_ratio_pct",
+      "scope": "campaign",
+      "status": "unavailable",
+      "value": null,
+      "unit": "pct",
+      "numerator": 0,
+      "denominator": 0,
+      "minimum": 10,
+      "target": null,
+      "good": null,
+      "resolvedSources": [],
+      "warnings": [
+        "estimated_metric_source"
+      ],
+      "reason": "Meta did not return the configured source for landing page views in this window.",
+      "recommendation": null
+    },
+    {
+      "metricId": "meta_conversion_rate_pct",
+      "scope": "campaign",
+      "status": "unavailable",
+      "value": null,
+      "unit": "pct",
+      "numerator": 0,
+      "denominator": 0,
+      "minimum": 1,
+      "target": null,
+      "good": 3,
+      "resolvedSources": [],
+      "warnings": [
+        "estimated_metric_source"
+      ],
+      "reason": "Meta did not return the configured source for landing page views in this window.",
+      "recommendation": null
+    },
+    {
+      "metricId": "meta_ic_ratio_pct",
+      "scope": "campaign",
+      "status": "unavailable",
+      "value": null,
+      "unit": "pct",
+      "numerator": 0,
+      "denominator": 0,
+      "minimum": null,
+      "target": null,
+      "good": null,
+      "resolvedSources": [],
+      "warnings": [
+        "estimated_metric_source"
+      ],
+      "reason": "Meta did not return the configured source for landing page views in this window.",
+      "recommendation": null
+    },
+    {
+      "metricId": "meta_purchase_ratio_pct",
+      "scope": "campaign",
+      "status": "unavailable",
+      "value": null,
+      "unit": "pct",
+      "numerator": 0,
+      "denominator": 0,
+      "minimum": 30,
+      "target": null,
+      "good": null,
+      "resolvedSources": [],
+      "warnings": [
+        "estimated_metric_source"
+      ],
+      "reason": "Meta did not return the configured source for adds to cart in this window.",
+      "recommendation": null
+    },
+    {
+      "metricId": "meta_video_hold_rate_pct",
+      "scope": "campaign",
+      "status": "unavailable",
+      "value": null,
+      "unit": "pct",
+      "numerator": 0,
+      "denominator": 0,
+      "minimum": 25,
+      "target": null,
+      "good": null,
+      "resolvedSources": [],
+      "warnings": [
+        "estimated_metric_source"
+      ],
+      "reason": "Meta did not return the configured source for impressions in this window.",
+      "recommendation": null
+    }
+  ],
+  "customMetricRows": [],
+  "artifacts": {
+    "metricsSnapshotArtifactId": "35e96f77-be03-4a6c-bba9-615db763970a",
+    "recommendedActionsArtifactId": "cef0f248-471d-42ec-aed2-6b630f9ae337"
+  }
+}

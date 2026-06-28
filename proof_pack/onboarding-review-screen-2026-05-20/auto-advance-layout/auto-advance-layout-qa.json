@@ -1,0 +1,174 @@
+{
+  "status": "passed",
+  "generatedAt": "2026-05-21T00:06:15.046Z",
+  "snapshots": [
+    {
+      "name": "01-workspace-input",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/01-workspace-input.png",
+      "title": "What should we call this workspace?",
+      "titleWidth": 760,
+      "descriptionWidth": 760,
+      "continueCount": 1,
+      "backText": null,
+      "formBox": {
+        "x": 220,
+        "y": 236,
+        "width": 760,
+        "height": 548,
+        "bottom": 784
+      },
+      "actionsBox": {
+        "x": 220,
+        "y": 730,
+        "width": 760,
+        "height": 54,
+        "bottom": 784
+      },
+      "gridColumns": null
+    },
+    {
+      "name": "02-business-type-choice",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/02-business-type-choice.png",
+      "title": "Is this a new or already live business?",
+      "titleWidth": 760,
+      "descriptionWidth": 760,
+      "continueCount": 0,
+      "backText": "Back",
+      "formBox": {
+        "x": 220,
+        "y": 296,
+        "width": 760,
+        "height": 548,
+        "bottom": 844
+      },
+      "actionsBox": {
+        "x": 220,
+        "y": 836,
+        "width": 760,
+        "height": 8,
+        "bottom": 844
+      },
+      "gridColumns": null
+    },
+    {
+      "name": "03-business-model-choice",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/03-business-model-choice.png",
+      "title": "How will this business make money?",
+      "titleWidth": 760,
+      "descriptionWidth": 760,
+      "continueCount": 0,
+      "backText": "Back",
+      "formBox": {
+        "x": 220,
+        "y": 296,
+        "width": 760,
+        "height": 548,
+        "bottom": 844
+      },
+      "actionsBox": {
+        "x": 220,
+        "y": 836,
+        "width": 760,
+        "height": 8,
+        "bottom": 844
+      },
+      "gridColumns": "366.5px 366.5px"
+    },
+    {
+      "name": "04-offering-kind-choice",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/04-offering-kind-choice.png",
+      "title": "What do you sell or plan to sell?",
+      "titleWidth": 760,
+      "descriptionWidth": 760,
+      "continueCount": 0,
+      "backText": "Back",
+      "formBox": {
+        "x": 220,
+        "y": 296,
+        "width": 760,
+        "height": 548,
+        "bottom": 844
+      },
+      "actionsBox": {
+        "x": 220,
+        "y": 836,
+        "width": 760,
+        "height": 8,
+        "bottom": 844
+      },
+      "gridColumns": "366.5px 366.5px"
+    },
+    {
+      "name": "05-offer-name-input",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/05-offer-name-input.png",
+      "title": "What service do you provide?",
+      "titleWidth": 760,
+      "descriptionWidth": 760,
+      "continueCount": 1,
+      "backText": "Back",
+      "formBox": {
+        "x": 220,
+        "y": 296,
+        "width": 760,
+        "height": 548,
+        "bottom": 844
+      },
+      "actionsBox": {
+        "x": 220,
+        "y": 790,
+        "width": 760,
+        "height": 54,
+        "bottom": 844
+      },
+      "gridColumns": null
+    },
+    {
+      "name": "06-pricing-choice",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/06-pricing-choice.png",
+      "title": "How do you charge for your service?",
+      "titleWidth": 760,
+      "descriptionWidth": 760,
+      "continueCount": 0,
+      "backText": "Back",
+      "formBox": {
+        "x": 220,
+        "y": 296,
+        "width": 760,
+        "height": 548,
+        "bottom": 844
+      },
+      "actionsBox": {
+        "x": 220,
+        "y": 836,
+        "width": 760,
+        "height": 8,
+        "bottom": 844
+      },
+      "gridColumns": "366.5px 366.5px"
+    },
+    {
+      "name": "07-competitors-input",
+      "file": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/auto-advance-layout/07-competitors-input.png",
+      "title": "Any competitors your agent should know about?",
+      "titleWidth": 760,
+      "descriptionWidth": 760,
+      "continueCount": 1,
+      "backText": "Back",
+      "formBox": {
+        "x": 220,
+        "y": 334,
+        "width": 760,
+        "height": 548,
+        "bottom": 882
+      },
+      "actionsBox": {
+        "x": 220,
+        "y": 828,
+        "width": 760,
+        "height": 54,
+        "bottom": 882
+      },
+      "gridColumns": null
+    }
+  ]
+}

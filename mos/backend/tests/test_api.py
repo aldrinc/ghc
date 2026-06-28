@@ -4,8 +4,13 @@ from uuid import UUID, uuid4
 
 from app.auth import dependencies as auth_dependencies
 from app.db.deps import get_session
-from app.db.enums import ArtifactTypeEnum, GeminiContextFileStatusEnum
-from app.db.models import Artifact, Funnel, GeminiContextFile, Org
+from app.db.enums import (
+    ArtifactTypeEnum,
+    GeminiContextFileStatusEnum,
+    WorkflowKindEnum,
+    WorkflowStatusEnum,
+)
+from app.db.models import Artifact, Funnel, GeminiContextFile, Org, WorkflowRun
 from app.main import app
 from app.routers import gemini as gemini_router
 from app.services.gemini_file_search import GeminiChatResult, GeminiCitation
@@ -75,6 +80,38 @@ def _insert_gemini_context_file(
     db_session.commit()
     db_session.refresh(record)
     return record
+
+
+_FOUNDATION_REQUIRED_STEP_KEYS = [
+    "v2-02.foundation.01",
+    "v2-02.foundation.03",
+    "v2-02.foundation.04",
+]
+
+
+def _insert_workflow_run(
+    db_session,
+    *,
+    org_id: UUID,
+    client_id: str,
+    product_id: str,
+    kind: WorkflowKindEnum,
+    status: WorkflowStatusEnum,
+) -> WorkflowRun:
+    run = WorkflowRun(
+        org_id=org_id,
+        client_id=UUID(client_id),
+        product_id=UUID(product_id),
+        campaign_id=None,
+        temporal_workflow_id=f"{kind.value}-{uuid4().hex[:12]}",
+        temporal_run_id=uuid4().hex,
+        kind=kind,
+        status=status,
+    )
+    db_session.add(run)
+    db_session.commit()
+    db_session.refresh(run)
+    return run
 
 
 def test_protected_routes_require_auth():
@@ -393,6 +430,261 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
 
     planning_logs = api_client.get(f"/workflows/{planning_run}/logs").json()
     assert any(log["step"] == "campaign_planning" for log in planning_logs)
+
+
+def test_marketing_agent_setup_allows_service_price_later(api_client, fake_temporal):
+    client_resp = api_client.post(
+        "/clients",
+        json={"name": "Service Workspace", "industry": "Services", "strategyV2Enabled": True},
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    setup_resp = api_client.post(
+        f"/clients/{client_id}/marketing-agent/setup",
+        json={
+            "business_type": "new",
+            "business_name": "Service Workspace",
+            "business_model": "service_business",
+            "offering_kind": "service",
+            "offering_type": "implementation service",
+            "offering_name": "Growth Sprint",
+            "offering_description": "A done-for-you service that improves customer acquisition.",
+            "competitor_urls": ["https://competitor.example"],
+        },
+    )
+    assert setup_resp.status_code == 200
+    payload = setup_resp.json()
+    assert payload["pricing_status"] == "later"
+    product_id = payload["product_id"]
+    assert fake_temporal.started
+
+    product_detail = api_client.get(f"/products/{product_id}")
+    assert product_detail.status_code == 200
+    product_payload = product_detail.json()
+    assert product_payload["title"] == "Growth Sprint"
+    assert product_payload["product_type"] == "implementation service"
+    assert product_payload["variants"] == []
+
+
+def test_marketing_agent_setup_supports_existing_business(api_client, fake_temporal):
+    client_resp = api_client.post(
+        "/clients",
+        json={"name": "Existing Workspace", "industry": "SaaS", "strategyV2Enabled": True},
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    setup_resp = api_client.post(
+        f"/clients/{client_id}/marketing-agent/setup",
+        json={
+            "business_type": "existing",
+            "input_mode": "source_extract",
+            "business_url": "https://existing.example",
+            "business_name": "Existing Workspace",
+            "business_model": "saas_subscription",
+            "offering_kind": "software",
+            "offering_type": "analytics software",
+            "offering_name": "Revenue Dashboard",
+            "offering_description": "Software that helps operators monitor revenue signals.",
+            "pricing_model": "subscription",
+            "context_dev_summary": {
+                "provider": "context_dev",
+                "fields": {
+                    "offering_name": {
+                        "value": "Revenue Dashboard",
+                        "provenance": "concrete",
+                        "provider": "context_dev",
+                    }
+                },
+            },
+        },
+    )
+    assert setup_resp.status_code == 200
+    assert setup_resp.json()["product_name"] == "Revenue Dashboard"
+    assert fake_temporal.started
+
+
+def test_marketing_agent_extract_uses_context_dev_review_service(api_client, monkeypatch):
+    client_resp = api_client.post(
+        "/clients",
+        json={"name": "Extract Workspace", "industry": "SaaS", "strategyV2Enabled": True},
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    from app.routers import clients as clients_router
+
+    def _fake_build_existing_business_review(*, business_url: str, competitor_urls: list[str] | None = None):
+        return {
+            "provider": "context_dev",
+            "domain": "example.com",
+            "business_url": business_url,
+            "competitor_urls": competitor_urls or [],
+            "fields": {
+                "offering_name": {
+                    "value": "Revenue Dashboard",
+                    "provenance": "concrete",
+                    "provider": "context_dev",
+                    "endpoint": "/brand/ai/products",
+                    "raw_path": "products[0].name",
+                    "confidence": "provider_returned",
+                }
+            },
+            "raw": {},
+            "requests": {},
+        }
+
+    monkeypatch.setattr(clients_router, "build_existing_business_review", _fake_build_existing_business_review)
+
+    extract_resp = api_client.post(
+        f"/clients/{client_id}/marketing-agent/extract",
+        json={"business_url": "example.com", "competitor_urls": ["competitor.example"]},
+    )
+    assert extract_resp.status_code == 200
+    payload = extract_resp.json()
+    assert payload["provider"] == "context_dev"
+    assert payload["business_url"] == "https://example.com"
+    assert payload["competitor_urls"] == ["https://competitor.example"]
+    assert payload["fields"]["offering_name"]["value"] == "Revenue Dashboard"
+    assert "raw" not in payload
+    assert isinstance(payload["raw_artifact_id"], str)
+
+
+def test_foundation_readiness_pending_before_bundle(api_client, db_session, auth_context):
+    client_resp = api_client.post(
+        "/clients",
+        json={"name": "Foundation Pending", "industry": "SaaS"},
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": "Pending Product"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    onboarding_run = _insert_workflow_run(
+        db_session,
+        org_id=UUID(auth_context.org_id),
+        client_id=client_id,
+        product_id=product_id,
+        kind=WorkflowKindEnum.client_onboarding,
+        status=WorkflowStatusEnum.running,
+    )
+
+    response = api_client.get(
+        f"/clients/{client_id}/foundation-readiness",
+        params={"productId": product_id},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "foundation_pending"
+    assert payload["should_gate_overview"] is True
+    assert payload["reason"] == "client_onboarding_running"
+    assert payload["onboarding_workflow_run_id"] == str(onboarding_run.id)
+    assert payload["required_step_keys"] == _FOUNDATION_REQUIRED_STEP_KEYS
+    assert payload["present_step_keys"] == []
+    assert payload["missing_step_keys"] == _FOUNDATION_REQUIRED_STEP_KEYS
+
+
+def test_foundation_readiness_failed_when_strategy_failed(api_client, db_session, auth_context):
+    client_resp = api_client.post(
+        "/clients",
+        json={"name": "Foundation Failed", "industry": "SaaS"},
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": "Failed Product"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    strategy_run = _insert_workflow_run(
+        db_session,
+        org_id=UUID(auth_context.org_id),
+        client_id=client_id,
+        product_id=product_id,
+        kind=WorkflowKindEnum.strategy_v2,
+        status=WorkflowStatusEnum.failed,
+    )
+
+    response = api_client.get(
+        f"/clients/{client_id}/foundation-readiness",
+        params={"productId": product_id},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "foundation_failed"
+    assert payload["should_gate_overview"] is True
+    assert payload["reason"] == "strategy_v2_foundation_run_failed"
+    assert payload["strategy_workflow_run_id"] == str(strategy_run.id)
+    assert payload["strategy_workflow_status"] == WorkflowStatusEnum.failed.value
+    assert payload["required_step_keys"] == _FOUNDATION_REQUIRED_STEP_KEYS
+    assert payload["present_step_keys"] == []
+    assert payload["missing_step_keys"] == _FOUNDATION_REQUIRED_STEP_KEYS
+
+
+def test_foundation_readiness_ready_when_bundle_complete(api_client, db_session, auth_context):
+    client_resp = api_client.post(
+        "/clients",
+        json={"name": "Foundation Ready", "industry": "SaaS"},
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": "Ready Product"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    strategy_run = _insert_workflow_run(
+        db_session,
+        org_id=UUID(auth_context.org_id),
+        client_id=client_id,
+        product_id=product_id,
+        kind=WorkflowKindEnum.strategy_v2,
+        status=WorkflowStatusEnum.completed,
+    )
+    db_session.add(
+        Artifact(
+            org_id=UUID(auth_context.org_id),
+            client_id=UUID(client_id),
+            product_id=UUID(product_id),
+            type=ArtifactTypeEnum.foundation_research_bundle,
+            data={
+                "workflow_run_id": str(strategy_run.id),
+                "step_payload_artifact_ids": {
+                    "v2-02.foundation.01": "artifact-step-01",
+                    "v2-02.foundation.03": "artifact-step-03",
+                    "v2-02.foundation.04": "artifact-step-04",
+                },
+            },
+        )
+    )
+    db_session.commit()
+
+    response = api_client.get(
+        f"/clients/{client_id}/foundation-readiness",
+        params={"productId": product_id},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "foundation_ready"
+    assert payload["should_gate_overview"] is False
+    assert payload["reason"] == "foundation_bundle_complete"
+    assert payload["strategy_workflow_run_id"] == str(strategy_run.id)
+    assert payload["strategy_workflow_status"] == WorkflowStatusEnum.completed.value
+    assert payload["required_step_keys"] == _FOUNDATION_REQUIRED_STEP_KEYS
+    assert payload["present_step_keys"] == _FOUNDATION_REQUIRED_STEP_KEYS
+    assert payload["missing_step_keys"] == []
 
 
 def test_generate_campaign_funnels_rejects_existing_angle(api_client, fake_temporal, db_session, auth_context):

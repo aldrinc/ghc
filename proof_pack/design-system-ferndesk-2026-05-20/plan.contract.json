@@ -1,0 +1,198 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-20-ferndesk-design-system-onboarding-plan",
+  "created_at": "2026-05-20T17:14:27.254986+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-20-ferndesk-design-system-onboarding-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/design-system-ferndesk-2026-05-20",
+  "items": [
+    {
+      "id": "P00",
+      "objective": "Capture and verify the user-provided FernDesk reference video before synthesis.",
+      "source_line": 6,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/design-system-ferndesk-2026-05-20/source/source_manifest.json",
+        "proof_pack/design-system-ferndesk-2026-05-20/source/video-contact-sheet.jpg",
+        "proof_pack/design-system-ferndesk-2026-05-20/source/video-color-samples.json"
+      ],
+      "acceptance": [
+        "Source manifest verifies with capturectl.",
+        "Contact sheet exists for visual review."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify proof_pack/design-system-ferndesk-2026-05-20/source/source_manifest.json"
+      ],
+      "proof_required": [
+        "source_manifest",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/design-system-ferndesk-2026-05-20/source/source_manifest.json",
+        "proof_pack/design-system-ferndesk-2026-05-20/source/video-contact-sheet.jpg",
+        "proof_pack/design-system-ferndesk-2026-05-20/source/video-color-samples.json"
+      ],
+      "notes": "Completed during plan creation."
+    },
+    {
+      "id": "P01",
+      "objective": "Validate Dalio planning gate artifacts for this non-trivial implementation plan.",
+      "source_line": 50,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/design-system-ferndesk-2026-05-20/plan-gate-proof.json",
+        "proof_pack/design-system-ferndesk-2026-05-20/planning/goal.md",
+        "proof_pack/design-system-ferndesk-2026-05-20/planning/problem-log.md",
+        "proof_pack/design-system-ferndesk-2026-05-20/planning/root-cause.md"
+      ],
+      "acceptance": [
+        "plangatecheck passes with zero errors."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/plangatecheck proof_pack/design-system-ferndesk-2026-05-20/plan-gate-proof.json"
+      ],
+      "proof_required": [
+        "plan_gate_proof",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/design-system-ferndesk-2026-05-20/plan-gate-proof.json",
+        "proof_pack/design-system-ferndesk-2026-05-20/planning"
+      ],
+      "notes": "Completed during plan creation."
+    },
+    {
+      "id": "P02",
+      "objective": "Implement design-system foundation for the FernDesk-style first-run experience.",
+      "source_line": 59,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/design-system.css",
+        "mos/frontend/src/components/onboarding/FirstRunShell.tsx",
+        "mos/frontend/src/components/onboarding/ContextPreviewPanel.tsx",
+        "mos/frontend/src/components/onboarding/OnboardingProgressRail.tsx",
+        "mos/frontend/src/components/onboarding/ChoiceList.tsx",
+        "mos/frontend/src/components/onboarding/SetupChecklist.tsx",
+        "mos/frontend/src/components/onboarding/IntegrationPillGrid.tsx",
+        "mos/frontend/src/components/onboarding/AgentWorkLog.tsx",
+        "mos/frontend/src/components/onboarding/ReviewChangesPanel.tsx",
+        "mos/frontend/src/components/onboarding/PublishProgressDialog.tsx",
+        "mos/frontend/src/components/onboarding/index.ts",
+        "mos/frontend/src/components/onboarding/FirstRunShell.test.tsx",
+        "mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx"
+      ],
+      "acceptance": [
+        "New tokens cover video-derived first-run canvas, chrome, surface, callout, black action, context panel, typography, progress, setup checklist, change review, and publish modal states.",
+        "Components are reusable and not hardcoded only to workspace onboarding.",
+        "Design-system page exposes structured previews while keeping raw JSON available.",
+        "No fake brand data, proof, integration state, or job status is introduced."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run check:semantic-ui",
+        "cd mos/frontend && ./node_modules/.bin/vitest run src/components/onboarding/FirstRunShell.test.tsx",
+        "cd mos/frontend && npm run build"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths",
+        "screenshots"
+      ],
+      "artifacts": [
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/design-system.css",
+        "mos/frontend/src/components/onboarding",
+        "mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log"
+      ],
+      "notes": "Implemented first-run tokens, scoped first-run surface CSS, reusable onboarding primitives, first-run preview in BrandDesignSystemPage, and targeted component tests. Existing button/badge primitives were reused rather than changed."
+    },
+    {
+      "id": "P03",
+      "objective": "Rebuild workspace onboarding on top of the new first-run design components.",
+      "source_line": 92,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/onboarding",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png"
+      ],
+      "acceptance": [
+        "First viewport is the onboarding experience, not explanatory panels.",
+        "The page variant renders required setup inputs in one continuous form view.",
+        "No default page stepper, progress rail, intent heading, or step-description card is shown.",
+        "Workspace setup context is available only behind an explicit debug toggle by default.",
+        "Mobile keeps required controls readable without sticky action overlap.",
+        "The page has one primary launch action.",
+        "Submitting still uses existing authorized APIs for client, product, compliance, and onboarding.",
+        "Backend failures surface clean errors without silent fallbacks."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run check:semantic-ui",
+        "cd mos/frontend && ./node_modules/.bin/vitest run src/components/clients/OnboardingWizard.test.tsx src/components/onboarding/FirstRunShell.test.tsx",
+        "cd mos/frontend && npm run build"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "screenshots"
+      ],
+      "artifacts": [
+        "mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log"
+      ],
+      "notes": "Rebuilt /workspaces/new as a cardless single-page setup form with neutral placeholders, hidden-by-default debug setup context, no default stepper/progress rail, no intent heading/card, and the existing onboarding API submission path. AppShell/useJourneyPhase/WorkflowDetailPage did not need edits for this scoped route upgrade."
+    },
+    {
+      "id": "P04",
+      "objective": "Run final validation and produce proof dashboard after implementation.",
+      "source_line": 126,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/design-system-ferndesk-2026-05-20/index.html",
+        "proof_pack/design-system-ferndesk-2026-05-20/lane-proof.json",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png"
+      ],
+      "acceptance": [
+        "Semantic UI check passes.",
+        "Targeted onboarding component tests and build pass.",
+        "Authenticated desktop and mobile screenshots prove the upgraded flow is readable.",
+        "planctl verify passes after implementation items are marked done."
+      ],
+      "verify_commands": [
+        "cd mos/frontend && npm run check:semantic-ui",
+        "cd mos/frontend && ./node_modules/.bin/vitest run src/components/clients/OnboardingWizard.test.tsx src/components/onboarding/FirstRunShell.test.tsx",
+        "cd mos/frontend && npm run build",
+        "/Users/aldrinclement/.codex/bin/planctl verify proof_pack/design-system-ferndesk-2026-05-20/plan.contract.json"
+      ],
+      "proof_required": [
+        "test_output",
+        "artifact_paths",
+        "screenshots",
+        "proof_dashboard"
+      ],
+      "artifacts": [
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png",
+        "proof_pack/design-system-ferndesk-2026-05-20/index.html"
+      ],
+      "notes": "Validation was run locally. The generic site-preview validator is not applicable to /workspaces/new; browser screenshots were captured for desktop and mobile instead. The dev preview logs show localhost:8008 backend connection refusal because the backend was not started; the route still rendered for UI validation."
+    }
+  ]
+}

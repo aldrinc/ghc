@@ -1,0 +1,66 @@
+{
+  "assetBriefId": "brief_editorial_wound_scene",
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "creativeServiceJobId": "embedded-freestyle:5d96efb71712c209db45c249a6b455c39b34d70ce04bb332",
+  "generatedAssetIds": [
+    "d8f845c1-9e38-4087-9105-429dca1a0452",
+    "e0e4b157-9dce-429c-bd5d-2813b1e71dd9",
+    "b4e1d4ce-d0d5-45db-a573-0899e25394f2"
+  ],
+  "images": [
+    {
+      "assetId": "d8f845c1-9e38-4087-9105-429dca1a0452",
+      "bytes": 583753,
+      "contentType": "image/jpeg",
+      "index": 1,
+      "remoteImagePath": "/tmp/mos-codex-swipe-image-flow-2026-05-04-atrophy/candidate-1-228a97c1-8607-4adc-8e7f-8198da5fdd34.jpg",
+      "sha256": "f41089a27bb49ace339f44d32db42af298cd7e6663dee9873c38a88352ec7f94"
+    },
+    {
+      "assetId": "e0e4b157-9dce-429c-bd5d-2813b1e71dd9",
+      "bytes": 567704,
+      "contentType": "image/jpeg",
+      "index": 2,
+      "remoteImagePath": "/tmp/mos-codex-swipe-image-flow-2026-05-04-atrophy/candidate-2-228a97c1-8607-4adc-8e7f-8198da5fdd34.jpg",
+      "sha256": "90f4694291bee08344818c00a31c6d8cbfc809daf6bef7f67fe42ad757cfb9a5"
+    },
+    {
+      "assetId": "b4e1d4ce-d0d5-45db-a573-0899e25394f2",
+      "bytes": 571800,
+      "contentType": "image/jpeg",
+      "index": 3,
+      "remoteImagePath": "/tmp/mos-codex-swipe-image-flow-2026-05-04-atrophy/candidate-3-228a97c1-8607-4adc-8e7f-8198da5fdd34.jpg",
+      "sha256": "b9dec9e30328057be5d145e44b6adbfccd855cb49e5bb9fd21f3a8aa54d29933"
+    }
+  ],
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "result": {
+    "asset_ids": [
+      "d8f845c1-9e38-4087-9105-429dca1a0452",
+      "e0e4b157-9dce-429c-bd5d-2813b1e71dd9",
+      "b4e1d4ce-d0d5-45db-a573-0899e25394f2"
+    ],
+    "gemini_rag_bundle_doc_keys": [],
+    "gemini_rag_doc_keys": [],
+    "gemini_rag_document_names": [],
+    "image_prompt": "A portrait-oriented (9:16) split-screen comparison image featuring a light grey gradient background in the top half and two side-by-side male thighs in the bottom half, separated by a thin white vertical line. The top half contains bold, sans-serif typography. Centered over the left leg is the text \"After\" on the first line and \"GLP-1\" on the second line, both in solid black. Centered over the right leg is the text \"After GLP-1\" in solid black on the first line, and \"+ Tenor\" in a rust-red color on the second line. Both thighs have the bottom hem of black athletic shorts visible at the top edge. The left thigh depicts severe post-GLP-1 muscle loss: it is visibly frail, depleted, and under-muscled with a narrow thigh circumference, shrunken quadriceps and hamstring volume, a prominent bony knee, hollow and deflated muscle shape, slack skin folds, poor tone, and an overall weak, concerning appearance. The right thigh is substantially larger, tight, highly muscular, strong, tanned, and prominently vascular with defined quadriceps. At the very bottom of the image is a solid black horizontal footer bar. Centered inside this black footer is a small, subtle wordmark \"TENOR\" in white, and directly below it is tiny white disclaimer text reading \"RESULTS ARE NOT GUARANTEED AND MAY VARY BY INDIVIDUAL\". The lighting is natural and clinical, highlighting the anatomical differences without glossy studio beautification. The skin textures are realistic, showing natural pores, honest human imperfections, and avoiding any plastic or AI-smoothed aesthetics. The composition is edge-to-edge with no extra margins, borders, or background elements outside the described layout.",
+    "job_id": "embedded-freestyle:5d96efb71712c209db45c249a6b455c39b34d70ce04bb332",
+    "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+    "stores_attached": 0,
+    "swipe_context_mode": "minimal",
+    "swipe_copy_model": null,
+    "swipe_copy_pack": null,
+    "swipe_copy_packs": [],
+    "swipe_prompt_markdown": "1) WHY THIS COMPETITOR AD WORKS (short)\n*   **Stark Visual Contrast:** The side-by-side comparison instantly communicates the problem (loose skin/muscle loss) and the solution (tight, vascular muscle) without needing complex copy.\n*   **Clear, Scannable Typography:** The bold, sans-serif headers are perfectly aligned over their respective images, making the \"Before/After\" narrative instantly readable.\n*   **Color-Coded Solution:** Using a distinct rust/orange-red color for the product name (\"+ Mars Men\") visually separates the solution from the problem state.\n*   **Clinical, Uncluttered Layout:** The simple grey gradient background and solid black footer force the viewer's eye directly to the physical transformation.\n\n2) ADAPT IT TO MY BRAND (keep vs swap)\n*   **KEEP (design DNA):** The portrait 9:16 aspect ratio, the light grey gradient background in the top half, the bold sans-serif typography layout, the thin white vertical divider line between the legs, the black shorts visible at the top of the legs, and the solid black footer bar at the bottom. The clinical, direct lighting and realistic skin textures must remain.\n*   **SWAP (branding & angle):** Change the left leg from just \"wrinkled\" to visibly frail, depleted, and under-muscled (shrunken volume, narrow circumference, bony knee, hollow shape) to emphasize serious post-GLP-1 muscle loss. Keep the right leg muscular and vascular. Swap the right header text from \"+ Mars Men\" to \"+ Tenor\" (keeping the rust-red accent color to preserve design DNA). Swap the footer logo to a small, subtle \"TENOR\" wordmark, keeping the tiny disclaimer text beneath it.\n\n3) OUTPUT: NEW IMAGE IDEA (1:1)\n\nA) TEXT I SEE (verbatim from competitor)\nHeadline (Left): After\\nGLP-1\nHeadline (Right): After GLP-1\\n+ Mars Men\nBody: [NONE]\nEquation line: [NONE]\nCTA: [NONE]\nFine print: MARS MEN [orange dot]\\nRESULTS ARE NOT GUARANTEED AND MAY VARY BY INDIVIDUAL\n\nB) NEW IMAGE PROMPT (MUST BE MARKDOWN)\n```text\nA portrait-oriented (9:16) split-screen comparison image featuring a light grey gradient background in the top half and two side-by-side male thighs in the bottom half, separated by a thin white vertical line. The top half contains bold, sans-serif typography. Centered over the left leg is the text \"After\" on the first line and \"GLP-1\" on the second line, both in solid black. Centered over the right leg is the text \"After GLP-1\" in solid black on the first line, and \"+ Tenor\" in a rust-red color on the second line. Both thighs have the bottom hem of black athletic shorts visible at the top edge. The left thigh depicts severe post-GLP-1 muscle loss: it is visibly frail, depleted, and under-muscled with a narrow thigh circumference, shrunken quadriceps and hamstring volume, a prominent bony knee, hollow and deflated muscle shape, slack skin folds, poor tone, and an overall weak, concerning appearance. The right thigh is substantially larger, tight, highly muscular, strong, tanned, and prominently vascular with defined quadriceps. At the very bottom of the image is a solid black horizontal footer bar. Centered inside this black footer is a small, subtle wordmark \"TENOR\" in white, and directly below it is tiny white disclaimer text reading \"RESULTS ARE NOT GUARANTEED AND MAY VARY BY INDIVIDUAL\". The lighting is natural and clinical, highlighting the anatomical differences without glossy studio beautification. The skin textures are realistic, showing natural pores, honest human imperfections, and avoiding any plastic or AI-smoothed aesthetics. The composition is edge-to-edge with no extra margins, borders, or background elements outside the described layout.\n```",
+    "swipe_prompt_model": "gemini-3.1-pro-preview",
+    "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+    "swipe_render_provider": "creative_service"
+  },
+  "sourceSwipeImageUrl": "https://static-gp.gethookd.ai/media/ads_media/92775828/media-00e7d202abe0.jpg",
+  "swipeAngle": "Preserve the Mars Men source ad composition literally, but make the left side communicate serious post-GLP-1 muscle loss, not just wrinkled skin. The left thigh should look frail, depleted, under-muscled, and at risk of poor function: visibly shrunken quadriceps and hamstring volume, narrow thigh circumference, bony knee prominence, hollow/deflated muscle shape, slack skin folds, poor tone, and weakness. It should feel genuinely concerning compared with the right side. The right thigh should be substantially larger, tight, muscular, strong, and vascular. Keep the source layout: large grey header area, legs start below the text, thin center divider, black footer bar, and a small subtle TENOR wordmark centered in the footer with tiny disclaimer text. Do not enlarge the footer logo.",
+  "swipeHook": "After GLP-1: visibly depleted, frail, low-muscle thigh at risk of weakness. After GLP-1 + Tenor: strong muscular thigh. Preserve the source layout and small footer branding.",
+  "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-dabd7321-61a0-4d30-aac2-0796cdacd3cc",
+  "workflowRunId": "228a97c1-8607-4adc-8e7f-8198da5fdd34",
+  "workflowUrl": "https://moshq.app/workflows/228a97c1-8607-4adc-8e7f-8198da5fdd34"
+}

@@ -1,0 +1,527 @@
+{
+  "YtiNHW": {
+    "type": "flow",
+    "id": "YtiNHW",
+    "attributes": {
+      "name": "Ember — Abandoned Cart",
+      "status": "draft",
+      "archived": false,
+      "created": "2026-04-21T18:28:40+00:00",
+      "updated": "2026-04-21T18:28:40+00:00",
+      "trigger_type": "Metric",
+      "definition": {
+        "triggers": [
+          {
+            "type": "metric",
+            "id": "SThFFB",
+            "trigger_filter": null
+          }
+        ],
+        "profile_filter": {
+          "condition_groups": [
+            {
+              "conditions": [
+                {
+                  "type": "profile-metric",
+                  "metric_id": "UFHzc6",
+                  "measurement": "count",
+                  "measurement_filter": {
+                    "type": "numeric",
+                    "operator": "equals",
+                    "value": 0
+                  },
+                  "timeframe_filter": {
+                    "type": "date",
+                    "operator": "flow-start"
+                  },
+                  "metric_filters": null
+                }
+              ]
+            }
+          ]
+        },
+        "actions": [
+          {
+            "id": "104677747",
+            "type": "time-delay",
+            "data": {
+              "unit": "hours",
+              "value": 1,
+              "secondary_value": 0,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677748"
+            }
+          },
+          {
+            "id": "104677748",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "The Ember Team",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Your Brain Clarity Protocol is waiting",
+                "preview_text": "Your protocol is saved and ready to ship.",
+                "template_id": "XdgHuG",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S2E1 — Gentle Reminder",
+                "id": "XQhL7j"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677751"
+            }
+          },
+          {
+            "id": "104677751",
+            "type": "time-delay",
+            "data": {
+              "unit": "hours",
+              "value": 23,
+              "secondary_value": 0,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677752"
+            }
+          },
+          {
+            "id": "104677752",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "The Ember Team",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "A question most women have before starting",
+                "preview_text": "What if this is just another supplement that doesn't work?",
+                "template_id": "WAfES5",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S2E2 — Objection Address",
+                "id": "SZpTR7"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677756"
+            }
+          },
+          {
+            "id": "104677756",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 1,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677757"
+            }
+          },
+          {
+            "id": "104677757",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "The Ember Team",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "She almost didn't start either",
+                "preview_text": "Your protocol is still saved.",
+                "template_id": "R8kKZe",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S2E3 — Social Proof",
+                "id": "VkdzCP"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677759"
+            }
+          },
+          {
+            "id": "104677759",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 1,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677760"
+            }
+          },
+          {
+            "id": "104677760",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "The Ember Team",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "We saved your Brain Clarity Protocol — plus a small thank you",
+                "preview_text": "Use code CLARITY10 for 10% off your first order.",
+                "template_id": "WvCqwF",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S2E4 — Incentive",
+                "id": "UHcx2c"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": null
+            }
+          }
+        ],
+        "entry_action_id": "104677747"
+      }
+    },
+    "relationships": {
+      "flow-actions": {
+        "links": {
+          "self": "https://a.klaviyo.com/api/flows/YtiNHW/relationships/flow-actions/",
+          "related": "https://a.klaviyo.com/api/flows/YtiNHW/flow-actions/"
+        }
+      },
+      "tags": {
+        "links": {
+          "self": "https://a.klaviyo.com/api/flows/YtiNHW/relationships/tags/",
+          "related": "https://a.klaviyo.com/api/flows/YtiNHW/tags/"
+        }
+      }
+    },
+    "links": {
+      "self": "https://a.klaviyo.com/api/flows/YtiNHW/"
+    }
+  },
+  "TtarLW": {
+    "type": "flow",
+    "id": "TtarLW",
+    "attributes": {
+      "name": "Ember — Post-Purchase Protocol",
+      "status": "draft",
+      "archived": false,
+      "created": "2026-04-21T18:28:44+00:00",
+      "updated": "2026-05-02T19:53:26+00:00",
+      "trigger_type": "Metric",
+      "definition": {
+        "triggers": [
+          {
+            "type": "metric",
+            "id": "UFHzc6",
+            "trigger_filter": null
+          }
+        ],
+        "profile_filter": null,
+        "actions": [
+          {
+            "id": "104677761",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Your Brain Clarity Protocol ships tomorrow — here's what to expect",
+                "preview_text": "You just made the decision to stop compensating and start refueling.",
+                "template_id": "R3HvDQ",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S3E1 — Welcome to Your Protocol",
+                "id": "X42cMU"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677764"
+            }
+          },
+          {
+            "id": "104677764",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 3,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677765"
+            }
+          },
+          {
+            "id": "104677765",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Day 3: The one thing that makes this work",
+                "preview_text": "Consistency is what determines whether this works.",
+                "template_id": "Sd8kxG",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S3E2 — Habit Anchor",
+                "id": "Ydr3FL"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677766"
+            }
+          },
+          {
+            "id": "104677766",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 11,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677767"
+            }
+          },
+          {
+            "id": "104677767",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Two weeks in — here's what's happening in your brain right now",
+                "preview_text": "Your brain's creatine phosphate stores are approaching saturation.",
+                "template_id": "RA7hV5",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S3E3 — Halfway Check",
+                "id": "XApZ59"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677768"
+            }
+          },
+          {
+            "id": "104677768",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 11,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677769"
+            }
+          },
+          {
+            "id": "104677769",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Your protocol is almost complete — don't let a gap undo your progress",
+                "preview_text": "Your brain creatine stores are at their highest point right now.",
+                "template_id": "VaX4W3",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S3E4 — Reorder Nudge",
+                "id": "Tnxbry"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677770"
+            }
+          },
+          {
+            "id": "104677770",
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 5,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677771"
+            }
+          },
+          {
+            "id": "104677771",
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shopemberco.com",
+                "from_label": "Dr. Catherine Langford",
+                "reply_to_email": "support@shopemberco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "30 days of Brain Clarity — what now?",
+                "preview_text": "The self-check: rate your afternoon clarity today, 1-5.",
+                "template_id": "SKw8NV",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[EMBER] S3E5 — Results + Upgrade",
+                "id": "QX6fis"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": null
+            }
+          }
+        ],
+        "entry_action_id": "104677761"
+      }
+    },
+    "relationships": {
+      "flow-actions": {
+        "links": {
+          "self": "https://a.klaviyo.com/api/flows/TtarLW/relationships/flow-actions/",
+          "related": "https://a.klaviyo.com/api/flows/TtarLW/flow-actions/"
+        }
+      },
+      "tags": {
+        "links": {
+          "self": "https://a.klaviyo.com/api/flows/TtarLW/relationships/tags/",
+          "related": "https://a.klaviyo.com/api/flows/TtarLW/tags/"
+        }
+      }
+    },
+    "links": {
+      "self": "https://a.klaviyo.com/api/flows/TtarLW/"
+    }
+  }
+}

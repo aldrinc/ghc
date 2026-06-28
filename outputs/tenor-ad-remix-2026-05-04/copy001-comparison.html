@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>COPY001 — Mars Men → Tenor Remix Debug</title>
+<style>
+  :root {
+    --bg: #f7f5f1;
+    --panel: #ffffff;
+    --ink: #1f2328;
+    --ink-soft: #585f66;
+    --rule: #e3ddd2;
+    --source-bg: #f1ede5;
+    --remix-bg: #fbf6ec;
+
+    --t-cadence: #0b6e8d;       /* H — habituation cadence */
+    --t-cadence-bg: #d6ecf3;
+    --t-disfluency: #b34a00;    /* D — managed disfluency */
+    --t-disfluency-bg: #fbe2cc;
+    --t-readlevel: #1f6f3a;     /* R — 6th-grade reading */
+    --t-readlevel-bg: #d9ecdf;
+    --t-voice: #6b3aa3;         /* V — brand voice / no-go swap */
+    --t-voice-bg: #e6daf3;
+    --t-factual: #a3303b;       /* F — factual integrity */
+    --t-factual-bg: #f6dadd;
+    --t-staircase: #6e6253;     /* S — staircase / mobile format */
+    --t-staircase-bg: #ece5d8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  header.top {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+  }
+  header.top h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  header.top .meta {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  header.top .meta strong { color: var(--ink); font-weight: 600; }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  /* full-ad before/after */
+  .fullads {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .ad {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .ad-head {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ad.source .ad-head { background: var(--source-bg); }
+  .ad.remix .ad-head { background: var(--remix-bg); }
+  .ad-tag {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .ad.source .ad-tag { color: #8a3331; }
+  .ad.remix .ad-tag { color: #316b8a; }
+  .ad-headline {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .ad-body {
+    padding: 18px 22px;
+    flex: 1;
+  }
+  .ad.source .ad-body { background: var(--source-bg); }
+  .ad.remix .ad-body { background: var(--remix-bg); }
+  .ad-field { margin-bottom: 18px; }
+  .ad-field:last-child { margin-bottom: 0; }
+  .ad-field-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .ad-field-value {
+    font-size: 14.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .ad-field-value.title {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--ink);
+  }
+  .ad-field-value.cta {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #1f2328;
+    color: #fbf6ec;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .ad-field-value.link-desc {
+    font-size: 13px;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--rule);
+    padding-left: 10px;
+  }
+  .section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .panel ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+  }
+  .panel ul li { margin-bottom: 4px; }
+  .panel .kv {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    row-gap: 6px;
+    column-gap: 12px;
+    font-size: 13px;
+  }
+  .panel .kv dt { color: var(--ink-soft); }
+  .panel .kv dd { margin: 0; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--rule);
+    background: var(--panel);
+  }
+  .chip .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+  .chip.cadence .dot { background: var(--t-cadence); }
+  .chip.disfluency .dot { background: var(--t-disfluency); }
+  .chip.readlevel .dot { background: var(--t-readlevel); }
+  .chip.voice .dot { background: var(--t-voice); }
+  .chip.factual .dot { background: var(--t-factual); }
+  .chip.staircase .dot { background: var(--t-staircase); }
+
+  .beats {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .beat {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .beat-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #f3eee4;
+    border-bottom: 1px solid var(--rule);
+  }
+  .beat-num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--ink-soft);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+  .beat-name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .beat-name small {
+    font-weight: 400;
+    color: var(--ink-soft);
+    margin-left: 6px;
+  }
+
+  .beat-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .col {
+    padding: 16px 18px;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .col.source {
+    background: var(--source-bg);
+    border-right: 1px solid var(--rule);
+  }
+  .col.remix {
+    background: var(--remix-bg);
+  }
+  .col-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .col-label .src { color: #8a3331; }
+  .col-label .rmx { color: #316b8a; }
+
+  /* technique highlights */
+  mark {
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    border-bottom: 2px solid transparent;
+  }
+  mark.cadence { background: var(--t-cadence-bg); border-color: var(--t-cadence); }
+  mark.disfluency { background: var(--t-disfluency-bg); border-color: var(--t-disfluency); }
+  mark.readlevel { background: var(--t-readlevel-bg); border-color: var(--t-readlevel); }
+  mark.voice { background: var(--t-voice-bg); border-color: var(--t-voice); }
+  mark.factual { background: var(--t-factual-bg); border-color: var(--t-factual); }
+  mark.staircase { background: var(--t-staircase-bg); border-color: var(--t-staircase); }
+
+  .notes {
+    border-top: 1px solid var(--rule);
+    padding: 12px 18px;
+    background: #faf6ed;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .notes ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .notes ul li { margin-bottom: 4px; }
+  .notes .tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 11px;
+    margin-right: 4px;
+    color: var(--ink);
+    border: 1px solid transparent;
+  }
+  .tag.cadence { background: var(--t-cadence-bg); border-color: var(--t-cadence); }
+  .tag.disfluency { background: var(--t-disfluency-bg); border-color: var(--t-disfluency); }
+  .tag.readlevel { background: var(--t-readlevel-bg); border-color: var(--t-readlevel); }
+  .tag.voice { background: var(--t-voice-bg); border-color: var(--t-voice); }
+  .tag.factual { background: var(--t-factual-bg); border-color: var(--t-factual); }
+  .tag.staircase { background: var(--t-staircase-bg); border-color: var(--t-staircase); }
+
+  .toggle {
+    margin-bottom: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .toggle input { accent-color: var(--ink); }
+
+  body.no-highlights mark {
+    background: transparent !important;
+    border-color: transparent !important;
+  }
+
+  .summary {
+    margin-top: 28px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .summary h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .summary .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 24px;
+    font-size: 13px;
+  }
+  .summary .grid h3 {
+    margin: 0 0 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .summary .grid p { margin: 0; color: var(--ink-soft); }
+
+  @media (max-width: 880px) {
+    .panels { grid-template-columns: 1fr; }
+    .beat-cols { grid-template-columns: 1fr; }
+    .col.source { border-right: none; border-bottom: 1px solid var(--rule); }
+    .summary .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>COPY001 — Mars Men → Tenor Remix</h1>
+    <div class="meta">
+      <strong>Source:</strong> Mars Men GLP-1 lander ad ("What GLP-1 Does to Your T Levels") &nbsp;·&nbsp;
+      <strong>Target:</strong> Tenor Daily Drive Essentials &nbsp;·&nbsp;
+      <strong>Skill:</strong> ad-remix &nbsp;·&nbsp;
+      <strong>Date:</strong> 2026-05-04
+    </div>
+  </header>
+
+  <div class="section-label">Full ad — before &amp; after</div>
+  <div class="fullads">
+
+    <div class="ad source">
+      <div class="ad-head">
+        <span class="ad-tag">Source — Mars Men</span>
+        <span class="ad-headline">COPY001 · GLP-1 lander</span>
+      </div>
+      <div class="ad-body">
+        <div class="ad-field">
+          <div class="ad-field-label">Title</div>
+          <div class="ad-field-value title">What GLP-1 Does to Your T Levels</div>
+        </div>
+
+        <div class="ad-field">
+          <div class="ad-field-label">Body</div>
+          <div class="ad-field-value">The weight's coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+
+Nobody's arguing that. But here's what your prescribing doctor probably didn't mention.
+
+Rapid weight loss triggers a massive cortisol spike.
+
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+
+You're thinner — but weaker, foggier, and running on fumes. That's not a win.
+
+Mars Men was built to protect what GLP-1s are quietly destroying.
+
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn't locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+
+This isn't theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+
+Right now it's 50% off with a full 90-day money-back guarantee.
+
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.</div>
+        </div>
+
+        <div class="ad-field">
+          <div class="ad-field-label">CTA</div>
+          <div class="ad-field-value cta">Shop now</div>
+        </div>
+
+        <div class="ad-field">
+          <div class="ad-field-label">Link description</div>
+          <div class="ad-field-value link-desc">Mars Men's clinical doses of Zinc (30mg) and Vitamin D (4,000 IU) signal your body to preserve lean mass while burning fat.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ad remix">
+      <div class="ad-head">
+        <span class="ad-tag">Remix — Tenor</span>
+        <span class="ad-headline">Daily Drive Essentials · GLP-1 angle</span>
+      </div>
+      <div class="ad-body">
+        <div class="ad-field">
+          <div class="ad-field-label">Title</div>
+          <div class="ad-field-value title">What GLP-1 Is Quietly Taking With the Weight</div>
+        </div>
+
+        <div class="ad-field">
+          <div class="ad-field-label">Body</div>
+          <div class="ad-field-value">The weight's coming off.
+
+But so is your drive. Your energy. Your edge.
+
+GLP-1s work. Nobody's arguing that.
+
+But here's what no one mentioned when you filled that prescription.
+
+Losing weight that fast sends your stress hormones through the roof.
+
+Your body stops protecting muscle. Starts burning it instead.
+
+The systems behind your energy, your focus, your physical drive — they don't slow down.
+
+They stall.
+
+You wake up lighter on the scale.
+
+And heavier everywhere else.
+
+Thinner — but foggier. Weaker. Running on fumes.
+
+That's not progress. That's a trade you didn't agree to.
+
+Tenor Daily Drive Essentials was built for this exact gap.
+
+21 active ingredients supporting the three systems that slip when weight drops fast:
+
+💊 Tongkat Ali (400mg) — supports the stress response that spikes during rapid weight loss
+
+💊 Maca (250mg) — feeds steady energy and endurance so the crash doesn't follow the scale
+
+💊 L-Arginine (250mg) — keeps circulation dialed in while your body adjusts
+
+Every dose on the label. No proprietary blend. Third-party tested.
+
+In a survey of 1,203 men:
+
+94% reported sustained morning energy.
+87% felt more focused and present.
+92% said they felt more like themselves.
+
+Not from a stimulant. Not from a needle.
+
+Two capsules every morning.
+
+Save 52% on the 90-Day Supply — $35/mo, free shipping, cancel anytime.
+
+90-day empty-bottle guarantee.
+
+See why men on GLP-1s are adding this to their daily protocol.</div>
+        </div>
+
+        <div class="ad-field">
+          <div class="ad-field-label">CTA</div>
+          <div class="ad-field-value cta">Get The Protocol</div>
+        </div>
+
+        <div class="ad-field">
+          <div class="ad-field-label">Link description</div>
+          <div class="ad-field-value link-desc">Tenor's 21 active ingredients at disclosed doses support the energy, drive, and focus that slip when weight drops fast. No proprietary blend. No prescription. No needle.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="section-label">Brand context</div>
+  <div class="panels">
+    <div class="panel">
+      <h2>Tenor brand inputs</h2>
+      <dl class="kv">
+        <dt>Voice</dt>
+        <dd>Confident not loud · informed not clinical · warm not bro-y · transparent · outcome-specific</dd>
+        <dt>No-go list</dt>
+        <dd>No "alpha / beast / dominate / crush / fight back / unleash" · no "boost your T" claims · no TRT replacement · no disease/cure language · no countdown urgency</dd>
+        <dt>Frame</dt>
+        <dd>"Drive Restoration Triad" — 3 systems (Leydig pathway, nitric oxide circulation, stress response). Tenor exists for the gap between a lab range and the man who wants his energy back.</dd>
+        <dt>Founder</dt>
+        <dd>Dr. Adam Reese, MD</dd>
+      </dl>
+    </div>
+
+    <div class="panel">
+      <h2>Real product specifics</h2>
+      <dl class="kv">
+        <dt>Ingredients</dt>
+        <dd>Tongkat Ali 400mg · Maca 250mg · L-Arginine 250mg · Ginseng-Eleutherococcus blend 125mg · Botanical matrix 745mg · Zinc (disclosed) · 21 active ingredients total, no proprietary blend</dd>
+        <dt>Offer</dt>
+        <dd>90-Day Supply: Save 52%, $35/mo, billed $105 every 90 days, free shipping, cancel anytime, $62 Welcome Kit</dd>
+        <dt>Guarantee</dt>
+        <dd>90-day empty-bottle guarantee — return even empty bottles for refund, keep the Welcome Kit</dd>
+        <dt>Proof</dt>
+        <dd>1,203-men survey: 94% sustained morning energy · 81% improved endurance · 87% more focused and present · 92% felt more like themselves</dd>
+        <dt>Ritual</dt>
+        <dd>2 capsules every morning</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="chip cadence"><span class="dot"></span>H · Habituation cadence (varied bullet/sentence shapes)</span>
+    <span class="chip disfluency"><span class="dot"></span>D · Managed disfluency (fragments, em-dashes, no-verb hits)</span>
+    <span class="chip readlevel"><span class="dot"></span>R · 6th-grade reading (jargon → plain verbs)</span>
+    <span class="chip voice"><span class="dot"></span>V · Brand voice / no-go swap</span>
+    <span class="chip factual"><span class="dot"></span>F · Factual integrity (real Tenor numbers/ingredients)</span>
+    <span class="chip staircase"><span class="dot"></span>S · Mobile staircase (line breaks as punctuation)</span>
+  </div>
+
+  <label class="toggle">
+    <input type="checkbox" id="hl" checked />
+    <span>Show technique highlights</span>
+  </label>
+
+  <div class="beats">
+
+    <!-- BEAT 1 — HOOK -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 1</span>
+        <span class="beat-name">Hook <small>— opening attention grab</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+The weight's coming off. But so is your testosterone. GLP-1 meds are incredible for dropping pounds.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+The weight's coming off.
+
+But so is <mark class="voice">your drive. Your energy. Your edge.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag voice">V</span> "your testosterone" → "your drive. Your energy. Your edge." — Tenor frames around vitality outcomes, not direct T claims (per "no boost your T" rule).</li>
+          <li><span class="tag disfluency">D</span> Single source sentence becomes a fragment cluster: noun. noun. noun. The brain has to land on each one separately.</li>
+          <li><span class="tag staircase">S</span> First two source sentences combined; "GLP-1 meds are incredible…" pushed into Beat 2 because that's the bridge function.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 2 — BRIDGE -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 2</span>
+        <span class="beat-name">Bridge / transition <small>— concede then pivot</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+Nobody's arguing that. But here's what your prescribing doctor probably didn't mention.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="readlevel">GLP-1s work.</mark> Nobody's arguing that.
+
+But here's what no one mentioned <mark class="readlevel">when you filled that prescription.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag readlevel">R</span> "GLP-1 meds are incredible for dropping pounds" (Beat 1 leftover) → "GLP-1s work." Three words. 6th-grade.</li>
+          <li><span class="tag readlevel">R</span> "your prescribing doctor probably didn't mention" → "no one mentioned when you filled that prescription" — same idea, simpler verb, more cinematic.</li>
+          <li><span class="tag staircase">S</span> Split into two beats with blank line between concession and pivot.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 3 — VILLAIN REVEAL -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 3</span>
+        <span class="beat-name">Villain reveal <small>— the hidden mechanism</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+Rapid weight loss triggers a massive cortisol spike.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="readlevel">Losing weight that fast sends your stress hormones through the roof.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag readlevel">R</span> "Rapid weight loss" → "Losing weight that fast." "Cortisol spike" → "stress hormones through the roof." Both clinical phrases swapped for the felt experience a 12-year-old understands.</li>
+          <li><span class="tag readlevel">R</span> Verb upgrade: "triggers" → "sends." Stronger action verb, plain language.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 4 — PAIN CONSEQUENCES -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 4</span>
+        <span class="beat-name">Pain consequences <small>— what the villain does to you</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+Cortisol tanks testosterone production at the source. Your body starts burning muscle for fuel instead of protecting it. Your energy craters. Your drive disappears. Your strength fades.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="disfluency">Your body stops protecting muscle. Starts burning it instead.</mark>
+
+The systems behind your energy, your focus, your physical drive <mark class="disfluency">— they don't slow down.</mark>
+
+<mark class="disfluency">They stall.</mark>
+
+You wake up lighter on the scale.
+
+And heavier everywhere else.
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag voice">V</span> Source's "Cortisol tanks testosterone production at the source" cut entirely — Tenor avoids direct "T production" cause-claims (compliance / no boost-your-T). The villain stays "stress + lost muscle" instead.</li>
+          <li><span class="tag disfluency">D</span> "Your body starts burning muscle for fuel instead of protecting it" rewritten as a two-fragment punch: "Your body stops protecting muscle. Starts burning it instead." Subject dropped on second clause for managed roughness.</li>
+          <li><span class="tag disfluency">D</span> Em-dash setup ("they don't slow down") → standalone one-line punch ("They stall.") — replaces the source's three flat parallel sentences ("Your energy craters. Your drive disappears. Your strength fades.")</li>
+          <li><span class="tag cadence">H</span> The source had three identically shaped sentences. The remix breaks pattern: paired fragment, em-dash setup, one-word resolution, then a couplet ("lighter on the scale / heavier everywhere else") for closure.</li>
+          <li><span class="tag staircase">S</span> Each idea gets its own line; blank lines separate the four conceptual moves.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 5 — REFRAME -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 5</span>
+        <span class="beat-name">Reframe / emotional pivot <small>— move blame, name the trade</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+You're thinner — but weaker, foggier, and running on fumes. That's not a win.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="disfluency">Thinner — but foggier. Weaker. Running on fumes.</mark>
+
+That's not progress. <mark class="voice">That's a trade you didn't agree to.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag disfluency">D</span> Subject "You're" dropped — fragment opener. Comma list broken into three fragments separated by periods. More percussive.</li>
+          <li><span class="tag voice">V</span> "That's not a win" → "That's not progress. That's a trade you didn't agree to." Tenor's warm voice moves blame off the reader (not "you failed") and names the unfairness directly. Closer to Tenor's "you're not weak, you're being drained" register from the skill's worked example.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 6 — PRODUCT BRIDGE -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 6</span>
+        <span class="beat-name">Product bridge <small>— hand-off to the brand</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+Mars Men was built to protect what GLP-1s are quietly destroying.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="voice">Tenor Daily Drive Essentials was built for this exact gap.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag voice">V</span> "protect what GLP-1s are quietly destroying" → "built for this exact gap." Tenor avoids combative "fight back / protect / destroy" framing. "The gap" echoes Dr. Adam Reese's founding line: "Tenor exists for the gap between a lab range and the man who wants his energy, drive, and presence back."</li>
+          <li><span class="tag factual">F</span> Brand name uses full product name on first reference (Daily Drive Essentials) per Tenor convention.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 7 — INGREDIENT BULLETS -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 7</span>
+        <span class="beat-name">Ingredient bullets <small>— what the product does, how</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+Tongkat Ali blocks the cortisol spike that crashes your T during rapid weight loss.
+
+Boron lowers SHBG so the testosterone you still have isn't locked up and useless. 8 clinically-dosed ingredients attacking the problem from every angle.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="factual">21 active ingredients</mark> supporting the three systems that slip when weight drops fast:
+
+<mark class="cadence">💊 Tongkat Ali (400mg)</mark> — supports the stress response that spikes during rapid weight loss
+
+<mark class="cadence">💊 Maca (250mg)</mark> — feeds steady energy and endurance so the crash doesn't follow the scale
+
+<mark class="cadence">💊 L-Arginine (250mg)</mark> — keeps circulation dialed in while your body adjusts
+
+Every dose on the label. No proprietary blend. Third-party tested.
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag factual">F</span> Mars Men's "8 clinically-dosed ingredients" → Tenor's "21 active ingredients." Source's Tongkat Ali (no dose) and Boron (no dose) → Tongkat Ali 400mg, Maca 250mg, L-Arginine 250mg — Tenor's actual ingredients at actual disclosed doses.</li>
+          <li><span class="tag voice">V</span> "Boron lowers SHBG" cut. Mechanism-specific testosterone claims (SHBG, aromatase) are off-limits per Tenor compliance. Replaced with system-level support language: stress response, energy/endurance, circulation — the Drive Restoration Triad's three systems.</li>
+          <li><span class="tag cadence">H</span> Three bullets, three different shapes:
+            <ul>
+              <li>Bullet 1: ingredient (dose) — supports [system] that [verb]s during [trigger]. Cause-effect shape.</li>
+              <li>Bullet 2: ingredient (dose) — feeds [outcome] and [outcome] so [consequence]. Compound consequence shape.</li>
+              <li>Bullet 3: ingredient (dose) — keeps [system] dialed in while [process]. Maintenance shape.</li>
+            </ul>
+          </li>
+          <li><span class="tag readlevel">R</span> "supports the stress response" / "feeds steady energy" / "keeps circulation dialed in" — every verb is on the skill's plain-language shortlist (supports, feeds, keeps).</li>
+          <li><span class="tag voice">V</span> Closing trio "Every dose on the label. No proprietary blend. Third-party tested." mirrors Tenor's transparency stack from the live page.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 8 — PROOF -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 8</span>
+        <span class="beat-name">Proof <small>— survey stats, social validation</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+This isn't theory. 91% of men in a 1,000-person survey reported higher energy within 90 days. 87% reported increased strength. Results backed by bloodwork, not promises.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+In a survey of <mark class="factual">1,203 men</mark>:
+
+<mark class="factual">94% reported sustained morning energy.</mark>
+<mark class="factual">87% felt more focused and present.</mark>
+<mark class="factual">92% said they felt more like themselves.</mark>
+
+Not from a stimulant. Not from a needle.
+
+Two capsules every morning.
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag factual">F</span> All Mars Men numbers swapped for Tenor's actual 1,203-men survey numbers (94% / 87% / 92%). Skipped the 81% endurance stat to keep three lines for cadence.</li>
+          <li><span class="tag voice">V</span> "Results backed by bloodwork, not promises" cut — Tenor doesn't claim bloodwork results without substantiation. Replaced with the brand's real differentiator stack: "Not from a stimulant. Not from a needle. Two capsules every morning." Mirrors live-page voice ("No prescription. No clinic. No needles.")</li>
+          <li><span class="tag cadence">H</span> Three stat lines stay parallel on purpose — that's a percussive triple, where parallel structure is the whole point.</li>
+          <li><span class="tag staircase">S</span> Each stat on its own line, blank line after the trio, then the negation couplet, then the ritual line.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 9 — OFFER -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 9</span>
+        <span class="beat-name">Offer <small>— price, terms, guarantee</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+Right now it's 50% off with a full 90-day money-back guarantee.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="factual">Save 52% on the 90-Day Supply — $35/mo, free shipping, cancel anytime.</mark>
+
+<mark class="factual">90-day empty-bottle guarantee.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag factual">F</span> "50% off" → "Save 52% on the 90-Day Supply." Tenor's actual price ($35/mo) and terms (free shipping, cancel anytime) added.</li>
+          <li><span class="tag factual">F</span> "money-back guarantee" → "empty-bottle guarantee" — Tenor's actual guarantee language; bigger differentiator (return even empty bottles).</li>
+          <li><span class="tag voice">V</span> "Right now" cut — avoids countdown urgency per Tenor compliance ("do not create countdown urgency or false scarcity").</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BEAT 10 — CLOSER -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">BEAT 10</span>
+        <span class="beat-name">Closer / CTA <small>— reason to click</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+Read the 10 reasons men on GLP-1s are adding this to their daily stack.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<mark class="voice">See why men on GLP-1s are adding this to their daily protocol.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag voice">V</span> "stack" → "protocol." Tenor uses "daily protocol" / "Daily Drive Essentials protocol" as its house word, not bro-supplement "stack."</li>
+          <li><span class="tag voice">V</span> "Read the 10 reasons" softened to "See why" — keeps the curiosity gap without committing to a specific 10-reasons lander format that Tenor may not have built yet.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- AUX FIELDS -->
+    <section class="beat">
+      <div class="beat-head">
+        <span class="beat-num">AUX</span>
+        <span class="beat-name">Title / CTA / Link description <small>— ad-unit metadata</small></span>
+      </div>
+      <div class="beat-cols">
+        <div class="col source">
+          <div class="col-label"><span class="src">SOURCE — MARS MEN</span></div>
+<strong>Title:</strong> What GLP-1 Does to Your T Levels
+
+<strong>CTA:</strong> Shop now
+
+<strong>Link description:</strong> Mars Men's clinical doses of Zinc (30mg) and Vitamin D (4,000 IU) signal your body to preserve lean mass while burning fat.
+        </div>
+        <div class="col remix">
+          <div class="col-label"><span class="rmx">REMIX — TENOR</span></div>
+<strong>Title:</strong> <mark class="voice">What GLP-1 Is Quietly Taking With the Weight</mark>
+
+<strong>CTA:</strong> <mark class="factual">Get The Protocol</mark>
+
+<strong>Link description:</strong> <mark class="factual">Tenor's 21 active ingredients at disclosed doses support the energy, drive, and focus that slip when weight drops fast. No proprietary blend. No prescription. No needle.</mark>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li><span class="tag voice">V</span> Title: "Your T Levels" → "Quietly Taking With the Weight." Curiosity gap intact, no direct T claim, calmer Tenor register.</li>
+          <li><span class="tag factual">F</span> CTA: "Shop now" → "Get The Protocol" — Tenor's live-page primary CTA copy.</li>
+          <li><span class="tag factual">F</span> Link description: Mars Men's specific zinc/vitamin D doses replaced with Tenor's "21 ingredients at disclosed doses" frame plus the "No prescription. No clinic. No needle." negation triple from Tenor's live page.</li>
+        </ul>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="summary">
+    <h2>Technique application — at-a-glance</h2>
+    <div class="grid">
+      <div>
+        <h3><span class="tag cadence">H</span> Habituation cadence</h3>
+        <p>Three ingredient bullets get three distinct shapes (cause-effect, compound-consequence, maintenance). Pain-consequence beat breaks the source's three flat parallel sentences with a paired fragment + em-dash + one-word resolution + closing couplet. Proof stat triple deliberately stays parallel because it's percussive.</p>
+      </div>
+      <div>
+        <h3><span class="tag disfluency">D</span> Managed disfluency</h3>
+        <p>Hook fragment cluster ("your drive. Your energy. Your edge."). Subject-drop on "Starts burning it instead." Em-dash setup → one-word punch ("They stall."). "Thinner — but foggier. Weaker." replaces the source's flowing comma list. Limited to roughly one move per beat — not every line.</p>
+      </div>
+      <div>
+        <h3><span class="tag readlevel">R</span> 6th-grade reading level</h3>
+        <p>"Cortisol spike" → "stress hormones through the roof." "Rapid weight loss" → "losing weight that fast." "Tanks testosterone production at the source" / "lowers SHBG" / "blocks the enzyme" — all clinical mechanism language cut entirely (also a compliance call). Verbs from skill shortlist: supports, feeds, keeps.</p>
+      </div>
+      <div>
+        <h3><span class="tag voice">V</span> Brand voice / no-go</h3>
+        <p>"Protect / fight back / destroy" → "built for this exact gap." "Win / not a win" → "trade you didn't agree to." "Stack" → "protocol." "Right now it's 50% off" → no countdown urgency. Direct T-production claims (cortisol→T, SHBG, aromatase) replaced with system-level support language (stress response, energy/endurance, circulation).</p>
+      </div>
+      <div>
+        <h3><span class="tag factual">F</span> Factual integrity</h3>
+        <p>Mars Men's 8 ingredients → Tenor's 21. Mars Men's 91%/87% from 1,000-person survey → Tenor's 94%/87%/92% from 1,203-men survey. "50% off / money-back" → "52% off / $35/mo / 90-day empty-bottle guarantee." Doses added: Tongkat Ali 400mg, Maca 250mg, L-Arginine 250mg. Zinc/Vitamin D doses from source link description deleted (not Tenor's hero ingredients in this angle).</p>
+      </div>
+      <div>
+        <h3><span class="tag staircase">S</span> Mobile staircase</h3>
+        <p>Single ideas on single lines, blank lines as punctuation between sections. Pain-consequence beat opens up from one dense paragraph in the source to five line-broken moves. Stat triple stays tight (no blank lines between them — percussive). Negation couplet stays tight ("Not from a stimulant. Not from a needle.").</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary" style="margin-top:14px;">
+    <h2>Open questions to verify before paid use</h2>
+    <ul style="margin:0; padding-left: 18px; font-size: 13px; color: var(--ink-soft);">
+      <li>Does Tenor have (or want) a GLP-1 specific landing page? Source ad pointed to <code>/pages/10-reasons-glp</code>. The closer "See why men on GLP-1s are adding this…" assumes a destination matching that angle.</li>
+      <li>The 1,203-men survey numbers (94/87/92) appear on the Tenor sales page but are flagged in <code>03-compliance.md</code> as requiring substantiation files before paid use. Confirm before launch.</li>
+      <li>"Save 52%" pricing math has to remain live at time of send.</li>
+      <li>Zinc dose intentionally not stated in body bullets due to the live-page conflict between summary (50mg) and table.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  document.getElementById('hl').addEventListener('change', function(e) {
+    document.body.classList.toggle('no-highlights', !e.target.checked);
+  });
+</script>
+</body>
+</html>

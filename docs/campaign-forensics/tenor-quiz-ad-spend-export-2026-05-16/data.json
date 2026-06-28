@@ -1,0 +1,1033 @@
+{
+  "campaign_id": "120246144705220293",
+  "since": "2026-05-14",
+  "until": "2026-05-16",
+  "rows": [
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705200293",
+      "ad_name": "ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee",
+      "spend": "83.76",
+      "impressions": "893",
+      "inline_link_clicks": "41",
+      "clicks": "47",
+      "ctr": "5.263158",
+      "cpc": "1.782128",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "429,576+ Men Took This 60-Second Test",
+        "body": "429,576+ men took this 60-second test.\n\nNot because of a slick ad. Because something they couldn't ignore showed up in their bloodwork.\n\nOne guy's doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn't explain.\n\nAnother spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: \"The bloodwork doesn't lie.\"\n\nThen there's the guy who walked away from TRT entirely \u2014 and came back six months later with higher numbers than he ever had on the needle.\n\nA 52-year-old who dropped 30 pounds says his wife can't keep her hands off him.\n\nThey all started in the same place: 60 seconds. 7 questions. Free.\n\nIt tells you where you actually stand \u2014 and which of the three hormones is hitting you hardest right now.\n\n\ud83d\udc49 Take the test.",
+        "description": "See why they did \u2014 and what showed up in their bloodwork after.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "a5af73f4f951239b256707b4db654ac0",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705200293_4-5_a5af73f4f9.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "23012f3c3e46570505ce67dd213472ea",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705200293_1-1_23012f3c3e.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "fdbf15eb1db955a405df74be03d8f7fc",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705200293_9-16_fdbf15eb1d.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705200293",
+        "ad_name": "ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee",
+        "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+        "spend": 83.74,
+        "link_clicks": 41,
+        "posthog_landed_sessions": 34,
+        "answered_any": 5,
+        "answered_any_rate_vs_landed": 0.147,
+        "answered_6plus": 3,
+        "full_completion": 1,
+        "completion_signal": 3,
+        "full_completion_rate_vs_landed": 0.029,
+        "completion_signal_rate_vs_landed": 0.088
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705180293",
+      "ad_name": "ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee",
+      "spend": "43.85",
+      "impressions": "622",
+      "inline_link_clicks": "24",
+      "clicks": "29",
+      "ctr": "4.662379",
+      "cpc": "1.512069",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "429,576+ Men Took This 60-Second Test",
+        "body": "429,576+ men took this 60-second test.\n\nNot because of a slick ad. Because something they couldn't ignore showed up in their bloodwork.\n\nOne guy's doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn't explain.\n\nAnother spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: \"The bloodwork doesn't lie.\"\n\nThen there's the guy who walked away from TRT entirely \u2014 and came back six months later with higher numbers than he ever had on the needle.\n\nA 52-year-old who dropped 30 pounds says his wife can't keep her hands off him.\n\nThey all started in the same place: 60 seconds. 7 questions. Free.\n\nIt tells you where you actually stand \u2014 and which of the three hormones is hitting you hardest right now.\n\n\ud83d\udc49 Take the test.",
+        "description": "See why they did \u2014 and what showed up in their bloodwork after.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "1b0ed3a7022894c1d1ab967b3355131e",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705180293_1-1_1b0ed3a702.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "04e3c47b24d8e81a9a5b635aa55748dc",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705180293_4-5_04e3c47b24.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "546074ff5dfa53d3f4223b4e8c379cb0",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705180293_9-16_546074ff5d.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705180293",
+        "ad_name": "ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee",
+        "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+        "spend": 43.85,
+        "link_clicks": 24,
+        "posthog_landed_sessions": 25,
+        "answered_any": 4,
+        "answered_any_rate_vs_landed": 0.16,
+        "answered_6plus": 4,
+        "full_completion": 4,
+        "completion_signal": 9,
+        "full_completion_rate_vs_landed": 0.16,
+        "completion_signal_rate_vs_landed": 0.36
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705060293",
+      "ad_name": "ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee",
+      "spend": "20.93",
+      "impressions": "160",
+      "inline_link_clicks": "7",
+      "clicks": "9",
+      "ctr": "5.625",
+      "cpc": "2.325556",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "429,576+ Men Took This 60-Second Test",
+        "body": "429,576+ men took this 60-second test.\n\nNot because of a slick ad. Because something they couldn't ignore showed up in their bloodwork.\n\nOne guy's doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn't explain.\n\nAnother spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: \"The bloodwork doesn't lie.\"\n\nThen there's the guy who walked away from TRT entirely \u2014 and came back six months later with higher numbers than he ever had on the needle.\n\nA 52-year-old who dropped 30 pounds says his wife can't keep her hands off him.\n\nThey all started in the same place: 60 seconds. 7 questions. Free.\n\nIt tells you where you actually stand \u2014 and which of the three hormones is hitting you hardest right now.\n\n\ud83d\udc49 Take the test.",
+        "description": "See why they did \u2014 and what showed up in their bloodwork after.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "f6910f30fd96528bb396534a6e4a4ddb",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705060293_9-16_f6910f30fd.jpg",
+          "width": 1024,
+          "height": 1824
+        },
+        {
+          "hash": "98a6e5888efc8539740ee94da68263d5",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705060293_1-1_98a6e5888e.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "bc0093ce800494a900b8f8434f16ad16",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705060293_4-5_bc0093ce80.jpg",
+          "width": 1024,
+          "height": 1280
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705060293",
+        "ad_name": "ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee",
+        "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+        "spend": 20.93,
+        "link_clicks": 7,
+        "posthog_landed_sessions": 5,
+        "answered_any": 1,
+        "answered_any_rate_vs_landed": 0.2,
+        "answered_6plus": 1,
+        "full_completion": 1,
+        "completion_signal": 1,
+        "full_completion_rate_vs_landed": 0.2,
+        "completion_signal_rate_vs_landed": 0.2
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705210293",
+      "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "ad_id": "120246144704940293",
+      "ad_name": "ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.",
+      "spend": "15.36",
+      "impressions": "157",
+      "inline_link_clicks": "4",
+      "clicks": "13",
+      "ctr": "8.280255",
+      "cpc": "1.181538",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "Why Your Grandfather Felt Better at 60 Than You Do at 35",
+        "body": "Your grandfather had more testosterone at 60 than you have at 35.\n\nHe didn't have:\n\n\u274c Plastics leaching estrogen into his drinking water\n\u274c Seed oils in everything he ate\n\u274c Blue light frying his hormones at 11 p.m.\n\u274c A phone glued to his hand from 6 a.m. to midnight\n\u274c A workweek powered by stress and caffeine\n\nYou do. Every day. For years.\n\nYou're not weak. You're not lazy. You're not \"just getting older.\"\n\nYou're surviving a modern life he never had to.\n\nAnd until you know where your T actually stands right now \u2014 not the \"normal range\" your doctor reads off a screen, but where YOU actually stand \u2014 every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.\n\n\ud83d\udc49 60-second test. Find out exactly what's hitting you hardest.",
+        "description": "60-second test to find out where yours actually stands.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "3868a723c53fdd026e72269aaa62d7d3",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144704940293_1-1_3868a723c5.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "83d6e92eb5e5a63b305316aff403cdaa",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144704940293_4-5_83d6e92eb5.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "59f52261b7d57d1eaf8a3251ab81734c",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144704940293_9-16_59f52261b7.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144704940293",
+        "ad_name": "ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.",
+        "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+        "spend": 15.36,
+        "link_clicks": 4,
+        "posthog_landed_sessions": 4,
+        "answered_any": 1,
+        "answered_any_rate_vs_landed": 0.25,
+        "answered_6plus": 1,
+        "full_completion": 1,
+        "completion_signal": 1,
+        "full_completion_rate_vs_landed": 0.25,
+        "completion_signal_rate_vs_landed": 0.25
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705040293",
+      "ad_name": "ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee",
+      "spend": "7.79",
+      "impressions": "152",
+      "inline_link_clicks": "5",
+      "clicks": "5",
+      "ctr": "3.289474",
+      "cpc": "1.558",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "429,576+ Men Took This 60-Second Test",
+        "body": "429,576+ men took this 60-second test.\n\nNot because of a slick ad. Because something they couldn't ignore showed up in their bloodwork.\n\nOne guy's doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn't explain.\n\nAnother spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: \"The bloodwork doesn't lie.\"\n\nThen there's the guy who walked away from TRT entirely \u2014 and came back six months later with higher numbers than he ever had on the needle.\n\nA 52-year-old who dropped 30 pounds says his wife can't keep her hands off him.\n\nThey all started in the same place: 60 seconds. 7 questions. Free.\n\nIt tells you where you actually stand \u2014 and which of the three hormones is hitting you hardest right now.\n\n\ud83d\udc49 Take the test.",
+        "description": "See why they did \u2014 and what showed up in their bloodwork after.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "fa09a6ade5eb8704d2e54c3c60acbf78",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705040293_1-1_fa09a6ade5.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "71ef2acf59d8bd64af327234a7a9fbc2",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705040293_4-5_71ef2acf59.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "1f4a57b42b800ddce3bc34c269e65bce",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705040293_9-16_1f4a57b42b.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705040293",
+        "ad_name": "ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee",
+        "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+        "spend": 7.79,
+        "link_clicks": 5,
+        "posthog_landed_sessions": 4,
+        "answered_any": 0,
+        "answered_any_rate_vs_landed": 0.0,
+        "answered_6plus": 0,
+        "full_completion": 0,
+        "completion_signal": 3,
+        "full_completion_rate_vs_landed": 0.0,
+        "completion_signal_rate_vs_landed": 0.75
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705250293",
+      "ad_name": "ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee",
+      "spend": "3.75",
+      "impressions": "61",
+      "inline_link_clicks": "1",
+      "clicks": "1",
+      "ctr": "1.639344",
+      "cpc": "3.75",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "52% Off + 90-Day Guarantee",
+        "body": "810,000+ men didn't start Tenor because of a slick ad.\n\nThey started because something changed.\n\nOne man's wife told him he seemed \"more there\" after three weeks. Another tried a dozen supplements \u2014 spent hundreds \u2014 before finding the one that actually made his mornings feel different. His words: \"The energy felt clean, not forced.\"\n\nThen there's the guy who walked away from the clinic entirely. Or the 52-year-old who says his afternoons don't crash anymore and his workouts feel purposeful again.\n\nThese aren't cherry-picked outliers. In a survey of 1,203 customers:\n\n\u2192 94% reported sustained morning energy\n\n\u2192 81% noticed improved endurance\n\n\u2192 87% felt more focused and present\n\n\u2192 92% said they felt more like themselves\n\nThe protocol: 21 active ingredients at disclosed doses supporting your drive from three angles \u2014 healthy hormone pathways (Tongkat Ali, Zinc, Boron), circulation and stamina (L-Arginine, Maca), and stress response (Ginseng-Eleutherococcus, adaptogens).\n\nEvery batch third-party tested. cGMP certified. Made in the USA.\n\nGet your 30-day supply for $44 at 52% off. Includes a 90-day guarantee. No risk. Just results or a full refund.",
+        "description": "-",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "b079c60befed2420cc6295c027aa9440",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705250293_1-1_b079c60bef.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "d157556c93c2efef52e5250712c154a0",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705250293_4-5_d157556c93.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "c6039c0f1b555b066827e630caf2e2b5",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705250293_9-16_c6039c0f1b.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705250293",
+        "ad_name": "ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee",
+        "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+        "spend": 3.75,
+        "link_clicks": 1,
+        "posthog_landed_sessions": 1,
+        "answered_any": 0,
+        "answered_any_rate_vs_landed": 0.0,
+        "answered_6plus": 0,
+        "full_completion": 0,
+        "completion_signal": 0,
+        "full_completion_rate_vs_landed": 0.0,
+        "completion_signal_rate_vs_landed": 0.0
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705210293",
+      "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "ad_id": "120246144705260293",
+      "ad_name": "ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.",
+      "spend": "3.28",
+      "impressions": "134",
+      "inline_link_clicks": "3",
+      "clicks": "2",
+      "ctr": "1.492537",
+      "cpc": "1.64",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "Why Your Grandfather Felt Better at 60 Than You Do at 35",
+        "body": "Your grandfather had more testosterone at 60 than you have at 35.\n\nHe didn't have:\n\n\u274c Plastics leaching estrogen into his drinking water\n\u274c Seed oils in everything he ate\n\u274c Blue light frying his hormones at 11 p.m.\n\u274c A phone glued to his hand from 6 a.m. to midnight\n\u274c A workweek powered by stress and caffeine\n\nYou do. Every day. For years.\n\nYou're not weak. You're not lazy. You're not \"just getting older.\"\n\nYou're surviving a modern life he never had to.\n\nAnd until you know where your T actually stands right now \u2014 not the \"normal range\" your doctor reads off a screen, but where YOU actually stand \u2014 every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.\n\n\ud83d\udc49 60-second test. Find out exactly what's hitting you hardest.",
+        "description": "60-second test to find out where yours actually stands.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "9edb06a4c864ee148e61f0b3af4bc7f8",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705260293_1-1_9edb06a4c8.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "7749456ad03b7e6c65f98d0d898a6118",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705260293_4-5_7749456ad0.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "ea942c7da375530a903ded29d3e00615",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705260293_9-16_ea942c7da3.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705260293",
+        "ad_name": "ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.",
+        "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+        "spend": 3.28,
+        "link_clicks": 3,
+        "posthog_landed_sessions": 3,
+        "answered_any": 1,
+        "answered_any_rate_vs_landed": 0.333,
+        "answered_6plus": 1,
+        "full_completion": 0,
+        "completion_signal": 0,
+        "full_completion_rate_vs_landed": 0.0,
+        "completion_signal_rate_vs_landed": 0.0
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705190293",
+      "ad_name": "ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "3.04",
+      "impressions": "50",
+      "inline_link_clicks": "2",
+      "clicks": "2",
+      "ctr": "4",
+      "cpc": "1.52",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "The \"Moobs\" Are Telling You Something",
+        "body": "The soft spot on your chest.\n\nThe roll over your belt.\n\nThe pec definition that's been \"almost back\" for two years and never quite gets there.\n\nHere's what most men miss:\n\nIt's not pizza. It's not skipping chest day. It's not a willpower problem.\n\nIt's a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn't fix itself with another set of bench presses.\n\nYour body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can't even use it.\n\nThree systems. All working against you. Crunches won't fix that. Neither will another crash diet.\n\n\ud83d\udc49 60-second test. Find out exactly which system is hitting you hardest \u2014 and where to actually start.",
+        "description": "60-second test reveals what's actually causing them.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "d338f4113914b2d128aba4c61a28b10c",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705190293_4-5_d338f41139.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "1abdeaf22b7ffbfd7acae6860fb456ac",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705190293_1-1_1abdeaf22b.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "754a85c4d54b03523ef622a400034c04",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705190293_9-16_754a85c4d5.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705190293",
+        "ad_name": "ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer",
+        "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+        "spend": 3.04,
+        "link_clicks": 2,
+        "posthog_landed_sessions": 2,
+        "answered_any": 0,
+        "answered_any_rate_vs_landed": 0.0,
+        "answered_6plus": 0,
+        "full_completion": 0,
+        "completion_signal": 1,
+        "full_completion_rate_vs_landed": 0.0,
+        "completion_signal_rate_vs_landed": 0.5
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705020293",
+      "ad_name": "ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "2.47",
+      "impressions": "42",
+      "inline_link_clicks": "0",
+      "clicks": "0",
+      "ctr": "0",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "52% Off Limited-Time Welcome Offer",
+        "body": "SAVE 52% + $35 WELCOME KIT VALUE\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence \u2014 naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol \u2014 start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.",
+        "description": "\u2705 90-Day Guarantee",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "e530ae6f91681abef015198d2210d55e",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705020293_1-1_e530ae6f91.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "7dda1ab09ef88e0446b1b6b228c21e1e",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705020293_4-5_7dda1ab09e.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "1c8443a6930e1a9841f875c0518791b9",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705020293_9-16_1c8443a693.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705020293",
+        "ad_name": "ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer",
+        "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+        "spend": 2.47,
+        "link_clicks": 0,
+        "posthog_landed_sessions": 0,
+        "answered_any": 0,
+        "answered_any_rate_vs_landed": null,
+        "answered_6plus": 0,
+        "full_completion": 0,
+        "completion_signal": 0,
+        "full_completion_rate_vs_landed": null,
+        "completion_signal_rate_vs_landed": null
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705210293",
+      "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "ad_id": "120246144705230293",
+      "ad_name": "ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "2.12",
+      "impressions": "59",
+      "inline_link_clicks": "3",
+      "clicks": "4",
+      "ctr": "6.779661",
+      "cpc": "0.53",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "3 Hormones Are Stealing Your Testosterone Right Now",
+        "body": "Your testosterone is dropping right now.\n\nNot next year. Not \"eventually.\" This minute. While you're scrolling.\n\nThree thieves are running the heist:\n\nOne converts the T you make into estrogen.\nOne locks up what's left so your body can't even use it.\nOne \u2014 cortisol, from work stress, bad sleep, modern life \u2014 tanks production at the source.\n\nThat brain fog at 2 p.m.? The gut that won't budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?\n\nThat's not laziness. That's the heist.\n\nAnd it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.\n\nMost men can't tell you which thief is hitting them hardest \u2014 so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.\n\n\ud83d\udc49 60-second test. Find out which thief is hitting you hardest \u2014 and where to actually start.",
+        "description": "60-second test reveals which one is hitting you hardest.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "cfc77f7db7b654a9d916901f928729b9",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705230293_1-1_cfc77f7db7.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "19551461dd9d562f61f39c6b5391f96e",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705230293_4-5_19551461dd.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "f57c9edb32f0615dd85d27c8485235a5",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705230293_9-16_f57c9edb32.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": {
+        "ad_id": "120246144705230293",
+        "ad_name": "ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer",
+        "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+        "spend": 2.12,
+        "link_clicks": 3,
+        "posthog_landed_sessions": 3,
+        "answered_any": 0,
+        "answered_any_rate_vs_landed": 0.0,
+        "answered_6plus": 0,
+        "full_completion": 0,
+        "completion_signal": 2,
+        "full_completion_rate_vs_landed": 0.0,
+        "completion_signal_rate_vs_landed": 0.667
+      }
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705210293",
+      "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "ad_id": "120246144705240293",
+      "ad_name": "ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "2.05",
+      "impressions": "31",
+      "inline_link_clicks": "2",
+      "clicks": "0",
+      "ctr": "0",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "3 Hormones Are Stealing Your Testosterone Right Now",
+        "body": "Your testosterone is dropping right now.\n\nNot next year. Not \"eventually.\" This minute. While you're scrolling.\n\nThree thieves are running the heist:\n\nOne converts the T you make into estrogen.\nOne locks up what's left so your body can't even use it.\nOne \u2014 cortisol, from work stress, bad sleep, modern life \u2014 tanks production at the source.\n\nThat brain fog at 2 p.m.? The gut that won't budge no matter what you eat? The fact that scrolling your phone is the most exciting part of your evening?\n\nThat's not laziness. That's the heist.\n\nAnd it compounds. Every month you wait, more gets stolen. Less gets made. The gap widens.\n\nMost men can't tell you which thief is hitting them hardest \u2014 so they spend years chasing the wrong one. More reps. Cleaner diet. Another supplement with a hidden formula.\n\n\ud83d\udc49 60-second test. Find out which thief is hitting you hardest \u2014 and where to actually start.",
+        "description": "60-second test reveals which one is hitting you hardest.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "a4009010a20922418517335792b65916",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705240293_1-1_a4009010a2.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "6ed73b9c6b12788ccf912de885b2fb7c",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705240293_4-5_6ed73b9c6b.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "e2526548bf95b0e8bb20f5c97dcbab07",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705240293_9-16_e2526548bf.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705210293",
+      "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "ad_id": "120246144705160293",
+      "ad_name": "ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.",
+      "spend": "0.93",
+      "impressions": "36",
+      "inline_link_clicks": "1",
+      "clicks": "1",
+      "ctr": "2.777778",
+      "cpc": "0.93",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "Eat Clean, Train Hard, Still Crashing at 2 p.m.?",
+        "body": "You eat clean.\nYou train hard.\nYou don't drink like you used to.\n\nAnd you're STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you're dragging an extra body across the gym floor.\n\nThis isn't motivation. It isn't willpower. It isn't \"I need to try harder.\"\n\nIt's your testosterone \u2014 quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.\n\nT drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence \u2014 and any feeling that your body is actually responding to the work you're putting in.\n\nMost men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that's actually draining.\n\n\ud83d\udc49 60-second test. Find out where you actually stand \u2014 and what's behind the crash.",
+        "description": "60-second test reveals what's actually behind it.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "0b580bfbe7b89c9042d2df71261a6e31",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705160293_1-1_0b580bfbe7.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "0974257beae9eccd0afcb1eb549feb97",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705160293_4-5_0974257bea.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "e38777a34011f9550a90c1bc16e06d8c",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705160293_9-16_e38777a340.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705050293",
+      "ad_name": "ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee",
+      "spend": "0.49",
+      "impressions": "6",
+      "inline_link_clicks": "2",
+      "clicks": "3",
+      "ctr": "50",
+      "cpc": "0.163333",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "429,576+ Men Took This 60-Second Test",
+        "body": "429,576+ men took this 60-second test.\n\nNot because of a slick ad. Because something they couldn't ignore showed up in their bloodwork.\n\nOne guy's doctor told him nothing natural would work. Sixty days later, that same doctor was staring at lab results he couldn't explain.\n\nAnother spent two years and hundreds of dollars on supplements with hidden formulas before finding the one his blood panel actually responded to. His words: \"The bloodwork doesn't lie.\"\n\nThen there's the guy who walked away from TRT entirely \u2014 and came back six months later with higher numbers than he ever had on the needle.\n\nA 52-year-old who dropped 30 pounds says his wife can't keep her hands off him.\n\nThey all started in the same place: 60 seconds. 7 questions. Free.\n\nIt tells you where you actually stand \u2014 and which of the three hormones is hitting you hardest right now.\n\n\ud83d\udc49 Take the test.",
+        "description": "See why they did \u2014 and what showed up in their bloodwork after.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "c2710440bd08f4880fb8a8340ead3a02",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705050293_1-1_c2710440bd.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "92fd291fe5a9dbc47216835289f244aa",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705050293_4-5_92fd291fe5.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "910c5e3124cff95b5daf0fe27a9da246",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705050293_9-16_910c5e3124.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705170293",
+      "ad_name": "ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "0.37",
+      "impressions": "7",
+      "inline_link_clicks": "0",
+      "clicks": "0",
+      "ctr": "0",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "The \"Moobs\" Are Telling You Something",
+        "body": "The soft spot on your chest.\n\nThe roll over your belt.\n\nThe pec definition that's been \"almost back\" for two years and never quite gets there.\n\nHere's what most men miss:\n\nIt's not pizza. It's not skipping chest day. It's not a willpower problem.\n\nIt's a visible symptom of a hormone imbalance affecting millions of men your age. And it doesn't fix itself with another set of bench presses.\n\nYour body is running a 24/7 sabotage operation on your physique. Cortisol tells it to store fat around your middle. An enzyme converts your T into estrogen. And whatever T you have left? Locked up. Your muscles can't even use it.\n\nThree systems. All working against you. Crunches won't fix that. Neither will another crash diet.\n\n\ud83d\udc49 60-second test. Find out exactly which system is hitting you hardest \u2014 and where to actually start.",
+        "description": "60-second test reveals what's actually causing them.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "526f8ebde11de28f57ff8ebef61a1ab4",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705170293_4-5_526f8ebde1.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "562bed44c39b1356c49589afce0738f8",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705170293_1-1_562bed44c3.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "70f77e606f94eeeef4743741d699a00e",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705170293_9-16_70f77e606f.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705210293",
+      "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "ad_id": "120246144705270293",
+      "ad_name": "ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today.",
+      "spend": "0.22",
+      "impressions": "12",
+      "inline_link_clicks": "1",
+      "clicks": "2",
+      "ctr": "16.666667",
+      "cpc": "0.11",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "Eat Clean, Train Hard, Still Crashing at 2 p.m.?",
+        "body": "You eat clean.\nYou train hard.\nYou don't drink like you used to.\n\nAnd you're STILL ready to put your head on your desk at 2 p.m. STILL gaining weight around the middle. STILL feel like you're dragging an extra body across the gym floor.\n\nThis isn't motivation. It isn't willpower. It isn't \"I need to try harder.\"\n\nIt's your testosterone \u2014 quietly tanking since you turned 30. And every cup of coffee is just papering over the real problem.\n\nT drops slowly at first. Then faster. And it robs you of energy, drive, strength, confidence \u2014 and any feeling that your body is actually responding to the work you're putting in.\n\nMost men spend years chasing the wrong fix. Cleaner diet. Another reset Monday. Another bottle of pills with a hidden formula. Nothing touches the hormone that's actually draining.\n\n\ud83d\udc49 60-second test. Find out where you actually stand \u2014 and what's behind the crash.",
+        "description": "60-second test reveals what's actually behind it.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "65e70bda166047687429057f1177a7e9",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705270293_4-5_65e70bda16.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "d249bcf02da4bd36a7cc0f0c969fefe7",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705270293_1-1_d249bcf02d.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "8719d73401fc4fc9fb301a77b3892d8f",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705270293_9-16_8719d73401.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705010293",
+      "ad_name": "ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "0.04",
+      "impressions": "8",
+      "inline_link_clicks": "0",
+      "clicks": "0",
+      "ctr": "0",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "Your Stress Is Eating Your Testosterone Alive",
+        "body": "Your stress is eating your testosterone alive.\n\nEvery deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every \"I'm fine, I just need a minute.\"\n\nYour body responds the same way every time \u2014 it floods you with cortisol.\n\nAnd here's what nobody tells you:\n\nCortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It's not a theory. It's basic endocrinology.\n\nSo that gut you can't lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?\n\nThat's not aging. That's cortisol winning.\n\nAnd every month you don't fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.\n\n\ud83d\udc49 60-second test. Find out where you actually stand \u2014 and which hormone is calling the shots in your body right now.",
+        "description": "60-second test reveals which hormone is calling the shots.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "89d5c6473e2e756c8625b3c31c260cee",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705010293_1-1_89d5c6473e.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "daf02c8aff6250b12af345d4db823b7c",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705010293_4-5_daf02c8aff.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "55fd924abe0e4800f7192724d8a3b5c1",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705010293_9-16_55fd924abe.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705080293",
+      "ad_name": "ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "0.02",
+      "impressions": "3",
+      "inline_link_clicks": "0",
+      "clicks": "0",
+      "ctr": "0",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "Your Stress Is Eating Your Testosterone Alive",
+        "body": "Your stress is eating your testosterone alive.\n\nEvery deadline. Every bad night of sleep. Every argument you swallowed instead of had. Every \"I'm fine, I just need a minute.\"\n\nYour body responds the same way every time \u2014 it floods you with cortisol.\n\nAnd here's what nobody tells you:\n\nCortisol and testosterone sit on a seesaw. When one goes up, the other crashes down. It's not a theory. It's basic endocrinology.\n\nSo that gut you can't lose? The brain fog at 2 p.m.? The fact that your wife has to ask you three times before you get off the couch?\n\nThat's not aging. That's cortisol winning.\n\nAnd every month you don't fight back, the gap gets wider. More cortisol. Less T. More fat. More fog. Less you.\n\n\ud83d\udc49 60-second test. Find out where you actually stand \u2014 and which hormone is calling the shots in your body right now.",
+        "description": "60-second test reveals which hormone is calling the shots.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "288ae9dc764e171a4edf67913438349c",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705080293_1-1_288ae9dc76.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "10d96ed47f264830d4576d5ab4e68d0d",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705080293_9-16_10d96ed47f.jpg",
+          "width": 1024,
+          "height": 1824
+        },
+        {
+          "hash": "0bfb4aa12b270388d27ae2b1e8cd7b32",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705080293_4-5_0bfb4aa12b.jpg",
+          "width": 1024,
+          "height": 1280
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705210293",
+      "adset_name": "Concept 4 - Quiz Daily Decline / System Problem",
+      "ad_id": "120246144704930293",
+      "ad_name": "ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.",
+      "spend": "0",
+      "impressions": "4",
+      "inline_link_clicks": "0",
+      "clicks": "0",
+      "ctr": "0",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "Why Your Grandfather Felt Better at 60 Than You Do at 35",
+        "body": "Your grandfather had more testosterone at 60 than you have at 35.\n\nHe didn't have:\n\n\u274c Plastics leaching estrogen into his drinking water\n\u274c Seed oils in everything he ate\n\u274c Blue light frying his hormones at 11 p.m.\n\u274c A phone glued to his hand from 6 a.m. to midnight\n\u274c A workweek powered by stress and caffeine\n\nYou do. Every day. For years.\n\nYou're not weak. You're not lazy. You're not \"just getting older.\"\n\nYou're surviving a modern life he never had to.\n\nAnd until you know where your T actually stands right now \u2014 not the \"normal range\" your doctor reads off a screen, but where YOU actually stand \u2014 every fix is a guess. More reps. Cleaner diet. Another supplement with a hidden formula. Nothing moves.\n\n\ud83d\udc49 60-second test. Find out exactly what's hitting you hardest.",
+        "description": "60-second test to find out where yours actually stands.",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "82e4f5317c98e5bd3aa8dd86886775fa",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144704930293_1-1_82e4f5317c.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "ad4d69c40530edb19d82aed939bc811f",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144704930293_4-5_ad4d69c405.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "1a2bf474df72a7c21047695d0fa88ed3",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144704930293_9-16_1a2bf474df.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    },
+    {
+      "campaign_id": "120246144705220293",
+      "campaign_name": "Tenor - GLP + Quiz - Problem-Aware Swipe Expansion - 2026-05-08 - Clean Review - Copy 4",
+      "adset_id": "120246144705150293",
+      "adset_name": "Concept 5 - Quiz Offer / Proof / Guarantee",
+      "ad_id": "120246144705030293",
+      "ad_name": "ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer",
+      "spend": "0",
+      "impressions": "10",
+      "inline_link_clicks": "0",
+      "clicks": "0",
+      "ctr": "0",
+      "date_start": "2026-05-14",
+      "date_stop": "2026-05-16",
+      "copy": {
+        "title": "52% Off Limited-Time Welcome Offer",
+        "body": "SAVE 52% + $35 WELCOME KIT VALUE\n\n21 active ingredients. Disclosed doses. Third-party tested.\n\nSee how Tenor Daily Drive Essentials is helping men support steady energy, drive, and presence \u2014 naturally.\n\nTwo capsules every morning. No prescription. No clinic. No needles.\n\nGet The Protocol \u2014 start your 30-day supply for $44 at 52% off and receive a $35 Welcome Kit value.",
+        "description": "\u2705 90-Day Guarantee",
+        "link": "https://shoptenorco.com/8b89a76d/testosterone-support/quiz",
+        "cta": "LEARN_MORE"
+      },
+      "image_assets": [
+        {
+          "hash": "b5d4c50df6de37f17a540537279bf762",
+          "aspect": "1:1",
+          "local_path": "assets/images/120246144705030293_1-1_b5d4c50df6.jpg",
+          "width": 1024,
+          "height": 1024
+        },
+        {
+          "hash": "c7a8a693732cfdba4605b5b2638790b3",
+          "aspect": "4:5",
+          "local_path": "assets/images/120246144705030293_4-5_c7a8a69373.jpg",
+          "width": 1024,
+          "height": 1280
+        },
+        {
+          "hash": "f5c4ee720555e47513cc14bf3cb1f032",
+          "aspect": "9:16",
+          "local_path": "assets/images/120246144705030293_9-16_f5c4ee7205.jpg",
+          "width": 1024,
+          "height": 1824
+        }
+      ],
+      "posthog_overlay": null
+    }
+  ]
+}

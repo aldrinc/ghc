@@ -1,0 +1,49 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "retrofit",
+  "created_at": "2026-05-22T16:46:00Z",
+  "daliogoals_skill_loaded": true,
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user asked to complete implementation if incomplete. Backend and Postiz ownership boundaries were already established; the missing slice was the low-risk frontend operator surface and proof loop.",
+  "owner": "Codex / Aldrin",
+  "review_date": "2026-05-22",
+  "stop_condition": "Targeted frontend test, frontend build, Chrome local end-to-end flow, backend tests, compile check, migration head check, Postiz ownership guard, source manifest verification, lane proof, plan gate proof, dashboard, and planctl verification pass.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "plan-gate.md",
+      "summary": "Goal is to make Connected Social Agents and TikTok Carousel Agent usable from MOS without moving posting ownership out of Postiz."
+    },
+    "problem_log": {
+      "path": "plan-gate.md",
+      "summary": "Problem was missing operator UI over already-added backend primitives."
+    },
+    "root_cause_diagnosis": {
+      "path": "plan-gate.md",
+      "summary": "Root cause was a backend-only first pass with no approval-gated operator surface."
+    },
+    "current_machine": {
+      "path": "plan-gate.md",
+      "summary": "Current machine had APIs and Postiz settings but no Social Agents workbench."
+    },
+    "designed_machine": {
+      "path": "plan-gate.md",
+      "summary": "Designed machine adds a Social Agents execution page for readiness, carousel drafting, approvals, handoff proposals, connected assets, and action queue review."
+    },
+    "worst_day_test": {
+      "path": "plan-gate.md",
+      "summary": "Worst-day cases cover no workspace, no channels, unapproved variants, missing conversion source, and pending action proposals."
+    },
+    "leading_lagging_metrics": {
+      "path": "plan-gate.md",
+      "summary": "Metrics track growth programs, variants, approvals, handoffs, action approvals, and downstream conversion attribution."
+    },
+    "owner_date_review": {
+      "path": "plan-gate.md",
+      "summary": "Owner/date/review point captured for the live OAuth/provider sync and executor pass."
+    },
+    "stop_condition": {
+      "path": "plan-gate.md",
+      "summary": "Stop condition requires Chrome local flow and all verification/proof gates to pass."
+    }
+  }
+}

@@ -1,0 +1,354 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "rebase-local-changes-audit-2026-05-20",
+  "created_at": "2026-05-20T16:14:52.484743+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/rebase-local-changes-audit-2026-05-20.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Snapshot the current dirty state before changing git state.",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-pre-status.txt",
+        "proof_pack/rebase-pre-diff-stat.txt",
+        "proof_pack/rebase-pre-cached-diff-stat.txt",
+        "proof_pack/rebase-pre-ahead-behind.txt",
+        "proof_pack/rebase-pre-untracked-mos.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "Create a code-only safety stash containing tracked edits and untracked real code under `mos/**`.",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-code-pathspec.txt",
+        "proof_pack/rebase-code-stash-name-status.txt",
+        "proof_pack/rebase-code-stash-stat.txt"
+      ],
+      "notes": "Created stash@{1}: codex-code-only-before-main-rebase-2026-05-20."
+    },
+    {
+      "id": "P03",
+      "objective": "Rebase the branch onto `origin/main`.",
+      "source_line": 11,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [
+        "git rev-list --left-right --count HEAD...origin/main"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-ahead-behind.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "Reapply the code-only stash and resolve blockers if they appear.",
+      "source_line": 12,
+      "status": "blocked",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-conflicted-paths.txt",
+        "proof_pack/rebase-code-stash-name-status.txt",
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "notes": "Global stash apply produced 30 conflicted files against newer main. Worktree was cleared back to rebased HEAD for those files while retaining stash@{1} for slice-by-slice merge."
+    },
+    {
+      "id": "P05",
+      "objective": "Audit the resulting worktree and classify code changes versus artifacts.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-tracked-files.txt",
+        "proof_pack/rebase-post-untracked-mos.txt",
+        "proof_pack/rebase-post-diff-stat.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "objective": "Produce the final decision queue with validation status.",
+      "source_line": 14,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "Branch is no longer behind `origin/main`.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [
+        "git rev-list --left-right --count HEAD...origin/main"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-ahead-behind.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P08",
+      "objective": "Real code changes are present after rebase.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-tracked-files.txt",
+        "proof_pack/rebase-post-untracked-mos.txt"
+      ],
+      "notes": "27 tracked files plus untracked migration/import code remain available for review; conflict-heavy slices retained in stash@{1}."
+    },
+    {
+      "id": "P09",
+      "objective": "Artifact directories are not intentionally staged or committed.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-status-no-untracked.txt",
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "notes": "No staging remains. Artifact directories are untracked; .local is ignored by current main; outputs remains unignored noise."
+    },
+    {
+      "id": "P10",
+      "objective": "`git diff --check` passes.",
+      "source_line": 21,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [
+        "git diff --check"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-diff-check.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P11",
+      "objective": "Final report names blockers, if any.",
+      "source_line": 22,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P12",
+      "objective": "`git rev-list --left-right --count HEAD...origin/main`",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [
+        "git rev-list --left-right --count HEAD...origin/main"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-ahead-behind.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P13",
+      "objective": "`git status --short --branch --untracked-files=no`",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [
+        "git status --short --branch --untracked-files=no"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-status-no-untracked.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P14",
+      "objective": "`git diff --check`",
+      "source_line": 28,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/rebase-decision-queue.md"
+      ],
+      "acceptance": [
+        "See global acceptance and proof artifacts."
+      ],
+      "verify_commands": [
+        "git diff --check"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/rebase-post-diff-check.txt"
+      ],
+      "notes": ""
+    }
+  ],
+  "global_verify_commands": [
+    "git rev-list --left-right --count HEAD...origin/main",
+    "git status --short --branch --untracked-files=no",
+    "git diff --check"
+  ],
+  "global_acceptance": [
+    "Branch is 0 ahead / 0 behind origin/main after rebase.",
+    "No unmerged files remain.",
+    "Code-only stash is retained for protected conflict slices.",
+    "Post-rebase tracked and untracked code audit artifacts exist.",
+    "git diff --check passes."
+  ]
+}

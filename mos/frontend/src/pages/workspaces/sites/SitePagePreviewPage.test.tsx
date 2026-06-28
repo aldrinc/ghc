@@ -130,6 +130,9 @@ vi.mock("@/components/ui/badge", () => ({
 
 vi.mock("@/funnels/puckConfig", () => ({
   createFunnelPuckConfig: () => ({}),
+}));
+
+vi.mock("@/funnels/funnelRuntime", () => ({
   FunnelRuntimeProvider: ({ children, value }: { children: ReactNode; value: unknown }) => {
     mockFunnelRuntimeProvider(value);
     return <>{children}</>;

@@ -1,0 +1,96 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Native sub-agents were not needed; the work had one write lane and several local read/verify lanes. Local parallel tool calls were sufficient without increasing token spend.",
+  "lanes": [
+    {
+      "lane_id": "implementation",
+      "objective": "Add Step 01 provider config, DeerFlow sidecar wrapper, activity routing, and tests.",
+      "role": "main_thread",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-21T19:20:00Z",
+      "ended_at": "2026-05-21T19:38:00Z",
+      "read_scope": [
+        "mos/backend/app/config.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/backend/tests"
+      ],
+      "write_scope": [
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example",
+        "mos/backend/app/services/deerflow_foundational.py",
+        "mos/backend/scripts/run_deerflow_foundational_step.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/backend/tests/test_strategy_v2_foundational_step01_provider.py",
+        "mos/backend/tests/test_config_env_precedence.py"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/services/deerflow_foundational.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/scripts/run_deerflow_foundational_step.py",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/backend/tests/test_strategy_v2_foundational_step01_provider.py"
+      ],
+      "summary": "Implemented DeerFlow as the default provider for foundational Step 01 and preserved explicit GPT override."
+    },
+    {
+      "lane_id": "cost",
+      "objective": "Calculate run cost from DeerFlow usage metadata and verified pricing sources.",
+      "role": "local proof tooling",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-21T19:38:00Z",
+      "ended_at": "2026-05-21T19:44:00Z",
+      "read_scope": [
+        "proof_pack/deerflow-step01-1to1-2026-05-21/outputs/deerflow-dsv4-step01-run.meta.json",
+        "https://api-docs.deepseek.com/quick_start/pricing",
+        "https://serper.dev/",
+        "https://jina.ai/en-US/reader/"
+      ],
+      "write_scope": [
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/run-cost.md",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/sources/pricing"
+      ],
+      "artifacts": [
+        "run-cost.md",
+        "sources/pricing/source_manifest.json"
+      ],
+      "summary": "Calculated measured total at $0.0816 and conservative no-cache bound at $0.3492."
+    },
+    {
+      "lane_id": "verification",
+      "objective": "Run compile, lint, direct assertions, pytest blocker capture, capturectl, provcheck, and planctl verification.",
+      "role": "local verifier",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-21T19:38:00Z",
+      "ended_at": "2026-05-21T19:46:02Z",
+      "read_scope": [
+        "mos/backend",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21"
+      ],
+      "write_scope": [
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/plan.contract.json"
+      ],
+      "artifacts": [
+        "logs/ruff.log",
+        "logs/py-compile.log",
+        "logs/direct-assertions.log",
+        "logs/planctl-verify.log"
+      ],
+      "summary": "Verification passed. Pytest remains blocked by local DB bootstrap and is recorded in exact logs."
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "Codex execution agent",
+    "summary": "Implementation, cost, and verification artifacts reconcile to a complete Step 01 DeerFlow default change with explicit GPT override."
+  },
+  "token_time_proxy": {
+    "deerflow_total_tokens": 692433,
+    "deerflow_output_tokens": 18463,
+    "unique_usage_messages": 20,
+    "serper_searches": 40,
+    "jina_fetches": 4
+  }
+}

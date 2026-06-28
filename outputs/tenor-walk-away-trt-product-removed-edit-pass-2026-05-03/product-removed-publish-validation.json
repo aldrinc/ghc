@@ -1,0 +1,299 @@
+{
+  "payload": {
+    "generationKey": "batch:tenor-walk-away-trt-product-removed-edit-20260503",
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "campaignName": "Tenor - Walk Away From TRT - Product Removed - 2026-05-03",
+    "campaignObjective": "OUTCOME_SALES",
+    "buyingType": "AUCTION",
+    "specialAdCategories": [],
+    "campaignDailyBudget": 10000,
+    "bucketCount": 5,
+    "bucketDestinationUrls": []
+  },
+  "response": {
+    "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+    "generationKey": "batch:tenor-walk-away-trt-product-removed-edit-20260503",
+    "ok": true,
+    "includedCount": 30,
+    "adsetCount": 5,
+    "bucketCount": 5,
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "publishDomain": "shoptenorco.com",
+    "budgetScope": "campaign",
+    "campaignDailyBudget": 10000,
+    "bucketDestinationUrls": [],
+    "blockers": [],
+    "items": [
+      {
+        "assetId": "cdc36e45-d6a5-420e-82c3-7753e4561ad6",
+        "creativeSpecId": "835f0f60-7926-4a66-a06a-f07c37911d5c",
+        "adsetSpecId": "a63280c2-f191-4ba2-acf3-d15e6125c32c",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "868525dd-7412-42b0-a75d-7d9cb83163bb",
+        "creativeSpecId": "15faa6d1-21e2-4c77-bdfd-3177119a8d76",
+        "adsetSpecId": "2c6c67ee-592b-4b52-9477-d74480767e23",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "ce62fdae-4560-431a-9f8e-bf5ccc3d749a",
+        "creativeSpecId": "5e80da5e-fc71-4cc0-9956-7072a031f4b9",
+        "adsetSpecId": "67cb0759-159f-4d84-9ee2-86af54e9e50e",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "476e1cf8-c6e2-449e-966c-87ce6fe3acce",
+        "creativeSpecId": "952a8e37-d375-496a-aa41-812590e16926",
+        "adsetSpecId": "67cb0759-159f-4d84-9ee2-86af54e9e50e",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "92adea0c-4854-490c-98f4-7c1752d8e2bd",
+        "creativeSpecId": "4487734b-6eff-49c8-9cdf-298c8c2868a4",
+        "adsetSpecId": "a63280c2-f191-4ba2-acf3-d15e6125c32c",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "56ed80c3-040f-466b-ab48-b7f32d5721ab",
+        "creativeSpecId": "a3029574-08e7-4a42-9044-bec9f9584fd9",
+        "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "1c7403a9-19f8-45d9-a72c-4a59e8e3c982",
+        "creativeSpecId": "d17864a8-2630-4def-ac17-af1032c5c474",
+        "adsetSpecId": "67cb0759-159f-4d84-9ee2-86af54e9e50e",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "470400ed-7263-4f49-947e-87719fa2a82c",
+        "creativeSpecId": "e401d1fa-60f0-4974-a31a-668ecf5c55ab",
+        "adsetSpecId": "a63280c2-f191-4ba2-acf3-d15e6125c32c",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "53c740c8-b81f-48b0-9f46-19d34dce590e",
+        "creativeSpecId": "59fd4128-cfb6-48df-9c13-95dcb0af5c2b",
+        "adsetSpecId": "59ff8fb9-448c-4d24-8396-c7d70a4851ec",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "f0dc95e1-fe15-4577-bad8-d0b1c0430886",
+        "creativeSpecId": "4aa07dbd-9547-44c1-b217-9149fceb0598",
+        "adsetSpecId": "67cb0759-159f-4d84-9ee2-86af54e9e50e",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "e64053e3-fa46-4d33-9711-1a9093c86bde",
+        "creativeSpecId": "addd215e-82c7-4aab-887e-d47651288819",
+        "adsetSpecId": "2c6c67ee-592b-4b52-9477-d74480767e23",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "64682b5d-cbe6-4bf8-b04e-0edede6c182d",
+        "creativeSpecId": "23aeddec-e0bc-475a-8480-6cfb0ba2e6ad",
+        "adsetSpecId": "a63280c2-f191-4ba2-acf3-d15e6125c32c",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "9c7bd3a5-d5d0-4541-8835-2979de3737f7",
+        "creativeSpecId": "f24a86f5-b1b3-438d-b7eb-34d0af335831",
+        "adsetSpecId": "59ff8fb9-448c-4d24-8396-c7d70a4851ec",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "04a9a769-4197-4355-8c09-aadf21254539",
+        "creativeSpecId": "6482631e-1bb2-4c01-b33b-80aeb83a0b2a",
+        "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "0ae4e398-0026-49bb-a7e6-b8b5c2de4410",
+        "creativeSpecId": "00e467a4-502a-4e91-8f54-dab1ca54857f",
+        "adsetSpecId": "2c6c67ee-592b-4b52-9477-d74480767e23",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "cc2bc22b-ba3f-4ced-bdeb-67df23f89df6",
+        "creativeSpecId": "993d41a3-908a-4666-9313-c9528d674d4f",
+        "adsetSpecId": "2c6c67ee-592b-4b52-9477-d74480767e23",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "28e33d05-5c8a-4f32-bd05-d835f2351c43",
+        "creativeSpecId": "1faf63f9-a1d8-4743-a279-175a3444bc3f",
+        "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "df9d4771-0942-4ef4-9d09-f4c795455e01",
+        "creativeSpecId": "e22ae050-688e-47b9-9af9-9b59446a55e8",
+        "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "fec3cbdc-2341-4c00-976c-a5758ad41403",
+        "creativeSpecId": "cbb902a1-1d31-4d10-bc2a-3d30c7f8e6b9",
+        "adsetSpecId": "59ff8fb9-448c-4d24-8396-c7d70a4851ec",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "ee9a8100-13b5-4555-beb3-99316f76bb48",
+        "creativeSpecId": "45a5958e-e13c-4b8e-97f4-946a080a9795",
+        "adsetSpecId": "a63280c2-f191-4ba2-acf3-d15e6125c32c",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "1b697cd5-6d09-45fa-965e-0aed36b17caf",
+        "creativeSpecId": "9943214f-9117-4282-88a8-745b4abad37a",
+        "adsetSpecId": "a63280c2-f191-4ba2-acf3-d15e6125c32c",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "80c3bfca-7d14-4c64-abf1-e1f611231ccf",
+        "creativeSpecId": "cce4e820-38fe-4cc2-a76a-07d359c81ac8",
+        "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "d4090b53-97d8-4362-9c9c-6a4071860182",
+        "creativeSpecId": "caceb203-2ff3-4367-a7ff-8d7e2d356aec",
+        "adsetSpecId": "59ff8fb9-448c-4d24-8396-c7d70a4851ec",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "6f4634cd-7332-4eb9-9c42-f548cd8f4338",
+        "creativeSpecId": "ac48212e-65d4-4f3c-b298-1fbc8a32d69b",
+        "adsetSpecId": "67cb0759-159f-4d84-9ee2-86af54e9e50e",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "61616a01-09a0-4062-b74a-1137d98365b5",
+        "creativeSpecId": "5c9b7cb6-7b58-4a37-a54f-139386214d29",
+        "adsetSpecId": "2c6c67ee-592b-4b52-9477-d74480767e23",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "7f4136d9-f0a4-4a1c-bf42-cd5f786bc056",
+        "creativeSpecId": "0d53cf13-48fd-4626-a460-243889d71395",
+        "adsetSpecId": "59ff8fb9-448c-4d24-8396-c7d70a4851ec",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "bb136e6d-4ed0-45cd-862f-eec8cc61249b",
+        "creativeSpecId": "cd9b066c-72ba-403a-8b6e-a2e36b651177",
+        "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "1f8e4b4b-b8a8-43bb-8136-de6a25e517d4",
+        "creativeSpecId": "e837717b-955a-409c-b23b-002a893a0795",
+        "adsetSpecId": "59ff8fb9-448c-4d24-8396-c7d70a4851ec",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "4266bff1-2f9b-4c2b-96f0-ea26cbb66bd6",
+        "creativeSpecId": "373341fd-4366-49f4-8da9-567e94faff2c",
+        "adsetSpecId": "2c6c67ee-592b-4b52-9477-d74480767e23",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "94340798-9c5b-497a-985d-12b944824913",
+        "creativeSpecId": "bd23780f-83dd-454b-984e-1d70b9234b5e",
+        "adsetSpecId": "67cb0759-159f-4d84-9ee2-86af54e9e50e",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "status": "ok",
+        "blockers": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "The user explicitly required Kimi K2.6 through the oh-my-pi harness for UI work. Native Codex sub-agents were not needed for this narrow two-file implementation; local parallel tools handled reads and proof checks.",
+  "lanes": [
+    {
+      "lane_id": "lane_kimi_omp_guidance",
+      "objective": "Delegate review-screen implementation guidance to Kimi K2.6 through omp and DeepInfra.",
+      "role": "Kimi K2.6 via omp harness",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T22:53:00Z",
+      "ended_at": "2026-05-22T22:58:00Z",
+      "summary": "Kimi recommended a visual SlideWorkspace, per-card actions, collapsed DetailsEditor, and explicit review test IDs while preserving business logic.",
+      "read_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-review-screen-plan.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-implementation-guidance.log"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-review-screen-plan.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-implementation-guidance.log"
+      ]
+    },
+    {
+      "lane_id": "lane_main_implementation",
+      "objective": "Refactor the actual MOS Social Agents Review screen into a visual-first workspace.",
+      "role": "main thread implementer",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-22T22:58:00Z",
+      "ended_at": "2026-05-22T23:01:00Z",
+      "summary": "Added visual slide cards with icon actions, collapsed advanced Review editor tabs, preserved Review workflow gates, and kept Postiz handoff proposal behavior.",
+      "read_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "write_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ]
+    },
+    {
+      "lane_id": "lane_verification",
+      "objective": "Verify the implementation with tests, build, guardrail scans, browser screenshots, and proof tooling.",
+      "role": "local verifier",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T23:01:00Z",
+      "ended_at": "2026-05-22T23:06:00Z",
+      "summary": "Focused unit tests, production build, semantic UI check, design-system scan, Browser responsive validation, source manifest verification, and plangatecheck passed.",
+      "read_scope": [
+        "http://localhost:5275/workspaces/execution/social-agents",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs",
+        "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/plan-gate-proof.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/lane-proof.json"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/social-agents-review-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/source_manifest.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/source-manifest-verify.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/logs/plangatecheck.log"
+      ]
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main_thread",
+    "summary": "Kimi guidance, app implementation, responsive Browser proof, source manifest, and local verification logs are integrated into this proof pack."
+  },
+  "token_time_proxy": {
+    "native_subagents": 0,
+    "local_parallel_tool_groups": 4,
+    "kimi_omp_guidance": "pass",
+    "unit_tests": "pass",
+    "build": "pass",
+    "semantic_ui": "pass",
+    "design_system": "pass",
+    "browser_validation": "pass",
+    "source_manifest": "pass",
+    "plan_gate": "pass"
+  }
+}

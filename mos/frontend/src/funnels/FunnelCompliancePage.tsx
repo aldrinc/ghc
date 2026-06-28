@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
-import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/funnelRuntime";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 
 type FunnelCompliancePageKey =

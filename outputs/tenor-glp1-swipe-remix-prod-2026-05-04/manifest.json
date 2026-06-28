@@ -1,0 +1,35 @@
+{
+  "createdAt": "2026-05-04T21:23:20.363Z",
+  "source": {
+    "creativeId": "C001",
+    "title": "What GLP-1 Does to Your T Levels",
+    "sha256": "9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-glp1-swipe-remix-prod-2026-05-04/source-mars-men-c001-glp1.png",
+    "sourceUrl": "https://static-gp.gethookd.ai/media/ads_media/92775828/media-00e7d202abe0.jpg"
+  },
+  "target": {
+    "brand": "Tenor",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "productTitle": "Tenor Daily Protocol",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+    "campaignName": "Tenor - Walk Away From TRT - 2026-05-02",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 0,
+    "aspectRatio": "9:16",
+    "swipeContextMode": "minimal",
+    "swipeRequiresProductImage": false
+  },
+  "workflow": {
+    "workflowRunId": "21a1249a-f193-4b25-9c49-4b7980394694",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-1740c616-8df1-4953-b2fb-8d5abeb41172",
+    "url": "https://moshq.app/workflows/21a1249a-f193-4b25-9c49-4b7980394694",
+    "generatedAssetId": "cea11d87-cb35-4a3e-ab85-64bec95c488e",
+    "creativeServiceJobId": "embedded-freestyle:c4217d739e099a38ce56d7f4dc2a66b90b1bc3ed3be352e9"
+  },
+  "output": {
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-glp1-swipe-remix-prod-2026-05-04/tenor-glp1-swipe-remix.png",
+    "contentType": "image/jpeg",
+    "bytes": 606546
+  }
+}

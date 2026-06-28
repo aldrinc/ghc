@@ -1,0 +1,49 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "retrofit",
+  "created_at": "2026-05-21T19:46:02Z",
+  "daliogoals_skill_loaded": true,
+  "questions_asked": [],
+  "question_sufficiency_rationale": "No new questions were needed. The user had already authorized making DeerFlow DSV4 Pro the default with a GPT flag, and the required run metadata, source pricing, and code context were available locally.",
+  "owner": "Codex execution agent",
+  "review_date": "2026-05-21",
+  "stop_condition": "Stop after the Step 01 DeerFlow default routing passes provider assertions, lint/compile checks, plan contract verification, cost provenance, pricing source manifest verification, lane check, and proof dashboard rendering.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "plan-gate.md",
+      "summary": "Defines the measurable Step 01 default-provider change."
+    },
+    "problem_log": {
+      "path": "plan-gate.md",
+      "summary": "Records GPT cost pressure and the need for a safe provider boundary."
+    },
+    "root_cause_diagnosis": {
+      "path": "plan-gate.md",
+      "summary": "Names missing Step 01 provider boundary as the root system flaw."
+    },
+    "current_machine": {
+      "path": "plan-gate.md",
+      "summary": "Documents the prior shared GPT runner behavior."
+    },
+    "designed_machine": {
+      "path": "plan-gate.md",
+      "summary": "Documents the DeerFlow default, explicit GPT override, and no-silent-fallback behavior."
+    },
+    "worst_day_test": {
+      "path": "plan-gate.md",
+      "summary": "Defines missing sidecar/config/key/output failure behavior."
+    },
+    "leading_lagging_metrics": {
+      "path": "plan-gate.md",
+      "summary": "Defines provider, sidecar, output, cost, and quality metrics."
+    },
+    "owner_date_review": {
+      "path": "plan-gate.md",
+      "summary": "Names owner, date, and review point."
+    },
+    "stop_condition": {
+      "path": "plan-gate.md",
+      "summary": "Defines verification gates required before completion."
+    }
+  }
+}

@@ -1,0 +1,310 @@
+{
+  "status": "passed",
+  "generatedAt": "2026-05-21T00:00:07.585Z",
+  "viewports": {
+    "desktop": [
+      {
+        "name": "desktop:workspace",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/desktop-01-workspace.png",
+        "title": "What should we call this workspace?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "33.6px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 680,
+          "height": 612,
+          "top": 274
+        },
+        "frameBox": {
+          "width": 680,
+          "height": 542,
+          "top": 274
+        },
+        "actionsBox": {
+          "width": 680,
+          "height": 54,
+          "top": 832
+        },
+        "frameScrollHeight": 542,
+        "frameClientHeight": 542
+      },
+      {
+        "name": "desktop:business-type",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/desktop-02-business-type.png",
+        "title": "Is this a new or already live business?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "33.6px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 680,
+          "height": 612,
+          "top": 299
+        },
+        "frameBox": {
+          "width": 680,
+          "height": 484,
+          "top": 299
+        },
+        "actionsBox": {
+          "width": 680,
+          "height": 112,
+          "top": 799
+        },
+        "frameScrollHeight": 484,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "desktop:business-model",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/desktop-03-business-model.png",
+        "title": "How will this business make money?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "33.6px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 680,
+          "height": 612,
+          "top": 274
+        },
+        "frameBox": {
+          "width": 680,
+          "height": 484,
+          "top": 274
+        },
+        "actionsBox": {
+          "width": 680,
+          "height": 112,
+          "top": 774
+        },
+        "frameScrollHeight": 484,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "desktop:offering-kind",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/desktop-04-offering-kind.png",
+        "title": "What do you sell or plan to sell?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "33.6px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 680,
+          "height": 612,
+          "top": 274
+        },
+        "frameBox": {
+          "width": 680,
+          "height": 484,
+          "top": 274
+        },
+        "actionsBox": {
+          "width": 680,
+          "height": 112,
+          "top": 774
+        },
+        "frameScrollHeight": 484,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "desktop:pricing",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/desktop-05-pricing.png",
+        "title": "How do you charge for your service?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "33.6px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 680,
+          "height": 612,
+          "top": 243
+        },
+        "frameBox": {
+          "width": 680,
+          "height": 484,
+          "top": 243
+        },
+        "actionsBox": {
+          "width": 680,
+          "height": 112,
+          "top": 743
+        },
+        "frameScrollHeight": 484,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "desktop:review",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/desktop-06-review.png",
+        "title": "Review workspace",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "33.6px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 680,
+          "height": 612,
+          "top": 236
+        },
+        "frameBox": {
+          "width": 680,
+          "height": 426,
+          "top": 236
+        },
+        "actionsBox": {
+          "width": 680,
+          "height": 170,
+          "top": 678
+        },
+        "frameScrollHeight": 1300,
+        "frameClientHeight": 426
+      }
+    ],
+    "narrow": [
+      {
+        "name": "narrow:workspace",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/narrow-01-workspace.png",
+        "title": "What should we call this workspace?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "30.4px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 624,
+          "height": 612,
+          "top": 267
+        },
+        "frameBox": {
+          "width": 624,
+          "height": 542,
+          "top": 267
+        },
+        "actionsBox": {
+          "width": 624,
+          "height": 54,
+          "top": 825
+        },
+        "frameScrollHeight": 542,
+        "frameClientHeight": 542
+      },
+      {
+        "name": "narrow:business-type",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/narrow-02-business-type.png",
+        "title": "Is this a new or already live business?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "30.4px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 624,
+          "height": 612,
+          "top": 291
+        },
+        "frameBox": {
+          "width": 624,
+          "height": 484,
+          "top": 291
+        },
+        "actionsBox": {
+          "width": 624,
+          "height": 112,
+          "top": 791
+        },
+        "frameScrollHeight": 484,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "narrow:business-model",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/narrow-03-business-model.png",
+        "title": "How will this business make money?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "30.4px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 624,
+          "height": 612,
+          "top": 267
+        },
+        "frameBox": {
+          "width": 624,
+          "height": 484,
+          "top": 267
+        },
+        "actionsBox": {
+          "width": 624,
+          "height": 112,
+          "top": 767
+        },
+        "frameScrollHeight": 552,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "narrow:offering-kind",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/narrow-04-offering-kind.png",
+        "title": "What do you sell or plan to sell?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "30.4px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 624,
+          "height": 612,
+          "top": 233
+        },
+        "frameBox": {
+          "width": 624,
+          "height": 484,
+          "top": 233
+        },
+        "actionsBox": {
+          "width": 624,
+          "height": 112,
+          "top": 733
+        },
+        "frameScrollHeight": 534,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "narrow:pricing",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/narrow-05-pricing.png",
+        "title": "How do you charge for your service?",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "30.4px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 624,
+          "height": 612,
+          "top": 243
+        },
+        "frameBox": {
+          "width": 624,
+          "height": 484,
+          "top": 243
+        },
+        "actionsBox": {
+          "width": 624,
+          "height": 112,
+          "top": 743
+        },
+        "frameScrollHeight": 484,
+        "frameClientHeight": 484
+      },
+      {
+        "name": "narrow:review",
+        "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/layout-spacing/narrow-06-review.png",
+        "title": "Review workspace",
+        "titleFontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+        "titleFontSize": "30.4px",
+        "actionsBorderTop": "0px",
+        "formBox": {
+          "width": 624,
+          "height": 612,
+          "top": 233
+        },
+        "frameBox": {
+          "width": 624,
+          "height": 426,
+          "top": 233
+        },
+        "actionsBox": {
+          "width": 624,
+          "height": 170,
+          "top": 675
+        },
+        "frameScrollHeight": 1300,
+        "frameClientHeight": 426
+      }
+    ]
+  }
+}

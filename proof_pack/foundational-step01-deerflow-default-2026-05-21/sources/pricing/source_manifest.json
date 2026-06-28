@@ -1,0 +1,44 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "pricing-sources",
+  "created_at": "2026-05-21T19:44:17.822946+00:00",
+  "source_type": "web",
+  "source": "DeepSeek, Serper, and Jina official pricing pages",
+  "operator_notes": "Pricing sources used to calculate DeerFlow DSV4 Pro Step 01 run cost.",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/sources/pricing/raw/deepseek-pricing-bf17ecd132.html",
+      "kind": "raw_files",
+      "sha256": "7091626f43bf6d2442031c526d13193039a122b139c4cffa979545b63e1560f2",
+      "bytes": 21630,
+      "captured_at": "2026-05-21T19:44:19.612556+00:00",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing",
+      "notes": "Official DeepSeek model pricing."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/sources/pricing/raw/serper-pricing-68f936c389.html",
+      "kind": "raw_files",
+      "sha256": "bfcb91f9a09a826a190d32d938442bf72747452fa554f5df59907122b074094d",
+      "bytes": 1043998,
+      "captured_at": "2026-05-21T19:44:19.690514+00:00",
+      "source": "https://serper.dev/",
+      "notes": "Official Serper pricing page."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/sources/pricing/raw/jina-reader-9f7c44d552.html",
+      "kind": "raw_files",
+      "sha256": "20291f0fcc29c9570690b11fad890e579dd734c7f217ddae2dbc548c895300e5",
+      "bytes": 357283,
+      "captured_at": "2026-05-21T19:44:19.764340+00:00",
+      "source": "https://jina.ai/en-US/reader/",
+      "notes": "Official Jina Reader rate/pricing page."
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-21T19:44:19.845232+00:00",
+    "errors": []
+  }
+}

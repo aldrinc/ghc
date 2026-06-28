@@ -1,0 +1,137 @@
+{
+  "clicked": [],
+  "opened": [
+    {
+      "id": "WWhhQWZxLiRmbG93",
+      "attributes": {
+        "label": "Flow",
+        "property": "$flow",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLiRtZXNzYWdl",
+      "attributes": {
+        "label": "Message",
+        "property": "$message",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLiRvcmlnaW5hdGluZ19lbWFpbA",
+      "attributes": {
+        "label": "$originating_email",
+        "property": "$originating_email",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLkNhbXBhaWduIE5hbWU",
+      "attributes": {
+        "label": "Campaign Name",
+        "property": "Campaign Name",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLkNsaWVudCBDYW5vbmljYWw",
+      "attributes": {
+        "label": "Client Canonical",
+        "property": "Client Canonical",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLkNsaWVudCBOYW1l",
+      "attributes": {
+        "label": "Client Name",
+        "property": "Client Name",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLkNsaWVudCBPUw",
+      "attributes": {
+        "label": "Client OS",
+        "property": "Client OS",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLkNsaWVudCBPUyBGYW1pbHk",
+      "attributes": {
+        "label": "Client OS Family",
+        "property": "Client OS Family",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLkNsaWVudCBUeXBl",
+      "attributes": {
+        "label": "Client Type",
+        "property": "Client Type",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLmVuZ3RyYWNrX2lk",
+      "attributes": {
+        "label": "engtrack_id",
+        "property": "engtrack_id",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLkluYm94IFByb3ZpZGVy",
+      "attributes": {
+        "label": "Inbox Provider",
+        "property": "Inbox Provider",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLm1hY2hpbmVfb3Blbg",
+      "attributes": {
+        "label": "Apple Privacy Open",
+        "property": "machine_open",
+        "inferred_type": "boolean",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLlJlY2lwaWVudCBFbWFpbCBBZGRyZXNz",
+      "attributes": {
+        "label": "Recipient Email Address",
+        "property": "Recipient Email Address",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    },
+    {
+      "id": "WWhhQWZxLlN1YmplY3Q",
+      "attributes": {
+        "label": "Subject",
+        "property": "Subject",
+        "inferred_type": "string",
+        "sample_values": null
+      }
+    }
+  ],
+  "placedOrder": {
+    "error": "/metrics/UFHzc6/metric-properties?additional-fields[metric-property]=sample_values failed 429: {\n  \"errors\": [\n    {\n      \"id\": \"aec05f7b-563b-4871-b4f3-4b2b30846e53\",\n      \"status\": 429,\n      \"code\": \"throttled\",\n      \"title\": \"Request was throttled.\",\n      \"detail\": \"Request was throttled. Expected available in 1 second.\",\n      \"source\": {\n        \"pointer\": \"/data\"\n      },\n      \"links\": {\n        \"type\": \"https://developers.klaviyo.com/en/docs/rate_limits_and_error_handling#rate-limits\"\n      },\n      \"meta\": {}\n    }\n  ]\n}"
+  },
+  "placedOrder2": {
+    "error": "/metrics/UtV6E6/metric-properties?additional-fields[metric-property]=sample_values failed 429: {\n  \"errors\": [\n    {\n      \"id\": \"b86958f8-74b8-41dd-abad-9625b9d5ed01\",\n      \"status\": 429,\n      \"code\": \"throttled\",\n      \"title\": \"Request was throttled.\",\n      \"detail\": \"Request was throttled. Expected available in 1 second.\",\n      \"source\": {\n        \"pointer\": \"/data\"\n      },\n      \"links\": {\n        \"type\": \"https://developers.klaviyo.com/en/docs/rate_limits_and_error_handling#rate-limits\"\n      },\n      \"meta\": {}\n    }\n  ]\n}"
+  }
+}

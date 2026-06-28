@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+  "urlState": "final_urls_supplied",
+  "salesDestinationKey": "sales_pdp",
+  "destinations": [
+    {
+      "key": "advertorial_a",
+      "type": "pre_sales_advertorial",
+      "label": "Advertorial A - Your Labs Are Normal",
+      "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-5-advertorial/advertorial-variant-a.md",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/your-labs-are-normal-the-30-000-lie-doctors-tell-men-over-40-and-how-to-avoid-the-trap/",
+      "onwardDestinationKey": "sales_pdp"
+    },
+    {
+      "key": "advertorial_b",
+      "type": "pre_sales_advertorial",
+      "label": "Advertorial B - The Two Pathways Every T-Booster Ignores",
+      "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-5-advertorial/advertorial-variant-b.md",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+      "onwardDestinationKey": "sales_pdp"
+    },
+    {
+      "key": "advertorial_c",
+      "type": "pre_sales_advertorial",
+      "label": "Advertorial C - Needles for Life / TRT Trap",
+      "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-5-advertorial/advertorial-variant-c.md",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+      "onwardDestinationKey": "sales_pdp"
+    },
+    {
+      "key": "listicle_a",
+      "type": "pre_sales_listicle",
+      "label": "Listicle A - 3 Reasons Your T-Booster Failed",
+      "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-6-listicle/listicle-variant-a.md",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/3-reasons-your-t-booster-failed-and-none-of-them-are-your-fault/",
+      "onwardDestinationKey": "sales_pdp"
+    },
+    {
+      "key": "listicle_b",
+      "type": "pre_sales_listicle",
+      "label": "Listicle B - Half the Science",
+      "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-6-listicle/listicle-variant-b.md",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/everything-youve-been-told-about-testosterone-support-is-based-on-half-the-science/",
+      "onwardDestinationKey": "sales_pdp"
+    },
+    {
+      "key": "listicle_c",
+      "type": "pre_sales_listicle",
+      "label": "Listicle C - 94% Morning Energy / 92% Like Yourself",
+      "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-6-listicle/listicle-variant-c.md",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+      "onwardDestinationKey": "sales_pdp"
+    },
+    {
+      "key": "sales_pdp",
+      "type": "sales_page",
+      "label": "Sales/PDP",
+      "sourcePath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-7-sales-page/sales-page.md",
+      "finalUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+      "onwardDestinationKey": null
+    }
+  ]
+}

@@ -128,6 +128,8 @@ class ArtifactTypeEnum(str, Enum):
     strategy_v2_step_payload = "strategy_v2_step_payload"
     strategy_v2_stage0 = "strategy_v2_stage0"
     strategy_v2_stage1 = "strategy_v2_stage1"
+    context_dev_extraction = "context_dev_extraction"
+    foundation_research_bundle = "foundation_research_bundle"
     strategy_v2_stage2 = "strategy_v2_stage2"
     strategy_v2_stage3 = "strategy_v2_stage3"
     strategy_v2_awareness_angle_matrix = "strategy_v2_awareness_angle_matrix"

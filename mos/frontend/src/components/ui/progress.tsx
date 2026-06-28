@@ -8,10 +8,10 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progr
   return (
     <BaseProgress.Root
       ref={ref}
-      className={cn("relative h-2 w-full overflow-hidden rounded-full bg-border", className)}
+      className={cn("relative h-2 w-full overflow-hidden rounded-pill bg-border", className)}
       {...props}
     >
-      <BaseProgress.Indicator className="h-full bg-accent transition-all" />
+      <BaseProgress.Indicator className="h-full rounded-pill bg-accent transition-all duration-[var(--dur-base)] ease-[var(--ease-out)]" />
     </BaseProgress.Root>
   );
 });

@@ -1,0 +1,3749 @@
+{
+  "campaignId": "120245546805940293",
+  "adObjectCount": 149,
+  "rows": [
+    {
+      "id": "120245565712310293",
+      "name": "ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "tenor-19-C018-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_19_C018_QUIZ_1X1"
+        ],
+        [
+          "TENOR_19_C018_QUIZ_4X5"
+        ],
+        [
+          "TENOR_19_C018_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565686290293",
+      "name": "ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-23-C025-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_23_C025_QUIZ_1X1"
+        ],
+        [
+          "TENOR_23_C025_QUIZ_4X5"
+        ],
+        [
+          "TENOR_23_C025_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565679490293",
+      "name": "ProblemAware GLP curated-01-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-01-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_01_GLP_1X1"
+        ],
+        [
+          "CURATED_01_GLP_4X5"
+        ],
+        [
+          "CURATED_01_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565635240293",
+      "name": "ProblemAware GLP curated-13-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-13-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "DISAPPROVED",
+      "has_review_feedback": true,
+      "has_issues_info": false,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [
+        "Unacceptable Business Practices"
+      ],
+      "image_labels": [
+        [
+          "CURATED_13_GLP_1X1"
+        ],
+        [
+          "CURATED_13_GLP_4X5"
+        ],
+        [
+          "CURATED_13_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565783080293",
+      "name": "ProblemAware GLP tenor-04-C006-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-04-C006-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_04_C006_GLP_1X1"
+        ],
+        [
+          "TENOR_04_C006_GLP_9X16"
+        ],
+        [
+          "TENOR_04_C006_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245565751690293",
+      "name": "ProblemAware GLP tenor-10-C005-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-10-C005-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_10_C005_GLP_1X1"
+        ],
+        [
+          "TENOR_10_C005_GLP_4X5"
+        ],
+        [
+          "TENOR_10_C005_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565589240293",
+      "name": "ProblemAware GLP curated-25-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-25-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_25_GLP_1X1"
+        ],
+        [
+          "CURATED_25_GLP_4X5"
+        ],
+        [
+          "CURATED_25_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565474940293",
+      "name": "ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-13-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_13_QUIZ_1X1"
+        ],
+        [
+          "CURATED_13_QUIZ_4X5"
+        ],
+        [
+          "CURATED_13_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565675360293",
+      "name": "ProblemAware GLP curated-02-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-02-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_02_GLP_1X1"
+        ],
+        [
+          "CURATED_02_GLP_4X5"
+        ],
+        [
+          "CURATED_02_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565660530293",
+      "name": "ProblemAware GLP curated-04-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-04-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_04_GLP_4X5"
+        ],
+        [
+          "CURATED_04_GLP_9X16"
+        ],
+        [
+          "CURATED_04_GLP_1X1"
+        ]
+      ]
+    },
+    {
+      "id": "120245565717600293",
+      "name": "ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "tenor-18-C017-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_18_C017_QUIZ_1X1"
+        ],
+        [
+          "TENOR_18_C017_QUIZ_4X5"
+        ],
+        [
+          "TENOR_18_C017_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565758330293",
+      "name": "ProblemAware GLP tenor-09-C007-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-09-C007-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_09_C007_GLP_1X1"
+        ],
+        [
+          "TENOR_09_C007_GLP_4X5"
+        ],
+        [
+          "TENOR_09_C007_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565765270293",
+      "name": "ProblemAware GLP tenor-08-C009-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-08-C009-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_08_C009_GLP_4X5"
+        ],
+        [
+          "TENOR_08_C009_GLP_9X16"
+        ],
+        [
+          "TENOR_08_C009_GLP_1X1"
+        ]
+      ]
+    },
+    {
+      "id": "120245565450770293",
+      "name": "ProblemAware GLP curated-23-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-23-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_23_GLP_4X5"
+        ],
+        [
+          "CURATED_23_GLP_1X1"
+        ],
+        [
+          "CURATED_23_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565787480293",
+      "name": "ProblemAware GLP tenor-03-C004-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-03-C004-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_03_C004_GLP_1X1"
+        ],
+        [
+          "TENOR_03_C004_GLP_4X5"
+        ],
+        [
+          "TENOR_03_C004_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565375630293",
+      "name": "ProblemAware QUIZ curated-30-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-30-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_30_QUIZ_1X1"
+        ],
+        [
+          "CURATED_30_QUIZ_4X5"
+        ],
+        [
+          "CURATED_30_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565598110293",
+      "name": "ProblemAware GLP curated-24-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-24-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_24_GLP_1X1"
+        ],
+        [
+          "CURATED_24_GLP_4X5"
+        ],
+        [
+          "CURATED_24_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565616550293",
+      "name": "ProblemAware GLP curated-07-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-07-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_07_GLP_1X1"
+        ],
+        [
+          "CURATED_07_GLP_4X5"
+        ],
+        [
+          "CURATED_07_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565575660293",
+      "name": "ProblemAware GLP curated-27-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-27-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_27_GLP_4X5"
+        ],
+        [
+          "CURATED_27_GLP_1X1"
+        ],
+        [
+          "CURATED_27_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565794240293",
+      "name": "ProblemAware GLP tenor-02-C002-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-02-C002-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_02_C002_GLP_1X1"
+        ],
+        [
+          "TENOR_02_C002_GLP_4X5"
+        ],
+        [
+          "TENOR_02_C002_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565770990293",
+      "name": "ProblemAware GLP tenor-06-C008-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-06-C008-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_06_C008_GLP_1X1"
+        ],
+        [
+          "TENOR_06_C008_GLP_4X5"
+        ],
+        [
+          "TENOR_06_C008_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565489550293",
+      "name": "ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-14-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_14_QUIZ_1X1"
+        ],
+        [
+          "CURATED_14_QUIZ_4X5"
+        ],
+        [
+          "CURATED_14_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565433800293",
+      "name": "ProblemAware GLP curated-29-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-29-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_29_GLP_4X5"
+        ],
+        [
+          "CURATED_29_GLP_1X1"
+        ],
+        [
+          "CURATED_29_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565360230293",
+      "name": "ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-09-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_09_QUIZ_4X5"
+        ],
+        [
+          "CURATED_09_QUIZ_1X1"
+        ],
+        [
+          "CURATED_09_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565353430293",
+      "name": "ProblemAware GLP curated-22-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-22-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_22_GLP_1X1"
+        ],
+        [
+          "CURATED_22_GLP_9X16"
+        ],
+        [
+          "CURATED_22_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245565777310293",
+      "name": "ProblemAware GLP tenor-05-C011-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-05-C011-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_05_C011_GLP_1X1"
+        ],
+        [
+          "TENOR_05_C011_GLP_4X5"
+        ],
+        [
+          "TENOR_05_C011_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565745320293",
+      "name": "ProblemAware GLP tenor-11-C010-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-11-C010-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_11_C010_GLP_1X1"
+        ],
+        [
+          "TENOR_11_C010_GLP_4X5"
+        ],
+        [
+          "TENOR_11_C010_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565728830293",
+      "name": "ProblemAware QUIZ tenor-16-C020-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-16-C020-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_16_C020_QUIZ_1X1"
+        ],
+        [
+          "TENOR_16_C020_QUIZ_4X5"
+        ],
+        [
+          "TENOR_16_C020_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565737940293",
+      "name": "ProblemAware QUIZ tenor-15-C019-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-15-C019-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_15_C019_QUIZ_1X1"
+        ],
+        [
+          "TENOR_15_C019_QUIZ_4X5"
+        ],
+        [
+          "TENOR_15_C019_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565647410293",
+      "name": "ProblemAware GLP curated-06-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-06-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_06_GLP_1X1"
+        ],
+        [
+          "CURATED_06_GLP_4X5"
+        ],
+        [
+          "CURATED_06_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565724660293",
+      "name": "ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-17-C016-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_17_C016_QUIZ_4X5"
+        ],
+        [
+          "TENOR_17_C016_QUIZ_1X1"
+        ],
+        [
+          "TENOR_17_C016_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565641800293",
+      "name": "ProblemAware GLP curated-09-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-09-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_09_GLP_1X1"
+        ],
+        [
+          "CURATED_09_GLP_4X5"
+        ],
+        [
+          "CURATED_09_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565708740293",
+      "name": "ProblemAware QUIZ tenor-20-C021-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "tenor-20-C021-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_20_C021_QUIZ_1X1"
+        ],
+        [
+          "TENOR_20_C021_QUIZ_4X5"
+        ],
+        [
+          "TENOR_20_C021_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565697080293",
+      "name": "ProblemAware QUIZ tenor-22-C024-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "tenor-22-C024-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_22_C024_QUIZ_1X1"
+        ],
+        [
+          "TENOR_22_C024_QUIZ_4X5"
+        ],
+        [
+          "TENOR_22_C024_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548931830293",
+      "name": "ProblemAware GLP tenor-02-C002-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-02-C002-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_02_C002_GLP_1X1"
+        ],
+        [
+          "TENOR_02_C002_GLP_4X5"
+        ],
+        [
+          "TENOR_02_C002_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548923810293",
+      "name": "ProblemAware GLP tenor-03-C004-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-03-C004-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_03_C004_GLP_1X1"
+        ],
+        [
+          "TENOR_03_C004_GLP_4X5"
+        ],
+        [
+          "TENOR_03_C004_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565701550293",
+      "name": "ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-21-C023-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_21_C023_QUIZ_1X1"
+        ],
+        [
+          "TENOR_21_C023_QUIZ_9X16"
+        ],
+        [
+          "TENOR_21_C023_QUIZ_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245548914880293",
+      "name": "ProblemAware GLP tenor-04-C006-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-04-C006-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_04_C006_GLP_1X1"
+        ],
+        [
+          "TENOR_04_C006_GLP_9X16"
+        ],
+        [
+          "TENOR_04_C006_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245548902730293",
+      "name": "ProblemAware GLP tenor-05-C011-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-05-C011-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_05_C011_GLP_1X1"
+        ],
+        [
+          "TENOR_05_C011_GLP_4X5"
+        ],
+        [
+          "TENOR_05_C011_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548895590293",
+      "name": "ProblemAware GLP tenor-06-C008-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-06-C008-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_06_C008_GLP_1X1"
+        ],
+        [
+          "TENOR_06_C008_GLP_4X5"
+        ],
+        [
+          "TENOR_06_C008_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565668440293",
+      "name": "ProblemAware GLP curated-03-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-03-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_03_GLP_1X1"
+        ],
+        [
+          "CURATED_03_GLP_4X5"
+        ],
+        [
+          "CURATED_03_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548883140293",
+      "name": "ProblemAware GLP tenor-08-C009-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-08-C009-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_08_C009_GLP_4X5"
+        ],
+        [
+          "TENOR_08_C009_GLP_9X16"
+        ],
+        [
+          "TENOR_08_C009_GLP_1X1"
+        ]
+      ]
+    },
+    {
+      "id": "120245565654400293",
+      "name": "ProblemAware GLP curated-05-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-05-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_05_GLP_1X1"
+        ],
+        [
+          "CURATED_05_GLP_4X5"
+        ],
+        [
+          "CURATED_05_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548875310293",
+      "name": "ProblemAware GLP tenor-09-C007-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-09-C007-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_09_C007_GLP_1X1"
+        ],
+        [
+          "TENOR_09_C007_GLP_4X5"
+        ],
+        [
+          "TENOR_09_C007_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548865970293",
+      "name": "ProblemAware GLP tenor-10-C005-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-10-C005-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_10_C005_GLP_1X1"
+        ],
+        [
+          "TENOR_10_C005_GLP_4X5"
+        ],
+        [
+          "TENOR_10_C005_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548857920293",
+      "name": "ProblemAware GLP tenor-11-C010-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-11-C010-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_11_C010_GLP_1X1"
+        ],
+        [
+          "TENOR_11_C010_GLP_4X5"
+        ],
+        [
+          "TENOR_11_C010_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548820340293",
+      "name": "ProblemAware QUIZ tenor-15-C019-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-15-C019-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_15_C019_QUIZ_1X1"
+        ],
+        [
+          "TENOR_15_C019_QUIZ_4X5"
+        ],
+        [
+          "TENOR_15_C019_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565520720293",
+      "name": "ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-06-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_06_QUIZ_1X1"
+        ],
+        [
+          "CURATED_06_QUIZ_4X5"
+        ],
+        [
+          "CURATED_06_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548795400293",
+      "name": "ProblemAware QUIZ tenor-16-C020-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-16-C020-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_16_C020_QUIZ_1X1"
+        ],
+        [
+          "TENOR_16_C020_QUIZ_4X5"
+        ],
+        [
+          "TENOR_16_C020_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565609280293",
+      "name": "ProblemAware GLP curated-18-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-18-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_18_GLP_1X1"
+        ],
+        [
+          "CURATED_18_GLP_4X5"
+        ],
+        [
+          "CURATED_18_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565629900293",
+      "name": "ProblemAware GLP curated-14-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-14-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_14_GLP_1X1"
+        ],
+        [
+          "CURATED_14_GLP_4X5"
+        ],
+        [
+          "CURATED_14_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548781940293",
+      "name": "ProblemAware QUIZ tenor-17-C016-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-17-C016-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_17_C016_QUIZ_4X5"
+        ],
+        [
+          "TENOR_17_C016_QUIZ_1X1"
+        ],
+        [
+          "TENOR_17_C016_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548773160293",
+      "name": "ProblemAware QUIZ tenor-18-C017-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "tenor-18-C017-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_18_C017_QUIZ_1X1"
+        ],
+        [
+          "TENOR_18_C017_QUIZ_4X5"
+        ],
+        [
+          "TENOR_18_C017_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548766100293",
+      "name": "ProblemAware QUIZ tenor-19-C018-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "tenor-19-C018-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_19_C018_QUIZ_1X1"
+        ],
+        [
+          "TENOR_19_C018_QUIZ_4X5"
+        ],
+        [
+          "TENOR_19_C018_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548755320293",
+      "name": "ProblemAware QUIZ tenor-20-C021-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "tenor-20-C021-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_20_C021_QUIZ_1X1"
+        ],
+        [
+          "TENOR_20_C021_QUIZ_4X5"
+        ],
+        [
+          "TENOR_20_C021_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548741670293",
+      "name": "ProblemAware QUIZ tenor-21-C023-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-21-C023-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_21_C023_QUIZ_1X1"
+        ],
+        [
+          "TENOR_21_C023_QUIZ_9X16"
+        ],
+        [
+          "TENOR_21_C023_QUIZ_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245565603120293",
+      "name": "ProblemAware GLP curated-19-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-19-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_19_GLP_4X5"
+        ],
+        [
+          "CURATED_19_GLP_1X1"
+        ],
+        [
+          "CURATED_19_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565583300293",
+      "name": "ProblemAware GLP curated-26-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-26-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_26_GLP_1X1"
+        ],
+        [
+          "CURATED_26_GLP_4X5"
+        ],
+        [
+          "CURATED_26_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565444020293",
+      "name": "ProblemAware QUIZ curated-20-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-20-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_20_QUIZ_1X1"
+        ],
+        [
+          "CURATED_20_QUIZ_4X5"
+        ],
+        [
+          "CURATED_20_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548729590293",
+      "name": "ProblemAware QUIZ tenor-22-C024-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "tenor-22-C024-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_22_C024_QUIZ_1X1"
+        ],
+        [
+          "TENOR_22_C024_QUIZ_4X5"
+        ],
+        [
+          "TENOR_22_C024_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548718850293",
+      "name": "ProblemAware QUIZ tenor-23-C025-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "tenor-23-C025-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_23_C025_QUIZ_1X1"
+        ],
+        [
+          "TENOR_23_C025_QUIZ_4X5"
+        ],
+        [
+          "TENOR_23_C025_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565537520293",
+      "name": "ProblemAware QUIZ curated-04-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-04-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_04_QUIZ_1X1"
+        ],
+        [
+          "CURATED_04_QUIZ_4X5"
+        ],
+        [
+          "CURATED_04_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548706910293",
+      "name": "ProblemAware GLP curated-01-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-01-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_01_GLP_1X1"
+        ],
+        [
+          "CURATED_01_GLP_4X5"
+        ],
+        [
+          "CURATED_01_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565567510293",
+      "name": "ProblemAware GLP curated-28-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-28-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_28_GLP_1X1"
+        ],
+        [
+          "CURATED_28_GLP_4X5"
+        ],
+        [
+          "CURATED_28_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548693620293",
+      "name": "ProblemAware GLP curated-02-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-02-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_02_GLP_1X1"
+        ],
+        [
+          "CURATED_02_GLP_4X5"
+        ],
+        [
+          "CURATED_02_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565625290293",
+      "name": "ProblemAware GLP curated-17-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-17-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "DISAPPROVED",
+      "has_review_feedback": true,
+      "has_issues_info": false,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [
+        "Unacceptable Business Practices"
+      ],
+      "image_labels": [
+        [
+          "CURATED_17_GLP_1X1"
+        ],
+        [
+          "CURATED_17_GLP_4X5"
+        ],
+        [
+          "CURATED_17_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565559840293",
+      "name": "ProblemAware GLP curated-30-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-30-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_30_GLP_1X1"
+        ],
+        [
+          "CURATED_30_GLP_9X16"
+        ],
+        [
+          "CURATED_30_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245548680800293",
+      "name": "ProblemAware GLP curated-03-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-03-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_03_GLP_1X1"
+        ],
+        [
+          "CURATED_03_GLP_4X5"
+        ],
+        [
+          "CURATED_03_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548668860293",
+      "name": "ProblemAware GLP curated-04-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-04-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_04_GLP_4X5"
+        ],
+        [
+          "CURATED_04_GLP_9X16"
+        ],
+        [
+          "CURATED_04_GLP_1X1"
+        ]
+      ]
+    },
+    {
+      "id": "120245548657980293",
+      "name": "ProblemAware GLP curated-05-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-05-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_05_GLP_1X1"
+        ],
+        [
+          "CURATED_05_GLP_4X5"
+        ],
+        [
+          "CURATED_05_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565554300293",
+      "name": "ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-01-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_01_QUIZ_1X1"
+        ],
+        [
+          "CURATED_01_QUIZ_4X5"
+        ],
+        [
+          "CURATED_01_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565546590293",
+      "name": "ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-03-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_03_QUIZ_9X16"
+        ],
+        [
+          "CURATED_03_QUIZ_1X1"
+        ],
+        [
+          "CURATED_03_QUIZ_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245548651590293",
+      "name": "ProblemAware GLP curated-06-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-06-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_06_GLP_1X1"
+        ],
+        [
+          "CURATED_06_GLP_4X5"
+        ],
+        [
+          "CURATED_06_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565391920293",
+      "name": "ProblemAware QUIZ curated-28-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-28-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_28_QUIZ_1X1"
+        ],
+        [
+          "CURATED_28_QUIZ_9X16"
+        ],
+        [
+          "CURATED_28_QUIZ_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245565503270293",
+      "name": "ProblemAware QUIZ curated-10-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-10-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_10_QUIZ_1X1"
+        ],
+        [
+          "CURATED_10_QUIZ_4X5"
+        ],
+        [
+          "CURATED_10_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548644580293",
+      "name": "ProblemAware GLP curated-09-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-09-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_09_GLP_1X1"
+        ],
+        [
+          "CURATED_09_GLP_4X5"
+        ],
+        [
+          "CURATED_09_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565511890293",
+      "name": "ProblemAware QUIZ curated-08-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-08-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_08_QUIZ_1X1"
+        ],
+        [
+          "CURATED_08_QUIZ_4X5"
+        ],
+        [
+          "CURATED_08_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565529250293",
+      "name": "ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-05-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_05_QUIZ_1X1"
+        ],
+        [
+          "CURATED_05_QUIZ_4X5"
+        ],
+        [
+          "CURATED_05_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548593330293",
+      "name": "ProblemAware GLP curated-13-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-13-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_13_GLP_1X1"
+        ],
+        [
+          "CURATED_13_GLP_4X5"
+        ],
+        [
+          "CURATED_13_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548579780293",
+      "name": "ProblemAware GLP curated-14-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-14-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_14_GLP_1X1"
+        ],
+        [
+          "CURATED_14_GLP_4X5"
+        ],
+        [
+          "CURATED_14_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548568280293",
+      "name": "ProblemAware GLP curated-17-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-17-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "WITH_ISSUES",
+      "has_review_feedback": false,
+      "has_issues_info": true,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [
+        "Can Not Enable Ad with Ad Review Rejected"
+      ],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_17_GLP_1X1"
+        ],
+        [
+          "CURATED_17_GLP_4X5"
+        ],
+        [
+          "CURATED_17_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548527150293",
+      "name": "ProblemAware GLP curated-07-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-07-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_07_GLP_1X1"
+        ],
+        [
+          "CURATED_07_GLP_4X5"
+        ],
+        [
+          "CURATED_07_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548505570293",
+      "name": "ProblemAware GLP curated-18-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-18-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_18_GLP_1X1"
+        ],
+        [
+          "CURATED_18_GLP_4X5"
+        ],
+        [
+          "CURATED_18_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565495300293",
+      "name": "ProblemAware QUIZ curated-15-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-15-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_15_QUIZ_1X1"
+        ],
+        [
+          "CURATED_15_QUIZ_4X5"
+        ],
+        [
+          "CURATED_15_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548413740293",
+      "name": "ProblemAware GLP curated-19-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-19-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_19_GLP_4X5"
+        ],
+        [
+          "CURATED_19_GLP_1X1"
+        ],
+        [
+          "CURATED_19_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565482270293",
+      "name": "ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-19-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_19_QUIZ_1X1"
+        ],
+        [
+          "CURATED_19_QUIZ_4X5"
+        ],
+        [
+          "CURATED_19_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548358140293",
+      "name": "ProblemAware GLP curated-24-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-24-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_24_GLP_1X1"
+        ],
+        [
+          "CURATED_24_GLP_4X5"
+        ],
+        [
+          "CURATED_24_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548339780293",
+      "name": "ProblemAware GLP curated-25-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-25-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_25_GLP_1X1"
+        ],
+        [
+          "CURATED_25_GLP_4X5"
+        ],
+        [
+          "CURATED_25_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548324280293",
+      "name": "ProblemAware GLP curated-26-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-26-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_26_GLP_1X1"
+        ],
+        [
+          "CURATED_26_GLP_4X5"
+        ],
+        [
+          "CURATED_26_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565466100293",
+      "name": "ProblemAware QUIZ curated-11-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-11-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_11_QUIZ_1X1"
+        ],
+        [
+          "CURATED_11_QUIZ_4X5"
+        ],
+        [
+          "CURATED_11_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565457710293",
+      "name": "ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-12-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_12_QUIZ_4X5"
+        ],
+        [
+          "CURATED_12_QUIZ_1X1"
+        ],
+        [
+          "CURATED_12_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548300250293",
+      "name": "ProblemAware GLP curated-27-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-27-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_27_GLP_4X5"
+        ],
+        [
+          "CURATED_27_GLP_1X1"
+        ],
+        [
+          "CURATED_27_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548286080293",
+      "name": "ProblemAware GLP curated-28-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-28-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_28_GLP_1X1"
+        ],
+        [
+          "CURATED_28_GLP_4X5"
+        ],
+        [
+          "CURATED_28_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548270330293",
+      "name": "ProblemAware GLP curated-30-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-30-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_30_GLP_1X1"
+        ],
+        [
+          "CURATED_30_GLP_9X16"
+        ],
+        [
+          "CURATED_30_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245565356280293",
+      "name": "ProblemAware QUIZ curated-07-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-07-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_07_QUIZ_1X1"
+        ],
+        [
+          "CURATED_07_QUIZ_4X5"
+        ],
+        [
+          "CURATED_07_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548254270293",
+      "name": "ProblemAware QUIZ curated-01-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-01-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_01_QUIZ_1X1"
+        ],
+        [
+          "CURATED_01_QUIZ_4X5"
+        ],
+        [
+          "CURATED_01_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565411660293",
+      "name": "ProblemAware QUIZ curated-23-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-23-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_23_QUIZ_1X1"
+        ],
+        [
+          "CURATED_23_QUIZ_4X5"
+        ],
+        [
+          "CURATED_23_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548232720293",
+      "name": "ProblemAware QUIZ curated-03-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-03-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_03_QUIZ_9X16"
+        ],
+        [
+          "CURATED_03_QUIZ_1X1"
+        ],
+        [
+          "CURATED_03_QUIZ_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245565417630293",
+      "name": "ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-16-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_16_QUIZ_1X1"
+        ],
+        [
+          "CURATED_16_QUIZ_4X5"
+        ],
+        [
+          "CURATED_16_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548221700293",
+      "name": "ProblemAware QUIZ curated-04-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-04-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_04_QUIZ_1X1"
+        ],
+        [
+          "CURATED_04_QUIZ_4X5"
+        ],
+        [
+          "CURATED_04_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565370170293",
+      "name": "ProblemAware QUIZ curated-25-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-25-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_25_QUIZ_1X1"
+        ],
+        [
+          "CURATED_25_QUIZ_4X5"
+        ],
+        [
+          "CURATED_25_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548205280293",
+      "name": "ProblemAware QUIZ curated-05-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-05-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_05_QUIZ_1X1"
+        ],
+        [
+          "CURATED_05_QUIZ_4X5"
+        ],
+        [
+          "CURATED_05_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548167640293",
+      "name": "ProblemAware QUIZ curated-06-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-06-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_06_QUIZ_1X1"
+        ],
+        [
+          "CURATED_06_QUIZ_4X5"
+        ],
+        [
+          "CURATED_06_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565398730293",
+      "name": "ProblemAware QUIZ curated-29-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-29-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_29_QUIZ_1X1"
+        ],
+        [
+          "CURATED_29_QUIZ_4X5"
+        ],
+        [
+          "CURATED_29_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565383840293",
+      "name": "ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-27-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_27_QUIZ_1X1"
+        ],
+        [
+          "CURATED_27_QUIZ_4X5"
+        ],
+        [
+          "CURATED_27_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548140660293",
+      "name": "ProblemAware QUIZ curated-08-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-08-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_08_QUIZ_1X1"
+        ],
+        [
+          "CURATED_08_QUIZ_4X5"
+        ],
+        [
+          "CURATED_08_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548077680293",
+      "name": "ProblemAware QUIZ curated-10-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-10-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_10_QUIZ_1X1"
+        ],
+        [
+          "CURATED_10_QUIZ_4X5"
+        ],
+        [
+          "CURATED_10_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548038020293",
+      "name": "ProblemAware QUIZ curated-15-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-15-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_15_QUIZ_1X1"
+        ],
+        [
+          "CURATED_15_QUIZ_4X5"
+        ],
+        [
+          "CURATED_15_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565364870293",
+      "name": "ProblemAware GLP curated-11-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-11-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_11_GLP_1X1"
+        ],
+        [
+          "CURATED_11_GLP_9X16"
+        ],
+        [
+          "CURATED_11_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245565425580293",
+      "name": "ProblemAware QUIZ curated-17-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-17-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "DISAPPROVED",
+      "has_review_feedback": true,
+      "has_issues_info": false,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [
+        "Unacceptable Business Practices"
+      ],
+      "image_labels": [
+        [
+          "CURATED_17_QUIZ_1X1"
+        ],
+        [
+          "CURATED_17_QUIZ_4X5"
+        ],
+        [
+          "CURATED_17_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548008420293",
+      "name": "ProblemAware QUIZ curated-14-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-14-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_14_QUIZ_1X1"
+        ],
+        [
+          "CURATED_14_QUIZ_4X5"
+        ],
+        [
+          "CURATED_14_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547965700293",
+      "name": "ProblemAware QUIZ curated-19-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-19-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_19_QUIZ_1X1"
+        ],
+        [
+          "CURATED_19_QUIZ_4X5"
+        ],
+        [
+          "CURATED_19_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547951800293",
+      "name": "ProblemAware QUIZ curated-13-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-13-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_13_QUIZ_1X1"
+        ],
+        [
+          "CURATED_13_QUIZ_4X5"
+        ],
+        [
+          "CURATED_13_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245565404140293",
+      "name": "ProblemAware QUIZ curated-24-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-24-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "DISAPPROVED",
+      "has_review_feedback": true,
+      "has_issues_info": false,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [
+        "Unacceptable Business Practices"
+      ],
+      "image_labels": [
+        [
+          "CURATED_24_QUIZ_4X5"
+        ],
+        [
+          "CURATED_24_QUIZ_1X1"
+        ],
+        [
+          "CURATED_24_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547937110293",
+      "name": "ProblemAware QUIZ curated-11-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-11-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_11_QUIZ_1X1"
+        ],
+        [
+          "CURATED_11_QUIZ_4X5"
+        ],
+        [
+          "CURATED_11_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547917060293",
+      "name": "ProblemAware QUIZ curated-12-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-12-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_12_QUIZ_4X5"
+        ],
+        [
+          "CURATED_12_QUIZ_1X1"
+        ],
+        [
+          "CURATED_12_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547887800293",
+      "name": "ProblemAware GLP curated-23-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-23-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_23_GLP_4X5"
+        ],
+        [
+          "CURATED_23_GLP_1X1"
+        ],
+        [
+          "CURATED_23_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547868430293",
+      "name": "ProblemAware QUIZ curated-20-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-20-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_20_QUIZ_1X1"
+        ],
+        [
+          "CURATED_20_QUIZ_4X5"
+        ],
+        [
+          "CURATED_20_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547837810293",
+      "name": "ProblemAware GLP curated-29-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-29-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_29_GLP_4X5"
+        ],
+        [
+          "CURATED_29_GLP_1X1"
+        ],
+        [
+          "CURATED_29_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547824270293",
+      "name": "ProblemAware QUIZ curated-17-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-17-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "WITH_ISSUES",
+      "has_review_feedback": false,
+      "has_issues_info": true,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [
+        "Can Not Enable Ad with Ad Review Rejected"
+      ],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_17_QUIZ_1X1"
+        ],
+        [
+          "CURATED_17_QUIZ_4X5"
+        ],
+        [
+          "CURATED_17_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547808120293",
+      "name": "ProblemAware QUIZ curated-16-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-16-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_16_QUIZ_1X1"
+        ],
+        [
+          "CURATED_16_QUIZ_4X5"
+        ],
+        [
+          "CURATED_16_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547761100293",
+      "name": "ProblemAware QUIZ curated-23-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-23-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_23_QUIZ_1X1"
+        ],
+        [
+          "CURATED_23_QUIZ_4X5"
+        ],
+        [
+          "CURATED_23_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547747030293",
+      "name": "ProblemAware QUIZ curated-24-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-24-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "WITH_ISSUES",
+      "has_review_feedback": false,
+      "has_issues_info": true,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [
+        "Can Not Enable Ad with Ad Review Rejected"
+      ],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_24_QUIZ_4X5"
+        ],
+        [
+          "CURATED_24_QUIZ_1X1"
+        ],
+        [
+          "CURATED_24_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547732230293",
+      "name": "ProblemAware QUIZ curated-29-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-29-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_29_QUIZ_1X1"
+        ],
+        [
+          "CURATED_29_QUIZ_4X5"
+        ],
+        [
+          "CURATED_29_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547719870293",
+      "name": "ProblemAware QUIZ curated-28-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-28-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_28_QUIZ_1X1"
+        ],
+        [
+          "CURATED_28_QUIZ_9X16"
+        ],
+        [
+          "CURATED_28_QUIZ_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245547694450293",
+      "name": "ProblemAware QUIZ curated-27-quiz - 52% Off + 90-Day Guarantee",
+      "groupKey": "curated-27-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_27_QUIZ_1X1"
+        ],
+        [
+          "CURATED_27_QUIZ_4X5"
+        ],
+        [
+          "CURATED_27_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547684690293",
+      "name": "ProblemAware QUIZ curated-30-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-30-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_30_QUIZ_1X1"
+        ],
+        [
+          "CURATED_30_QUIZ_4X5"
+        ],
+        [
+          "CURATED_30_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547677420293",
+      "name": "ProblemAware QUIZ curated-25-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-25-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_25_QUIZ_1X1"
+        ],
+        [
+          "CURATED_25_QUIZ_4X5"
+        ],
+        [
+          "CURATED_25_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547665850293",
+      "name": "ProblemAware GLP curated-11-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-11-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_11_GLP_1X1"
+        ],
+        [
+          "CURATED_11_GLP_9X16"
+        ],
+        [
+          "CURATED_11_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245547646580293",
+      "name": "ProblemAware QUIZ curated-09-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "curated-09-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_09_QUIZ_4X5"
+        ],
+        [
+          "CURATED_09_QUIZ_1X1"
+        ],
+        [
+          "CURATED_09_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547632290293",
+      "name": "ProblemAware QUIZ curated-07-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-07-quiz",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_07_QUIZ_1X1"
+        ],
+        [
+          "CURATED_07_QUIZ_4X5"
+        ],
+        [
+          "CURATED_07_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547621510293",
+      "name": "ProblemAware GLP curated-22-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-22-glp",
+      "status": "PAUSED",
+      "configured_status": "PAUSED",
+      "effective_status": "PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_22_GLP_1X1"
+        ],
+        [
+          "CURATED_22_GLP_9X16"
+        ],
+        [
+          "CURATED_22_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245548839200293",
+      "name": "ProblemAware GLP tenor-13-C013-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "tenor-13-C013-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_13_C013_GLP_1X1"
+        ],
+        [
+          "TENOR_13_C013_GLP_4X5"
+        ],
+        [
+          "TENOR_13_C013_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548847040293",
+      "name": "ProblemAware GLP tenor-12-C012-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-12-C012-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_12_C012_GLP_1X1"
+        ],
+        [
+          "TENOR_12_C012_GLP_9X16"
+        ],
+        [
+          "TENOR_12_C012_GLP_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245548603810293",
+      "name": "ProblemAware GLP curated-12-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-12-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_12_GLP_1X1"
+        ],
+        [
+          "CURATED_12_GLP_4X5"
+        ],
+        [
+          "CURATED_12_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548546910293",
+      "name": "ProblemAware GLP curated-21-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-21-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_21_GLP_1X1"
+        ],
+        [
+          "CURATED_21_GLP_4X5"
+        ],
+        [
+          "CURATED_21_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548941330293",
+      "name": "ProblemAware GLP tenor-01-C001-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "tenor-01-C001-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_01_C001_GLP_1X1"
+        ],
+        [
+          "TENOR_01_C001_GLP_4X5"
+        ],
+        [
+          "TENOR_01_C001_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548889430293",
+      "name": "ProblemAware GLP tenor-07-C003-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "tenor-07-C003-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_07_C003_GLP_1X1"
+        ],
+        [
+          "TENOR_07_C003_GLP_4X5"
+        ],
+        [
+          "TENOR_07_C003_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548830990293",
+      "name": "ProblemAware QUIZ tenor-14-C022-quiz - Stop Losing Drive. Start Today.",
+      "groupKey": "tenor-14-C022-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "TENOR_14_C022_QUIZ_1X1"
+        ],
+        [
+          "TENOR_14_C022_QUIZ_4X5"
+        ],
+        [
+          "TENOR_14_C022_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547710850293",
+      "name": "ProblemAware QUIZ curated-26-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-26-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_26_QUIZ_4X5"
+        ],
+        [
+          "CURATED_26_QUIZ_1X1"
+        ],
+        [
+          "CURATED_26_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547655270293",
+      "name": "ProblemAware QUIZ curated-02-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-02-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "DISAPPROVED",
+      "has_review_feedback": true,
+      "has_issues_info": false,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [
+        "Unacceptable Business Practices"
+      ],
+      "image_labels": [
+        [
+          "CURATED_02_QUIZ_1X1"
+        ],
+        [
+          "CURATED_02_QUIZ_4X5"
+        ],
+        [
+          "CURATED_02_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548619770293",
+      "name": "ProblemAware GLP curated-08-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-08-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_08_GLP_1X1"
+        ],
+        [
+          "CURATED_08_GLP_4X5"
+        ],
+        [
+          "CURATED_08_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548634220293",
+      "name": "ProblemAware GLP curated-10-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-10-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_10_GLP_1X1"
+        ],
+        [
+          "CURATED_10_GLP_4X5"
+        ],
+        [
+          "CURATED_10_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548559220293",
+      "name": "ProblemAware GLP curated-20-glp - Keep Your Drive Steady on GLP-1s",
+      "groupKey": "curated-20-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_20_GLP_1X1"
+        ],
+        [
+          "CURATED_20_GLP_4X5"
+        ],
+        [
+          "CURATED_20_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548379050293",
+      "name": "ProblemAware GLP curated-15-glp - The GLP-1 Side Effect No One Mentions",
+      "groupKey": "curated-15-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_15_GLP_1X1"
+        ],
+        [
+          "CURATED_15_GLP_4X5"
+        ],
+        [
+          "CURATED_15_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245548456240293",
+      "name": "ProblemAware GLP curated-16-glp - What GLP-1 Does to Your Drive",
+      "groupKey": "curated-16-glp",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "DISAPPROVED",
+      "has_review_feedback": true,
+      "has_issues_info": false,
+      "review_rejected_like": true,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [
+        "Unacceptable Business Practices"
+      ],
+      "image_labels": [
+        [
+          "CURATED_16_GLP_4X5"
+        ],
+        [
+          "CURATED_16_GLP_1X1"
+        ],
+        [
+          "CURATED_16_GLP_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547857090293",
+      "name": "ProblemAware QUIZ curated-18-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-18-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_18_QUIZ_1X1"
+        ],
+        [
+          "CURATED_18_QUIZ_9X16"
+        ],
+        [
+          "CURATED_18_QUIZ_4X5"
+        ]
+      ]
+    },
+    {
+      "id": "120245547775070293",
+      "name": "ProblemAware QUIZ curated-22-quiz - 52% Off Limited-Time Welcome Offer",
+      "groupKey": "curated-22-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_22_QUIZ_1X1"
+        ],
+        [
+          "CURATED_22_QUIZ_4X5"
+        ],
+        [
+          "CURATED_22_QUIZ_9X16"
+        ]
+      ]
+    },
+    {
+      "id": "120245547787990293",
+      "name": "ProblemAware QUIZ curated-21-quiz - 90-Day Guarantee. Because It Works.",
+      "groupKey": "curated-21-quiz",
+      "status": "ACTIVE",
+      "configured_status": "ACTIVE",
+      "effective_status": "CAMPAIGN_PAUSED",
+      "has_review_feedback": false,
+      "has_issues_info": false,
+      "review_rejected_like": false,
+      "variant_count": 3,
+      "issue_summaries": [],
+      "feedback_keys": [],
+      "image_labels": [
+        [
+          "CURATED_21_QUIZ_1X1"
+        ],
+        [
+          "CURATED_21_QUIZ_4X5"
+        ],
+        [
+          "CURATED_21_QUIZ_9X16"
+        ]
+      ]
+    }
+  ]
+}

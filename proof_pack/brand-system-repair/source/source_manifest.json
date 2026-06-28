@@ -1,0 +1,26 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "source",
+  "created_at": "2026-05-20T23:06:13.063344+00:00",
+  "source_type": "html",
+  "source": "/Users/aldrinclement/Downloads/Moz Design System.html",
+  "operator_notes": "",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/source/raw/Moz Design System.html",
+      "kind": "raw_files",
+      "sha256": "705864ba938f418e4b1833c2cd502e1bd6869bef7cfb5a956519128c817049b2",
+      "bytes": 487510,
+      "captured_at": "2026-05-20T23:06:17.426028+00:00",
+      "source": "/Users/aldrinclement/Downloads/Moz Design System.html",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-20T23:06:17.500151+00:00",
+    "errors": []
+  }
+}

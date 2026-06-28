@@ -1,0 +1,109 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "native_subagents",
+  "reason": "Ship loop used independent read-only audit and verification lanes while the main thread repaired and integrated the implementation.",
+  "token_time_proxy": {
+    "provenance": "concrete",
+    "source": "Lane count and proof artifacts recorded in this file.",
+    "lane_count": 3,
+    "native_subagents": 2,
+    "local_parallel_tool_batches": 9,
+    "proof_artifacts": 9
+  },
+  "lanes": [
+    {
+      "lane_id": "explorer-volta",
+      "agent_id": "019e46d5-c213-7e01-b146-02495d4ce25c",
+      "objective": "Read-only audit of Phase 1 and Phase 2 implementation coverage against the plan.",
+      "role": "explorer",
+      "mode": "native_subagent",
+      "status": "pass",
+      "started_at": "2026-05-20T19:20:00Z",
+      "ended_at": "2026-05-20T19:24:00Z",
+      "read_scope": [
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/design-system.css",
+        "mos/frontend/src/components/onboarding",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx",
+        "mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx"
+      ],
+      "write_scope": [],
+      "artifacts": [
+        "lane-notes/explorer-volta.md"
+      ],
+      "summary": "Found missing Phase 2 flow, unused first-run primitives, missing design-system first-run previews, and missing tests."
+    },
+    {
+      "lane_id": "verifier-boole",
+      "agent_id": "019e46d5-d164-7162-9edf-79d399e03a7f",
+      "objective": "Run safe local verification and inspect proof validators.",
+      "role": "verifier",
+      "mode": "native_subagent",
+      "status": "pass",
+      "started_at": "2026-05-20T19:20:00Z",
+      "ended_at": "2026-05-20T19:24:00Z",
+      "read_scope": [
+        "proof_pack/design-system-ferndesk-2026-05-20",
+        "mos/frontend/package.json"
+      ],
+      "write_scope": [
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-semantic-ui-20260520-142140.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-first-run-shell-vitest-20260520-142144.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/verification-lane-build-20260520-142150.log"
+      ],
+      "artifacts": [
+        "lane-notes/verifier-boole.md",
+        "logs/verification-lane-semantic-ui-20260520-142140.log",
+        "logs/verification-lane-first-run-shell-vitest-20260520-142144.log",
+        "logs/verification-lane-build-20260520-142150.log"
+      ],
+      "summary": "Confirmed semantic/build passed but targeted test, planctl, and lanecheck failed on missing artifacts before repair."
+    },
+    {
+      "lane_id": "main-repair",
+      "objective": "Repair implementation gaps, integrate first-run flow, run final validation, and update proof pack.",
+      "role": "main_thread",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-20T19:24:00Z",
+      "ended_at": "2026-05-20T19:43:12Z",
+      "read_scope": [
+        "docs/plans/2026-05-20-ferndesk-design-system-onboarding-plan.md",
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx",
+        "mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx"
+      ],
+      "write_scope": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/onboarding/FirstRunShell.test.tsx",
+        "mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx",
+        "mos/frontend/src/pages/workspaces/BrandDesignSystemPage.tsx",
+        "proof_pack/design-system-ferndesk-2026-05-20/lane-proof.json",
+        "proof_pack/design-system-ferndesk-2026-05-20/lane-notes/main-repair.md",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/semantic-ui.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/onboarding-components-vitest.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/frontend-vitest-full.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/logs/vite-build.log",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-desktop.png",
+        "proof_pack/design-system-ferndesk-2026-05-20/screenshots/workspace-onboarding-mobile.png"
+      ],
+      "artifacts": [
+        "lane-notes/main-repair.md",
+        "logs/semantic-ui.log",
+        "logs/onboarding-components-vitest.log",
+        "logs/frontend-vitest-full.log",
+        "logs/vite-build.log",
+        "screenshots/workspace-onboarding-desktop.png",
+        "screenshots/workspace-onboarding-mobile.png"
+      ],
+      "summary": "Repaired flow, simplified /workspaces/new into one page, hid setup context behind a debug toggle, removed sticky overlap, updated tests, screenshots, and final proof artifacts."
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "Codex main thread",
+    "summary": "Audit and verifier lane blockers were repaired. User visual feedback was integrated after the first pass. Final checks pass except the original Jest-style --runInBand command, which is not supported by Vitest and was replaced with full npm test."
+  }
+}

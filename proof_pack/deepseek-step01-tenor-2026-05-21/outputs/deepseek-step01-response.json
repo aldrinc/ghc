@@ -1,0 +1,19 @@
+{
+  "model": "deepseek-v4-pro",
+  "usage": {
+    "prompt_tokens": 9911,
+    "completion_tokens": 7000,
+    "total_tokens": 16911,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1531
+    },
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 9911
+  },
+  "id": "fb258831-7c68-474b-bb4d-7258c115c059",
+  "elapsed_ms": 241769,
+  "finish_reason": "length"
+}

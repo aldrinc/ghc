@@ -1,0 +1,58 @@
+{
+  "asset_briefs": [
+    {
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "experimentId": "tenor-glp-quiz-gpt-image2",
+      "funnelId": null,
+      "deliveryMode": "external_urls",
+      "requirements": [
+        {
+          "channel": "meta",
+          "format": "image",
+          "funnelStage": "pre-sales",
+          "destinationType": "pre-sales",
+          "hook": "Package supplied row",
+          "angle": "Use the supplied row-level swipe image, copy, and destination."
+        }
+      ],
+      "constraints": [],
+      "toneGuidelines": [],
+      "visualGuidelines": [],
+      "id": "brief_glp_listicle_swipe_image2",
+      "variantId": "glp-listicle",
+      "variantName": "GLP Listicle",
+      "destinationType": "pre-sales",
+      "destinationLabel": "GLP listicle presale",
+      "creativeConcept": "Source creative remixes routed to the GLP listicle presale."
+    },
+    {
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+      "experimentId": "tenor-glp-quiz-gpt-image2",
+      "funnelId": null,
+      "deliveryMode": "external_urls",
+      "requirements": [
+        {
+          "channel": "meta",
+          "format": "image",
+          "funnelStage": "pre-sales",
+          "destinationType": "pre-sales",
+          "hook": "Package supplied row",
+          "angle": "Use the supplied row-level swipe image, copy, and destination."
+        }
+      ],
+      "constraints": [],
+      "toneGuidelines": [],
+      "visualGuidelines": [],
+      "id": "brief_quiz_funnel_swipe_image2",
+      "variantId": "quiz-funnel",
+      "variantName": "Quiz Funnel",
+      "destinationType": "pre-sales",
+      "destinationLabel": "Quiz presale",
+      "creativeConcept": "Source creative remixes routed to the quiz presale."
+    }
+  ],
+  "source": "tenor-glp-quiz-gpt-image2-full-launch",
+  "packageDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04"
+}

@@ -1,0 +1,59 @@
+{
+  "checkedAt": "2026-05-22T23:03:51.787Z",
+  "desktop": {
+    "url": "http://localhost:5275/workspaces/execution/social-agents",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "docWidth": 1265,
+    "bodyWidth": 1265,
+    "horizontalOverflow": false,
+    "slideCards": 6,
+    "visibleTextareas": 0,
+    "primaryButtons": [
+      {
+        "text": "Test",
+        "ariaLabel": "Start test"
+      }
+    ],
+    "primaryCount": 1,
+    "exactAssetsButtonCount": 0,
+    "visibleToolbarLabels": [
+      "Media",
+      "Generate",
+      "Render",
+      "Use",
+      "Editor"
+    ],
+    "screenshot": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-desktop.png"
+  },
+  "mobile": {
+    "url": "http://localhost:5275/workspaces/execution/social-agents",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "docWidth": 375,
+    "bodyWidth": 375,
+    "horizontalOverflow": false,
+    "slideCards": 6,
+    "visibleTextareas": 0,
+    "primaryButtons": [
+      {
+        "text": "Test",
+        "ariaLabel": "Start test"
+      }
+    ],
+    "primaryCount": 1,
+    "exactAssetsButtonCount": 0,
+    "visibleToolbarLabels": [
+      "Media",
+      "Generate",
+      "Render",
+      "Use",
+      "Editor"
+    ],
+    "screenshot": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/review-visual-mobile.png"
+  }
+}

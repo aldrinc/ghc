@@ -708,6 +708,102 @@ class SkillsRuntimeRegistryService:
                     ],
                 },
             },
+            {
+                "key": "meta-ads-manager",
+                "name": "Meta Ads Manager",
+                "description": "Read Meta ad snapshots and create approval-gated media buying proposals.",
+                "profile_json": {
+                    "skillChain": [
+                        {"name": "FutrGroup_pipeline-orchestrator", "role": "Workflow sequencing"},
+                        {"name": "FutrGroup_signal-hunter", "role": "Performance pattern synthesis"},
+                        {"name": "FutrGroup_opportunity-engine", "role": "Experiment strategy"},
+                    ],
+                    "supportingDocRoles": [
+                        "v3_claude",
+                        "v3_onboarding",
+                        "v3_agents",
+                        "ember_workflow",
+                        "ember_chat_prompts",
+                    ],
+                    "toolsets": [
+                        "mos.connected_social.read",
+                        "mos.connected_social.action_proposals",
+                        "mos.meta_ads.snapshots",
+                    ],
+                    "runtimeRules": [
+                        "Use only mOS-provided Meta snapshots and workspace artifacts as source data.",
+                        "Do not access raw Meta tokens or call Meta APIs directly.",
+                        "Create action proposals for every external write; do not execute provider mutations.",
+                        "Do not invent spend, conversions, dates, account ids, or performance labels.",
+                    ],
+                },
+            },
+            {
+                "key": "social-media-manager",
+                "name": "Social Media Manager",
+                "description": "Draft and analyze social content through approval-gated publishing workflows.",
+                "profile_json": {
+                    "skillChain": [
+                        {"name": "FutrGroup_pipeline-orchestrator", "role": "Workflow sequencing"},
+                        {"name": "FutrGroup_signal-hunter", "role": "Audience and content insight synthesis"},
+                        {"name": "FutrGroup_copy-forge", "role": "Platform-native post drafting"},
+                    ],
+                    "supportingDocRoles": [
+                        "v3_claude",
+                        "v3_onboarding",
+                        "v3_agents",
+                        "ember_workflow",
+                        "ember_chat_prompts",
+                    ],
+                    "toolsets": [
+                        "mos.connected_social.read",
+                        "mos.connected_social.action_proposals",
+                        "mos.postiz.handoff",
+                    ],
+                    "runtimeRules": [
+                        "Draft social content from approved mOS strategy, product, and campaign context.",
+                        "Create Postiz handoff proposals for compose/schedule/publish work; Postiz remains the system of record for posting.",
+                        "Do not publish, schedule, reply, or mutate social provider state from the agent runtime.",
+                        "Use provider analytics only when they are available from Postiz or source-backed mOS snapshots.",
+                        "Surface missing channel, permission, or analytics data as a blocker.",
+                    ],
+                },
+            },
+            {
+                "key": "tiktok-carousel-growth-manager",
+                "name": "TikTok Carousel Growth Manager",
+                "description": "Plan TikTok carousel experiments and conversion-backed next actions.",
+                "profile_json": {
+                    "skillChain": [
+                        {"name": "FutrGroup_pipeline-orchestrator", "role": "Workflow sequencing"},
+                        {"name": "FutrGroup_signal-hunter", "role": "Hook and competitor signal synthesis"},
+                        {"name": "FutrGroup_opportunity-engine", "role": "Growth experiment strategy"},
+                        {"name": "FutrGroup_copy-forge", "role": "Carousel overlay and caption drafting"},
+                    ],
+                    "supportingDocRoles": [
+                        "v3_claude",
+                        "v3_onboarding",
+                        "v3_agents",
+                        "ember_workflow",
+                        "ember_chat_prompts",
+                    ],
+                    "toolsets": [
+                        "mos.growth_programs.read",
+                        "mos.growth_programs.variants",
+                        "mos.connected_social.action_proposals",
+                        "mos.postiz.handoff",
+                        "postiz.analytics.read",
+                        "mos.conversion_sources.read",
+                    ],
+                    "runtimeRules": [
+                        "Treat content growth program records as the source of truth.",
+                        "Create six-slide TikTok carousel storyboards unless the growth program specifies another format.",
+                        "Do not change image generation provider or model configuration.",
+                        "Create Postiz handoff proposals only; Postiz owns compose, schedule, publish, post status, and provider-specific posting state.",
+                        "Label attribution confidence; do not present heuristic timing correlation as concrete conversion proof.",
+                    ],
+                },
+            },
         ]
 
     @staticmethod

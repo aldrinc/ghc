@@ -1,0 +1,30 @@
+User-Agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /_next/
+Crawl-delay: 1
+
+User-Agent: Googlebot
+Allow: /
+Disallow: /_next/
+
+User-Agent: Bingbot
+Allow: /
+Disallow: /_next/
+
+User-Agent: AhrefsBot
+User-Agent: MJ12bot
+User-Agent: DotBot
+User-Agent: SemrushBot
+User-Agent: MegaIndex
+Disallow: /
+
+User-Agent: GPTBot
+User-Agent: ChatGPT-User
+User-Agent: CCBot
+User-Agent: anthropic-ai
+User-Agent: Claude-Web
+Disallow: /
+
+Sitemap: https://peptideprice.store/sitemap.xml

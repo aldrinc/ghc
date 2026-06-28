@@ -1,0 +1,90 @@
+{
+  "base_url": "http://127.0.0.1:9380",
+  "dataset_id": "fc9b56f059fb11f18c4395dfede317ef",
+  "document_id": "fc9ee20c59fb11f18c4395dfede317ef",
+  "embedding_model": "bge-m3@Ollama",
+  "finished_at": "2026-05-27T13:43:51-0500",
+  "retrieval": {
+    "chunks": [
+      {
+        "content": "\nThis is a local RAGFlow smoke test document for MOS.\nThe retrieval sentinel is MOS_RAGFLOW_BGE_M3_LOCAL_VECTOR_BRIDGE_20260527.\nIf RAGFlow indexed the document with local BGE-M3 embeddings, retrieval should return this sentence.\n",
+        "content_ltks": "\nThis is a local RAGFlow smoke test document for MOS.\nThe retrieval sentinel is MOS_RAGFLOW_BGE_M3_LOCAL_VECTOR_BRIDGE_20260527.\nIf RAGFlow indexed the document with local BGE-M3 embeddings, retrieval should return this sentence.\n",
+        "dataset_id": "fc9b56f059fb11f18c4395dfede317ef",
+        "doc_type_kwd": [],
+        "document_id": "fc9ee20c59fb11f18c4395dfede317ef",
+        "document_keyword": "ragflow-local-smoke-doc.txt",
+        "id": "f5b33c3808fadf5f",
+        "image_id": "",
+        "important_keywords": [],
+        "mom_id": "",
+        "positions": [
+          [
+            2,
+            1,
+            1,
+            1,
+            1
+          ]
+        ],
+        "row_id": 0,
+        "similarity": 0.696896493434906,
+        "tag_kwd": [],
+        "term_similarity": 0.696896493434906,
+        "vector_similarity": 0.696896493434906
+      }
+    ],
+    "doc_aggs": [
+      {
+        "count": 1,
+        "doc_id": "fc9ee20c59fb11f18c4395dfede317ef",
+        "doc_name": "ragflow-local-smoke-doc.txt"
+      }
+    ],
+    "total": 1
+  },
+  "sentinel": "MOS_RAGFLOW_BGE_M3_LOCAL_VECTOR_BRIDGE_20260527",
+  "started_at": "2026-05-27T13:43:43-0500",
+  "status": "PASS",
+  "steps": [
+    {
+      "at": "2026-05-27T13:43:43-0500",
+      "data": {
+        "dataset_id": "fc9b56f059fb11f18c4395dfede317ef",
+        "name": "mos-ragflow-bge-m3-smoke-1779907423"
+      },
+      "step": "dataset_created"
+    },
+    {
+      "at": "2026-05-27T13:43:43-0500",
+      "data": {
+        "document_id": "fc9ee20c59fb11f18c4395dfede317ef",
+        "document_name": "ragflow-local-smoke-doc.txt"
+      },
+      "step": "document_uploaded"
+    },
+    {
+      "at": "2026-05-27T13:43:43-0500",
+      "data": {
+        "document_id": "fc9ee20c59fb11f18c4395dfede317ef"
+      },
+      "step": "parse_started"
+    },
+    {
+      "at": "2026-05-27T13:43:51-0500",
+      "data": {
+        "chunk_count": 1,
+        "document_id": "fc9ee20c59fb11f18c4395dfede317ef",
+        "run": "DONE"
+      },
+      "step": "parse_done"
+    },
+    {
+      "at": "2026-05-27T13:43:51-0500",
+      "data": {
+        "chunk_count": 1,
+        "sentinel_found": true
+      },
+      "step": "retrieval_done"
+    }
+  ]
+}

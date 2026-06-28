@@ -43,7 +43,7 @@ import defaults from "./defaults.json";
 import styles from "./pdpPage.module.css";
 import baseStyles from "./salesPdpTemplate.module.css";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
-import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/funnelRuntime";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
   resolveDesignSystemBrandLogoVariant,

@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-22T00:00:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user specified the target surface, desired output, required Kimi/DeepInfra model, harness requirement, and plan-only intent. Local code inspection plus Kimi output supplied enough evidence for a plan without interrupting for clarifications.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Goal is a clear operator workbench for Social Agents."
+    },
+    "problem_log": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Observable blocker is same-weight resource blocks and detached queue/assets tabs."
+    },
+    "root_cause_diagnosis": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Root cause is UI organized by backend resources instead of operator workflow."
+    },
+    "current_machine": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Current machine shows callouts, form stack, sidebar, and separate tabs."
+    },
+    "designed_machine": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Designed machine is a stage workbench with persistent context and secondary panels."
+    },
+    "worst_day_test": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "No program/assets, pending proposal, and mobile viewport must still be usable."
+    },
+    "leading_lagging_metrics": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Leading metrics are tests and screenshots; lagging metrics are route-stable handoff and Postiz ownership reviewability."
+    },
+    "owner_date_review": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Owner is Codex main thread; review after unit/build/browser checks."
+    },
+    "stop_condition": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+      "summary": "Plan stops after artifacts and plangatecheck pass; implementation waits for Ship the plan."
+    }
+  },
+  "owner": "Codex main thread",
+  "review_date": "2026-05-22",
+  "stop_condition": "Plan is final only after Kimi raw output is captured and plangatecheck passes."
+}

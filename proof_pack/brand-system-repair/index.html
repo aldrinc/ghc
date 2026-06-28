@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Proof Dashboard</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172026; background: #f7f8fa; }
+    header { padding: 24px 28px; background: #172026; color: white; }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    h2 { margin: 26px 0 10px; font-size: 17px; }
+    main { padding: 22px 28px 36px; max-width: 1180px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .card { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 14px; }
+    .label { color: #5b6875; font-size: 12px; text-transform: uppercase; }
+    .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pass { background: #d9f4e4; color: #146c3c; }
+    .fail { background: #ffe1df; color: #9c231e; }
+    .warn { background: #fff1c7; color: #7b5600; }
+    .neutral { background: #e9edf2; color: #4b5663; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d9dee5; border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e7ebef; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #eef2f6; font-size: 12px; color: #394653; }
+    tr:last-child td { border-bottom: 0; }
+    code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Codex Proof Dashboard</h1>
+    <div>MOS Brand System Repair</div>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="card"><div class="label">Plan Contract</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Source Manifest</div><div class="value"><span class="pill pass">pass</span></div></div>
+      <div class="card"><div class="label">Provenance</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Planning Gate</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Plan Questions</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Parallelism</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Lanes</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Proof Files</div><div class="value">50</div></div>
+    </section>
+
+    <h2>Plan Items</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Status</th><th>Objective</th><th>Expected Files</th><th>Artifacts</th></tr></thead>
+      <tbody><tr><td>P01</td><td><span class='pill pass'>done</span></td><td>Replace copied Manus design tokens with neutral MOS tokens and define every token currently used by components.</td><td>../../mos/frontend/src/styles/theme.css</td><td>token-check.log</td></tr>
+<tr><td>P02</td><td><span class='pill pass'>done</span></td><td>Add missing first-run, choice-card, and enhanced input CSS so onboarding primitives render as designed.</td><td>../../mos/frontend/src/styles/design-system.css</td><td>semantic-ui.log, component-review.png, onboarding.png</td></tr>
+<tr><td>P03</td><td><span class='pill pass'>done</span></td><td>Restore sign-in routing to the existing `/sign-in` path flow while keeping the neutral wordmark untouched.</td><td>../../mos/frontend/src/pages/auth/SignInPage.tsx</td><td>signin-routing.log</td></tr>
+<tr><td>P04</td><td><span class='pill pass'>done</span></td><td>Validate with static token checks, frontend build, component review screenshot, onboarding screenshot, and workspace screenshot.</td><td>component-review.png, onboarding.png, workspaces.png</td><td>build.log, workspaces.png, unit-tests.log, browser-proof.json</td></tr>
+<tr><td>P05</td><td><span class='pill pass'>done</span></td><td>Remove the split-panel onboarding page treatment and validate the actual onboarding page as a single focused flow.</td><td>../../mos/frontend/src/components/clients/OnboardingWizard.tsx, ../../mos/frontend/src/components/onboarding/FirstRunShell.tsx, onboarding.png</td><td>onboarding.png, browser-proof.json</td></tr>
+<tr><td>P06</td><td><span class='pill pass'>done</span></td><td>Repair the workspace Cards/List segmented selector and validate it in the live workspaces UI.</td><td>../../mos/frontend/src/pages/workspaces/WorkspacesPage.tsx, ../../mos/frontend/src/styles/design-system.css, workspaces.png</td><td>workspaces.png, browser-proof.json, segmented-control.log</td></tr>
+<tr><td>P07</td><td><span class='pill pass'>done</span></td><td>Repair onboarding progress behavior and typography readability, then validate the exact branch-choice sequence in browser.</td><td>../../mos/frontend/src/components/clients/OnboardingWizard.tsx, ../../mos/frontend/src/components/clients/OnboardingWizard.test.tsx, ../../mos/frontend/src/components/ui/field.tsx, ../../mos/frontend/src/components/ui/input.tsx, ../../mos/frontend/src/components/ui/textarea.tsx, ../../mos/frontend/src/styles/design-system.css, ../../mos/frontend/src/styles/globals.css, onboarding-progress-typography.png, onboarding-progress-typography-proof.json</td><td>onboarding-progress-typography.png, onboarding-progress-typography-proof.json, browser-proof.json, build.log</td></tr></tbody>
+    </table>
+
+    <h2>Plan Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Plan Warnings</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Provenance Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Blocked Source Items</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Planning Gate Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> unknown</div>
+      <div><strong>Skill loaded:</strong> </div>
+      <div><strong>Questions:</strong> 0</div>
+      <div><strong>Question rationale:</strong> </div>
+      <div><strong>Owner:</strong> </div>
+      <div><strong>Review:</strong> </div>
+      <div><strong>Stop:</strong> </div>
+    </div>
+    <table>
+      <thead><tr><th>Artifact</th><th>Path</th><th>Summary</th></tr></thead>
+      <tbody><tr><td colspan='3'>No planning gate proof loaded.</td></tr></tbody>
+    </table>
+
+    <h2>Parallel Lane Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> unknown</div>
+      <div><strong>Reason:</strong> </div>
+      <div><strong>Fan-in:</strong> unknown</div>
+      <ul><li>none</li></ul>
+    </div>
+    <table>
+      <thead><tr><th>Lane</th><th>Role</th><th>Mode</th><th>Status</th><th>Write Scope</th><th>Artifacts</th><th>Summary</th></tr></thead>
+      <tbody><tr><td colspan='7'>No lane proof loaded.</td></tr></tbody>
+    </table>
+
+    <h2>Proof Files</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Type</th><th>Path</th></tr></thead>
+      <tbody><tr><td>PLAN.contract.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/PLAN.contract.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/PLAN.contract.json</a></td></tr>
+<tr><td>PLAN.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/PLAN.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/PLAN.md</a></td></tr>
+<tr><td>browser-proof.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/browser-proof.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/browser-proof.json</a></td></tr>
+<tr><td>build.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/build.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/build.log</a></td></tr>
+<tr><td>check-theme-tokens.cjs</td><td>.cjs</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/check-theme-tokens.cjs'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/check-theme-tokens.cjs</a></td></tr>
+<tr><td>component-review-5275.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/component-review-5275.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/component-review-5275.png</a></td></tr>
+<tr><td>component-review.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/component-review.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/component-review.png</a></td></tr>
+<tr><td>onboarding-progress-typography-proof.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding-progress-typography-proof.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding-progress-typography-proof.json</a></td></tr>
+<tr><td>onboarding-progress-typography.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding-progress-typography.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding-progress-typography.png</a></td></tr>
+<tr><td>onboarding-single-panel.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding-single-panel.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding-single-panel.log</a></td></tr>
+<tr><td>onboarding.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/onboarding.png</a></td></tr>
+<tr><td>planctl-verify.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/planctl-verify.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/planctl-verify.log</a></td></tr>
+<tr><td>planctl-repair-prompt.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/planctl-repair-prompt.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/planctl-repair-prompt.md</a></td></tr>
+<tr><td>planctl-repair.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/planctl-repair.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/planctl-repair.json</a></td></tr>
+<tr><td>verify-20260520-181403-Users-aldrinclement-.codex-bin-planctl-verify-proof_pack-brand-system-repair-PL.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-Users-aldrinclement-.codex-bin-planctl-verify-proof_pack-brand-system-repair-PL.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-Users-aldrinclement-.codex-bin-planctl-verify-proof_pack-brand-system-repair-PL.log</a></td></tr>
+<tr><td>verify-20260520-181403-bash--lc-rg-visual-onboardingVisual-isFirstStep-mos-frontend-src-components-clie.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-bash--lc-rg-visual-onboardingVisual-isFirstStep-mos-frontend-src-components-clie.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-bash--lc-rg-visual-onboardingVisual-isFirstStep-mos-frontend-src-components-clie.log</a></td></tr>
+<tr><td>verify-20260520-181403-node-proof_pack-brand-system-repair-check-theme-tokens.cjs.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-node-proof_pack-brand-system-repair-check-theme-tokens.cjs.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-node-proof_pack-brand-system-repair-check-theme-tokens.cjs.log</a></td></tr>
+<tr><td>verify-20260520-181403-npm-run---silent-build.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-npm-run---silent-build.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-npm-run---silent-build.log</a></td></tr>
+<tr><td>verify-20260520-181403-npm-run---silent-check-semantic-ui.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-npm-run---silent-check-semantic-ui.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-npm-run---silent-check-semantic-ui.log</a></td></tr>
+<tr><td>verify-20260520-181403-rg-mos-segmented-control-mos-segmented-option-mos-frontend-src-pages-workspaces.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-rg-mos-segmented-control-mos-segmented-option-mos-frontend-src-pages-workspaces.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-rg-mos-segmented-control-mos-segmented-option-mos-frontend-src-pages-workspaces.log</a></td></tr>
+<tr><td>verify-20260520-181403-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-mos-frontend-src-pages-aut.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-mos-frontend-src-pages-aut.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181403-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-mos-frontend-src-pages-aut.log</a></td></tr>
+<tr><td>verify-20260520-181450-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181450-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181450-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</a></td></tr>
+<tr><td>verify-20260520-181450-node-check-theme-tokens.cjs.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181450-node-check-theme-tokens.cjs.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181450-node-check-theme-tokens.cjs.log</a></td></tr>
+<tr><td>verify-20260520-181451-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181451-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181451-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</a></td></tr>
+<tr><td>verify-20260520-181451-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-Users-aldrinclement-Docume.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181451-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-Users-aldrinclement-Docume.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181451-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-Users-aldrinclement-Docume.log</a></td></tr>
+<tr><td>verify-20260520-181504-bash--lc-rg-visual-onboardingVisual-isFirstStep-Users-aldrinclement-Documents-pr.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181504-bash--lc-rg-visual-onboardingVisual-isFirstStep-Users-aldrinclement-Documents-pr.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181504-bash--lc-rg-visual-onboardingVisual-isFirstStep-Users-aldrinclement-Documents-pr.log</a></td></tr>
+<tr><td>verify-20260520-181504-rg-mos-segmented-control-mos-segmented-option-Users-aldrinclement-Documents-prog.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181504-rg-mos-segmented-control-mos-segmented-option-Users-aldrinclement-Documents-prog.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181504-rg-mos-segmented-control-mos-segmented-option-Users-aldrinclement-Documents-prog.log</a></td></tr>
+<tr><td>verify-20260520-181505-Users-aldrinclement-.codex-bin-planctl-verify-Users-aldrinclement-Documents-pro.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181505-Users-aldrinclement-.codex-bin-planctl-verify-Users-aldrinclement-Documents-pro.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-181505-Users-aldrinclement-.codex-bin-planctl-verify-Users-aldrinclement-Documents-pro.log</a></td></tr>
+<tr><td>verify-20260520-182300-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182300-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182300-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</a></td></tr>
+<tr><td>verify-20260520-182300-node-check-theme-tokens.cjs.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182300-node-check-theme-tokens.cjs.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182300-node-check-theme-tokens.cjs.log</a></td></tr>
+<tr><td>verify-20260520-182301-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182301-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182301-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</a></td></tr>
+<tr><td>verify-20260520-182301-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-Users-aldrinclement-Docume.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182301-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-Users-aldrinclement-Docume.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182301-rg-routing-path-span-style-wordmarkTextStyle-mOS-span-Users-aldrinclement-Docume.log</a></td></tr>
+<tr><td>verify-20260520-182316-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182316-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182316-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</a></td></tr>
+<tr><td>verify-20260520-182316-bash--lc-rg-visual-onboardingVisual-isFirstStep-Users-aldrinclement-Documents-pr.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182316-bash--lc-rg-visual-onboardingVisual-isFirstStep-Users-aldrinclement-Documents-pr.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182316-bash--lc-rg-visual-onboardingVisual-isFirstStep-Users-aldrinclement-Documents-pr.log</a></td></tr>
+<tr><td>verify-20260520-182316-rg-mos-segmented-control-mos-segmented-option-Users-aldrinclement-Documents-prog.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182316-rg-mos-segmented-control-mos-segmented-option-Users-aldrinclement-Documents-prog.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182316-rg-mos-segmented-control-mos-segmented-option-Users-aldrinclement-Documents-prog.log</a></td></tr>
+<tr><td>verify-20260520-182320-Users-aldrinclement-.codex-bin-planctl-verify-Users-aldrinclement-Documents-pro.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182320-Users-aldrinclement-.codex-bin-planctl-verify-Users-aldrinclement-Documents-pro.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182320-Users-aldrinclement-.codex-bin-planctl-verify-Users-aldrinclement-Documents-pro.log</a></td></tr>
+<tr><td>verify-20260520-182320-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182320-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182320-bash--lc-cd-Users-aldrinclement-Documents-programming-marketi-mos-frontend-npm-r.log</a></td></tr>
+<tr><td>verify-20260520-182320-node-check-theme-tokens.cjs.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182320-node-check-theme-tokens.cjs.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/proof_pack/verify-20260520-182320-node-check-theme-tokens.cjs.log</a></td></tr>
+<tr><td>segmented-control-rg.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/segmented-control-rg.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/segmented-control-rg.log</a></td></tr>
+<tr><td>segmented-control.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/segmented-control.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/segmented-control.log</a></td></tr>
+<tr><td>semantic-ui.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/semantic-ui.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/semantic-ui.log</a></td></tr>
+<tr><td>signin-clerk.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/signin-clerk.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/signin-clerk.png</a></td></tr>
+<tr><td>signin-routing.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/signin-routing.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/signin-routing.log</a></td></tr>
+<tr><td>Moz Design System.html</td><td>.html</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/source/raw/Moz%20Design%20System.html'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/source/raw/Moz Design System.html</a></td></tr>
+<tr><td>source_manifest.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/source/source_manifest.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/source/source_manifest.json</a></td></tr>
+<tr><td>token-check.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/token-check.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/token-check.log</a></td></tr>
+<tr><td>unit-tests.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/unit-tests.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/unit-tests.log</a></td></tr>
+<tr><td>workspaces-current.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/workspaces-current.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/workspaces-current.png</a></td></tr>
+<tr><td>workspaces-proof.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/workspaces-proof.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/workspaces-proof.json</a></td></tr>
+<tr><td>workspaces.png</td><td>.png</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/workspaces.png'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/brand-system-repair/workspaces.png</a></td></tr></tbody>
+    </table>
+  </main>
+</body>
+</html>

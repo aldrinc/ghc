@@ -1,0 +1,87 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Native sub-agents were not needed; local parallel tool calls were enough for read, validation, and proof lanes while the main thread ran the DeerFlow execution.",
+  "lanes": [
+    {
+      "lane_id": "execution",
+      "objective": "Run Strategy V2 Step 1 through DeerFlow with DSV4 Pro and persist output artifacts.",
+      "role": "main_thread",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-21T18:30:00Z",
+      "ended_at": "2026-05-21T18:40:00Z",
+      "read_scope": [
+        "outputs/rendered-strategy-v2-step01-prompt.md",
+        "/Users/aldrinclement/Documents/programming/marketi/.local/deer-flow/config.yaml"
+      ],
+      "write_scope": [
+        "outputs"
+      ],
+      "artifacts": [
+        "outputs/deerflow-dsv4-step01-raw.md",
+        "outputs/deerflow-dsv4-step01-content.md",
+        "outputs/deerflow-dsv4-step01-events.jsonl",
+        "outputs/deerflow-dsv4-step01-run.meta.json"
+      ],
+      "summary": "Completed the full DeerFlow DSV4 Pro Step 1 run with 40 web_search calls, 4 web_fetch calls, 2 calculator calls, and no output-token cap."
+    },
+    {
+      "lane_id": "validation",
+      "objective": "Postprocess output for prompt parity, tags, phase coverage, scoring, citations, and tool use.",
+      "role": "local validator",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-21T18:40:00Z",
+      "ended_at": "2026-05-21T18:42:00Z",
+      "read_scope": [
+        "outputs",
+        "sources"
+      ],
+      "write_scope": [
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json"
+      ],
+      "artifacts": [
+        "outputs/deerflow-dsv4-step01-validation.json",
+        "sources/deerflow-tool-calls.json",
+        "sources/deerflow-source-urls.json"
+      ],
+      "summary": "Validator passed all required checks: Strategy V2 Step 1 prompt, tags, Phases 1-9, D1-D5 scoring, calculator use, and citation URLs."
+    },
+    {
+      "lane_id": "proof",
+      "objective": "Create source manifest and proof gates.",
+      "role": "local proof tooling",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-21T18:42:00Z",
+      "ended_at": "2026-05-21T18:43:26Z",
+      "read_scope": [
+        "outputs",
+        "sources"
+      ],
+      "write_scope": [
+        "sources/deerflow-web",
+        "proof_pack"
+      ],
+      "artifacts": [
+        "sources/deerflow-web/source_manifest.json",
+        "plan-gate-proof.json",
+        "lane-proof.json"
+      ],
+      "summary": "Source manifest verified and proof-gate artifacts were created for plan and lane validation."
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "Codex execution agent",
+    "summary": "Execution, validation, and proof artifacts reconcile to a completed 1:1 Strategy V2 Step 1 DeerFlow run."
+  },
+  "token_time_proxy": {
+    "deerflow_elapsed_seconds": 629.112,
+    "deerflow_total_tokens": 692433,
+    "deerflow_output_tokens": 18463,
+    "event_count": 9816
+  }
+}

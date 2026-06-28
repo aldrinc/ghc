@@ -1,0 +1,58 @@
+{
+  "createdAt": "2026-04-29T02:01:54.526Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "sourcePage": "https://mengotomars.com/products/30-day-supply-starter-kit",
+  "outputs": [
+    {
+      "key": "01-tenor-product-benefit-hero-v4-light-bg",
+      "sourceFile": "01-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "05b4e869-c8fa-40a1-839f-d8697d245384",
+        "publicId": "b298e049-d95c-4912-86d0-6a81be53b713",
+        "filename": "01-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 672,
+        "height": 672,
+        "url": "/public/assets/b298e049-d95c-4912-86d0-6a81be53b713"
+      },
+      "workflowRunId": "96dde2c5-15a6-41c7-9843-8499a18af29d",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-37a9cdaf-ceaa-4836-a872-398bfb76fb96",
+      "assetId": "6b7829bf-fb0d-4be4-b7e9-835fdc255356",
+      "publicId": "8225753c-8365-4e24-a4d7-aa446e4fdbe8",
+      "publicUrl": "https://api.moshq.app/public/assets/8225753c-8365-4e24-a4d7-aa446e4fdbe8",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-v4/01-tenor-product-benefit-hero-v4-light-bg.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/b298e049-d95c-4912-86d0-6a81be53b713",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Get 30% Off Daily Drive Essentials",
+        "swipeAngle": "Use the attached product carousel image as a layout and hierarchy reference for a Tenor version.\n\nBrand context:\nTenor is a premium men's vitality brand for men who want a simple daily protocol rather than clinics, prescriptions, or hype supplements. The product is Daily Drive Essentials, a black 60-capsule bottle with a restrained label. Brand feel is masculine, premium, editorial, evidence-aware, and direct.\n\nVisual direction for this version:\nUse a light premium background instead of a dark one: warm bone, off-white, stone, or soft ivory. Text and icons should be black or near-black. Keep the black bottle central so it anchors the composition. Use very restrained accent color only if needed, such as a small muted copper/gold/deep ember detail. Avoid the heavy red/orange glow from the previous version.\n\nProduct context:\nDaily Drive Essentials is positioned around clean and consistent energy, natural drive and libido, peak vitality and performance, exact active doses, and 2 capsules daily. Formula context includes Tongkat Ali, Zinc, Maca, L-Arginine, and Ginseng + Eleuthero. The hero proof claim to use is: 90% recommend Tenor, based on a 12-week triple-blind clinical study.\n\nPreserve from the reference:\n- centered product bottle as the hero\n- top offer badge structure, set to GET 30% OFF\n- large left-side recommendation proof module, using the 90% recommend Tenor claim\n- small footnote under the proof module referencing the 12-week triple-blind clinical study\n- right-side vertical benefit stack with small icons\n- strong contrast and clear mobile-first hierarchy\n- energetic but clean ecommerce carousel feel\n\nHigh-level changes:\n- make it clearly Tenor, not Mars\n- use Daily Drive Essentials as the product identity\n- adapt the proof and benefit language to Tenor's brand and product context\n- keep the icons as a structural element, but render them as premium black line icons\n- use a refined light Tenor color system: bone/ivory background, black text, black icons, black bottle\n- keep the bottle recognizable and central\n- make the final image feel like a polished PDP carousel slide for Tenor",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:3b7a4c58f9240216a8c3899499f264a38e23a038796cfa4c",
+        "asset_ids": [
+          "6b7829bf-fb0d-4be4-b7e9-835fdc255356"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

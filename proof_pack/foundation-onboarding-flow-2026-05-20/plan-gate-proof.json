@@ -1,0 +1,127 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-20T00:00:00-05:00",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "docs/plans/2026-05-20-foundation-onboarding-flow-plan.md",
+  "questions_asked": [
+    {
+      "question": "Are foundational docs only research/avatar docs?",
+      "answer_source": "user: research avatar docs only for now"
+    },
+    {
+      "question": "Should onboarding auto-run all foundation research or stop after competitor research?",
+      "answer_source": "user: get the core docs done without their input"
+    },
+    {
+      "question": "Is price always required at onboarding?",
+      "answer_source": "user: not required, can be set later"
+    },
+    {
+      "question": "Should business model stay in onboarding?",
+      "answer_source": "user: yes"
+    },
+    {
+      "question": "Should competitor URLs be required?",
+      "answer_source": "user: no"
+    },
+    {
+      "question": "Is design system/logo part of onboarding?",
+      "answer_source": "user: separate/later"
+    },
+    {
+      "question": "Should existing business onboarding be supported now?",
+      "answer_source": "user: support it"
+    },
+    {
+      "question": "Should onboarding support services as well as products?",
+      "answer_source": "user: We need to support product or service, not just product."
+    },
+    {
+      "question": "Should customer-facing onboarding highlight research/foundation docs?",
+      "answer_source": "user: I also don't want to highlight researching in onboarding. We want this to feel like onboarding onto a product, which is a marketing agent."
+    },
+    {
+      "question": "How should existing businesses differ from new businesses?",
+      "answer_source": "user: Existing business should collect business website URL, then use an agent to figure out most other questions."
+    },
+    {
+      "question": "How should new businesses be handled?",
+      "answer_source": "user: New business should ask about product and/or service and price."
+    },
+    {
+      "question": "Should pricing questions differ by offering type?",
+      "answer_source": "user: Product asks product price; service asks how they charge for the service."
+    },
+    {
+      "question": "Should competitor URLs still be asked?",
+      "answer_source": "user: Ask new and existing businesses for optional competitors because it helps narrow down the work."
+    },
+    {
+      "question": "What provider should existing-business website extraction use?",
+      "answer_source": "user: We need to use context.dev for our brand scraping, so that's going to happen for the existing businesses."
+    },
+    {
+      "question": "Should the existing-business review screen be editable?",
+      "answer_source": "user: In existing business branch 5e can be like does this look right to you and show information like product and business model; customer should be able to modify or edit."
+    },
+    {
+      "question": "What should the new-business offering-kind screen ask?",
+      "answer_source": "user: Instead of what should your marketing agent work on first, say what do you sell or what do you plan to sell."
+    },
+    {
+      "question": "Should new-business onboarding ask whether the offering can change later?",
+      "answer_source": "user: I don't think we care about 8n."
+    },
+    {
+      "question": "What should the new-business review CTA do?",
+      "answer_source": "user: The review is good, with a call to action for create workspace."
+    }
+  ],
+  "question_sufficiency_rationale": "The user resolved the major plan boundaries: foundation docs remain internal, customer-facing onboarding should feel like marketing-agent setup, existing businesses are URL-first with Context.dev-backed source extraction and editable confirmation, new businesses use manual product/service setup with the question 'What do you sell or plan to sell?', pricing questions branch by offering type, competitor URLs are optional on both paths, business model retained, design system deferred, existing businesses supported, product/service support required, 8N removed, and review CTA creates the workspace. Remaining UI microcopy can be implementation detail.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/goal.md",
+      "summary": "Measurable target for simplified foundation onboarding."
+    },
+    "problem_log": {
+      "path": "planning/problem-log.md",
+      "summary": "Observable blockers in current onboarding."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/root-cause.md",
+      "summary": "Backend execution requirements leaked into first-run UX."
+    },
+    "current_machine": {
+      "path": "planning/current-machine.md",
+      "summary": "Current full Strategy V2 onboarding path."
+    },
+    "designed_machine": {
+      "path": "planning/designed-machine.md",
+      "summary": "Foundation-only onboarding path."
+    },
+    "worst_day_test": {
+      "path": "planning/worst-day.md",
+      "summary": "Minimum viable payload still runs without fake data."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/metrics.md",
+      "summary": "Leading and lagging metrics for the onboarding redesign."
+    },
+    "owner_date_review": {
+      "path": "planning/owner-review.md",
+      "summary": "Owner and review point."
+    },
+    "stop_condition": {
+      "path": "planning/stop-condition.md",
+      "summary": "Planning completion conditions."
+    },
+    "source_manifest": {
+      "path": "sources/context-dev-docs/source_manifest.json",
+      "summary": "Captured Context.dev docs for existing-business scraping plan."
+    }
+  },
+  "owner": "main",
+  "review_date": "2026-05-20",
+  "stop_condition": "Plan is final only after plangatecheck passes."
+}

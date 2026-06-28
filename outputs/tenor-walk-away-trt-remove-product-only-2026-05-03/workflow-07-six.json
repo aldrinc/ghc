@@ -1,0 +1,502 @@
+{
+  "run": {
+    "id": "35a0c418-e516-46a3-b7e7-302ab2227fb0",
+    "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-a5d0d819-4fb1-4f7b-83b8-573c5ff6cbc5",
+    "kind": "swipe_image_ad",
+    "started_at": "2026-05-03T15:12:18.705142+00:00",
+    "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+    "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+    "temporal_run_id": "019dee65-bf1c-7b1d-b041-94e96cc3faa0",
+    "status": "completed",
+    "finished_at": "2026-05-03T15:13:48.345904+00:00"
+  },
+  "logs": [
+    {
+      "workflow_run_id": "35a0c418-e516-46a3-b7e7-302ab2227fb0",
+      "step": "swipe_image_ad",
+      "payload_in": null,
+      "error": null,
+      "status": "succeeded",
+      "id": "127eb428-e8bd-4549-985b-c900bd8c2a1f",
+      "payload_out": {
+        "job_id": "embedded-freestyle:8d6a367902a3502eaf51277abeb70deac514fe9dbf46bbfe",
+        "asset_ids": [
+          "c553a2aa-e93e-442b-be80-e9451daffd7d"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      },
+      "created_at": "2026-05-03T15:13:48.316332+00:00"
+    },
+    {
+      "workflow_run_id": "35a0c418-e516-46a3-b7e7-302ab2227fb0",
+      "step": "swipe_image_ad",
+      "payload_in": {
+        "count": 1,
+        "model": "gemini-3.1-pro-preview",
+        "swipe_hook": "Solution-Aware",
+        "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "swipe_angle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: remove the product and nothing else. Do not show any product, product packaging, packshot, supplement bottle, pouch, jar, tub, box, pack, product label, capsule, gummy, pill, or fake physical product anywhere in the image. Do not replace the removed product with a new object, prop, document, report, book, notebook, badge, icon, chart, lab result, illustration, or visual proxy. Preserve the original source swipe composition, text, people, background, colors, layout, and style; only remove the product object if one exists.\n\nRun marker: tenor-walk-away-trt-no-product-07-six-1777821138575.",
+        "aspect_ratio": "1:1",
+        "render_count": 1,
+        "asset_brief_id": "brief_editorial_wound_scene",
+        "render_provider": "creative_service",
+        "swipe_image_url": null,
+        "company_swipe_id": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "swipe_brand_name": "Tenor",
+        "requirement_index": 1,
+        "swipe_context_mode": "minimal",
+        "swipe_product_name": "Tenor",
+        "render_model_id_used": "models/gemini-3.1-flash-image-preview",
+        "render_model_id_requested": "gemini-3.1-flash-image-preview",
+        "swipe_requires_product_image": false
+      },
+      "error": null,
+      "status": "started",
+      "id": "22c87a9d-6204-4202-a22a-09923f3455fb",
+      "payload_out": null,
+      "created_at": "2026-05-03T15:12:18.770805+00:00"
+    },
+    {
+      "workflow_run_id": "35a0c418-e516-46a3-b7e7-302ab2227fb0",
+      "step": "swipe_image_ad",
+      "payload_in": {
+        "count": 1,
+        "model": null,
+        "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "swipe_hook": "Solution-Aware",
+        "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "swipe_angle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: remove the product and nothing else. Do not show any product, product packaging, packshot, supplement bottle, pouch, jar, tub, box, pack, product label, capsule, gummy, pill, or fake physical product anywhere in the image. Do not replace the removed product with a new object, prop, document, report, book, notebook, badge, icon, chart, lab result, illustration, or visual proxy. Preserve the original source swipe composition, text, people, background, colors, layout, and style; only remove the product object if one exists.\n\nRun marker: tenor-walk-away-trt-no-product-07-six-1777821138575.",
+        "aspect_ratio": "1:1",
+        "asset_brief_id": "brief_editorial_wound_scene",
+        "render_model_id": null,
+        "swipe_image_url": null,
+        "company_swipe_id": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "swipe_brand_name": "Tenor",
+        "max_output_tokens": null,
+        "requirement_index": 1,
+        "swipe_context_mode": "minimal",
+        "swipe_product_name": "Tenor",
+        "swipe_requires_product_image": false
+      },
+      "error": null,
+      "status": "started",
+      "id": "e671e8e6-cf59-498e-96a0-002f3d1d1851",
+      "payload_out": null,
+      "created_at": "2026-05-03T15:12:18.732241+00:00"
+    }
+  ],
+  "client_canon": {
+    "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+    "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "campaign_id": null,
+    "version": 1,
+    "created_by_user": null,
+    "id": "14d25cfa-96f3-4c5c-a1e0-da6b04ea24f4",
+    "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "type": "client_canon",
+    "data": {
+      "icps": [
+        {
+          "id": "tenor-men-40-60",
+          "name": "Men 40–60 who feel something has quietly dimmed — the drive, the fire, the presence.",
+          "gains": [
+            "Afternoon energy that doesn't collapse (VERBATIM: \"no crash\", \"cleaner boost\")",
+            "Drive and motivation restored (VERBATIM: \"drive is back\", \"motivation again\")",
+            "Mental sharpness in meetings and conversations (VERBATIM: \"brain fog\", \"more focused\")",
+            "Libido as a natural outcome of feeling well (NOT as a standalone gym-bro pursuit) (VERBATIM: \"sex drive is back as a welcome bonus\")",
+            "His wife to notice the return, without him having to announce it (VERBATIM: \"he's feeling like his old self now\", wife Amazon review)"
+          ],
+          "pains": [
+            "Afternoon energy collapses and meetings blur by mid-afternoon.",
+            "Loses his thread in conversations or meetings and feels less sharp than before.",
+            "Workouts take longer to recover from and drive feels flat.",
+            "A partner has started asking quietly if he is okay."
+          ],
+          "segments": [
+            "men 40-60",
+            "midlife",
+            "pre-TRT"
+          ],
+          "jobsToBeDone": [
+            "Feel like himself again without a prescription, clinic, or needle.",
+            "Hold energy and focus through the afternoon workday.",
+            "Restore drive, presence, and confidence at home and at work."
+          ]
+        }
+      ],
+      "brand": {
+        "story": "\"I'm an MD. At 47, my labs came back 'normal.' I didn't feel normal. That's why I built Tenor.\"",
+        "values": [
+          "**Confident, not loud.** Never yells. Never hypes. Trusts the reader to get it.",
+          "**Informed, not clinical.** Uses the science when relevant. Refuses jargon unless it IS the story.",
+          "**Warm, not bro-y.** No \"crush it\", no \"dominate\", no \"unlock\". Addresses the reader as a peer, not a prospect.",
+          "**Honest about limits.** \"From low to even\" — not \"from low to superhuman\". Acknowledges competitor skepticism upfront.",
+          "**Quiet humor.** The kind of dry, observational wit a 45-year-old uses."
+        ],
+        "mission": "Feel like yourself again without a prescription, a clinic, or a needle.",
+        "manifesto": "For men 40–60 who notice something has quietly dimmed — the drive, the fire, the presence — Tenor is a daily protocol that raises the hormonal floor four ways, so you don't have to accept \"normal for your age\" as the end of feeling like you.",
+        "toneOfVoice": {
+          "do": [
+            "**Confident, not loud.** Never yells. Never hypes. Trusts the reader to get it.",
+            "**Informed, not clinical.** Uses the science when relevant. Refuses jargon unless it IS the story.",
+            "**Warm, not bro-y.** No \"crush it\", no \"dominate\", no \"unlock\". Addresses the reader as a peer, not a prospect.",
+            "**Honest about limits.** \"From low to even\" — not \"from low to superhuman\". Acknowledges competitor skepticism upfront.",
+            "**Quiet humor.** The kind of dry, observational wit a 45-year-old uses."
+          ],
+          "dont": [
+            "Speaks in **lowered voice**, never shouts (audio/video pacing)",
+            "Uses **clinical terms ONLY when reframing them** (\"andropause\" is a term he'll define for you; \"aromatase\" he'll explain once and move on)",
+            "Admits what he doesn't know (strengthens trust)",
+            "Refuses to over-promise (echoes the CSO's \"low-to-even not low-to-superhuman\" positioning)",
+            "Mentions his wife by role, not name, rarely (respects her privacy but confirms family/partnership is real)",
+            "Never: \"broooo\", \"listen up\", \"here's the truth the industry won't tell you\" (MLM-coded)",
+            "Not TRT — not a prescription, not a clinic, not a needle",
+            "Not a gym brand — not targeting the 25-year-old who wants \"GAINS\"",
+            "Not a hormone-replacement service — this is a daily protocol, not a medical intervention",
+            "Not a \"superhuman\" promise — explicitly positions against over-promising"
+          ],
+          "examples": {
+            "bad": [],
+            "good": []
+          }
+        },
+        "visualStyleRefs": {
+          "docUrls": [],
+          "logoUrl": null,
+          "palette": null
+        }
+      },
+      "offers": [
+        {
+          "id": "offer-90-day-plan",
+          "name": "90-Day Plan",
+          "guarantee": "The 90-Day Tenor Guarantee",
+          "description": "Feel like yourself again without a prescription, a clinic, or a needle.",
+          "businessModel": "subscription",
+          "differentiation": [
+            "\"The 4-Factor Vanishing Cascade\" The reason men don't feel like themselves between 40 and 60 is not age, not stress, not their marriage — it's a named four-factor hormonal cascade that compounds silently until it's already 30–40% complete.",
+            "\"The Four-Factor Protocol\" (or \"Four-Corner Reset\" — secondary label) Because the cascade has four inputs, a solution that only targets one of them leaves three levers untouched. The Tenor Protocol addresses each factor with the specific ingredient + clinical dose that the published research supported — one capsule stack, taken daily.",
+            "Tenor: Full Drive Protocol is a daily 4-factor andropause protocol for men who've noticed the drift and don't want TRT. Three subscription tiers (N / 2N / 3N per Rule 6.2): **30-Day Plan $42/mo · 60-Day Plan $39/mo · 90-Day Plan $35/mo ★**. Subscription-only display — one-time purchase not surfaced. Max tier (90-day) aligns exactly with the 90-day money-back guarantee (\"return even the empty bottles\") so buyer can exhaust the full supply inside the guarantee window. Cancel anytime from account dashboard, no email or phone required. Launches at full price (no launch-promo cohort — per Gate 7b decisions). Priced against TRT clinic cost ($200–400/mo) as the \"try this first\" positioning. Founder persona: Adam Reese, MD (composite)."
+          ]
+        }
+      ],
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "constraints": {
+        "legal": [
+          "DSHEA structure/function claims only",
+          "\"Supports healthy testosterone levels\" allowed",
+          "\"Raises testosterone by X%\" NOT allowed",
+          "\"Andropause\" can be named as a concept; cannot be treated/cured/diagnosed",
+          "Full DSHEA disclaimer on packaging and LP footer",
+          "audience_state, problem_moment (afternoon-slump + approaching-50 + wife-noticed scenes)",
+          "desired_outcome, belief_shift, felt_symptom_language",
+          "top_objections (all 5 primary objections sourced to verbatim)",
+          "proof_stack (all 4 VERBATIM transformation arcs)",
+          "The 3am wake-and-google scene (Stage 4 training-knowledge inference)",
+          "The \"photo from 5 years ago\" visual scene (Stage 4 inference)",
+          "The \"meeting and lost-word\" specific variant (not verbatim; adjacent \"more tired at times\" is verbatim)",
+          "Specific headline phrasings that use phrases we constructed vs phrases from VOC",
+          "Any specific claims about *\"raises testosterone by X%\"* — structure/function language only",
+          "Any claim that references disease states, prescription alternatives, or cures"
+        ],
+        "compliance": [
+          "Use DSHEA structure/function language only.",
+          "Do not claim to treat, cure, or diagnose andropause.",
+          "Do not claim specific testosterone increases."
+        ],
+        "bannedTopics": [
+          "disease claims",
+          "prescription replacement claims"
+        ],
+        "bannedPhrases": [
+          "UNLEASH your TESTOSTERONE",
+          "clinically proven",
+          "superhuman"
+        ]
+      },
+      "contentPatterns": {
+        "hooks": [
+          "The afternoon slump men in their 40s ignore is the same 4-factor collapse that wrecks marriages, careers, and identity by 55. It has a name — and most doctors won't use it.",
+          "For men 40–60 who notice something has quietly dimmed — the drive, the fire, the presence — Tenor is a daily protocol that raises the hormonal floor four ways, so you don't have to accept \"normal for your age\" as the end of feeling like you."
+        ],
+        "angles": [
+          "The Vanishing Man",
+          "The 4-Factor Vanishing Cascade",
+          "The Four-Factor Protocol"
+        ],
+        "formats": [
+          "advertorial",
+          "sales-page",
+          "image_ad"
+        ],
+        "badAssetIds": [],
+        "goodAssetIds": []
+      },
+      "voiceOfCustomer": {
+        "quotes": [
+          "Travison et al. 2007 MMAS — 1.6% annual within-person T decline (VERIFIED)",
+          "Ambiye et al. 2013 — ashwagandha 600mg/day → 14.7% T increase in men (PLAUSIBLE for healthy men)"
+        ],
+        "triggers": [
+          "The afternoon slump that never recovers.",
+          "A younger colleague finishing the sentence you started.",
+          "Your wife quietly asking if you are okay."
+        ],
+        "objections": [
+          "My labs came back normal twice.",
+          "I was out of options that were not needles.",
+          "I do not want a clinic, a prescription, or a needle."
+        ],
+        "languagePatterns": [
+          "feel like yourself again",
+          "normal for your age",
+          "something has shifted",
+          "the afternoon wall"
+        ]
+      }
+    },
+    "created_at": "2026-04-19T15:42:35.035550+00:00"
+  },
+  "metric_schema": null,
+  "strategy_sheet": null,
+  "experiment_specs": [
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+      "version": 1,
+      "created_by_user": null,
+      "id": "7e286e56-a7a1-4825-ac4c-8e285829ab69",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "experimentSpecs": [
+          {
+            "id": "walk-away-trt-congruence-review",
+            "name": "Walk Away From TRT Congruence Review",
+            "variants": [
+              {
+                "id": "presales",
+                "name": "Presales",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [
+                  "no product reveal",
+                  "no mechanism reveal"
+                ],
+                "description": "Ad-to-advertorial creatives for the supplied Walk Away From TRT presales URL."
+              }
+            ],
+            "metricIds": [],
+            "hypothesis": "Swipe-image creatives using only awareness level plus destination context can create congruent reviewable ads for the supplied presales URL.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-02T19:26:12.867825+00:00"
+    },
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+      "version": 1,
+      "created_by_user": null,
+      "id": "cde9fa73-967c-4045-ba7a-f780b1be644a",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "experimentSpecs": [
+          {
+            "id": "walk-away-trt-congruence-review",
+            "name": "Walk Away From TRT Congruence Review",
+            "variants": [
+              {
+                "id": "presales",
+                "name": "Presales",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [
+                  "no product reveal",
+                  "no mechanism reveal"
+                ],
+                "description": "Ad-to-advertorial creatives for the supplied Walk Away From TRT presales URL."
+              }
+            ],
+            "metricIds": [],
+            "hypothesis": "Swipe-image creatives using only awareness level plus destination context can create congruent reviewable ads for the supplied presales URL.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-02T19:24:07.698556+00:00"
+    },
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+      "version": 1,
+      "created_by_user": null,
+      "id": "28714b98-ac7b-4b48-aad1-bdba1964958a",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "experimentSpecs": [
+          {
+            "id": "walk-away-trt-congruence-review",
+            "name": "Walk Away From TRT Congruence Review",
+            "variants": [
+              {
+                "id": "presales",
+                "name": "Presales",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [
+                  "no product reveal",
+                  "no mechanism reveal"
+                ],
+                "description": "Ad-to-advertorial creatives for the supplied Walk Away From TRT presales URL."
+              }
+            ],
+            "metricIds": [],
+            "hypothesis": "Swipe-image creatives using only awareness level plus destination context can create congruent reviewable ads for the supplied presales URL.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-02T19:20:11.761539+00:00"
+    },
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+      "version": 1,
+      "created_by_user": null,
+      "id": "f2585dde-db8d-455f-bc05-68413f4e004f",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "experiment_spec",
+      "data": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "experimentSpecs": [
+          {
+            "id": "walk-away-trt-congruence-review",
+            "name": "Walk Away From TRT Congruence Review",
+            "variants": [
+              {
+                "id": "presales",
+                "name": "Presales",
+                "channels": [
+                  "meta"
+                ],
+                "guardrails": [
+                  "no product reveal",
+                  "no mechanism reveal"
+                ],
+                "description": "Ad-to-advertorial creatives for the supplied Walk Away From TRT presales URL."
+              }
+            ],
+            "metricIds": [],
+            "hypothesis": "Swipe-image creatives using only awareness level plus destination context can create congruent reviewable ads for the supplied presales URL.",
+            "durationDays": null,
+            "budgetEstimate": null,
+            "sampleSizeEstimate": null
+          }
+        ]
+      },
+      "created_at": "2026-05-02T19:18:41.816237+00:00"
+    }
+  ],
+  "asset_briefs": [
+    {
+      "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+      "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "campaign_id": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+      "version": 1,
+      "created_by_user": null,
+      "id": "ac685e85-cb95-487c-b3ae-d93cccdf3acd",
+      "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "type": "asset_brief",
+      "data": {
+        "source": "tenor-walk-away-trt-review-setup",
+        "createdFor": "first review sample generation",
+        "asset_briefs": [
+          {
+            "id": "brief_editorial_wound_scene",
+            "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+            "funnelId": null,
+            "variantId": "presales",
+            "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+            "constraints": [],
+            "variantName": "Walk Away From TRT",
+            "deliveryMode": "external_urls",
+            "experimentId": "walk-away-trt-congruence-review",
+            "requirements": [
+              {
+                "hook": "Problem-Aware",
+                "angle": "Destination-congruent creative for the Walk Away From TRT advertorial.",
+                "format": "image",
+                "channel": "meta",
+                "funnelStage": "top-of-funnel",
+                "destinationType": "pre-sales",
+                "destinationLabel": "Walk Away From TRT presales"
+              },
+              {
+                "hook": "Solution-Aware",
+                "angle": "Destination-congruent creative for the Walk Away From TRT advertorial.",
+                "format": "image",
+                "channel": "meta",
+                "funnelStage": "top-of-funnel",
+                "destinationType": "pre-sales",
+                "destinationLabel": "Walk Away From TRT presales"
+              }
+            ],
+            "toneGuidelines": [],
+            "creativeConcept": "Destination-congruent swipe-image ad creative for the Walk Away From TRT advertorial.",
+            "destinationType": "pre-sales",
+            "destinationLabel": "Walk Away From TRT presales",
+            "visualGuidelines": []
+          }
+        ]
+      },
+      "created_at": "2026-05-02T19:20:22.454556+00:00"
+    }
+  ],
+  "precanon_research": null,
+  "research_artifacts": [],
+  "research_highlights": null,
+  "temporal_status": "COMPLETED",
+  "pending_activity_progress": [],
+  "strategy_v2_state": null,
+  "strategy_v2_stage3": null,
+  "strategy_v2_offer": null,
+  "strategy_v2_copy": null,
+  "strategy_v2_copy_canonical": null,
+  "strategy_v2_copy_context": null,
+  "strategy_v2_awareness_angle_matrix": null,
+  "strategy_v2_launches": []
+}

@@ -1,0 +1,208 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools + omp_kimi_delegation",
+  "reason": "Kimi K2.6 was delegated through the oh-my-pi harness for UI review. Native Codex sub-agents were not used; local parallel tools handled verification.",
+  "lanes": [
+    {
+      "lane_id": "lane_context",
+      "objective": "Inspect current Social Agents implementation and existing proof artifacts.",
+      "role": "local explorer",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T00:00:00Z",
+      "ended_at": "2026-05-22T00:00:00Z",
+      "summary": "Read SocialAgentsPage and prior plan proof to understand current backend-shaped wizard and constraints.",
+      "read_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md"
+      ],
+      "write_scope": [],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/context-summary.md"
+      ]
+    },
+    {
+      "lane_id": "lane_browser_observation",
+      "objective": "Observe the live route and capture proof of the current visible IA.",
+      "role": "browser observation",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T00:00:00Z",
+      "ended_at": "2026-05-22T00:00:00Z",
+      "summary": "Captured live UI text and screenshot from /workspaces/execution/social-agents.",
+      "read_scope": [
+        "http://localhost:5275/workspaces/execution/social-agents"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-observation.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-screenshot.png"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-observation.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-screenshot.png"
+      ]
+    },
+    {
+      "lane_id": "lane_plan",
+      "objective": "Produce a complete UX refactor options plan with proof gate.",
+      "role": "main thread planner",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-22T00:00:00Z",
+      "ended_at": "2026-05-22T00:00:00Z",
+      "summary": "Wrote the Agent Command Center recommendation, alternatives, right rail design, wizard screens, implementation phases, and acceptance checks.",
+      "read_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/live-ui-observation.json"
+      ],
+      "write_scope": [
+        "docs/plans/2026-05-22-social-agents-agent-command-center-options.md",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate-proof.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/lane-proof.json"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/lane-proof.json"
+      ]
+    },
+    {
+      "lane_id": "lane_visual_mock",
+      "objective": "Create and verify a standalone HTML visual mock of the recommended Agent Command Center.",
+      "role": "visual designer",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T00:00:00Z",
+      "ended_at": "2026-05-22T00:00:00Z",
+      "summary": "Created a simplified MOS app-shell mock with Setup and combined Review/Approve states, one primary CTA per visible state, and a compact Agent Dossier.",
+      "read_scope": [
+        "mos/frontend/src/styles/theme.css",
+        "mos/frontend/src/styles/design-system.css",
+        "mos/frontend/src/components/layout/PageHeader.tsx",
+        "mos/frontend/src/components/ui/button.tsx",
+        "mos/frontend/src/components/ui/badge.tsx"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-command-center-mock.html",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/copy-reduction-audit.md",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-browser-observation.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-desktop-screenshot.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-mobile-screenshot.png"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-command-center-mock.html",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/copy-reduction-audit.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-browser-observation.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-desktop-screenshot.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/mock-mobile-screenshot.png"
+      ]
+    },
+    {
+      "lane_id": "lane_actual_implementation",
+      "objective": "Implement the simplified Social Agents UI in the actual MOS app.",
+      "role": "main thread implementer",
+      "mode": "main_thread",
+      "status": "pass",
+      "started_at": "2026-05-22T21:51:17.362Z",
+      "ended_at": "2026-05-22T21:51:17.362Z",
+      "summary": "Replaced the backend-shaped wizard with Setup and Review screens, added a compact Agent Dossier, kept Postiz proposal-only handoff payloads, and applied Kimi-informed responsive refinements in the actual app.",
+      "read_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "docs/plans/2026-05-22-social-agents-agent-command-center-options.md"
+      ],
+      "write_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ]
+    },
+    {
+      "lane_id": "lane_actual_verification",
+      "objective": "Verify implementation with unit tests, build, design checks, browser screenshots, and plan contract.",
+      "role": "local verifier",
+      "mode": "local_tool",
+      "status": "pass",
+      "started_at": "2026-05-22T21:51:17.362Z",
+      "ended_at": "2026-05-22T21:51:17.362Z",
+      "summary": "Unit tests, production build, semantic UI check, design-system check, Kimi OMP transcript checks, responsive browser screenshots, and planctl verify passed.",
+      "read_scope": [
+        "http://localhost:5275/workspaces/execution/social-agents",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-test.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-build.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-browser-observation.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-desktop.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-mobile.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-responsive-browser-check.json",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-desktop-1440.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-shell-1180.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-tablet-900.png",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-mobile-390.png"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-browser-observation.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-mobile-observation.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-desktop.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-implementation-mobile.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-responsive-browser-check.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-desktop-1440.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-shell-1180.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-tablet-900.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/social-agents-mobile-390.png"
+      ]
+    },
+    {
+      "lane_id": "lane_kimi_omp_review",
+      "objective": "Delegate actual Social Agents responsive UI review to Kimi K2.6 through omp using DeepInfra.",
+      "role": "Kimi K2.6 via omp harness",
+      "mode": "terminal_omp",
+      "status": "pass",
+      "started_at": "2026-05-22T22:30:11.430Z",
+      "ended_at": "2026-05-22T22:30:11.430Z",
+      "summary": "Configured a local omp model registry for DeepInfra Kimi K2.6, verified the model with a smoke prompt, and captured Kimi UI review guidance for responsive app refinements.",
+      "read_scope": [
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "write_scope": [
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-smoke.log",
+        "docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-ui-review.log"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-smoke.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/kimi-k2.6-omp-ui-review.log"
+      ]
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main_thread",
+    "summary": "Planning, mock iteration, Kimi OMP review, actual app implementation, and responsive verification artifacts are integrated into the proof pack."
+  },
+  "token_time_proxy": {
+    "native_subagents": 0,
+    "local_parallel_tool_groups": 6,
+    "browser_observation": "pass",
+    "plan_gate": "pass",
+    "lanecheck": "pass",
+    "visual_mock": "pass",
+    "proof_dashboard": "pass",
+    "implementation": "pass",
+    "unit_tests": "pass",
+    "build": "pass",
+    "browser_validation": "pass",
+    "planctl": "pass",
+    "kimi_omp_review": "pass",
+    "responsive_browser_validation": "pass"
+  }
+}

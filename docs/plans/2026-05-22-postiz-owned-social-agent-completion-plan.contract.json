@@ -1,0 +1,1852 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-22-postiz-owned-social-agent-completion-plan",
+  "created_at": "2026-05-22T16:21:25.756102+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-postiz-owned-social-agent-completion-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "agent strategy and reasoning inputs",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P02",
+      "objective": "content growth programs",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P03",
+      "objective": "carousel variants and slides",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P04",
+      "objective": "Postiz handoff/action proposals",
+      "source_line": 21,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P05",
+      "objective": "conversion sources and conversion events",
+      "source_line": 22,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P06",
+      "objective": "source-backed attribution references",
+      "source_line": 23,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P07",
+      "objective": "connected social channels used for publishing",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P08",
+      "objective": "composer/calendar/scheduling/publishing",
+      "source_line": 28,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P09",
+      "objective": "post ids, release ids, post status, and post lifecycle",
+      "source_line": 29,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P10",
+      "objective": "provider-specific posting details",
+      "source_line": 30,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P11",
+      "objective": "Remove the new `content_publications`, `content_performance_snapshots`, and `content_attributions` layer from the growth-program migration and ORM models.",
+      "source_line": 34,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P12",
+      "objective": "Remove the growth-program `/publications` API that duplicates Postiz posting state.",
+      "source_line": 35,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P13",
+      "objective": "Add an approval-gated Postiz handoff endpoint for an approved variant:",
+      "source_line": 36,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P14",
+      "objective": "validates the growth program and variant",
+      "source_line": 37,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P15",
+      "objective": "requires variant approval",
+      "source_line": 38,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P16",
+      "objective": "creates an `agent_action_proposals` record targeting Postiz",
+      "source_line": 39,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P17",
+      "objective": "stores the intended Postiz composer payload in `proposed_after_json`",
+      "source_line": 40,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P18",
+      "objective": "Extend conversion events with optional `contentVariantId`, `postizPostId`, and `postizChannelId` references so conversion data can point at Postiz-owned posts without cloning Postiz state.",
+      "source_line": 41,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P19",
+      "objective": "Update runtime profiles to say Postiz remains the posting system of record.",
+      "source_line": 42,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P20",
+      "objective": "Update targeted tests and proof artifacts.",
+      "source_line": 43,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P21",
+      "objective": "Do not execute live Postiz writes.",
+      "source_line": 47,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P22",
+      "objective": "Do not replicate Postiz calendar/post status tables in the growth-program layer.",
+      "source_line": 48,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P23",
+      "objective": "Do not change models/providers.",
+      "source_line": 49,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P24",
+      "objective": "Do not deploy or restart services.",
+      "source_line": 50,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Preserved by removing the growth-program publication ledger and routing approved variants through Postiz handoff proposals."
+    },
+    {
+      "id": "P25",
+      "objective": "No new `content_publications` table/class/route remains in the Connected Social/TikTok growth slice.",
+      "source_line": 54,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P26",
+      "objective": "Approved TikTok carousel variants can create Postiz action proposals.",
+      "source_line": 55,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P27",
+      "objective": "Unapproved variants cannot create Postiz handoff proposals.",
+      "source_line": 56,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P28",
+      "objective": "Conversion events can reference concrete Postiz ids without local post duplication.",
+      "source_line": 57,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P29",
+      "objective": "Targeted backend tests pass.",
+      "source_line": 58,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P30",
+      "objective": "`planctl verify` passes.",
+      "source_line": 59,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P31",
+      "objective": "`cd mos/backend && uv run pytest tests/test_connected_social_agents.py tests/test_tiktok_growth_programs.py`",
+      "source_line": 63,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P32",
+      "objective": "`cd mos/backend && uv run python -m py_compile app/routers/growth_programs.py app/schemas/growth_programs.py app/db/repositories/growth_programs.py app/db/models.py app/services/skills_runtime_registry.py`",
+      "source_line": 64,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P33",
+      "objective": "`cd mos/backend && uv run alembic heads`",
+      "source_line": 65,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P34",
+      "objective": "`/Users/aldrinclement/.codex/bin/planctl verify docs/plans/2026-05-22-postiz-owned-social-agent-completion-plan.contract.json`",
+      "source_line": 66,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P35",
+      "objective": "`mos/backend/app/db/models.py`",
+      "source_line": 70,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P36",
+      "objective": "`mos/backend/alembic/versions/0098_connected_social_growth_agents.py`",
+      "source_line": 71,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P37",
+      "objective": "`mos/backend/app/schemas/growth_programs.py`",
+      "source_line": 72,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P38",
+      "objective": "`mos/backend/app/db/repositories/growth_programs.py`",
+      "source_line": 73,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P39",
+      "objective": "`mos/backend/app/routers/growth_programs.py`",
+      "source_line": 74,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P40",
+      "objective": "`mos/backend/app/services/skills_runtime_registry.py`",
+      "source_line": 75,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P41",
+      "objective": "`mos/backend/tests/test_connected_social_agents.py`",
+      "source_line": 76,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P42",
+      "objective": "`mos/backend/tests/test_tiktok_growth_programs.py`",
+      "source_line": 77,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P43",
+      "objective": "`docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md`",
+      "source_line": 78,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P44",
+      "objective": "Schema/model/migration correction.",
+      "source_line": 86,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P45",
+      "objective": "Router/repository handoff endpoint.",
+      "source_line": 87,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    },
+    {
+      "id": "P46",
+      "objective": "Runtime profile and PRD wording update.",
+      "source_line": 88,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py",
+        "docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md"
+      ],
+      "acceptance": [
+        "Postiz remains the system of record for social posting state.",
+        "The new growth-program slice creates action proposals or conversion references, not a duplicate posting ledger.",
+        "Covered by targeted backend tests, compile checks, migration-head check, and the Postiz ownership guard."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "test -f docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "test -s docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/alembic-heads.log",
+        "docs/plans/proof_pack/2026-05-22-postiz-owned-social-agent-completion/postiz-ownership-guard.log"
+      ],
+      "notes": "Implemented or preserved in this Postiz-owned completion slice."
+    }
+  ],
+  "global_verify_commands": [],
+  "global_acceptance": []
+}

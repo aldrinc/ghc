@@ -12,10 +12,13 @@ import { CreativeLibraryPage } from "@/pages/library/CreativeLibraryPage";
 import { WorkspacesPage } from "@/pages/workspaces/WorkspacesPage";
 import { WorkspaceOnboardingPage } from "@/pages/workspaces/WorkspaceOnboardingPage";
 import { WorkspaceOverviewPage } from "@/pages/workspaces/WorkspaceOverviewPage";
+import { WorkspaceFoundationStatusPage } from "@/pages/workspaces/WorkspaceFoundationStatusPage";
+import { WorkspaceFoundationReadyPage } from "@/pages/workspaces/WorkspaceFoundationReadyPage";
 import { BrandDesignSystemPage } from "@/pages/workspaces/BrandDesignSystemPage";
 import { AnalyticsPage } from "@/pages/workspaces/AnalyticsPage";
 import { ProductsPage } from "@/pages/workspaces/ProductsPage";
 import { PostizPage } from "@/pages/workspaces/PostizPage";
+import { SocialAgentsPage } from "@/pages/workspaces/SocialAgentsPage";
 import { ProductDetailPage } from "@/pages/workspaces/ProductDetailPage";
 import { SitesPage } from "@/pages/workspaces/SitesPage";
 import { SiteImportsPage } from "@/pages/workspaces/SiteImportsPage";
@@ -35,6 +38,7 @@ import { CampaignCreativeTab } from "@/pages/campaigns/tabs/CampaignCreativeTab"
 import { CampaignDeliveryTab } from "@/pages/campaigns/tabs/CampaignDeliveryTab";
 import { CampaignPublishTab } from "@/pages/campaigns/tabs/CampaignPublishTab";
 import { PlatformPublishWorkspace } from "@/pages/campaigns/tabs/PlatformPublishWorkspace";
+import { ComponentReviewPage } from "@/pages/dev/ComponentReviewPage";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProductProvider } from "@/contexts/ProductContext";
 import { ClaudeChatPage } from "@/pages/claude/ClaudeChatPage";
@@ -75,6 +79,9 @@ function App() {
         {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug/*" element={<PublicFunnelPage />} /> : null}
         <Route path="/f/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
         <Route path="/f/:productSlug/:funnelSlug/*" element={<PublicFunnelPage />} />
+        {standaloneBundleMode || !import.meta.env.DEV ? null : (
+          <Route path="/dev/components" element={<ComponentReviewPage />} />
+        )}
         {standaloneBundleMode ? null : <Route path="/sign-in/*" element={<SignInPage />} />}
         {standaloneBundleMode ? null : (
           <Route
@@ -116,10 +123,13 @@ function App() {
             }
           >
             <Route index element={<Navigate to="/workspaces/overview" replace />} />
+            <Route path="workspaces/foundation-status" element={<WorkspaceFoundationStatusPage />} />
+            <Route path="workspaces/foundation-ready" element={<WorkspaceFoundationReadyPage />} />
             <Route path="workspaces/overview" element={<WorkspaceOverviewPage />} />
             <Route path="workspaces/brand" element={<BrandDesignSystemPage />} />
             <Route path="workspaces/execution/analytics" element={<AnalyticsPage />} />
             <Route path="workspaces/execution/postiz" element={<PostizPage />} />
+            <Route path="workspaces/execution/social-agents" element={<SocialAgentsPage />} />
             {/* Sites - canonical workspace destination */}
             <Route path="workspaces/sites" element={<SitesPage />} />
             <Route path="workspaces/sites/templates" element={<SitesPage />} />
@@ -149,6 +159,7 @@ function App() {
             <Route path="commerce" element={<CommercePage />} />
             <Route path="creative-library" element={<CreativeLibraryPage />} />
             <Route path="claude-chat" element={<ClaudeChatPage />} />
+            {import.meta.env.DEV ? <Route path="dev/components" element={<ComponentReviewPage />} /> : null}
             {/* Strategy runs (renamed from workflows) */}
             <Route path="strategy" element={<WorkflowsPage />} />
             <Route path="strategy/:workflowId" element={<WorkflowDetailPage />} />

@@ -1,0 +1,53 @@
+- button "Back to workspaces":
+  - text: Back to workspaces
+- main:
+  - heading "Set up your marketing agent" [level=1]
+  - paragraph: Add the minimum source details needed to create the workspace.
+  - heading "Name your workspace" [level=2]
+  - generic: Workspace name
+  - textbox "Workspace name":
+    - /placeholder: Enter the business or workspace name
+  - button "Back" [disabled]:
+    - text: Back
+  - button "Continue":
+    - text: Continue
+- complementary:
+  - generic: Setup progress
+  - generic: 1/2
+  - progressbar "Setup progress"
+  - complementary "Setup context":
+    - heading "Setup context" [level=2]
+    - generic: 2 blocked
+    - region "Workspace":
+      - heading "Workspace" [level=3]
+      - term: Name
+      - definition: Not set
+      - term: Stage
+      - definition: Not set
+      - term: Model
+      - definition: Select business model
+    - region "Offering":
+      - heading "Offering" [level=3]
+      - term: Kind
+      - definition: Not set
+      - term: Name
+      - definition: Not set
+      - term: Pricing
+      - definition: Later
+    - region "Source checklist":
+      - heading "Source checklist" [level=2]
+      - generic: Workspace
+      - generic: Pending
+      - paragraph: Name missing
+      - generic: Business branch
+      - generic: Pending
+      - paragraph: Not selected
+      - generic: Offer setup
+      - generic: Pending
+      - paragraph: Not set
+    - region "Blockers":
+      - heading "Blockers" [level=3]
+      - list:
+        - listitem: Workspace name is required.
+        - listitem: Business stage is required.
+- region "Notifications"

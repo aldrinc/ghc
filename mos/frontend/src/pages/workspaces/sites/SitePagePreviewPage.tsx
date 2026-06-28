@@ -12,7 +12,8 @@ import { B2CRuntimeProvider } from "@/components/commerce/b2c/B2CRuntimeProvider
 import { isMedusaB2CRuntimeSite } from "@/components/commerce/b2c/runtimeSite";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
+import { FunnelRuntimeProvider } from "@/funnels/funnelRuntime";
+import { createFunnelPuckConfig } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
 import {
   buildRuntimePageMap,

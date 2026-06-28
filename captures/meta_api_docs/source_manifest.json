@@ -1,0 +1,44 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "meta_api_docs",
+  "created_at": "2026-05-22T13:02:19.558896+00:00",
+  "source_type": "website",
+  "source": "https://developers.facebook.com/docs/permissions/ and https://developers.facebook.com/docs/marketing-api/insights/ and https://developers.facebook.com/docs/facebook-login/guides/access-tokens/",
+  "operator_notes": "",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/meta_api_docs/raw/meta-permissions.html",
+      "kind": "raw_files",
+      "sha256": "62ee754705c9ed656f185d37d84d8b20d5396c2459996dbaef8f8c929a12b593",
+      "bytes": 1118101,
+      "captured_at": "2026-05-22T13:02:19.631659+00:00",
+      "source": "https://developers.facebook.com/docs/permissions/ and https://developers.facebook.com/docs/marketing-api/insights/ and https://developers.facebook.com/docs/facebook-login/guides/access-tokens/",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/meta_api_docs/raw/meta-insights.html",
+      "kind": "raw_files",
+      "sha256": "b70fdf0b968ece6450e10e93685f3e967d9173ce63cd495808a546957ab040df",
+      "bytes": 1488481,
+      "captured_at": "2026-05-22T13:02:19.706309+00:00",
+      "source": "https://developers.facebook.com/docs/permissions/ and https://developers.facebook.com/docs/marketing-api/insights/ and https://developers.facebook.com/docs/facebook-login/guides/access-tokens/",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/meta_api_docs/raw/meta-tokens.html",
+      "kind": "raw_files",
+      "sha256": "2cafbc1c0ede7e0e95861b785540c3805bda18b2863f999d91eb651b53be2285",
+      "bytes": 408156,
+      "captured_at": "2026-05-22T13:02:19.783952+00:00",
+      "source": "https://developers.facebook.com/docs/permissions/ and https://developers.facebook.com/docs/marketing-api/insights/ and https://developers.facebook.com/docs/facebook-login/guides/access-tokens/",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-22T16:47:23.345135+00:00",
+    "errors": []
+  }
+}

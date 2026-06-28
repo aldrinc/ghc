@@ -1,0 +1,357 @@
+{
+  "createdAt": "2026-04-30T01:38:49.737Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/generated",
+  "sourceDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/sources",
+  "pipeline": {
+    "root": "/Users/aldrinclement/Downloads/pipeline-run-v3",
+    "metaAdsPath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md"
+  },
+  "workspace": {
+    "brand": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "collection": {
+    "id": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+    "name": "Default"
+  },
+  "outputs": [
+    {
+      "adId": "AV-A1",
+      "selectedAd": {
+        "id": "AV-A1",
+        "variant": "Contrarian",
+        "primaryText": "\"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link]",
+        "hook": "\"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can los (125) PASS",
+        "headline": "Normal Isn't Optimal",
+        "destination": "advertorial-variant-a.md",
+        "hookType": "Contrarian",
+        "format": "Single image — man in his 40s, domestic setting, natural light",
+        "rawMarkdown": "### AD AV-A1 — Contrarian\n**Primary Text:** \"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link]\n**Hook (first 125 chars):** \"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can los (125) PASS\n**Headline:** Normal Isn't Optimal (19 chars)\n**Destination:** advertorial-variant-a.md\n**Hook Type:** Contrarian\n**Format:** Single image — man in his 40s, domestic setting, natural light"
+      },
+      "source": {
+        "collectionId": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+        "collectionName": "Default",
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "sourceSwipeTitle": "11.png",
+        "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/11.png",
+        "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/sources/av-a1-11.png.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Normal Isn't Optimal",
+        "swipeAngle": "RUN_MARKER: pipeline-v3-five-samples-AV-A1-no-product-1777513005368. Use pipeline v3 Meta ad AV-A1 as the off-image Meta copy and destination context. Off-image Meta primary text: \"Your labs are normal\" is the most expensive sentence a man over 40 will hear. Normal range spans 300 to 1,000 ng/dL. You can lose 66% of your testosterone and still be \"in range.\" The test wasn't designed to detect your decline. Here's what was. [Link] Meta headline: Normal Isn't Optimal. Destination: advertorial-variant-a.md (final URL pending). Pipeline format direction: Single image — man in his 40s, domestic setting, natural light. Hook type: Contrarian. Represent the hook as a quiet domestic-lab-report moment: a man holding a paper that says NORMAL, while the visual implies normal is a broad category rather than an answer. Replace the original product container zone with a folded lab report and a simple range strip. The report can show generic blurred rows, but no fake patient name, dates, doctor, biomarkers, or random lab values. Readable on-image copy exactly: YOUR LABS ARE NORMAL; NORMAL ISN'T OPTIMAL; READ THE NOTE. Global compliance: no product shown anywhere. No bottle, jar, tub, pouch, package, label, capsule, pill, supplement facts panel, ingredient panel, gift stack, price, guarantee badge, rating, purchase cue, or product CTA. If the source swipe has product placement, replace it with non-product story cues only: paper, lab report, coffee mug, empty hands, domestic light, notebook, framed photo, or negative space. Do not substitute another product or container. Avoid source-swipe product/brand claims unless they are explicitly part of the selected Tenor ad copy above. Do not invent clinical data, patient data, endorsements, study citations, testimonials, or fake lab values. Keep the visual as a problem/curiosity/social-proof tease that can click through to the mapped destination. Use Tenor editorial palette: bone, graphite, and one restrained warm red accent. A small Tenor brand mark is allowed; product reveal is not.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "0d0e95b2-cab3-4c15-a6f6-3a48bf76a59b",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-240e3718-f6e0-427b-8f5c-b60dbad943ae"
+      },
+      "result": {
+        "workflowRunId": "0d0e95b2-cab3-4c15-a6f6-3a48bf76a59b",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-240e3718-f6e0-427b-8f5c-b60dbad943ae",
+        "assetId": "c8c27bb2-8523-4981-9083-3b6fb8aecead",
+        "publicId": "d1b6e0e7-96a6-43c7-9dd1-40ac4f035bd7",
+        "publicUrl": "https://api.moshq.app/public/assets/d1b6e0e7-96a6-43c7-9dd1-40ac4f035bd7",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/generated/av-a1-no-product.jpg",
+        "contentType": "image/jpeg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:a3ae434e76dacf82f138a15f8c18b02f0a1b90572540906c",
+          "asset_ids": [
+            "c8c27bb2-8523-4981-9083-3b6fb8aecead"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/workflow-av-a1.json"
+      }
+    },
+    {
+      "adId": "AV-C1",
+      "selectedAd": {
+        "id": "AV-C1",
+        "variant": "Fear",
+        "primaryText": "Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link]",
+        "hook": "Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down (125) PASS",
+        "headline": "Before You Start TRT",
+        "destination": "advertorial-variant-c.md",
+        "hookType": "Fear",
+        "format": "Single image — stark medical imagery contrasted with 2 capsules",
+        "rawMarkdown": "### AD AV-C1 — Fear\n**Primary Text:** Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link]\n**Hook (first 125 chars):** Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down (125) PASS\n**Headline:** Before You Start TRT (21 chars)\n**Destination:** advertorial-variant-c.md\n**Hook Type:** Fear\n**Format:** Single image — stark medical imagery contrasted with 2 capsules"
+      },
+      "source": {
+        "collectionId": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+        "collectionName": "Default",
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "sourceSwipeTitle": "Static #2.png",
+        "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/Static%20%232.png",
+        "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/sources/av-c1-Static #2.png.png"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_founder_authority",
+        "requirementIndex": 1,
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Before You Start TRT",
+        "swipeAngle": "RUN_MARKER: pipeline-v3-five-samples-AV-C1-no-product-1777513007239. Use pipeline v3 Meta ad AV-C1 as the off-image Meta copy and destination context. Off-image Meta primary text: Needles for life. Weekly injections. Blood work every 3 months. And once you start TRT, your body's own production can shut down — potentially for good. Before you sign up for a lifetime of medical dependency, read this. There's a third option. [Link] Meta headline: Before You Start TRT. Destination: advertorial-variant-c.md (final URL pending). Pipeline format direction: Single image — stark medical imagery contrasted with 2 capsules. Hook type: Fear. Represent the hook as a calm pre-TRT decision moment, not a product pitch: a mature man at a kitchen table with medical paperwork, a calendar, and a blank clinic intake form. Use the source swipe as a news/editorial frame, but avoid graphic injections or fear imagery. No needles in skin, no blood, no medical procedure scene. Readable on-image copy exactly: BEFORE YOU START TRT; READ THIS FIRST; READ THE NOTE. Global compliance: no product shown anywhere. No bottle, jar, tub, pouch, package, label, capsule, pill, supplement facts panel, ingredient panel, gift stack, price, guarantee badge, rating, purchase cue, or product CTA. If the source swipe has product placement, replace it with non-product story cues only: paper, lab report, coffee mug, empty hands, domestic light, notebook, framed photo, or negative space. Do not substitute another product or container. Avoid source-swipe product/brand claims unless they are explicitly part of the selected Tenor ad copy above. Do not invent clinical data, patient data, endorsements, study citations, testimonials, or fake lab values. Keep the visual as a problem/curiosity/social-proof tease that can click through to the mapped destination. Use Tenor editorial palette: bone, graphite, and one restrained warm red accent. A small Tenor brand mark is allowed; product reveal is not.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "6a9892c8-2870-4557-bcb6-1fc619733221",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-ce0d6c54-de0c-459e-94a6-2ea5f65477a1"
+      },
+      "result": {
+        "workflowRunId": "6a9892c8-2870-4557-bcb6-1fc619733221",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-ce0d6c54-de0c-459e-94a6-2ea5f65477a1",
+        "assetId": "7618bb47-58d2-46b8-bae3-bac8228ab828",
+        "publicId": "f3f4b8db-c05e-4b29-83c0-c8d613fd906f",
+        "publicUrl": "https://api.moshq.app/public/assets/f3f4b8db-c05e-4b29-83c0-c8d613fd906f",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/generated/av-c1-no-product.jpg",
+        "contentType": "image/jpeg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:a63dff36d343984fe4796b444b7b2e47b0b265184b2c26e8",
+          "asset_ids": [
+            "7618bb47-58d2-46b8-bae3-bac8228ab828"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/workflow-av-c1.json"
+      }
+    },
+    {
+      "adId": "L2",
+      "selectedAd": {
+        "id": "L2",
+        "variant": "Fear",
+        "primaryText": "The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link]",
+        "hook": "The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingred (125) PASS",
+        "headline": "What Your Label Hid",
+        "destination": null,
+        "hookType": "Fear",
+        "format": "Single image — supplement label with \"Proprietary Blend\" circled in red",
+        "rawMarkdown": "### AD L2 — Fear\n**Primary Text:** The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link]\n**Hook (first 125 chars):** The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingred (125) PASS\n**Headline:** What Your Label Hid (20 chars)\n**Hook Type:** Fear\n**Format:** Single image — supplement label with \"Proprietary Blend\" circled in red"
+      },
+      "source": {
+        "collectionId": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+        "collectionName": "Default",
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "sourceSwipeTitle": "big_text.jpg",
+        "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/big_text.jpg",
+        "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/sources/l2-big_text.jpg.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "What Your Label Hid",
+        "swipeAngle": "RUN_MARKER: pipeline-v3-five-samples-L2-no-product-1777513008805. Use pipeline v3 Meta ad L2 as the off-image Meta copy and destination context. Off-image Meta primary text: The 3 words on your supplement label that told you everything: \"Proprietary Blend.\" It means they can put 10mg of each active ingredient inside 1,500mg of filler, and you'd never know. You didn't fail those supplements. They failed you — by design. Here's what transparency actually looks like. [Link] Meta headline: What Your Label Hid. Destination: [pending] (final URL pending). Pipeline format direction: Single image — supplement label with \"Proprietary Blend\" circled in red. Hook type: Fear. Represent the hook with a typography-led paper evidence card, not a product label. Use a torn-paper or document-crop motif with the words PROPRIETARY BLEND stamped/circled as an abstract warning. Do not show a bottle, supplement facts panel, package, capsule, or any real/fake label. This should feel like a consumer warning note, not a product comparison. Readable on-image copy exactly: WHAT YOUR LABEL HID; PROPRIETARY BLEND; READ THE NOTE. Global compliance: no product shown anywhere. No bottle, jar, tub, pouch, package, label, capsule, pill, supplement facts panel, ingredient panel, gift stack, price, guarantee badge, rating, purchase cue, or product CTA. If the source swipe has product placement, replace it with non-product story cues only: paper, lab report, coffee mug, empty hands, domestic light, notebook, framed photo, or negative space. Do not substitute another product or container. Avoid source-swipe product/brand claims unless they are explicitly part of the selected Tenor ad copy above. Do not invent clinical data, patient data, endorsements, study citations, testimonials, or fake lab values. Keep the visual as a problem/curiosity/social-proof tease that can click through to the mapped destination. Use Tenor editorial palette: bone, graphite, and one restrained warm red accent. A small Tenor brand mark is allowed; product reveal is not.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "d91825c1-b08d-41e3-8896-d902f833e2e0",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-b45a72b0-1c09-4435-88bc-5218b00696ad"
+      },
+      "result": {
+        "workflowRunId": "d91825c1-b08d-41e3-8896-d902f833e2e0",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-b45a72b0-1c09-4435-88bc-5218b00696ad",
+        "assetId": "f8f5241e-f5fe-4368-ab38-0168f9dfafc3",
+        "publicId": "06ef2491-a6c5-4b01-ab2a-582265100b25",
+        "publicUrl": "https://api.moshq.app/public/assets/06ef2491-a6c5-4b01-ab2a-582265100b25",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/generated/l2-no-product.jpg",
+        "contentType": "image/jpeg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:b12a7d97524f01b08e036c1993d4ad548bf0c3cf039396c4",
+          "asset_ids": [
+            "f8f5241e-f5fe-4368-ab38-0168f9dfafc3"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/workflow-l2.json"
+      }
+    },
+    {
+      "adId": "L8",
+      "selectedAd": {
+        "id": "L8",
+        "variant": "Desire",
+        "primaryText": "Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link]",
+        "hook": "Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coff (125) PASS",
+        "headline": "Just You, Restored",
+        "destination": null,
+        "hookType": "Desire",
+        "format": "Single image — man mid-40s, engaged, domestic setting, heavy shadow",
+        "rawMarkdown": "### AD L8 — Desire\n**Primary Text:** Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link]\n**Hook (first 125 chars):** Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coff (125) PASS\n**Headline:** Just You, Restored (17 chars)\n**Hook Type:** Desire\n**Format:** Single image — man mid-40s, engaged, domestic setting, heavy shadow"
+      },
+      "source": {
+        "collectionId": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+        "collectionName": "Default",
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "sourceSwipeTitle": "fatigue.jpg",
+        "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+        "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/sources/l8-fatigue.jpg.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "Just You, Restored",
+        "swipeAngle": "RUN_MARKER: pipeline-v3-five-samples-L8-no-product-1777513009867. Use pipeline v3 Meta ad L8 as the off-image Meta copy and destination context. Off-image Meta primary text: Not 25 again. Not superhuman. Not \"alpha\" anything. Just the version of yourself people remember — the one who didn't need 3 coffees to function, who stayed present in conversations, who had energy left at the end of the day. That's what 92% of men reported. And it starts with 2 capsules each morning. [Link] Meta headline: Just You, Restored. Destination: [pending] (final URL pending). Pipeline format direction: Single image — man mid-40s, engaged, domestic setting, heavy shadow. Hook type: Desire. Represent the hook as a human identity-return moment: a man in a domestic room, present but reflective, with family-life cues in the background such as a framed photo or jacket by the door. Preserve the source swipe's bold fatigue-advertorial text structure, but remove source claims about alcohol, program, ratings, or money back. Readable on-image copy exactly: NOT 25 AGAIN; JUST YOU, RESTORED; READ THE NOTE. Global compliance: no product shown anywhere. No bottle, jar, tub, pouch, package, label, capsule, pill, supplement facts panel, ingredient panel, gift stack, price, guarantee badge, rating, purchase cue, or product CTA. If the source swipe has product placement, replace it with non-product story cues only: paper, lab report, coffee mug, empty hands, domestic light, notebook, framed photo, or negative space. Do not substitute another product or container. Avoid source-swipe product/brand claims unless they are explicitly part of the selected Tenor ad copy above. Do not invent clinical data, patient data, endorsements, study citations, testimonials, or fake lab values. Keep the visual as a problem/curiosity/social-proof tease that can click through to the mapped destination. Use Tenor editorial palette: bone, graphite, and one restrained warm red accent. A small Tenor brand mark is allowed; product reveal is not.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "94c4f556-e0fb-43c3-b7ae-da92bb2fbed9",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-2f439a06-7cf2-42b0-924e-46840eba100b"
+      },
+      "result": {
+        "workflowRunId": "94c4f556-e0fb-43c3-b7ae-da92bb2fbed9",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-2f439a06-7cf2-42b0-924e-46840eba100b",
+        "assetId": "d200c9a0-f96d-4ec2-889e-3a318a7c6ca1",
+        "publicId": "96d99707-58e6-4e5a-9357-4b7e207d0171",
+        "publicUrl": "https://api.moshq.app/public/assets/96d99707-58e6-4e5a-9357-4b7e207d0171",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/generated/l8-no-product.jpg",
+        "contentType": "image/jpeg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:a6c7f3045949b04ed53673c46a6a9810d7b36c5d1311279e",
+          "asset_ids": [
+            "d200c9a0-f96d-4ec2-889e-3a318a7c6ca1"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/workflow-l8.json"
+      }
+    },
+    {
+      "adId": "PDP2",
+      "selectedAd": {
+        "id": "PDP2",
+        "variant": "Social Proof",
+        "primaryText": "\"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link]",
+        "hook": "\"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three (125) PASS",
+        "headline": "\"I Knew I Wasn't Going Back\"",
+        "destination": null,
+        "hookType": "Social Proof",
+        "format": "Single image — testimonial quote card, brand colors",
+        "rawMarkdown": "### AD PDP2 — Social Proof\n**Primary Text:** \"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link]\n**Hook (first 125 chars):** \"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three (125) PASS\n**Headline:** \"I Knew I Wasn't Going Back\" (30 chars)\n**Hook Type:** Social Proof\n**Format:** Single image — testimonial quote card, brand colors"
+      },
+      "source": {
+        "collectionId": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+        "collectionName": "Default",
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "sourceSwipeTitle": "fb_message_ad.jpg",
+        "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fb_message_ad.jpg",
+        "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/sources/pdp2-fb_message_ad.jpg.jpg"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_founder_authority",
+        "requirementIndex": 0,
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "withheld visual product",
+        "swipeHook": "\"I Knew I Wasn't Going Back\"",
+        "swipeAngle": "RUN_MARKER: pipeline-v3-five-samples-PDP2-no-product-1777513010809. Use pipeline v3 Meta ad PDP2 as the off-image Meta copy and destination context. Off-image Meta primary text: \"By month two, my wife said I seemed more like myself. That was the moment I knew I wasn't going back.\" — David M., 52. Three pathways supported. 21 ingredients disclosed. 2 capsules every morning. One 90-day risk-free trial. See the full protocol and pricing. [Link] Meta headline: \"I Knew I Wasn't Going Back\". Destination: [pending] (final URL pending). Pipeline format direction: Single image — testimonial quote card, brand colors. Hook type: Social Proof. Represent the hook as a testimonial quote card, not a product ad. Use a clean social-proof layout with a mature man portrait zone and a large quote block. Do not show product, bottle, capsules, packaging, pricing, guarantee badge, ingredient count, protocol diagram, or purchase CTA. Keep the quote feeling like a review excerpt, not an offer stack. Readable on-image copy exactly: “MY WIFE SAID I SEEMED LIKE MYSELF.”; THAT WAS THE MOMENT.; READ THE NOTE. Global compliance: no product shown anywhere. No bottle, jar, tub, pouch, package, label, capsule, pill, supplement facts panel, ingredient panel, gift stack, price, guarantee badge, rating, purchase cue, or product CTA. If the source swipe has product placement, replace it with non-product story cues only: paper, lab report, coffee mug, empty hands, domestic light, notebook, framed photo, or negative space. Do not substitute another product or container. Avoid source-swipe product/brand claims unless they are explicitly part of the selected Tenor ad copy above. Do not invent clinical data, patient data, endorsements, study citations, testimonials, or fake lab values. Keep the visual as a problem/curiosity/social-proof tease that can click through to the mapped destination. Use Tenor editorial palette: bone, graphite, and one restrained warm red accent. A small Tenor brand mark is allowed; product reveal is not.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "41d7e113-c730-4938-b2a7-a00e5e546816",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-4f306d75-c184-429c-a53e-cc2bb9a5f519"
+      },
+      "result": {
+        "workflowRunId": "41d7e113-c730-4938-b2a7-a00e5e546816",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-4f306d75-c184-429c-a53e-cc2bb9a5f519",
+        "assetId": "90c53baa-b55f-4bfe-af6f-22c2c1bb3ba6",
+        "publicId": "ed44b4b6-64a2-4571-82ba-856c23eef9cb",
+        "publicUrl": "https://api.moshq.app/public/assets/ed44b4b6-64a2-4571-82ba-856c23eef9cb",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/generated/pdp2-no-product.jpg",
+        "contentType": "image/jpeg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:2240f8ff51a63b2eb0362771f28156e7858e2e252b6df3ba",
+          "asset_ids": [
+            "90c53baa-b55f-4bfe-af6f-22c2c1bb3ba6"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-five-samples-no-product-2026-04-30T01-36-42-012Z/workflow-pdp2.json"
+      }
+    }
+  ],
+  "validationIntent": {
+    "noProductShown": true,
+    "finalUrlsPending": true,
+    "sampleCount": 5
+  }
+}

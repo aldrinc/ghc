@@ -1,0 +1,86 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "local_parallel_tools",
+  "reason": "Native subagents were blocked by developer tool policy for this request; used local parallel tool lanes for reads, tests, build, browser smoke, and proof checks.",
+  "lanes": [
+    {
+      "lane_id": "backend-contract-workflow",
+      "objective": "Implement marketing-agent setup schemas, Context.dev extraction proxy, offering persistence, and foundation-only workflow behavior.",
+      "role": "implementation",
+      "mode": "local_tool",
+      "status": "passed",
+      "started_at": "2026-05-20T20:35:00Z",
+      "ended_at": "2026-05-20T21:02:06.681Z",
+      "summary": "Backend setup endpoints, Context.dev adapter, raw extraction artifact, foundation bundle artifact, migration, and tests are in place.",
+      "read_scope": [
+        "mos/backend"
+      ],
+      "write_scope": [
+        "mos/backend/app",
+        "mos/backend/tests",
+        "mos/backend/alembic"
+      ],
+      "artifacts": [
+        "logs/backend-targeted-pytest.log",
+        "logs/backend-compile.log",
+        "logs/backend-new-schema-service-ruff.log"
+      ]
+    },
+    {
+      "lane_id": "frontend-onboarding-flow",
+      "objective": "Implement the Ferndesk-style step-by-step onboarding UI with new/existing branches and product/service-specific questions.",
+      "role": "implementation",
+      "mode": "local_tool",
+      "status": "passed",
+      "started_at": "2026-05-20T20:35:00Z",
+      "ended_at": "2026-05-20T21:02:06.681Z",
+      "summary": "Frontend wizard supports existing-business extraction review, new-business product/service setup, optional pricing/competitors, and post-create success state.",
+      "read_scope": [
+        "mos/frontend"
+      ],
+      "write_scope": [
+        "mos/frontend/src"
+      ],
+      "artifacts": [
+        "logs/frontend-onboarding-wizard-test.log",
+        "logs/frontend-semantic-ui.log",
+        "logs/frontend-build.log",
+        "logs/browser-onboarding-smoke.json",
+        "onboarding-service-screen.png"
+      ]
+    },
+    {
+      "lane_id": "proof-and-source-gates",
+      "objective": "Validate source capture, secret handling, plan contract, browser proof, and proof dashboard inputs.",
+      "role": "verification",
+      "mode": "local_tool",
+      "status": "passed",
+      "started_at": "2026-05-20T20:35:00Z",
+      "ended_at": "2026-05-20T21:02:06.681Z",
+      "summary": "Context.dev docs source manifest, secret scan, browser smoke, and plan contract verification passed.",
+      "read_scope": [
+        "proof_pack/foundation-onboarding-flow-2026-05-20",
+        "docs/plans"
+      ],
+      "write_scope": [
+        "proof_pack/foundation-onboarding-flow-2026-05-20"
+      ],
+      "artifacts": [
+        "logs/context-dev-capture-verify.log",
+        "logs/secret-scan.log",
+        "logs/planctl-verify-final.log",
+        "sources/context-dev-docs/source_manifest.json"
+      ]
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "main Codex thread",
+    "summary": "Local backend, frontend, and proof lanes were integrated in the shared workspace; no overlapping file ownership conflicts were introduced beyond the main thread edits."
+  },
+  "token_time_proxy": {
+    "native_subagents": 0,
+    "local_parallel_tool_batches": 8,
+    "note": "Parallelism: blocked by tool policy for native subagents; local parallel tools used where safe."
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "createdAt": "2026-04-28T19:05:05.949Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "stagingFunnelId": "be65d76e-ced9-4948-9465-18723c8446fd",
+  "stagingPageId": "ab3102f4-a179-410a-9eb0-66aa3020cafc",
+  "outputs": [
+    {
+      "key": "01-product-hero-v2",
+      "sourceFile": "01-tenor-product-hero-source-v2.jpg",
+      "sourceAttachment": {
+        "assetId": "2d804ee1-3f76-45e2-9d45-fa0d54af3889",
+        "publicId": "55940d52-8a4e-4428-8c8c-8c61cc88f493",
+        "filename": "01-tenor-product-hero-source-v2.jpg",
+        "contentType": "image/jpeg",
+        "width": 1024,
+        "height": 1024,
+        "url": "/public/assets/55940d52-8a4e-4428-8c8c-8c61cc88f493"
+      },
+      "workflowRunId": "90f59ed7-efba-40fe-b3dc-abd08a1931db",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1c727c70-3019-4baf-bf1e-1c2fce3f85e0",
+      "assetId": "4edf9716-89aa-4629-9e9b-e5e22e20ce01",
+      "publicId": "25238e98-64e8-4e30-b13e-d6b50ee358c4",
+      "publicUrl": "https://api.moshq.app/public/assets/25238e98-64e8-4e30-b13e-d6b50ee358c4",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated-v2/01-product-hero-v2.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/55940d52-8a4e-4428-8c8c-8c61cc88f493",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Product-only vitality hero, no added words",
+        "swipeAngle": "Create a square Tenor listicle carousel hero image using the attached source swipe as the visual target. The final image must have no added copy, no headline, no captions, no badges, no labels, and no typography outside the product bottle label itself. Show the updated black Daily Drive Essentials bottle as the hero subject, surrounded by premium natural vitality visualizations: whole fruit-like red botanical forms, roots, leaves, mineral/crystal accents, warm energy arcs, and a neutral editorial cream background. It should feel fresh, masculine, premium, and benefit-led without words. Do not use sachets, powder, scoop, IM8 branding, celebrity language, or any extra text.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:641d039532e429f76686ffe045707e11c4eb17a1aefdd29c",
+        "asset_ids": [
+          "4edf9716-89aa-4629-9e9b-e5e22e20ce01"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "02-survey-proof-v2",
+      "sourceFile": "02-tenor-survey-proof-source-v2.jpg",
+      "sourceAttachment": {
+        "assetId": "7ef96c1c-455f-4bb0-88b7-f88937abc977",
+        "publicId": "8ef29ccf-47ab-4760-b7bb-d95717986898",
+        "filename": "02-tenor-survey-proof-source-v2.jpg",
+        "contentType": "image/jpeg",
+        "width": 1024,
+        "height": 1024,
+        "url": "/public/assets/8ef29ccf-47ab-4760-b7bb-d95717986898"
+      },
+      "workflowRunId": "78500d6a-adb8-4145-bcb1-f677893675e2",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-da1d2db6-2ab2-4916-860f-75e3efac60c7",
+      "assetId": "899679e5-4aab-4b55-8877-6ab05f6404f7",
+      "publicId": "6c6f8d9d-b3e8-4d6b-8b27-a8ef8657fdc4",
+      "publicUrl": "https://api.moshq.app/public/assets/6c6f8d9d-b3e8-4d6b-8b27-a8ef8657fdc4",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated-v2/02-survey-proof-v2.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 1,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/8ef29ccf-47ab-4760-b7bb-d95717986898",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Men reported feeling more like themselves.",
+        "swipeAngle": "Create a square Tenor listicle carousel survey proof card based on the attached source swipe. Make the background substantially lighter and airier than the prior dark/tan version: warm ivory, soft cream, white stat cards, minimal shadow, no dark bands. Use survey proof only, not clinical trial language. Required text: Reported outcomes; Men reported feeling more like themselves; Survey data from 1,203 men; 94% Morning energy; 81% Physical stamina; 87% Mental sharpness; 92% Overall vitality; For creative review. Not a clinical trial claim. Keep it editorial, neutral, masculine, and mobile-legible. Do not mention digestion, sleep, randomized trial, IM8, Essentials Pro, or product packaging.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:8b81903da52fe920ba1cec3534f4145c687c47c53650e774",
+        "asset_ids": [
+          "899679e5-4aab-4b55-8877-6ab05f6404f7"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "03-formula-v2",
+      "sourceFile": "03-tenor-formula-source-v2.jpg",
+      "sourceAttachment": {
+        "assetId": "c9d871e1-4c45-458e-a1a3-2a74140f2c27",
+        "publicId": "36c479ae-2921-44f6-ad65-8a08a2651000",
+        "filename": "03-tenor-formula-source-v2.jpg",
+        "contentType": "image/jpeg",
+        "width": 1024,
+        "height": 1024,
+        "url": "/public/assets/36c479ae-2921-44f6-ad65-8a08a2651000"
+      },
+      "workflowRunId": "941884dd-38cb-4f73-976f-10b72f4ecf7b",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-61d0f194-2360-49e6-9e1e-e234060f851d",
+      "assetId": "c1c5a590-5b24-4635-a14f-452e222d1454",
+      "publicId": "d478feff-75ca-4eb1-bba0-86705a03b07b",
+      "publicUrl": "https://api.moshq.app/public/assets/d478feff-75ca-4eb1-bba0-86705a03b07b",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated-v2/03-formula-v2.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/36c479ae-2921-44f6-ad65-8a08a2651000",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Five core levers. No proprietary blend.",
+        "swipeAngle": "Create a square Tenor listicle carousel formula card from the attached source swipe. Do not show the product bottle or any product packaging. Use ingredient objects and formula components instead: roots, maca-like red botanicals, zinc/mineral crystals, amino-acid crystal accents, leaves, and a premium neutral background. Required text: Formula; Five core levers; No proprietary blend; Exact active doses disclosed on the label; Tongkat Ali 400 mg; Zinc 50 mg; Maca 250 mg; L-Arginine 250 mg; Ginseng + Eleuthero 125 mg; Built for men who want a daily protocol before clinics, prescriptions, or needles. Do not say one scoop replaces anything, do not show sachets or powder, do not include a bottle, and do not invent additional doses.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:439279ec9e1e1192ffdcc85581591835c7be82f707701812",
+        "asset_ids": [
+          "c1c5a590-5b24-4635-a14f-452e222d1454"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

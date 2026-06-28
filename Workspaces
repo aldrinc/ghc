@@ -1,0 +1,6 @@
+mos/frontend/src/components/clients/OnboardingWizard.tsx:1726:  const hasPrimaryAction = (step === "existing-review" || step === "new-review") ? true : !isSelectionOnlyStep;
+mos/frontend/src/components/clients/OnboardingWizard.tsx:1729:      className={`mos-onboarding-form ${stepLayoutClassName[stepLayoutKind]}${hasPrimaryAction ? "" : " mos-onboarding-form--no-primary-action"}`}
+mos/frontend/src/pages/workspaces/WorkspaceOnboardingPage.tsx:47:            <span className="sm:hidden">Workspaces</span>
+mos/frontend/src/styles/design-system.css:164:    grid-template-columns: minmax(0, 1fr) minmax(140px, 220px) minmax(0, 1fr);
+mos/frontend/src/styles/design-system.css:321:    .mos-onboarding-form--no-primary-action {
+mos/frontend/src/styles/design-system.css:326:    .mos-onboarding-form--no-primary-action .mos-onboarding-step-frame {

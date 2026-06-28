@@ -1,0 +1,147 @@
+{
+  "campaign": {
+    "id": "120245038391240293",
+    "name": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - Compliance Clean 15",
+    "status": "PAUSED",
+    "effective_status": "PAUSED"
+  },
+  "adsets": [
+    {
+      "id": "120245038391810293",
+      "name": "CBO Bucket 1",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038395060293",
+      "name": "CBO Bucket 2",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038396550293",
+      "name": "CBO Bucket 3",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038397320293",
+      "name": "CBO Bucket 4",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "id": "120245038400410293",
+      "name": "CBO Bucket 5",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    }
+  ],
+  "ads": [
+    {
+      "adId": "PDP6",
+      "id": "120245038410060293",
+      "name": "PDP6 - \"You Can See What You're Taking\"",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "PDP2",
+      "id": "120245038416690293",
+      "name": "PDP2 - \"I Knew I Wasn't Going Back\"",
+      "status": "PAUSED",
+      "effective_status": "PAUSED"
+    },
+    {
+      "adId": "L11",
+      "id": "120245038429000293",
+      "name": "L11 - 810K+ Men. 90-Day Guarantee.",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "L10",
+      "id": "120245038437020293",
+      "name": "L10 - Nothing to Hide",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "L9",
+      "id": "120245038443800293",
+      "name": "L9 - Mark, 47: \"Night and Day\"",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "L8",
+      "id": "120245038452220293",
+      "name": "L8 - Just You, Restored",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "L7",
+      "id": "120245038457400293",
+      "name": "L7 - Not Who You Are",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "L3",
+      "id": "120245038466410293",
+      "name": "L3 - Feel Like Yourself Again",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "L2",
+      "id": "120245038475390293",
+      "name": "L2 - What Your Label Hid",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "AV-C2",
+      "id": "120245038481480293",
+      "name": "AV-C2 - The Third Option",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "AV-C1",
+      "id": "120245038486290293",
+      "name": "AV-C1 - Before You Start TRT",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "AV-B4",
+      "id": "120245038495840293",
+      "name": "AV-B4 - More T Was Never Enough",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "AV-A4",
+      "id": "120245038506530293",
+      "name": "AV-A4 - 5 Signs It's Not Just Age",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "AV-A2",
+      "id": "120245038511400293",
+      "name": "AV-A2 - The 700-Point Spread",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    },
+    {
+      "adId": "AV-A1",
+      "id": "120245038516860293",
+      "name": "AV-A1 - Normal Isn't Optimal",
+      "status": "PAUSED",
+      "effective_status": "PENDING_REVIEW"
+    }
+  ]
+}

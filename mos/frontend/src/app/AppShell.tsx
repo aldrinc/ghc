@@ -62,6 +62,7 @@ import {
   ShoppingBag,
   LayoutTemplate,
   Send,
+  Bot,
 } from "lucide-react";
 import { appRoutes } from "./routes";
 import { cn } from "@/lib/utils";
@@ -117,6 +118,7 @@ const EXECUTION_NAV: NavSection = {
     { title: "Campaigns", path: "/campaigns", icon: Target },
     { title: "Analytics", path: "/workspaces/execution/analytics", icon: BarChart3 },
     { title: "Postiz", path: "/workspaces/execution/postiz", icon: Send },
+    { title: "Social Agents", path: "/workspaces/execution/social-agents", icon: Bot },
   ],
 };
 
@@ -217,9 +219,11 @@ function NavigationMenu({ label, items, strategyNeedsInput }: NavSection & { str
     }, null)?.path ?? null;
 
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
-      <SidebarMenu>
+    <SidebarGroup className="px-[8px] py-[4px] group-data-[collapsible=icon]:px-[4px]">
+      <SidebarGroupLabel className="h-[24px] px-[8px] text-xs font-medium text-content-muted">
+        {label}
+      </SidebarGroupLabel>
+      <SidebarMenu className="gap-[2px]">
         {parsedItems.map(({ item }) => {
           const isActive = item.path === activeItemPath;
           const showDot = strategyNeedsInput && item.path === "/strategy";
@@ -229,7 +233,7 @@ function NavigationMenu({ label, items, strategyNeedsInput }: NavSection & { str
               <SidebarMenuButton
                 isActive={isActive}
                 tooltip={item.title}
-                className="min-w-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 transition-transform hover:translate-x-[1px]"
+                className="h-[34px] min-w-0 rounded-lg px-[10px] text-[13px] font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:h-[32px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-[8px] transition-[background-color,color,transform] hover:translate-x-[1px] data-[active=true]:font-semibold"
                 onClick={() => {
                   navigate(item.path);
                   setOpenMobile(false);
@@ -367,24 +371,24 @@ export function AppShell() {
   return (
     <SidebarProvider className="bg-background text-foreground">
       <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-        <SidebarHeader>
-          <SidebarMenu>
+        <SidebarHeader className="gap-[4px] px-[12px] pb-[8px] pt-[12px] group-data-[collapsible=icon]:px-[8px]">
+          <SidebarMenu className="gap-0">
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
                     size="lg"
                     tooltip="Workspace"
-                    className="min-w-0 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                    className="h-[48px] min-w-0 rounded-xl px-[10px] data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-foreground group-data-[collapsible=icon]:h-[32px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                   >
-                    <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-semibold uppercase group-data-[collapsible=icon]:size-8">
+                    <div className="flex size-[36px] shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sm font-semibold uppercase text-sidebar-primary-foreground group-data-[collapsible=icon]:size-[32px]">
                       {workspaceInitial}
                     </div>
-                    <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                      <span className="truncate font-semibold">
+                    <div className="grid min-w-0 flex-1 gap-0.5 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                      <span className="truncate font-semibold leading-5">
                         {workspace?.name || "Select a workspace"}
                       </span>
-                      <span className="truncate text-xs text-sidebar-foreground opacity-70">
+                      <span className="truncate text-xs leading-4 text-content-muted">
                         Workspace
                       </span>
                     </div>
@@ -459,34 +463,34 @@ export function AppShell() {
           <JourneyIndicator />
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="gap-[4px] px-[4px] py-[4px]">
           <NavigationMenu {...WORKSPACE_NAV} strategyNeedsInput={strategyNeedsInput} />
           <NavigationMenu {...RESEARCH_NAV} />
           <NavigationMenu {...EXECUTION_NAV} />
           <NavigationMenu {...AI_NAV} />
 
-          <SidebarSeparator className="mx-2" />
+          <SidebarSeparator className="mx-[12px] my-[4px]" />
           <NavigationMenu {...ASSETS_NAV} />
         </SidebarContent>
 
-        <SidebarFooter>
-          <SidebarSeparator className="mx-2" />
-          <SidebarMenu>
+        <SidebarFooter className="gap-[8px] px-[12px] pb-[12px] pt-[8px] group-data-[collapsible=icon]:px-[8px]">
+          <SidebarSeparator className="mx-0" />
+          <SidebarMenu className="gap-0">
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
                     size="lg"
                     tooltip="Account"
-                    className="min-w-0 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                    className="h-[48px] min-w-0 rounded-xl px-[10px] data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-foreground group-data-[collapsible=icon]:h-[32px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                   >
-                    <Avatar className="h-9 w-9 rounded-lg">
+                    <Avatar className="h-[36px] w-[36px] shrink-0 rounded-xl">
                       <AvatarImage src={user?.imageUrl} alt={name} />
-                      <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                      <AvatarFallback className="rounded-xl">{initials}</AvatarFallback>
                     </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                      <span className="truncate font-semibold">{name}</span>
-                      {email ? <span className="truncate text-xs">{email}</span> : null}
+                    <div className="grid min-w-0 flex-1 gap-0.5 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                      <span className="truncate font-semibold leading-5">{name}</span>
+                      {email ? <span className="truncate text-xs leading-4 text-content-muted">{email}</span> : null}
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>

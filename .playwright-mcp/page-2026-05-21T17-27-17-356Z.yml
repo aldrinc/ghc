@@ -1,0 +1,63 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - button "Previous" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - text: Previous
+      - generic [ref=e7]:
+        - generic:
+          - progressbar "Setup progress"
+      - button "Onboarding options" [ref=e9] [cursor=pointer]:
+        - img
+    - main [ref=e11]:
+      - heading "How will this business make money?" [level=1] [ref=e62]
+      - listbox "Business model" [ref=e65]:
+        - option "E-commerce product A product-first business selling through an online store." [ref=e66] [cursor=pointer]:
+          - img [ref=e68]
+          - generic [ref=e74]:
+            - generic [ref=e76]: E-commerce product
+            - generic [ref=e77]: A product-first business selling through an online store.
+          - img [ref=e79]
+        - option "Digital product or course A course, template, download, training, or packaged knowledge." [ref=e81] [cursor=pointer]:
+          - img [ref=e83]
+          - generic [ref=e88]:
+            - generic [ref=e90]: Digital product or course
+            - generic [ref=e91]: A course, template, download, training, or packaged knowledge.
+          - img [ref=e93]
+        - option "Service business Done-for-you work, consulting, implementation, or local services." [ref=e95] [cursor=pointer]:
+          - img [ref=e97]
+          - generic [ref=e102]:
+            - generic [ref=e104]: Service business
+            - generic [ref=e105]: Done-for-you work, consulting, implementation, or local services.
+          - img [ref=e107]
+        - option "SaaS or software An app, tool, or platform customers use to get a job done." [ref=e109] [cursor=pointer]:
+          - img [ref=e111]
+          - generic [ref=e117]:
+            - generic [ref=e119]: SaaS or software
+            - generic [ref=e120]: An app, tool, or platform customers use to get a job done.
+          - img [ref=e122]
+        - option "Lead generation A business built around qualified inquiries, booked calls, or buyer introductions." [ref=e124] [cursor=pointer]:
+          - img [ref=e126]
+          - generic [ref=e131]:
+            - generic [ref=e133]: Lead generation
+            - generic [ref=e134]: A business built around qualified inquiries, booked calls, or buyer introductions.
+          - img [ref=e136]
+        - option "Affiliate Promote another company's offer and earn commission." [ref=e138] [cursor=pointer]:
+          - img [ref=e140]
+          - generic [ref=e146]:
+            - generic [ref=e148]: Affiliate
+            - generic [ref=e149]: Promote another company's offer and earn commission.
+          - img [ref=e151]
+        - option "Marketplace or platform A two-sided network, directory, or transaction platform." [ref=e153] [cursor=pointer]:
+          - img [ref=e155]
+          - generic [ref=e161]:
+            - generic [ref=e163]: Marketplace or platform
+            - generic [ref=e164]: A two-sided network, directory, or transaction platform.
+          - img [ref=e166]
+        - option "Other Use this when the model does not fit the common buckets." [ref=e168] [cursor=pointer]:
+          - img [ref=e170]
+          - generic [ref=e175]:
+            - generic [ref=e177]: Other
+            - generic [ref=e178]: Use this when the model does not fit the common buckets.
+          - img [ref=e180]
+  - region "Notifications"

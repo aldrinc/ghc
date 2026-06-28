@@ -1,0 +1,43 @@
+{
+  "createdAt": "2026-05-05T00:40:12.046Z",
+  "creativeAction": "created",
+  "creativeSpecId": "671cec7b-7de8-4399-b10e-91701732efed",
+  "assetId": "f7bf9821-16f5-4c2b-a563-ab7e33c9dbc4",
+  "generationKey": "remoteJob:openai:c0d5d40c5cc06ba18f6fe1f58d0809ae5d2c0949cf849852a540f265f9221913",
+  "validationPayload": {
+    "generationKey": "remoteJob:openai:c0d5d40c5cc06ba18f6fe1f58d0809ae5d2c0949cf849852a540f265f9221913",
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "campaignName": "Tenor GLP Pilot GPT Image 2 - C001 - 2026-05-05",
+    "campaignObjective": "OUTCOME_SALES",
+    "buyingType": "AUCTION",
+    "specialAdCategories": [],
+    "campaignDailyBudget": 10000,
+    "bucketCount": 1,
+    "bucketDestinationUrls": []
+  },
+  "validation": {
+    "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+    "generationKey": "remoteJob:openai:c0d5d40c5cc06ba18f6fe1f58d0809ae5d2c0949cf849852a540f265f9221913",
+    "ok": true,
+    "includedCount": 1,
+    "adsetCount": 1,
+    "bucketCount": 1,
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "publishDomain": "shoptenorco.com",
+    "budgetScope": "campaign",
+    "campaignDailyBudget": 10000,
+    "bucketDestinationUrls": [],
+    "blockers": [],
+    "items": [
+      {
+        "assetId": "f7bf9821-16f5-4c2b-a563-ab7e33c9dbc4",
+        "creativeSpecId": "671cec7b-7de8-4399-b10e-91701732efed",
+        "adsetSpecId": "4bf65272-c6d7-434e-b3b4-86c0ed77b501",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+        "status": "ok",
+        "blockers": []
+      }
+    ]
+  }
+}

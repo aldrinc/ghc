@@ -5769,3 +5769,488 @@ class PostizPublication(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# =============================================================================
+# Connected social agents + content growth programs
+# =============================================================================
+
+
+class SocialProviderConnection(Base):
+    """Workspace-scoped social/provider connection metadata.
+
+    Secret material remains in provider-specific credential tables. This table is the
+    normalized inventory anchor that agents can reference without receiving tokens.
+    """
+
+    __tablename__ = "social_provider_connections"
+    __table_args__ = (
+        sa.Index("idx_social_provider_connections_org_client", "org_id", "client_id"),
+        sa.Index("idx_social_provider_connections_provider_status", "provider", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    external_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    auth_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="oauth")
+    scopes_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    token_metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    last_health_checked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SocialProviderAsset(Base):
+    """Normalized provider asset such as ad account, Page, TikTok channel, or post."""
+
+    __tablename__ = "social_provider_assets"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "client_id",
+            "provider",
+            "provider_asset_id",
+            "asset_type",
+            name="uq_social_provider_assets_provider_asset_type",
+        ),
+        sa.Index("idx_social_provider_assets_org_client", "org_id", "client_id"),
+        sa.Index("idx_social_provider_assets_connection", "connection_id"),
+        sa.Index("idx_social_provider_assets_type_status", "asset_type", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    connection_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("social_provider_connections.id", ondelete="SET NULL"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_asset_id: Mapped[str] = mapped_column(Text, nullable=False)
+    asset_type: Mapped[str] = mapped_column(Text, nullable=False)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    parent_provider_asset_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    capability_flags_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    raw_payload_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SocialProviderSnapshot(Base):
+    """Raw and normalized provider snapshot for agent-readable social truth."""
+
+    __tablename__ = "social_provider_snapshots"
+    __table_args__ = (
+        sa.Index("idx_social_provider_snapshots_org_client", "org_id", "client_id"),
+        sa.Index("idx_social_provider_snapshots_asset_created", "provider_asset_id", "created_at"),
+        sa.Index("idx_social_provider_snapshots_type", "snapshot_type"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    provider_asset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("social_provider_assets.id", ondelete="SET NULL"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    snapshot_type: Mapped[str] = mapped_column(Text, nullable=False)
+    time_from: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    time_to: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    metrics_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    raw_payload_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    provenance: Mapped[str] = mapped_column(Text, nullable=False, server_default="concrete")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AgentActionProposal(Base):
+    """Approval-gated external action proposal created by an agent or workflow."""
+
+    __tablename__ = "agent_action_proposals"
+    __table_args__ = (
+        sa.Index("idx_agent_action_proposals_org_client_status", "org_id", "client_id", "status"),
+        sa.Index("idx_agent_action_proposals_target", "target_provider", "target_asset_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    source_agent_run_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    action_type: Mapped[str] = mapped_column(Text, nullable=False)
+    target_provider: Mapped[str] = mapped_column(Text, nullable=False)
+    target_asset_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    target_asset_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    before_snapshot_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    proposed_after_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    rationale: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    risk_label: Mapped[str] = mapped_column(Text, nullable=False, server_default="medium")
+    required_capability: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    approved_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_response_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    rollback_hint_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ConversionSource(Base):
+    """Generic conversion source used by content growth programs."""
+
+    __tablename__ = "conversion_sources"
+    __table_args__ = (
+        sa.Index("idx_conversion_sources_org_client", "org_id", "client_id"),
+        sa.Index("idx_conversion_sources_provider_status", "provider", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    goal_events_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    config_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    credentials_metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ContentGrowthProgram(Base):
+    """Agent-owned content growth loop for TikTok carousel and future formats."""
+
+    __tablename__ = "content_growth_programs"
+    __table_args__ = (
+        sa.Index("idx_content_growth_programs_org_client", "org_id", "client_id"),
+        sa.Index("idx_content_growth_programs_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    conversion_source_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("conversion_sources.id", ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    objective: Mapped[str] = mapped_column(Text, nullable=False)
+    platform_key: Mapped[str] = mapped_column(Text, nullable=False, server_default="tiktok")
+    format_key: Mapped[str] = mapped_column(Text, nullable=False, server_default="tiktok_carousel")
+    authority_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="approval_required"
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    settings_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ContentExperiment(Base):
+    """A content hypothesis under a growth program."""
+
+    __tablename__ = "content_experiments"
+    __table_args__ = (
+        sa.Index("idx_content_experiments_program", "growth_program_id"),
+        sa.Index("idx_content_experiments_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    growth_program_id: Mapped[str] = mapped_column(
+        ForeignKey("content_growth_programs.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
+    hook_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cta_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    audience: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ContentVariant(Base):
+    """Platform-specific content unit, such as a six-slide TikTok carousel."""
+
+    __tablename__ = "content_variants"
+    __table_args__ = (
+        sa.Index("idx_content_variants_program", "growth_program_id"),
+        sa.Index("idx_content_variants_experiment", "experiment_id"),
+        sa.Index("idx_content_variants_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    growth_program_id: Mapped[str] = mapped_column(
+        ForeignKey("content_growth_programs.id", ondelete="CASCADE"), nullable=False
+    )
+    experiment_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("content_experiments.id", ondelete="SET NULL"), nullable=True
+    )
+    platform_key: Mapped[str] = mapped_column(Text, nullable=False, server_default="tiktok")
+    format_key: Mapped[str] = mapped_column(Text, nullable=False, server_default="tiktok_carousel")
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    caption: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    slide_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="6")
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    approved_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    storyboard_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    provider_payload_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ContentVariantSlide(Base):
+    """Slide-level planning/render state for carousel variants."""
+
+    __tablename__ = "content_variant_slides"
+    __table_args__ = (
+        UniqueConstraint("variant_id", "slide_index", name="uq_content_variant_slides_index"),
+        sa.Index("idx_content_variant_slides_variant", "variant_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    variant_id: Mapped[str] = mapped_column(
+        ForeignKey("content_variants.id", ondelete="CASCADE"), nullable=False
+    )
+    slide_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    visual_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    overlay_text: Mapped[str] = mapped_column(Text, nullable=False)
+    source_asset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
+    )
+    rendered_asset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
+    )
+    render_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    renderer_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ConversionEvent(Base):
+    """Normalized conversion event from a configured conversion source."""
+
+    __tablename__ = "conversion_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "conversion_source_id",
+            "provider_event_id",
+            name="uq_conversion_events_source_event",
+        ),
+        sa.Index("idx_conversion_events_org_client_occurred", "org_id", "client_id", "occurred_at"),
+        sa.Index("idx_conversion_events_event_name", "event_name"),
+        sa.Index("idx_conversion_events_content_variant", "content_variant_id"),
+        sa.Index("idx_conversion_events_postiz_post", "postiz_post_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    conversion_source_id: Mapped[str] = mapped_column(
+        ForeignKey("conversion_sources.id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_event_id: Mapped[str] = mapped_column(Text, nullable=False)
+    event_name: Mapped[str] = mapped_column(Text, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    value: Mapped[Optional[float]] = mapped_column(Numeric(14, 4), nullable=True)
+    currency: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_id_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    campaign_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_experiment_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("content_experiments.id", ondelete="SET NULL"), nullable=True
+    )
+    content_variant_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("content_variants.id", ondelete="SET NULL"), nullable=True
+    )
+    postiz_post_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    postiz_channel_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    attribution_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    raw_payload_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    provenance: Mapped[str] = mapped_column(Text, nullable=False, server_default="concrete")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class HookCtaRollup(Base):
+    """Source-backed memory of hook/CTA performance for future agent runs."""
+
+    __tablename__ = "hook_cta_rollups"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "client_id",
+            "growth_program_id",
+            "hook_key",
+            "cta_key",
+            name="uq_hook_cta_rollups_program_hook_cta",
+        ),
+        sa.Index("idx_hook_cta_rollups_program", "growth_program_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    growth_program_id: Mapped[str] = mapped_column(
+        ForeignKey("content_growth_programs.id", ondelete="CASCADE"), nullable=False
+    )
+    hook_key: Mapped[str] = mapped_column(Text, nullable=False)
+    cta_key: Mapped[str] = mapped_column(Text, nullable=False)
+    sample_size: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    metrics_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    provenance: Mapped[str] = mapped_column(Text, nullable=False, server_default="concrete")
+    last_observed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

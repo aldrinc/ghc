@@ -1,0 +1,79 @@
+{
+  "created_at": "2026-05-04T18:53:36.894Z",
+  "artifact": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-welcome-lead-nurturer-compressed-review.md",
+  "revision": "2026-04-15",
+  "templates": [
+    {
+      "sequence": "01",
+      "heading": "Email 1 — Orientation — Day 0",
+      "subject": "It's not just you",
+      "template_id": "RhsKJf",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 01 - It's not just you"
+    },
+    {
+      "sequence": "02",
+      "heading": "Email 2 — Story / Mechanism Tease — Day 1",
+      "subject": "Three things that fall together",
+      "template_id": "YtahLb",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 02 - Three things that fall together"
+    },
+    {
+      "sequence": "03",
+      "heading": "Email 3 — Transparency / Proof — Day 3",
+      "subject": "21 ingredients, zero secrets",
+      "template_id": "SsRAC7",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 03 - 21 ingredients, zero secrets"
+    },
+    {
+      "sequence": "04",
+      "heading": "Email 4 — Full Mechanism + Soft Offer — Day 5",
+      "subject": "The Triad most men don't know exists",
+      "template_id": "W3HmD5",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 04 - The Triad most men don't know exists"
+    },
+    {
+      "sequence": "05",
+      "heading": "Email 5 — Full Offer + Guarantee — Day 7",
+      "subject": "The protocol, the guarantee, and the math",
+      "template_id": "RPQxZu",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 05 - The protocol, the guarantee, and the math"
+    },
+    {
+      "sequence": "06",
+      "heading": "Conditional Follow-Up 1 — Clicked Offer, No Purchase",
+      "subject": "The question most men don't ask until later",
+      "template_id": "SZfnTk",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Conditional 06 - The question most men don't ask until later"
+    },
+    {
+      "sequence": "07",
+      "heading": "Conditional Follow-Up 2 — Opened, No Click",
+      "subject": "A question",
+      "template_id": "RKdhE6",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Conditional 07 - A question"
+    }
+  ],
+  "existing_flows_snapshot": [
+    {
+      "id": "TtarLW",
+      "name": "Ember — Post-Purchase Protocol",
+      "status": "draft",
+      "trigger_type": "Metric",
+      "archived": false
+    },
+    {
+      "id": "YaNMuT",
+      "name": "Ember — Welcome (Belief Shift)",
+      "status": "draft",
+      "trigger_type": "Added to List",
+      "archived": false
+    },
+    {
+      "id": "YtiNHW",
+      "name": "Ember — Abandoned Cart",
+      "status": "draft",
+      "trigger_type": "Metric",
+      "archived": false
+    }
+  ]
+}

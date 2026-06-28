@@ -12,7 +12,7 @@ export function ErrorState({ title, message, onRetry, className, ...props }: Err
   return (
     <div
       className={cn(
-        "rounded-md border border-danger/40 bg-danger/5 px-4 py-5 text-center text-sm",
+        "rounded-card border border-danger/25 bg-danger-bg px-5 py-6 text-center text-sm",
         className,
       )}
       {...props}

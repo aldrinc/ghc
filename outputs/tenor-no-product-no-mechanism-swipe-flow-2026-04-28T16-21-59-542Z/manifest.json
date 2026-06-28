@@ -1,0 +1,56 @@
+{
+  "createdAt": "2026-04-28T16:22:56.087Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-no-product-no-mechanism-swipe-flow-2026-04-28T16-21-59-542Z",
+  "source": {
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "sourceSwipePublicUrl": "https://api.moshq.app/public/assets/10f481c8-922c-472e-b6a3-7f66edaf1f38",
+    "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated/01-product-hero.jpg",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1
+  },
+  "payload": {
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1,
+    "swipeImageUrl": "https://api.moshq.app/public/assets/10f481c8-922c-472e-b6a3-7f66edaf1f38",
+    "swipeRequiresProductImage": false,
+    "swipeContextMode": "minimal",
+    "swipeBrandName": "Tenor",
+    "swipeProductName": "withheld teaser",
+    "swipeHook": "\"In the normal range\" is the most expensive sentence in men's health.",
+    "swipeAngle": "Use the attached source ad as the design starting point, but convert it into a blind problem-tease card for the existing normal-range gap angle. Remove the product reveal entirely: no product image, no bottle, no package, no label, no capsule, no supplement shelf, no product name, and no formula or ingredient list. Do not reveal a mechanism or explain how any solution works: no cascade, levers, hormone pathway, protocol, dosage, ingredient science, chart, table, checklist, or comparison language. Tease only the lived problem with quiet editorial tension. Required readable text only: \"In the normal range\" still doesn't mean normal. The afternoon wall is real. Read the note. Use the existing Tenor editorial world: bone background, graphite serif type, one restrained warm red accent, domestic kitchen or home-office scene, real man in his forties to sixties, reflective and mid-thought. If the source card has a product zone, replace it with negative space, a coffee mug, folded mail, a notebook, or natural window light; do not substitute another product.",
+    "aspectRatio": "1:1",
+    "count": 1
+  },
+  "workflow": {
+    "workflow_run_id": "64ab751e-5af4-4fe5-a3fc-b6b1af858d90",
+    "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-7c6bfc5e-6176-412b-9901-0ad12c41e13f"
+  },
+  "result": {
+    "workflowRunId": "64ab751e-5af4-4fe5-a3fc-b6b1af858d90",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-7c6bfc5e-6176-412b-9901-0ad12c41e13f",
+    "assetId": "2ddbe5b2-f8c7-4c24-9c85-5ba0c9bae290",
+    "publicId": "3dab614e-2ecf-4933-a453-d3668bedbbbe",
+    "publicUrl": "https://api.moshq.app/public/assets/3dab614e-2ecf-4933-a453-d3668bedbbbe",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-no-product-no-mechanism-swipe-flow-2026-04-28T16-21-59-542Z/01-normal-range-gap-no-product.jpg",
+    "contentType": "image/jpeg",
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:98c110093b312d826695b3dd1b1b7aedef47df6fcbee269b",
+      "asset_ids": [
+        "2ddbe5b2-f8c7-4c24-9c85-5ba0c9bae290"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  }
+}

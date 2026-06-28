@@ -9,6 +9,18 @@ def test_strategy_v2_reasoning_defaults_use_gpt55():
     assert config_module.Settings.model_fields["STRATEGY_V2_OFFER_MODEL"].default == "gpt-5.5"
 
 
+def test_strategy_v2_foundational_step01_defaults_to_deerflow():
+    fields = config_module.Settings.model_fields
+    assert fields["STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER"].default == "deerflow"
+    assert fields["STRATEGY_V2_FOUNDATIONAL_STEP01_DEERFLOW_MODEL"].default == "deepseek-v4-pro"
+
+
+def test_strategy_v2_foundational_step04_defaults_to_gpt_with_dsv4_available():
+    fields = config_module.Settings.model_fields
+    assert fields["STRATEGY_V2_FOUNDATIONAL_STEP04_PROVIDER"].default == "gpt"
+    assert fields["STRATEGY_V2_FOUNDATIONAL_STEP04_DEERFLOW_MODEL"].default == "deepseek-v4-pro"
+
+
 def test_paid_ads_qa_default_uses_gpt55():
     assert config_module.Settings.model_fields["PAID_ADS_QA_LLM_MODEL"].default == "gpt-5.5"
 

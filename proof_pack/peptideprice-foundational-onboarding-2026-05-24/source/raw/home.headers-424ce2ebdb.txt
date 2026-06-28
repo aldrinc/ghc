@@ -1,0 +1,26 @@
+HTTP/2 200 
+accept-ranges: bytes
+access-control-allow-origin: https://peptideprice.store
+age: 2504
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net; script-src-elem 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://infenkiajqjxtidbygcz.supabase.co wss://infenkiajqjxtidbygcz.supabase.co https://www.google-analytics.com https://region1.google-analytics.com https://stats.g.doubleclick.net https://www.google.com; img-src 'self' data: https://www.google-analytics.com https://stats.g.doubleclick.net https://www.google.com https://www.googleadservices.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';
+content-type: text/html; charset=utf-8
+date: Sun, 24 May 2026 20:40:23 GMT
+etag: "e477c41190402fd09dff720473a7d863"
+permissions-policy: camera=(), microphone=(), geolocation=()
+referrer-policy: strict-origin-when-cross-origin
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+x-content-type-options: nosniff
+x-dns-prefetch-control: on
+x-frame-options: DENY
+x-matched-path: /
+x-nextjs-prerender: 1
+x-nextjs-stale-time: 300
+x-vercel-cache: HIT
+x-vercel-id: cle1::4x9zg-1779655223397-56b5748eabb0
+x-xss-protection: 1; mode=block
+content-length: 175622
+

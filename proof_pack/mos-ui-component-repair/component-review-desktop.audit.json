@@ -1,0 +1,833 @@
+{
+  "bodyStart": "Component Review\n\nLocal MOS primitive harness for density, radius, focus, disabled, overflow, and floating states.\n\nShow toast\nButtons\n\nReference: pill shape, 46px default, 36/54/64px sizes, halo hover and focus states.\n\nGet started\nGet started\nBook a demo\nGhost\nDelete campaign\nRead the docs\nSmall\nDefault\nLarge\nExtra large\nDEFAULT\nLaunch campaign\nHOVER\nLaunch campaign\nFOCUSED\nLaunch campaign\nICON ONLY\nDISABLED\nDisabled\nBadges, Pills And Status\n\nReference: 22px badges, subtle borders, dots with s",
+  "buttonMetrics": [
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Show toast",
+      "width": 104
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Get started",
+      "width": 159
+    },
+    {
+      "background": "color(srgb 0.145098 0.388235 0.921569)",
+      "border": "1px color(srgb 0.145098 0.388235 0.921569)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Get started",
+      "width": 159
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Book a demo",
+      "width": 146
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(0, 0, 0, 0)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Ghost",
+      "width": 93
+    },
+    {
+      "background": "color(srgb 0.937255 0.266667 0.266667)",
+      "border": "1px color(srgb 0.937255 0.266667 0.266667)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Delete campaign",
+      "width": 200
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(0, 0, 0, 0)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 27,
+      "radius": "999px",
+      "text": "Read the docs",
+      "width": 156
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Small",
+      "width": 68
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Default",
+      "width": 102
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 54,
+      "radius": "999px",
+      "text": "Large",
+      "width": 101
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "17px",
+      "fontWeight": "600",
+      "height": 64,
+      "radius": "999px",
+      "text": "Extra large",
+      "width": 153
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "",
+      "width": 46
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Launch campaign",
+      "width": 183
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 47,
+      "radius": "999px",
+      "text": "Launch campaign",
+      "width": 186
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Launch campaign",
+      "width": 183
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "",
+      "width": 46
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "16px",
+      "fontWeight": "600",
+      "height": 46,
+      "radius": "999px",
+      "text": "Disabled",
+      "width": 113
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(11, 13, 18)",
+      "color": "rgb(11, 13, 18)",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": 87,
+      "radius": "14px",
+      "text": "Study my marketCompetitors, reviews, search, and customer language.",
+      "width": 537
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "color": "rgb(11, 13, 18)",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": 87,
+      "radius": "14px",
+      "text": "Build campaign briefsTurn source research into a launchable plan.",
+      "width": 537
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "All",
+      "width": 50
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(0, 0, 0, 0)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Ready",
+      "width": 73
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(0, 0, 0, 0)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Blocked",
+      "width": 84
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.294118 0.321569 0.376471)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 31,
+      "radius": "8px",
+      "text": "Overview",
+      "width": 104
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.294118 0.321569 0.376471)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 31,
+      "radius": "8px",
+      "text": "Activity",
+      "width": 104
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px rgb(229, 231, 235)",
+      "color": "color(srgb 0.294118 0.321569 0.376471)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 31,
+      "radius": "8px",
+      "text": "Settings",
+      "width": 104
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Menu",
+      "width": 93
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Popover",
+      "width": 85
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(0, 0, 0, 0)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Tooltip",
+      "width": 77
+    },
+    {
+      "background": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "color": "color(srgb 1 1 1)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Dialog",
+      "width": 72
+    },
+    {
+      "background": "color(srgb 0.937255 0.266667 0.266667)",
+      "border": "1px color(srgb 0.937255 0.266667 0.266667)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Alert dialog",
+      "width": 106
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Reset filters",
+      "width": 108
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "color": "color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "13px",
+      "fontWeight": "600",
+      "height": 36,
+      "radius": "999px",
+      "text": "Retry",
+      "width": 68
+    }
+  ],
+  "componentMetrics": [
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 119,
+      "radius": "10px",
+      "tag": "div",
+      "text": "DefaultLaunch campaign",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 119,
+      "radius": "10px",
+      "tag": "div",
+      "text": "HoverLaunch campaign",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 119,
+      "radius": "10px",
+      "tag": "div",
+      "text": "FocusedLaunch campaign",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 119,
+      "radius": "10px",
+      "tag": "div",
+      "text": "Icon only",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 119,
+      "radius": "10px",
+      "tag": "div",
+      "text": "DisabledDisabled",
+      "width": 260
+    },
+    {
+      "background": "rgb(37, 99, 235)",
+      "border": "0px rgb(229, 231, 235)",
+      "cls": "mos-dot mos-dot--blue",
+      "height": 8,
+      "radius": "50%",
+      "tag": "span",
+      "text": "",
+      "width": 8
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-chip",
+      "height": 28,
+      "radius": "999px",
+      "tag": "span",
+      "text": "Live",
+      "width": 64
+    },
+    {
+      "background": "rgb(16, 185, 129)",
+      "border": "0px rgb(229, 231, 235)",
+      "cls": "mos-dot mos-dot--success",
+      "height": 8,
+      "radius": "50%",
+      "tag": "span",
+      "text": "",
+      "width": 8
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-chip",
+      "height": 28,
+      "radius": "999px",
+      "tag": "span",
+      "text": "Brand voice",
+      "width": 98
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-chip",
+      "height": 28,
+      "radius": "999px",
+      "tag": "span",
+      "text": "Organic social",
+      "width": 112
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-chip",
+      "height": 28,
+      "radius": "999px",
+      "tag": "span",
+      "text": "Needs input",
+      "width": 114
+    },
+    {
+      "background": "rgb(245, 158, 11)",
+      "border": "0px rgb(229, 231, 235)",
+      "cls": "mos-dot mos-dot--warning",
+      "height": 8,
+      "radius": "50%",
+      "tag": "span",
+      "text": "",
+      "width": 8
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 127,
+      "radius": "10px",
+      "tag": "div",
+      "text": "Default",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 127,
+      "radius": "10px",
+      "tag": "div",
+      "text": "Focused",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 127,
+      "radius": "10px",
+      "tag": "div",
+      "text": "Error",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(230, 233, 240)",
+      "cls": "mos-state-card",
+      "height": 127,
+      "radius": "10px",
+      "tag": "div",
+      "text": "Input grouphttps://",
+      "width": 260
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-chip",
+      "height": 28,
+      "radius": "999px",
+      "tag": "span",
+      "text": "Email",
+      "width": 58
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-chip",
+      "height": 28,
+      "radius": "999px",
+      "tag": "span",
+      "text": "Paid social",
+      "width": 90
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-combobox-panel",
+      "height": 151,
+      "radius": "14px",
+      "tag": "div",
+      "text": "EmailSelectedPaid socialMetaOrganic socialQueued",
+      "width": 854
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(11, 13, 18)",
+      "cls": "mos-choice is-selected",
+      "height": 87,
+      "radius": "14px",
+      "tag": "button",
+      "text": "Study my marketCompetitors, reviews, search, and customer language.",
+      "width": 537
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "cls": "mos-choice",
+      "height": 87,
+      "radius": "14px",
+      "tag": "button",
+      "text": "Build campaign briefsTurn source research into a launchable plan.",
+      "width": 537
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "border": "0px color(srgb 0.901961 0.913725 0.941176)",
+      "cls": "w-full border-collapse text-sm text-content table-auto",
+      "height": 147,
+      "radius": "0px",
+      "tag": "table",
+      "text": "ItemStatusOwnerWorkspace sourcecompletedOperatorStrategy briefrunningOperatorCreative queuecompletedSystem",
+      "width": 1084
+    }
+  ],
+  "counts": {
+    "buttons": 32,
+    "fields": 14,
+    "headings": 9
+  },
+  "fieldMetrics": [
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.890196 0.901961 0.933333)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "Enter workspace name",
+      "radius": "12px",
+      "tag": "input",
+      "type": "",
+      "width": 535
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.937255 0.266667 0.266667)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "",
+      "radius": "12px",
+      "tag": "select",
+      "type": "",
+      "width": 535
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.890196 0.901961 0.933333)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "Search components",
+      "radius": "12px",
+      "tag": "input",
+      "type": "",
+      "width": 535
+    },
+    {
+      "background": "color(srgb 0.941176 0.94902 0.964706)",
+      "border": "1px color(srgb 0.901961 0.913725 0.941176)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "Unavailable",
+      "radius": "12px",
+      "tag": "input",
+      "type": "",
+      "width": 535
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.890196 0.901961 0.933333)",
+      "fontSize": "16px",
+      "height": 124,
+      "placeholder": "Write a short internal note.",
+      "radius": "12px",
+      "tag": "textarea",
+      "type": "",
+      "width": 1086
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.890196 0.901961 0.933333)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "acme.com",
+      "radius": "12px",
+      "tag": "input",
+      "type": "",
+      "width": 218
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.0431373 0.0509804 0.0705882)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "",
+      "radius": "12px",
+      "tag": "input",
+      "type": "",
+      "width": 218
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.937255 0.266667 0.266667)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "",
+      "radius": "12px",
+      "tag": "input",
+      "type": "",
+      "width": 218
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "0px rgb(11, 13, 18)",
+      "fontSize": "15px",
+      "height": 50,
+      "placeholder": "",
+      "radius": "0px",
+      "tag": "input",
+      "type": "",
+      "width": 138
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "fontSize": "22px",
+      "height": 56,
+      "placeholder": "",
+      "radius": "10px",
+      "tag": "input",
+      "type": "",
+      "width": 48
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(11, 13, 18)",
+      "fontSize": "22px",
+      "height": 56,
+      "placeholder": "",
+      "radius": "10px",
+      "tag": "input",
+      "type": "",
+      "width": 48
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "fontSize": "22px",
+      "height": 56,
+      "placeholder": "",
+      "radius": "10px",
+      "tag": "input",
+      "type": "",
+      "width": 48
+    },
+    {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px rgb(227, 230, 238)",
+      "fontSize": "22px",
+      "height": 56,
+      "placeholder": "",
+      "radius": "10px",
+      "tag": "input",
+      "type": "",
+      "width": 48
+    },
+    {
+      "background": "color(srgb 1 1 1)",
+      "border": "1px color(srgb 0.890196 0.901961 0.933333)",
+      "fontSize": "16px",
+      "height": 54,
+      "placeholder": "Filter rows",
+      "radius": "12px",
+      "tag": "input",
+      "type": "",
+      "width": 256
+    }
+  ],
+  "headingMetrics": [
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "26px",
+      "fontWeight": "600",
+      "lineHeight": "29.9px",
+      "tag": "h2",
+      "text": "Component Review",
+      "width": 682
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Buttons",
+      "width": 1086
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Badges, Pills And Status",
+      "width": 1086
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Forms",
+      "width": 1086
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Choice Cards",
+      "width": 1086
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Filters And Tabs",
+      "width": 1086
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Table",
+      "width": 1086
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Floating Surfaces",
+      "width": 1086
+    },
+    {
+      "fontFamily": "\"Libre Baskerville\", \"Source Serif Pro\", Georgia, serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27.9px",
+      "tag": "h2",
+      "text": "Feedback States",
+      "width": 1086
+    }
+  ],
+  "horizontalOverflow": false,
+  "offenders": [],
+  "title": "mOS Frontend",
+  "url": "http://localhost:5275/dev/components",
+  "viewport": {
+    "height": 1100,
+    "scrollHeight": 3753,
+    "scrollWidth": 1397,
+    "width": 1397
+  }
+}

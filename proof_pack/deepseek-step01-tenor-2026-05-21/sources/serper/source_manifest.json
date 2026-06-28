@@ -1,0 +1,26 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "serper",
+  "created_at": "2026-05-21T17:29:11.963228+00:00",
+  "source_type": "search",
+  "source": "serper",
+  "operator_notes": "",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deepseek-step01-tenor-2026-05-21/sources/serper/raw/serper-step01-tenor-fcb380a54a.json",
+      "kind": "raw_files",
+      "sha256": "ba5bb02639a6e7f459e61a9ad441b76c77ebe1f861f8e12c95ec10bb27aea9d9",
+      "bytes": 47049,
+      "captured_at": "2026-05-21T17:34:57.520099+00:00",
+      "source": "serper",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-21T17:34:57.596625+00:00",
+    "errors": []
+  }
+}

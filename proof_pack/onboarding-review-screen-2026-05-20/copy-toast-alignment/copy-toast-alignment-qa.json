@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-05-21T01:32:29.706Z",
+  "competitorCopy": {
+    "description": "Optional",
+    "oldDescription": "Optional — useful when you already know direct alternatives."
+  },
+  "toast": {
+    "text": "Workspace created",
+    "rowClass": "flex gap-3 items-center",
+    "backgroundColor": "rgb(20, 149, 109)",
+    "opacity": "1",
+    "root": {
+      "top": 534,
+      "bottom": 600,
+      "height": 66,
+      "center": 567
+    },
+    "icon": {
+      "top": 555,
+      "bottom": 579,
+      "height": 24,
+      "center": 567
+    },
+    "title": {
+      "top": 551,
+      "bottom": 583,
+      "height": 32,
+      "center": 567
+    },
+    "close": {
+      "top": 551,
+      "bottom": 583,
+      "height": 32,
+      "center": 567
+    }
+  },
+  "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/copy-toast-alignment/workspace-created-toast.png"
+}

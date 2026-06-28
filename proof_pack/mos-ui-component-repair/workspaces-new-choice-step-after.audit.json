@@ -1,0 +1,54 @@
+{
+  "body": "Back to workspaces\nIs this new or already live?\n\nAlready live means there is a website your agent can learn from.\n\nNew business\nNot live yet. Tell your agent what you plan to sell.\nExisting business\nAlready has a website your agent can use as source material.\nContinue\nBack",
+  "buttons": [
+    "Back to workspaces",
+    "New business Not live yet. Tell your agent what you plan to sell.",
+    "Existing business Already has a website your agent can use as source material.",
+    "Continue",
+    "Back"
+  ],
+  "choiceCount": 2,
+  "choices": [
+    {
+      "border": "1px rgb(227, 230, 238)",
+      "height": 82,
+      "icon": {
+        "background": "rgb(240, 242, 246)",
+        "height": "44px",
+        "radius": "10px",
+        "width": "44px"
+      },
+      "radius": "14px",
+      "ring": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px rgb(205, 210, 221)",
+        "height": "22px",
+        "radius": "50%",
+        "width": "22px"
+      },
+      "text": "New businessNot live yet. Tell your agent what you plan to sell.",
+      "width": 430
+    },
+    {
+      "border": "1px rgb(227, 230, 238)",
+      "height": 100,
+      "icon": {
+        "background": "rgb(240, 242, 246)",
+        "height": "44px",
+        "radius": "10px",
+        "width": "44px"
+      },
+      "radius": "14px",
+      "ring": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px rgb(205, 210, 221)",
+        "height": "22px",
+        "radius": "50%",
+        "width": "22px"
+      },
+      "text": "Existing businessAlready has a website your agent can use as source material.",
+      "width": 430
+    }
+  ],
+  "url": "http://localhost:5275/workspaces/new"
+}

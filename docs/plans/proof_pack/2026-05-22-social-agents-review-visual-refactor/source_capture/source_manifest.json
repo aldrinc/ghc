@@ -1,0 +1,35 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "social-agents-review-browser",
+  "created_at": "2026-05-22T23:04:50.385329+00:00",
+  "source_type": "browser",
+  "source": "http://localhost:5275/workspaces/execution/social-agents",
+  "operator_notes": "Local app Review screen validation after setup mission; screenshots and metrics captured by Browser plugin.",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/raw/review-visual-desktop.png",
+      "kind": "raw_files",
+      "sha256": "8b1c0e4a130c9363d6cefddcdd8f2c05f1932af8363225392ab4b6bad72decd5",
+      "bytes": 258195,
+      "captured_at": "2026-05-22T23:04:59.728014+00:00",
+      "source": "browser-screenshot-desktop",
+      "notes": "Desktop Review screen screenshot."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-review-visual-refactor/source_capture/raw/review-visual-mobile.png",
+      "kind": "raw_files",
+      "sha256": "4b7bbf949553d9b7edc21e5efbf7b98e5ba4ee47b97f91d1c2295e7d2df51da8",
+      "bytes": 188701,
+      "captured_at": "2026-05-22T23:04:59.768733+00:00",
+      "source": "browser-screenshot-mobile",
+      "notes": "Mobile Review screen screenshot."
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-22T23:09:25.574861+00:00",
+    "errors": []
+  }
+}

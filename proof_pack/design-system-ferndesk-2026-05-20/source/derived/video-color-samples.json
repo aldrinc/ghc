@@ -1,0 +1,44 @@
+{
+  "schema": "marketi.reference_video_color_samples.v1",
+  "source_video": "/Users/aldrinclement/Downloads/ssstwitter.com_1779296969971.mp4",
+  "method": "Approximate samples from extracted video frames using ImageMagick crops and quantized histograms. Values are reference targets, not exact FernDesk brand tokens.",
+  "provenance": "concrete",
+  "samples": {
+    "task_canvas": {
+      "frame": "frame-001.jpg",
+      "crop": "420x120+220+80",
+      "hex": "#FDFDFC",
+      "role": "near-white onboarding canvas"
+    },
+    "primary_cta": {
+      "frame": "frame-001.jpg",
+      "crop": "470x52+214+553",
+      "hex": "#151411",
+      "role": "black primary action"
+    },
+    "app_sidebar": {
+      "frame": "frame-006.jpg",
+      "crop": "164x680+29+65",
+      "hex": "#ECECEC",
+      "role": "pale app chrome/sidebar"
+    },
+    "trial_banner": {
+      "frame": "frame-006.jpg",
+      "crop": "980x40+194+66",
+      "hex": "#EFE6D5",
+      "role": "warm announcement/status banner"
+    },
+    "article_canvas": {
+      "frame": "frame-007.jpg",
+      "crop": "620x610+525+135",
+      "hex": "#F6F6F6",
+      "role": "editorial app reading surface"
+    },
+    "progress_rail_active_region": {
+      "frame": "frame-003.jpg",
+      "crop": "360x8+220+413",
+      "hex": "#A8A8A8",
+      "role": "thin progress rail mixed active/track sample"
+    }
+  }
+}

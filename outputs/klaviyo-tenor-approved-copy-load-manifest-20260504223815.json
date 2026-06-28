@@ -1,0 +1,122 @@
+{
+  "created_at": "2026-05-04T22:38:31.972Z",
+  "artifact": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-welcome-lead-nurturer-compressed-review.md",
+  "flow_id": "Vy4zyb",
+  "saved": [
+    {
+      "sequence": "01",
+      "subject": "It's not just age",
+      "template_id": "RhsKJf",
+      "template_name": "[Tenor] DDE Direct Approved 20260504223815 - Core 01 - It's not just age",
+      "html_bytes": 4867,
+      "failures": []
+    },
+    {
+      "sequence": "02",
+      "subject": "The 3 systems declining together",
+      "template_id": "YtahLb",
+      "template_name": "[Tenor] DDE Direct Approved 20260504223815 - Core 02 - The 3 systems declining together",
+      "html_bytes": 5256,
+      "failures": []
+    },
+    {
+      "sequence": "03",
+      "subject": "Why I left the clinic",
+      "template_id": "SsRAC7",
+      "template_name": "[Tenor] DDE Direct Approved 20260504223815 - Core 03 - Why I left the clinic",
+      "html_bytes": 6057,
+      "failures": []
+    },
+    {
+      "sequence": "04",
+      "subject": "1,200 men can't all be wrong",
+      "template_id": "W3HmD5",
+      "template_name": "[Tenor] DDE Direct Approved 20260504223815 - Core 04 - 1,200 men can't all be wrong",
+      "html_bytes": 6157,
+      "failures": []
+    },
+    {
+      "sequence": "05",
+      "subject": "Save 52% on your first 90 days",
+      "template_id": "RPQxZu",
+      "template_name": "[Tenor] DDE Direct Approved 20260504223815 - Core 05 - Save 52% on your first 90 days",
+      "html_bytes": 6477,
+      "failures": []
+    },
+    {
+      "sequence": "06",
+      "subject": "One thing I should clarify",
+      "template_id": "SZfnTk",
+      "template_name": "[Tenor] DDE Direct Approved 20260504223815 - Conditional 06 - One thing I should clarify",
+      "html_bytes": 5335,
+      "failures": []
+    },
+    {
+      "sequence": "07",
+      "subject": "One question",
+      "template_id": "RKdhE6",
+      "template_name": "[Tenor] DDE Direct Approved 20260504223815 - Conditional 07 - One question",
+      "html_bytes": 5316,
+      "failures": []
+    }
+  ],
+  "flow": [
+    {
+      "action_id": "105690567",
+      "sequence": "01",
+      "subject": "It's not just age",
+      "preview": "Your energy, drive, and focus are slipping — and you've noticed",
+      "source_template_id": "RhsKJf",
+      "cloned_template_id": "TW4rQk",
+      "status": "draft",
+      "html_bytes": 4867,
+      "failures": []
+    },
+    {
+      "action_id": "105690569",
+      "sequence": "02",
+      "subject": "The 3 systems declining together",
+      "preview": "Most men are told it's one thing. It's not.",
+      "source_template_id": "YtahLb",
+      "cloned_template_id": "Uuse7z",
+      "status": "draft",
+      "html_bytes": 5256,
+      "failures": []
+    },
+    {
+      "action_id": "105690571",
+      "sequence": "03",
+      "subject": "Why I left the clinic",
+      "preview": "The conversation that changed everything",
+      "source_template_id": "SsRAC7",
+      "cloned_template_id": "XsgWvU",
+      "status": "draft",
+      "html_bytes": 6057,
+      "failures": []
+    },
+    {
+      "action_id": "105690573",
+      "sequence": "04",
+      "subject": "1,200 men can't all be wrong",
+      "preview": "What happens when you support all three systems",
+      "source_template_id": "W3HmD5",
+      "cloned_template_id": "RYn3D5",
+      "status": "draft",
+      "html_bytes": 6157,
+      "failures": []
+    },
+    {
+      "action_id": "105690576",
+      "sequence": "05",
+      "subject": "Save 52% on your first 90 days",
+      "preview": "The Daily Drive Essentials protocol + $62 Welcome Kit",
+      "source_template_id": "RPQxZu",
+      "cloned_template_id": "Xh2rP8",
+      "status": "draft",
+      "html_bytes": 6477,
+      "failures": []
+    }
+  ],
+  "preview_path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-approved-copy-template-preview-20260504223815.html",
+  "failures": []
+}

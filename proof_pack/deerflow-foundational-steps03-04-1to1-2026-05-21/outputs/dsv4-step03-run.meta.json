@@ -1,0 +1,27 @@
+{
+  "thread_id": "strategy-v2-foundation-dsv4-foundational-03-04-1to1-03",
+  "status": "completed",
+  "error": null,
+  "elapsed_seconds": 181.532,
+  "event_count": 5248,
+  "tool_counts": {},
+  "usage": {
+    "input_tokens": 13676,
+    "output_tokens": 5578,
+    "total_tokens": 19254
+  },
+  "deduped_usage": {
+    "input_tokens": 13676,
+    "output_tokens": 5578,
+    "total_tokens": 19254,
+    "cache_read": 3712,
+    "cache_miss_input_tokens": 9964,
+    "reasoning_tokens": 335,
+    "unique_usage_messages": 1
+  },
+  "events_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/runs/dsv4-foundational-03-04-1to1/step-03/events.jsonl",
+  "raw_output_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/runs/dsv4-foundational-03-04-1to1/step-03/raw.md",
+  "summary_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/runs/dsv4-foundational-03-04-1to1/step-03/summary.md",
+  "content_path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/runs/dsv4-foundational-03-04-1to1/step-03/content.md",
+  "no_output_token_cap": true
+}

@@ -1,0 +1,322 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-22-social-agents-ui-refactor-kimi-plan",
+  "created_at": "2026-05-22T19:12:58.444975+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/docs/plans",
+  "proof_dir": "proof_pack/2026-05-22-social-agents-ui-refactor-kimi",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Replace the primary tab/workbench shell with a Social Agents wizard structure.",
+      "source_line": 40,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "acceptance": [
+        "Only one primary wizard screen is active at a time.",
+        "Program, Source, Experiment, Carousel, Media, and Handoff each have one purpose.",
+        "Connected Social and Action Queue remain accessible as secondary context, not primary workflow surfaces."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "browser_screenshot"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ],
+      "notes": "Implemented as a six-step wizard with one active screen, progress navigation, Previous/Next controls, and secondary utility panels."
+    },
+    {
+      "id": "P02",
+      "objective": "Add explicit stage readiness and blocked-state reasons for Program, Conversion Source, Experiment/Variant, and Handoff.",
+      "source_line": 90,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "acceptance": [
+        "Stage 4 remains disabled until selected variant is approved and media URL count equals slideCount.",
+        "Disabled actions show visible reasons tied to current state.",
+        "Existing create/approve/handoff mutation payloads are preserved."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ],
+      "notes": "Stage badges and visible handoff block reason added. Existing create/approve/handoff mutation payloads preserved by focused tests."
+    },
+    {
+      "id": "P03",
+      "objective": "Keep slide preview and media readiness scoped to the wizard step where that context is needed.",
+      "source_line": 102,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "acceptance": [
+        "Slide preview appears only inside the carousel-writing step.",
+        "Rendered media preview appears only inside the media-rendering step.",
+        "Media parity count is visible near the handoff decision."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "browser_screenshot"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ],
+      "notes": "Removed always-visible sticky preview. Preview now appears only on the Carousel or Media steps."
+    },
+    {
+      "id": "P04",
+      "objective": "Move Connected Social assets and Action Queue proposals into secondary panels/drawers.",
+      "source_line": 114,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "acceptance": [
+        "Provider assets remain readable on demand.",
+        "Pending proposal approval is available without leaving the main workflow.",
+        "Opening and closing panels does not reset stage form state."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ],
+      "notes": "Connected assets and proposal approval moved into toggleable secondary panels without leaving the main workflow."
+    },
+    {
+      "id": "P05",
+      "objective": "Apply visual hierarchy pass aligned to MOS app UI constraints.",
+      "source_line": 138,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "acceptance": [
+        "Nested card borders are reduced in favor of stage groups, dividers, chips, and compact labels.",
+        "Desktop and mobile layouts have no text/control overlap.",
+        "The page reads as dense operator UI, not a marketing dashboard."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json"
+      ],
+      "proof_required": [
+        "browser_screenshot",
+        "diff_summary"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ],
+      "notes": "Converted from multi-section workbench to single-purpose wizard screens. Browser proof shows no horizontal overflow at 1366px client width."
+    },
+    {
+      "id": "P06",
+      "objective": "Update targeted unit tests for stage gating, preview behavior, and panel state.",
+      "source_line": 160,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "acceptance": [
+        "Tests cover no-program disabled stages.",
+        "Tests cover unapproved variant and media mismatch disabling handoff.",
+        "Tests cover proposal panel approval path and state preservation."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json"
+      ],
+      "proof_required": [
+        "test_output"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ],
+      "notes": "Focused tests cover wizard render, step navigation to media/handoff, no-program disabled wizard steps, unapproved-variant handoff blocking, media count gating, asset enablement, action queue approval, and no-workspace empty state."
+    },
+    {
+      "id": "P07",
+      "objective": "Run final proof: unit tests, build, authenticated/browser smoke, and proof dashboard.",
+      "source_line": 148,
+      "status": "done",
+      "expected_files": [
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.tsx",
+        "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/workspaces/SocialAgentsPage.test.tsx"
+      ],
+      "acceptance": [
+        "Unit test and build logs pass.",
+        "Browser screenshot validates desktop and mobile readability.",
+        "Proof dashboard links the plan, contract, Kimi output, and verification logs."
+      ],
+      "verify_commands": [
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run test:unit -- src/pages/workspaces/SocialAgentsPage.test.tsx",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run build",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:semantic-ui",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/frontend && npm run check:design-system",
+        "/Users/aldrinclement/.codex/bin/planctl verify /Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json"
+      ],
+      "proof_required": [
+        "test_output",
+        "artifact_paths",
+        "proof_dashboard"
+      ],
+      "artifacts": [
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-ui-refactor-kimi-plan.contract.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-source-packet.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/kimi-raw-output.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate.md",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/plan-gate-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/lane-proof.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-test.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/social-agents-build.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/semantic-ui.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/design-system.log",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-smoke.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-empty-state.png",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.json",
+        "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-ui-refactor-kimi/browser-wizard.png"
+      ],
+      "notes": "Unit tests, build, semantic UI, design-system checks, planctl, lanecheck, and browser wizard overflow proof pass."
+    }
+  ],
+  "global_verify_commands": [],
+  "global_acceptance": []
+}

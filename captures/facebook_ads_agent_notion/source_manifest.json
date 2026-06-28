@@ -1,0 +1,62 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "facebook_ads_agent_notion",
+  "created_at": "2026-05-22T12:59:57.962057+00:00",
+  "source_type": "notion",
+  "source": "https://www.notion.so/graphed/How-to-Build-an-AI-Facebook-Ads-Manager-Agent-with-Claude-Code-3602cdf0baf481038305c480a4c84196",
+  "operator_notes": "",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/facebook_ads_agent_notion/raw/notion.raw.html",
+      "kind": "raw_files",
+      "sha256": "01238457752cfbb9db68148d26b49f2678e933ee3d52cd99950242ae7c84a068",
+      "bytes": 1031899,
+      "captured_at": "2026-05-22T13:00:18.550181+00:00",
+      "source": "https://www.notion.so/graphed/How-to-Build-an-AI-Facebook-Ads-Manager-Agent-with-Claude-Code-3602cdf0baf481038305c480a4c84196",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/facebook_ads_agent_notion/raw/notion.headers.txt",
+      "kind": "raw_files",
+      "sha256": "0223387ef382bc679e71a6d2dab121739ac3b882115a68cea52c21407be742a9",
+      "bytes": 11017,
+      "captured_at": "2026-05-22T13:00:18.612962+00:00",
+      "source": "https://www.notion.so/graphed/How-to-Build-an-AI-Facebook-Ads-Manager-Agent-with-Claude-Code-3602cdf0baf481038305c480a4c84196",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/facebook_ads_agent_notion/raw/loadPageChunk.json",
+      "kind": "raw_files",
+      "sha256": "f34021deecd8fd330f982db5ae461051d3f7a3c050b0a2242b6fbaa91579ea96",
+      "bytes": 110199,
+      "captured_at": "2026-05-22T13:01:33.193771+00:00",
+      "source": "https://www.notion.so/graphed/How-to-Build-an-AI-Facebook-Ads-Manager-Agent-with-Claude-Code-3602cdf0baf481038305c480a4c84196",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/facebook_ads_agent_notion/raw/loadPageChunk.all.json",
+      "kind": "raw_files",
+      "sha256": "5bbe8759551b50c137137cd295c686303ed8b9d0e2383e36ce0e104401b2de6c",
+      "bytes": 1179747,
+      "captured_at": "2026-05-22T13:01:33.258154+00:00",
+      "source": "https://www.notion.so/graphed/How-to-Build-an-AI-Facebook-Ads-Manager-Agent-with-Claude-Code-3602cdf0baf481038305c480a4c84196",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/facebook_ads_agent_notion/raw/notion.extracted.md",
+      "kind": "raw_files",
+      "sha256": "f9ab140e4098eed3975adb7e6dc8119bd5f8fcf72efa8e333a7ae9c0f54f6810",
+      "bytes": 20063,
+      "captured_at": "2026-05-22T13:01:33.319738+00:00",
+      "source": "https://www.notion.so/graphed/How-to-Build-an-AI-Facebook-Ads-Manager-Agent-with-Claude-Code-3602cdf0baf481038305c480a4c84196",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-22T16:47:23.266717+00:00",
+    "errors": []
+  }
+}

@@ -41,8 +41,8 @@ vi.mock("./importedRuntimeFrameAssets", () => ({
   },
 }));
 
-vi.mock("@/funnels/puckConfig", async () => {
-  const actual = await vi.importActual<typeof import("@/funnels/puckConfig")>("@/funnels/puckConfig");
+vi.mock("@/funnels/funnelRuntime", async () => {
+  const actual = await vi.importActual<typeof import("@/funnels/funnelRuntime")>("@/funnels/funnelRuntime");
   return {
     ...actual,
     useFunnelRuntime: () => ({

@@ -50,6 +50,15 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/compo
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
+import {
+  AgentWorkLog,
+  ContextPreviewPanel,
+  FirstRunShell,
+  IntegrationPillGrid,
+  OnboardingProgressRail,
+  ReviewChangesPanel,
+  SetupChecklist,
+} from "@/components/onboarding";
 import type { DesignSystem } from "@/types/designSystems";
 import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
 import { cn } from "@/lib/utils";
@@ -2566,6 +2575,104 @@ export function BrandDesignSystemPage() {
                         }}
                       >
                         Secondary
+                      </div>
+                    </div>
+
+                    <div className="mt-5 border-t pt-5" style={{ borderColor: "var(--color-border)" }}>
+                      <div className="mb-3 text-xs font-semibold" style={{ color: "var(--color-text)" }}>
+                        First-run experience preview
+                      </div>
+                      <div className="first-run-surface overflow-hidden rounded-md border" style={{ borderColor: "var(--first-run-border)" }}>
+                        <FirstRunShell
+                          className="max-w-none px-3 py-3"
+                          taskClassName="justify-center"
+                          contextClassName="lg:w-[320px]"
+                          progressRail={<OnboardingProgressRail current={3} total={7} label="Workspace setup" />}
+                          title={<span className="first-run-title">Brand source</span>}
+                          description={<span className="first-run-body">A focused setup surface using the active workspace context.</span>}
+                          context={
+                            <ContextPreviewPanel
+                              title="Setup context"
+                              description="Source state and blockers stay visible while the operator works."
+                              workspaceSummary={[
+                                { label: "Workspace", value: workspace.name },
+                                { label: "Industry", value: workspace.industry || "Not set" },
+                              ]}
+                              productSummary={[
+                                { label: "Product", value: activeWorkspaceProduct?.title || "Not set" },
+                              ]}
+                              checklist={[
+                                { id: "workspace", label: "Workspace selected", status: "done" },
+                                {
+                                  id: "product",
+                                  label: "Product selected",
+                                  status: activeWorkspaceProduct ? "done" : "blocked",
+                                  details: activeWorkspaceProduct ? undefined : "Select a product before product-specific generation.",
+                                },
+                                {
+                                  id: "shopify",
+                                  label: "Shopify source",
+                                  status: shopifyState === "ready" ? "done" : "blocked",
+                                  details: shopifyState === "ready" ? undefined : shopifyStatusLabel,
+                                },
+                              ]}
+                              generatedOutputs={[
+                                {
+                                  id: "design-system",
+                                  label: "Design system tokens",
+                                  status: previewCssVarEntries.length ? "updated" : "missing",
+                                  detail: previewCssVarEntries.length ? `${previewCssVarEntries.length} CSS variables loaded.` : "No cssVars object found.",
+                                },
+                                {
+                                  id: "logo",
+                                  label: "Brand mark",
+                                  status: previewBrand.logoAssetPublicId ? "updated" : "missing",
+                                  detail: previewBrand.logoAssetPublicId ? "Logo asset is linked." : "No default logo asset linked.",
+                                },
+                              ]}
+                              blockers={
+                                activeWorkspaceProduct
+                                  ? []
+                                  : ["Select a product to preview product-specific generated states."]
+                              }
+                              className="first-run-context-panel"
+                            />
+                          }
+                        >
+                          <div className="space-y-4">
+                            <IntegrationPillGrid
+                              title="Source chips"
+                              items={[
+                                { id: "workspace", label: "Workspace", status: "connected" },
+                                { id: "product", label: "Product", status: activeWorkspaceProduct ? "connected" : "blocked" },
+                                { id: "shopify", label: "Shopify", status: shopifyState === "ready" ? "connected" : "blocked", disabledReason: shopifyStatusLabel },
+                                { id: "assets", label: "Assets", status: workspaceImageAssets.length ? "connected" : "available" },
+                              ]}
+                            />
+                            <SetupChecklist
+                              title="Work-state preview"
+                              items={[
+                                { id: "configured", label: "Configured", status: "done" },
+                                { id: "learning", label: "Learning", status: shopifyState === "ready" ? "running" : "blocked" },
+                                { id: "created", label: "Created", status: "pending" },
+                              ]}
+                            />
+                            <ReviewChangesPanel
+                              title="Review states"
+                              items={[
+                                { id: "new", label: "New item", status: "added" },
+                                { id: "updated", label: "Updated item", status: "updated" },
+                                { id: "blocked", label: "Blocked item", status: "blocked", detail: "Requires a real connected source." },
+                              ]}
+                            />
+                            <AgentWorkLog
+                              title="Publish modal state"
+                              events={[
+                                { id: "modal", label: "Blocking publish action", status: "running", detail: "Blur-backed modal uses the same first-run action and backdrop tokens." },
+                              ]}
+                            />
+                          </div>
+                        </FirstRunShell>
                       </div>
                     </div>
                   </div>

@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-20T00:00:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "docs/plans/2026-05-20-ferndesk-design-system-onboarding-plan.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user supplied the reference video and explicit sequencing: update the design system first, then update onboarding to match the FernDesk-style experience. Repo inspection supplied current implementation context. No implementation starts until the user approves with Ship the plan.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/goal.md",
+      "summary": "Measurable target for design-system and onboarding plan."
+    },
+    "problem_log": {
+      "path": "planning/problem-log.md",
+      "summary": "Observable blockers in current onboarding and design-system coverage."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/root-cause.md",
+      "summary": "Backend payload requirements leak into UI because first-run experience primitives are missing."
+    },
+    "current_machine": {
+      "path": "planning/current-machine.md",
+      "summary": "Current design system, onboarding, and feedback workflow."
+    },
+    "designed_machine": {
+      "path": "planning/designed-machine.md",
+      "summary": "Target design-system-first machine and onboarding sequence."
+    },
+    "worst_day_test": {
+      "path": "planning/worst-day.md",
+      "summary": "Plan behavior when inputs and patience are limited."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/metrics.md",
+      "summary": "Action and outcome metrics for implementation."
+    },
+    "owner_date_review": {
+      "path": "planning/owner-review.md",
+      "summary": "Owner, date, review point, and validation owner."
+    },
+    "stop_condition": {
+      "path": "planning/stop-condition.md",
+      "summary": "Planning completion conditions."
+    }
+  },
+  "owner": "main",
+  "review_date": "2026-05-20",
+  "stop_condition": "Plan is final only after source manifest verification and plangatecheck pass."
+}

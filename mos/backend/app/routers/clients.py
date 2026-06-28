@@ -66,12 +66,23 @@ from app.db.repositories.products import (
 )
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
-from app.db.enums import ArtifactTypeEnum, AssetStatusEnum, FunnelStatusEnum
+from app.db.enums import (
+    ArtifactTypeEnum,
+    AssetStatusEnum,
+    FunnelStatusEnum,
+    WorkflowKindEnum,
+    WorkflowStatusEnum,
+)
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
 from app.schemas.preferences import ActiveProductUpdateRequest
 from app.schemas.common import ClientCreate
 from app.schemas.clients import ClientDeleteRequest, ClientUpdateRequest
-from app.schemas.onboarding import OnboardingStartRequest
+from app.schemas.onboarding import (
+    FoundationReadinessResponse,
+    MarketingAgentExtractRequest,
+    MarketingAgentSetupRequest,
+    OnboardingStartRequest,
+)
 from app.schemas.intent import CampaignIntentRequest
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.schemas.shopify_connection import (
@@ -189,9 +200,15 @@ from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
 )
 from app.services.product_types import canonical_product_type
+from app.services.context_dev import (
+    ContextDevConfigError,
+    ContextDevError,
+    build_existing_business_review,
+)
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
+from app.strategy_v2.errors import StrategyV2MissingContextError
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from app.strategy_v2.pricing import parse_price_to_cents_and_currency
 from app.temporal.client import get_temporal_client
@@ -311,6 +328,12 @@ _THEME_FOOTER_TAB_LINK_STYLE_SNIPPET = (
     "    font-weight: 700;\n"
     "    cursor: pointer;\n"
     "  }\n\n"
+)
+
+_FOUNDATION_REQUIRED_STEP_KEYS: tuple[str, ...] = (
+    "v2-02.foundation.01",
+    "v2-02.foundation.03",
+    "v2-02.foundation.04",
 )
 _THEME_CONTACT_TEMPLATE_FILENAME_RE = re.compile(
     r"^templates/page\.contact(?:-[a-z0-9]+)*\.json$",
@@ -3645,6 +3668,26 @@ def get_client(
     return jsonable_encoder(client)
 
 
+@router.get("/{client_id}/foundation-readiness", response_model=FoundationReadinessResponse)
+def get_client_foundation_readiness(
+    client_id: str,
+    product_id: str = Query(..., alias="productId"),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if not isinstance(product_id, str) or not product_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="productId is required.",
+        )
+    return _resolve_foundation_readiness(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        product_id=product_id.strip(),
+    )
+
+
 def _serialize_active_product(product: Product) -> dict:
     return {
         "id": str(product.id),
@@ -3663,6 +3706,159 @@ def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
 
 def _require_client_exists(*, session: Session, org_id: str, client_id: str) -> None:
     _get_client_or_404(session=session, org_id=org_id, client_id=client_id)
+
+
+def _enum_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "value"):
+        return str(value.value)
+    return str(value)
+
+
+def _resolve_foundation_readiness(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+) -> FoundationReadinessResponse:
+    _require_client_exists(session=session, org_id=org_id, client_id=client_id)
+
+    workflows_repo = WorkflowsRepository(session)
+    artifacts_repo = ArtifactsRepository(session)
+    runs = workflows_repo.list(org_id=org_id, client_id=client_id, product_id=product_id)
+    onboarding_runs = [
+        run for run in runs if _enum_str(getattr(run, "kind", None)) == WorkflowKindEnum.client_onboarding.value
+    ]
+    strategy_runs = [
+        run for run in runs if _enum_str(getattr(run, "kind", None)) == WorkflowKindEnum.strategy_v2.value
+    ]
+    latest_onboarding = onboarding_runs[0] if onboarding_runs else None
+    latest_strategy = strategy_runs[0] if strategy_runs else None
+
+    onboarding_status = _enum_str(getattr(latest_onboarding, "status", None))
+    onboarding_run_id = str(latest_onboarding.id) if latest_onboarding else None
+
+    bundle_artifact = artifacts_repo.get_latest_by_type(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        artifact_type=ArtifactTypeEnum.foundation_research_bundle,
+    )
+    bundle_data = bundle_artifact.data if bundle_artifact and isinstance(bundle_artifact.data, dict) else {}
+    raw_step_payload_ids = (
+        bundle_data.get("step_payload_artifact_ids")
+        if isinstance(bundle_data.get("step_payload_artifact_ids"), dict)
+        else {}
+    )
+    raw_present_step_keys = {
+        str(step_key).strip()
+        for step_key, artifact_id in raw_step_payload_ids.items()
+        if isinstance(step_key, str)
+        and step_key.strip()
+        and isinstance(artifact_id, str)
+        and artifact_id.strip()
+    }
+    present_step_keys = [
+        step_key
+        for step_key in _FOUNDATION_REQUIRED_STEP_KEYS
+        if step_key in raw_present_step_keys
+    ]
+    missing_step_keys = [
+        step_key for step_key in _FOUNDATION_REQUIRED_STEP_KEYS if step_key not in set(present_step_keys)
+    ]
+
+    strategy_run_id_from_bundle = (
+        str(bundle_data.get("workflow_run_id")).strip()
+        if isinstance(bundle_data.get("workflow_run_id"), str) and str(bundle_data.get("workflow_run_id")).strip()
+        else None
+    )
+    strategy_run_from_bundle = (
+        workflows_repo.get(org_id=org_id, workflow_run_id=strategy_run_id_from_bundle)
+        if strategy_run_id_from_bundle
+        else None
+    )
+    strategy_run = strategy_run_from_bundle or latest_strategy
+    strategy_status = _enum_str(getattr(strategy_run, "status", None))
+    strategy_run_id = str(strategy_run.id) if strategy_run else None
+
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    if bundle_artifact:
+        if missing_step_keys:
+            return FoundationReadinessResponse.model_validate(
+                {
+                    "status": "foundation_failed",
+                    "should_gate_overview": True,
+                    "reason": "foundation_bundle_missing_required_step_artifacts",
+                    "strategy_workflow_run_id": strategy_run_id,
+                    "strategy_workflow_status": strategy_status,
+                    "onboarding_workflow_run_id": onboarding_run_id,
+                    "onboarding_workflow_status": onboarding_status,
+                    "required_step_keys": list(_FOUNDATION_REQUIRED_STEP_KEYS),
+                    "present_step_keys": present_step_keys,
+                    "missing_step_keys": missing_step_keys,
+                    "checked_at": checked_at,
+                }
+            )
+        return FoundationReadinessResponse.model_validate(
+            {
+                "status": "foundation_ready",
+                "should_gate_overview": False,
+                "reason": "foundation_bundle_complete",
+                "strategy_workflow_run_id": strategy_run_id,
+                "strategy_workflow_status": strategy_status,
+                "onboarding_workflow_run_id": onboarding_run_id,
+                "onboarding_workflow_status": onboarding_status,
+                "required_step_keys": list(_FOUNDATION_REQUIRED_STEP_KEYS),
+                "present_step_keys": present_step_keys,
+                "missing_step_keys": [],
+                "checked_at": checked_at,
+            }
+        )
+
+    gate_if_in_setup = latest_onboarding is not None or latest_strategy is not None
+    if strategy_status in {WorkflowStatusEnum.failed.value, WorkflowStatusEnum.cancelled.value}:
+        return FoundationReadinessResponse.model_validate(
+            {
+                "status": "foundation_failed",
+                "should_gate_overview": gate_if_in_setup,
+                "reason": "strategy_v2_foundation_run_failed",
+                "strategy_workflow_run_id": strategy_run_id,
+                "strategy_workflow_status": strategy_status,
+                "onboarding_workflow_run_id": onboarding_run_id,
+                "onboarding_workflow_status": onboarding_status,
+                "required_step_keys": list(_FOUNDATION_REQUIRED_STEP_KEYS),
+                "present_step_keys": [],
+                "missing_step_keys": list(_FOUNDATION_REQUIRED_STEP_KEYS),
+                "checked_at": checked_at,
+            }
+        )
+
+    pending_reason = "foundation_not_started"
+    if latest_onboarding and onboarding_status == WorkflowStatusEnum.running.value:
+        pending_reason = "client_onboarding_running"
+    elif latest_onboarding:
+        pending_reason = "waiting_for_strategy_v2_foundation_bundle"
+    elif latest_strategy:
+        pending_reason = "strategy_v2_foundation_bundle_not_available"
+
+    return FoundationReadinessResponse.model_validate(
+        {
+            "status": "foundation_pending",
+            "should_gate_overview": gate_if_in_setup,
+            "reason": pending_reason,
+            "strategy_workflow_run_id": strategy_run_id,
+            "strategy_workflow_status": strategy_status,
+            "onboarding_workflow_run_id": onboarding_run_id,
+            "onboarding_workflow_status": onboarding_status,
+            "required_step_keys": list(_FOUNDATION_REQUIRED_STEP_KEYS),
+            "present_step_keys": [],
+            "missing_step_keys": list(_FOUNDATION_REQUIRED_STEP_KEYS),
+            "checked_at": checked_at,
+        }
+    )
 
 
 def _require_public_asset_base_url() -> str:
@@ -11048,18 +11244,60 @@ def delete_client(
     return {"ok": True}
 
 
-@router.post("/{client_id}/onboarding")
-async def start_client_onboarding(
-    client_id: str,
-    payload: OnboardingStartRequest,
-    auth: AuthContext = Depends(get_current_user),
-    session: Session = Depends(get_session),
-):
-    if payload.business_type != "new":
+def _require_marketing_agent_setup_fields(payload: MarketingAgentSetupRequest) -> None:
+    required = [
+        "business_model",
+        "offering_kind",
+        "offering_type",
+        "offering_name",
+        "offering_description",
+    ]
+    missing = [field for field in required if getattr(payload, field) in (None, "")]
+    if missing:
         raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Existing customer onboarding is not supported yet.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Marketing agent setup is missing required fields: " + ", ".join(missing),
         )
+
+
+def _try_parse_setup_price(payload: MarketingAgentSetupRequest) -> dict[str, Any]:
+    pricing_text = payload.price or payload.starting_rate
+    if not pricing_text:
+        return {
+            "pricing_status": "later",
+            "pricing_text": None,
+            "price_cents": None,
+            "currency": None,
+        }
+    try:
+        price_cents, currency = parse_price_to_cents_and_currency(
+            price_text=pricing_text,
+            context="Marketing agent setup",
+        )
+    except StrategyV2MissingContextError:
+        return {
+            "pricing_status": "needs_concrete_price",
+            "pricing_text": pricing_text,
+            "price_cents": None,
+            "currency": None,
+        }
+    return {
+        "pricing_status": "concrete",
+        "pricing_text": pricing_text,
+        "price_cents": price_cents,
+        "currency": currency,
+    }
+
+
+async def _start_marketing_agent_setup(
+    *,
+    client_id: str,
+    payload: MarketingAgentSetupRequest,
+    auth: AuthContext,
+    session: Session,
+    legacy_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    _require_marketing_agent_setup_fields(payload)
     onboarding_repo = OnboardingPayloadsRepository(session)
     clients_repo = ClientsRepository(session)
     products_repo = ProductsRepository(session)
@@ -11075,24 +11313,22 @@ async def start_client_onboarding(
             detail="Strategy V2 is disabled for this tenant/client. Enable strategy_v2_enabled before onboarding.",
         )
 
-    product_fields: dict[str, object] = {"title": payload.product_name}
-    if payload.product_description is not None:
-        product_fields["description"] = payload.product_description
-    normalized_product_type = canonical_product_type(payload.product_type)
+    normalized_product_type = canonical_product_type(payload.offering_type or payload.offering_kind)
     if not normalized_product_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="product_type is required.",
+            detail="offering_type is required.",
         )
-    product_fields["product_type"] = normalized_product_type
-    if payload.primary_benefits is not None:
-        product_fields["primary_benefits"] = payload.primary_benefits
-    if payload.feature_bullets is not None:
-        product_fields["feature_bullets"] = payload.feature_bullets
-    if payload.guarantee_text is not None:
-        product_fields["guarantee_text"] = payload.guarantee_text
-    if payload.disclaimers is not None:
-        product_fields["disclaimers"] = payload.disclaimers
+    product_name = str(payload.offering_name or "").strip()
+    product_description = str(payload.offering_description or "").strip()
+    product_category = payload.product_category or payload.category or payload.offering_type
+    product_fields: dict[str, object] = {
+        "title": product_name,
+        "description": product_description,
+        "product_type": normalized_product_type,
+    }
+    if product_category:
+        product_fields["tags"] = [str(product_category).strip()]
 
     product = products_repo.create(
         org_id=auth.org_id,
@@ -11102,14 +11338,18 @@ async def start_client_onboarding(
 
     offer_fields: dict[str, object] = {
         "name": product.title,
-        "business_model": payload.business_model.strip(),
+        "business_model": str(payload.business_model or "").strip(),
+        "description": product_description,
+        "options_schema": {
+            "source": "marketing_agent_setup",
+            "business_type": payload.business_type,
+            "input_mode": payload.input_mode,
+            "offering_kind": payload.offering_kind,
+            "offering_type": payload.offering_type,
+            "pricing_model": payload.pricing_model or payload.charge_model,
+            "business_url": payload.business_url,
+        },
     }
-    if payload.product_description is not None:
-        offer_fields["description"] = payload.product_description
-    if payload.primary_benefits:
-        offer_fields["differentiation_bullets"] = payload.primary_benefits
-    if payload.guarantee_text is not None:
-        offer_fields["guarantee_text"] = payload.guarantee_text
 
     default_offer = offers_repo.create(
         org_id=auth.org_id,
@@ -11117,19 +11357,49 @@ async def start_client_onboarding(
         product_id=str(product.id),
         **offer_fields,
     )
-    price_cents, currency = parse_price_to_cents_and_currency(
-        price_text=payload.price,
-        context="Onboarding",
-    )
-    variants_repo.create(
-        product_id=str(product.id),
-        offer_id=str(default_offer.id),
-        title=product.title,
-        price=price_cents,
-        currency=currency,
-    )
+    price_result = _try_parse_setup_price(payload)
+    if price_result["price_cents"] is not None:
+        variants_repo.create(
+            product_id=str(product.id),
+            offer_id=str(default_offer.id),
+            title=product.title,
+            price=int(price_result["price_cents"]),
+            currency=str(price_result["currency"]),
+        )
 
-    payload_data = payload.model_dump()
+    payload_data = {
+        "schema_version": "marketing_agent_setup.v1",
+        "business_type": payload.business_type,
+        "input_mode": payload.input_mode,
+        "business_url": payload.business_url,
+        "business_name": payload.business_name or client.name,
+        "business_model": str(payload.business_model or "").strip(),
+        "product_name": product.title,
+        "product_description": product_description,
+        "product_type": normalized_product_type,
+        "product_category": product_category,
+        "product_customizable": False,
+        "price": price_result["pricing_text"] or "TBD",
+        "pricing_status": price_result["pricing_status"],
+        "pricing_model": payload.pricing_model or payload.charge_model,
+        "offering": {
+            "kind": payload.offering_kind,
+            "type": payload.offering_type,
+            "name": product.title,
+            "description": product_description,
+            "price": payload.price,
+            "starting_rate": payload.starting_rate,
+            "pricing_model": payload.pricing_model,
+            "charge_model": payload.charge_model,
+        },
+        "competitor_urls": list(payload.competitor_urls or []),
+        "compliance_notes": payload.compliance_notes,
+        "context_dev_summary": payload.context_dev_summary,
+        "extraction_review": payload.extraction_review,
+        "metadata": payload.metadata or {},
+    }
+    if legacy_payload:
+        payload_data["legacy_onboarding"] = legacy_payload
     payload_data["product_type"] = normalized_product_type
     payload_data["product_id"] = str(product.id)
     payload_data["default_offer_id"] = str(default_offer.id)
@@ -11149,15 +11419,16 @@ async def start_client_onboarding(
             client_id=client_id,
             onboarding_payload_id=str(onboarding_payload.id),
             product_id=str(product.id),
-            business_model=payload.business_model.strip(),
-            funnel_position=payload.funnel_position.strip(),
-            target_platforms=list(payload.target_platforms),
-            target_regions=list(payload.target_regions),
-            existing_proof_assets=list(payload.existing_proof_assets),
-            brand_voice_notes=payload.brand_voice_notes.strip(),
+            business_model=str(payload.business_model or "").strip(),
+            funnel_position="foundation_only",
+            target_platforms=[],
+            target_regions=[],
+            existing_proof_assets=[],
+            brand_voice_notes="Foundation setup only; brand voice is configured after onboarding.",
             compliance_notes=payload.compliance_notes.strip()
             if isinstance(payload.compliance_notes, str) and payload.compliance_notes.strip()
             else None,
+            foundation_only=True,
         ),
         id=f"client-onboarding-{auth.org_id}-{client_id}-{onboarding_payload.id}",
         task_queue=settings.TEMPORAL_TASK_QUEUE,
@@ -11190,7 +11461,95 @@ async def start_client_onboarding(
         "product_id": str(product.id),
         "product_name": product.title,
         "default_offer_id": str(default_offer.id),
+        "pricing_status": price_result["pricing_status"],
     }
+
+
+@router.post("/{client_id}/marketing-agent/extract")
+async def extract_marketing_agent_context(
+    client_id: str,
+    payload: MarketingAgentExtractRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    clients_repo = ClientsRepository(session)
+    client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
+    if not client:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    try:
+        extraction = build_existing_business_review(
+            business_url=payload.business_url,
+            competitor_urls=list(payload.competitor_urls or []),
+        )
+        raw_artifact = ArtifactsRepository(session).insert(
+            org_id=auth.org_id,
+            client_id=client_id,
+            artifact_type=ArtifactTypeEnum.context_dev_extraction,
+            data={
+                "schema_version": "context_dev_extraction.v1",
+                "provider": extraction.get("provider"),
+                "domain": extraction.get("domain"),
+                "business_url": extraction.get("business_url"),
+                "competitor_urls": extraction.get("competitor_urls"),
+                "fields": extraction.get("fields"),
+                "requests": extraction.get("requests"),
+                "raw": extraction.get("raw"),
+            },
+        )
+        compact = dict(extraction)
+        compact.pop("raw", None)
+        compact["raw_artifact_id"] = str(raw_artifact.id)
+        return compact
+    except ContextDevConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except ContextDevError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/{client_id}/marketing-agent/setup")
+async def start_marketing_agent_setup(
+    client_id: str,
+    payload: MarketingAgentSetupRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    return await _start_marketing_agent_setup(
+        client_id=client_id,
+        payload=payload,
+        auth=auth,
+        session=session,
+    )
+
+
+@router.post("/{client_id}/onboarding")
+async def start_client_onboarding(
+    client_id: str,
+    payload: OnboardingStartRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    setup_payload = MarketingAgentSetupRequest(
+        business_type="new",
+        input_mode="manual_seed",
+        business_name=None,
+        business_model=payload.business_model,
+        offering_kind="product" if payload.product_type != "service" else "service",
+        offering_type=payload.product_type,
+        offering_name=payload.product_name,
+        offering_description=payload.product_description,
+        product_category=payload.product_category,
+        price=payload.price,
+        competitor_urls=payload.competitor_urls,
+        compliance_notes=payload.compliance_notes,
+        metadata={"source": "legacy_onboarding_endpoint"},
+    )
+    return await _start_marketing_agent_setup(
+        client_id=client_id,
+        payload=setup_payload,
+        auth=auth,
+        session=session,
+        legacy_payload=payload.model_dump(),
+    )
 
 
 @router.post("/{client_id}/intent")

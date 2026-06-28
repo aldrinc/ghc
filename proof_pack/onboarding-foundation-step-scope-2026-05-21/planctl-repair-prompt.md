@@ -1,0 +1,239 @@
+# Plan Repair Prompt
+
+Goal: repair the implementation until the plan contract passes.
+
+Plan ID: `2026-05-21-onboarding-foundation-step-scope-plan`
+Contract: `/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md`
+Repair JSON: `/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/planctl-repair.json`
+
+Rules:
+- Read the original plan and contract before editing.
+- Fix only the failing or brittle items.
+- Update item status, artifacts, and notes in the contract.
+- Run verification again with `planctl verify <contract> --run`.
+
+Errors:
+- none
+
+Warnings:
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P01: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P02: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P03: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P04: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P05: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P06: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P07: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P08: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P09: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P11: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- P12: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`

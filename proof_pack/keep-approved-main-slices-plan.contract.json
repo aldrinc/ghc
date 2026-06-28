@@ -1,0 +1,531 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "keep-approved-main-slices",
+  "created_at": "2026-05-20T16:55:14.643493+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/keep-approved-main-slices-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "site funnel variants/options/paths and publication snapshots",
+      "source_line": 7,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/alembic/versions/0096_site_funnel_variants.py",
+        "mos/backend/app/db/models.py",
+        "mos/backend/app/routers/site_funnels.py",
+        "mos/backend/app/services/site_funnels.py",
+        "mos/backend/app/services/site_publications.py",
+        "mos/backend/app/services/deploy.py",
+        "mos/frontend/src/api/siteFunnels.ts",
+        "mos/frontend/src/pages/workspaces/sites/SiteFunnelDetailPage.tsx"
+      ],
+      "acceptance": [
+        "Variant option/path schema, API, publication snapshot, runtime artifact, and UI files are staged."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-staged-files.txt",
+        "proof_pack/keep-approved-alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "Hermes sidecar state DB response and usage capture",
+      "source_line": 8,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/services/hermes_sidecar.py",
+        "mos/backend/tests/test_hermes_sidecar.py"
+      ],
+      "acceptance": [
+        "Hermes state.db response and usage helpers are staged and exercised by smoke checks."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-backend-smoke.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "objective": "campaign funnel custom page specs",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/schemas/campaign_funnels.py",
+        "mos/backend/app/routers/campaigns.py",
+        "mos/backend/app/temporal/workflows/campaign_funnel_generation.py",
+        "mos/backend/app/temporal/activities/campaign_intent_activities.py",
+        "mos/backend/tests/test_campaign_funnel_generation_request_schema.py"
+      ],
+      "acceptance": [
+        "Custom page specs are accepted by schema, passed into workflow input, normalized, and used for nextPageSlug wiring."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-backend-smoke.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "small non-regressive checkout funnel event mapping, if clean",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        "mos/frontend/src/lib/metaFunnelEvents.ts",
+        "mos/frontend/src/lib/metaFunnelEvents.test.ts"
+      ],
+      "acceptance": [
+        "checkout_page_view maps to PageView plus InitiateCheckout with no duplicate checkout_started branch."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-frontend-meta-events-npm.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "objective": "authorized model standardization to `gpt-5.5` only where directly needed",
+      "source_line": 11,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/config.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "mos/backend/tests/test_config_env_precedence.py"
+      ],
+      "acceptance": [
+        "Paid ads QA default is gpt-5.5 and prompt budget guard recognizes gpt-5.5."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-backend-smoke.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "objective": "Create a dedicated branch from the current rebased main-equivalent HEAD.",
+      "source_line": 15,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-branch.txt"
+      ],
+      "acceptance": [
+        "Branch codex/keep-approved-main-slices exists and is current."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-branch.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "Remove stale local changes not in the approved set.",
+      "source_line": 16,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-diff-files.txt"
+      ],
+      "acceptance": [
+        "Staged files match approved slices; stale whole-file changes were restored to main."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-diff-files.txt",
+        "proof_pack/keep-approved-staged-files.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P08",
+      "objective": "Remove untracked junk/artifacts and explicitly dropped code: Tenor import adapter, GetHookD defaults/docs alignment, and meta management report artifact migration.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-dropped-files-check.txt"
+      ],
+      "acceptance": [
+        "Tenor adapter files, stale GetHookD 0085, stale meta report 0086, and DB artifacts are absent."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-dropped-files-check.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P09",
+      "objective": "Keep and repair approved slices so the diff is coherent against current main.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-staged-files.txt"
+      ],
+      "acceptance": [
+        "Approved slices are coherent against current main and staged."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-diff-files.txt",
+        "proof_pack/keep-approved-diff-stat.txt",
+        "proof_pack/keep-approved-staged-files.txt",
+        "proof_pack/keep-approved-staged-stat.txt",
+        "proof_pack/keep-approved-git-diff-check.log",
+        "proof_pack/keep-approved-staged-diff-check.log",
+        "proof_pack/keep-approved-backend-smoke.log",
+        "proof_pack/keep-approved-backend-tests.log",
+        "proof_pack/keep-approved-alembic-heads.log",
+        "proof_pack/keep-approved-frontend-meta-events-npm.log",
+        "proof_pack/keep-approved-frontend-build.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P10",
+      "objective": "Run targeted backend/frontend verification and `git diff --check`.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-backend-smoke.log",
+        "proof_pack/keep-approved-frontend-build.log"
+      ],
+      "acceptance": [
+        "Direct backend smoke, Alembic heads, frontend unit test, frontend build, and diff checks pass; DB-backed pytest blocker is documented."
+      ],
+      "verify_commands": [
+        "git diff --cached --check",
+        "cd mos/backend && uv run alembic heads",
+        "cd mos/frontend && npm run test:unit -- src/lib/metaFunnelEvents.test.ts",
+        "cd mos/frontend && npm run build"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-diff-files.txt",
+        "proof_pack/keep-approved-diff-stat.txt",
+        "proof_pack/keep-approved-staged-files.txt",
+        "proof_pack/keep-approved-staged-stat.txt",
+        "proof_pack/keep-approved-git-diff-check.log",
+        "proof_pack/keep-approved-staged-diff-check.log",
+        "proof_pack/keep-approved-backend-smoke.log",
+        "proof_pack/keep-approved-backend-tests.log",
+        "proof_pack/keep-approved-alembic-heads.log",
+        "proof_pack/keep-approved-frontend-meta-events-npm.log",
+        "proof_pack/keep-approved-frontend-build.log"
+      ],
+      "notes": "DB-backed pytest was attempted and blocked because local Postgres/Docker is not running; see proof_pack/keep-approved-backend-tests.log."
+    },
+    {
+      "id": "P11",
+      "objective": "Stage only the intended PR files and leave unrelated artifacts untracked.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-staged-files.txt"
+      ],
+      "acceptance": [
+        "Only intended PR files are staged; proof/artifact noise remains untracked."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-staged-files.txt",
+        "proof_pack/keep-approved-staged-stat.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P12",
+      "objective": "Branch is based on `origin/main` with zero ahead/behind before the new changes.",
+      "source_line": 24,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-ahead-behind-before-stage.txt"
+      ],
+      "acceptance": [
+        "Ahead/behind was 0 0 before staging new changes."
+      ],
+      "verify_commands": [
+        "git rev-list --left-right --count HEAD...origin/main"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-ahead-behind-before-stage.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P13",
+      "objective": "No Tenor import adapter files remain in the intended diff.",
+      "source_line": 25,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-dropped-files-check.txt"
+      ],
+      "acceptance": [
+        "Tenor import adapter paths are absent from filesystem and staged diff."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-dropped-files-check.txt",
+        "proof_pack/keep-approved-forbidden-diff-check.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P14",
+      "objective": "No GetHookD default/doc-alignment changes remain in the intended diff.",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-forbidden-diff-check.txt"
+      ],
+      "acceptance": [
+        "GetHookD default/doc-alignment changes are absent from intended diff."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-forbidden-diff-check.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P15",
+      "objective": "No meta management report artifact migration remains in the intended diff.",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-dropped-files-check.txt"
+      ],
+      "acceptance": [
+        "Stale 0086 meta management report migration is absent."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-dropped-files-check.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P16",
+      "objective": "Site funnel variants migration and matching model/service/API/UI changes are present.",
+      "source_line": 28,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/alembic/versions/0096_site_funnel_variants.py",
+        "proof_pack/keep-approved-alembic-heads.log"
+      ],
+      "acceptance": [
+        "0096 site funnel variants migration is staged and is the Alembic head."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-alembic-heads.log",
+        "proof_pack/keep-approved-staged-files.txt"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P17",
+      "objective": "Hermes sidecar tests cover persisted state DB response and usage capture.",
+      "source_line": 29,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/tests/test_hermes_sidecar.py"
+      ],
+      "acceptance": [
+        "Hermes state DB response and usage behavior is covered by staged tests and smoke log."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-backend-smoke.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P18",
+      "objective": "Campaign funnel custom page specs are present with tests.",
+      "source_line": 30,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/tests/test_campaign_funnel_generation_request_schema.py"
+      ],
+      "acceptance": [
+        "Campaign page specs have schema tests and workflow smoke coverage."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-backend-smoke.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P19",
+      "objective": "Verification commands pass or blocked failures are documented with exact output.",
+      "source_line": 31,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-diff-files.txt",
+        "proof_pack/keep-approved-diff-stat.txt",
+        "proof_pack/keep-approved-staged-files.txt",
+        "proof_pack/keep-approved-staged-stat.txt",
+        "proof_pack/keep-approved-git-diff-check.log",
+        "proof_pack/keep-approved-staged-diff-check.log",
+        "proof_pack/keep-approved-backend-smoke.log",
+        "proof_pack/keep-approved-backend-tests.log",
+        "proof_pack/keep-approved-alembic-heads.log",
+        "proof_pack/keep-approved-frontend-meta-events-npm.log",
+        "proof_pack/keep-approved-frontend-build.log"
+      ],
+      "acceptance": [
+        "Passing checks and blocked DB-backed pytest attempt are logged."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-diff-files.txt",
+        "proof_pack/keep-approved-diff-stat.txt",
+        "proof_pack/keep-approved-staged-files.txt",
+        "proof_pack/keep-approved-staged-stat.txt",
+        "proof_pack/keep-approved-git-diff-check.log",
+        "proof_pack/keep-approved-staged-diff-check.log",
+        "proof_pack/keep-approved-backend-smoke.log",
+        "proof_pack/keep-approved-backend-tests.log",
+        "proof_pack/keep-approved-alembic-heads.log",
+        "proof_pack/keep-approved-frontend-meta-events-npm.log",
+        "proof_pack/keep-approved-frontend-build.log"
+      ],
+      "notes": "Blocked item is local infrastructure only: Docker daemon is not running, so Postgres 5433 cannot be started for DB-backed pytest."
+    },
+    {
+      "id": "P20",
+      "objective": "Only intended files are staged for PR prep.",
+      "source_line": 32,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/keep-approved-staged-files.txt"
+      ],
+      "acceptance": [
+        "Staged file list contains only approved code and migration files."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/keep-approved-staged-files.txt",
+        "proof_pack/keep-approved-staged-stat.txt"
+      ],
+      "notes": ""
+    }
+  ],
+  "global_verify_commands": [
+    "git diff --cached --check",
+    "cd mos/backend && uv run alembic heads",
+    "cd mos/frontend && npm run test:unit -- src/lib/metaFunnelEvents.test.ts",
+    "cd mos/frontend && npm run build"
+  ],
+  "global_acceptance": [
+    "Approved slices are staged on codex/keep-approved-main-slices.",
+    "Stale Tenor/GetHookD/meta-report artifacts are absent from intended diff.",
+    "DB-backed pytest blocker is documented with exact local infrastructure error."
+  ]
+}

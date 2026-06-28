@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { useFunnelRuntime } from "@/funnels/puckConfig";
+import { useFunnelRuntime } from "@/funnels/funnelRuntime";
 import { listProducts } from "@/lib/medusa";
 import type { MedusaProduct, MedusaProductVariant } from "@/types/commerce";
 import { useB2CRuntime } from "../B2CRuntimeProvider";

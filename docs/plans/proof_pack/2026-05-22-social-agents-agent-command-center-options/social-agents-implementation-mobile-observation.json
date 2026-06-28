@@ -1,0 +1,16 @@
+{
+  "url": "http://localhost:5275/workspaces/execution/social-agents",
+  "width": 390,
+  "height": 844,
+  "scrollWidth": 390,
+  "hasHorizontalOverflow": false,
+  "primaryButtons": [
+    "Continue"
+  ],
+  "headings": [
+    "Marketing Agent",
+    "Set mission",
+    "Success signal",
+    "TikTok carousel"
+  ]
+}

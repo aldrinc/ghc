@@ -1,0 +1,23 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e6]
+      - generic [ref=e9]: mOS
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e14]:
+          - heading "Sign in to My Application" [level=1] [ref=e15]
+          - paragraph [ref=e16]: Welcome back! Please sign in to continue
+        - generic [ref=e17]:
+          - button "Sign in with Google Continue with Google" [ref=e20] [cursor=pointer]
+          - paragraph [ref=e27]: or
+          - generic [ref=e29]
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]: Don’t have an account?
+          - link "Sign up" [ref=e46] [cursor=pointer]:
+            - /url: https://immune-turtle-79.accounts.dev/sign-up?__clerk_db_jwt=dvb_3E5VJBl7boYirQQCSWhPSupRuiB
+        - generic [ref=e48]:
+          - generic [ref=e50]
+          - paragraph [ref=e58]: Development mode
+  - region "Notifications"

@@ -1,0 +1,11 @@
+Error: POST https://api.moshq.app/meta/campaigns/3ff5811c-741b-4dc2-8050-46506dea14bc/publish-runs failed 504: <html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx/1.18.0 (Ubuntu)</center>
+</body>
+</html>
+
+    at requestJson ([stdin]:26:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async [stdin]:60:20

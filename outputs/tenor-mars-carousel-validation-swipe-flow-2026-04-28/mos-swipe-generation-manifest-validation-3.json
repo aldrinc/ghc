@@ -1,0 +1,158 @@
+{
+  "createdAt": "2026-04-29T01:28:53.031Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "stagingFunnelId": "be65d76e-ced9-4948-9465-18723c8446fd",
+  "stagingPageId": "ab3102f4-a179-410a-9eb0-66aa3020cafc",
+  "sourcePage": "https://mengotomars.com/products/30-day-supply-starter-kit",
+  "outputs": [
+    {
+      "key": "01-tenor-product-benefit-hero",
+      "sourceFile": "01-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "4e237c19-8bb2-45ab-bbbd-79dda0ccaf92",
+        "publicId": "3bf5334f-3321-49c6-8825-7e2519ae42fa",
+        "filename": "01-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 672,
+        "height": 672,
+        "url": "/public/assets/3bf5334f-3321-49c6-8825-7e2519ae42fa"
+      },
+      "workflowRunId": "66a41ff2-f963-4ba4-8bb2-6ded043e4251",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-1b2e4891-2ef9-4687-9010-84074c8c8be9",
+      "assetId": "0d515a58-ffad-483e-a514-bf88af4d77df",
+      "publicId": "e3fa6402-6c77-4858-ad65-4bfb20b250d0",
+      "publicUrl": "https://api.moshq.app/public/assets/e3fa6402-6c77-4858-ad65-4bfb20b250d0",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor/01-tenor-product-benefit-hero.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/3bf5334f-3321-49c6-8825-7e2519ae42fa",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Daily Drive Essentials product hero",
+        "swipeAngle": "Tenor workspace facts to use, without inventing unsupported claims: Brand: Tenor. Product: Daily Drive Essentials. Product format: black 60-capsule supplement bottle, 2 capsules daily. Positioning: physician-formulated daily men's vitality support with exact active doses disclosed. Core benefits from product label: clean & consistent energy; natural drive & libido; peak vitality & performance. Formula facts: Tongkat Ali 400 mg, Zinc 50 mg, Maca 250 mg, L-Arginine 250 mg, Ginseng + Eleuthero 125 mg. Survey proof allowed: survey data from 1,203 men; 94% morning energy; 81% physical stamina; 87% mental sharpness; 92% overall vitality. Do not invent discounts, buyer counts, testimonials, doctor endorsements, lab changes, TRT comparisons, or guarantee language.\n\nUse the attached Mars carousel image only as a structural swipe reference: a bold square product hero with product centered, dark premium background, restrained red accent, and short benefit callouts. Create the Tenor equivalent using the updated Tenor Daily Drive Essentials bottle. Do not copy Mars branding, Mars bottle, Mars orange palette, lightning icons, discounts, 80% recommendation claim, or any Mars text. Safe Tenor copy may include only: Daily Drive Essentials; Clean & consistent energy; Natural drive & libido; Peak vitality & performance; 2 capsules daily; Exact active doses disclosed. Keep text minimal and mobile-legible. Premium masculine editorial style, black/graphite with deep red accent. No fake offers, no fake percentages, no testosterone lab claims.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:ec41c35889c4823ab2b2779cb08be5856d1a5c228810e7ac",
+        "asset_ids": [
+          "0d515a58-ffad-483e-a514-bf88af4d77df"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "02-tenor-survey-proof",
+      "sourceFile": "02-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "e3c43f9e-2990-436b-8446-c45390a17d7f",
+        "publicId": "60772d09-11f1-4bc8-b4c8-49cf21b50001",
+        "filename": "02-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 1080,
+        "height": 1080,
+        "url": "/public/assets/60772d09-11f1-4bc8-b4c8-49cf21b50001"
+      },
+      "workflowRunId": "6410e00c-8d03-425e-8964-bcf29e5a59db",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e9382f47-41e3-45e7-9948-f162d879eff7",
+      "assetId": "83887143-a8ab-413a-8eda-84c50fcd73e8",
+      "publicId": "0984ce6f-c807-4280-aed7-b56acab84bad",
+      "publicUrl": "https://api.moshq.app/public/assets/0984ce6f-c807-4280-aed7-b56acab84bad",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor/02-tenor-survey-proof.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 1,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/60772d09-11f1-4bc8-b4c8-49cf21b50001",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Reported outcomes from 1,203 men",
+        "swipeAngle": "Tenor workspace facts to use, without inventing unsupported claims: Brand: Tenor. Product: Daily Drive Essentials. Product format: black 60-capsule supplement bottle, 2 capsules daily. Positioning: physician-formulated daily men's vitality support with exact active doses disclosed. Core benefits from product label: clean & consistent energy; natural drive & libido; peak vitality & performance. Formula facts: Tongkat Ali 400 mg, Zinc 50 mg, Maca 250 mg, L-Arginine 250 mg, Ginseng + Eleuthero 125 mg. Survey proof allowed: survey data from 1,203 men; 94% morning energy; 81% physical stamina; 87% mental sharpness; 92% overall vitality. Do not invent discounts, buyer counts, testimonials, doctor endorsements, lab changes, TRT comparisons, or guarantee language.\n\nUse the attached Mars carousel image only as a structural swipe reference: a square proof/results card with large outcome stats and a human element. Create the Tenor equivalent using only Tenor survey proof. Required safe copy: Reported outcomes; Survey data from 1,203 men; 94% Morning energy; 81% Physical stamina; 87% Mental sharpness; 92% Overall vitality; Not a clinical trial claim. Use a mature realistic man in his late 40s or a premium product/lifestyle visual, not a shirtless fighter or MMA testimonial. Do not include stars, named testimonials, Mars Men, fighter credentials, partner/male model claims, or any invented quote. Warm off-white/graphite palette with deep red accents, clean and mobile-legible.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:433b5be025ccd9d67d894b30b93a016e066240d4fcd22c97",
+        "asset_ids": [
+          "83887143-a8ab-413a-8eda-84c50fcd73e8"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    },
+    {
+      "key": "03-tenor-lifestyle-social-proof-collage",
+      "sourceFile": "03-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "be7861b8-eeb6-43fc-bd49-535c5b4540a8",
+        "publicId": "a72129b4-3231-4da0-89dc-0ac548f29a78",
+        "filename": "03-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 2160,
+        "height": 2160,
+        "url": "/public/assets/a72129b4-3231-4da0-89dc-0ac548f29a78"
+      },
+      "workflowRunId": "f6cc28e4-d329-4dde-8599-6d005e61a506",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-37891bcf-3283-4ca7-82fa-c164563ece27",
+      "assetId": "8072af9f-008a-4877-8059-4d998045328e",
+      "publicId": "eae2955f-bd72-42c1-b092-7b7522d23211",
+      "publicUrl": "https://api.moshq.app/public/assets/eae2955f-bd72-42c1-b092-7b7522d23211",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor/03-tenor-lifestyle-social-proof-collage.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/a72129b4-3231-4da0-89dc-0ac548f29a78",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Daily protocol for men who want their drive back",
+        "swipeAngle": "Tenor workspace facts to use, without inventing unsupported claims: Brand: Tenor. Product: Daily Drive Essentials. Product format: black 60-capsule supplement bottle, 2 capsules daily. Positioning: physician-formulated daily men's vitality support with exact active doses disclosed. Core benefits from product label: clean & consistent energy; natural drive & libido; peak vitality & performance. Formula facts: Tongkat Ali 400 mg, Zinc 50 mg, Maca 250 mg, L-Arginine 250 mg, Ginseng + Eleuthero 125 mg. Survey proof allowed: survey data from 1,203 men; 94% morning energy; 81% physical stamina; 87% mental sharpness; 92% overall vitality. Do not invent discounts, buyer counts, testimonials, doctor endorsements, lab changes, TRT comparisons, or guarantee language.\n\nUse the attached Mars carousel image only as a structural swipe reference: a square collage-style carousel image with multiple lifestyle/product tiles and a central bold message. Create the Tenor equivalent with realistic premium lifestyle moments for men in their 40s/50s: morning routine, focused work, walking outdoors, product bottle detail, water glass, neutral interiors. Do not copy the Mars athlete/bodybuilding montage, shirtless gym imagery, 429,576+ count, 'vitalized men' phrase, or any fake customer count. Safe central copy may include: Daily Drive Essentials; Daily protocol for clean energy, drive & performance. Keep it premium, mature, neutral, and Tenor-branded with black bottle and deep red accent. No invented testimonials, no fake numbers, no Mars branding.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:f14b31b8b114032086da1a9af228cedcf9828af9a9de80f3",
+        "asset_ids": [
+          "8072af9f-008a-4877-8059-4d998045328e"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

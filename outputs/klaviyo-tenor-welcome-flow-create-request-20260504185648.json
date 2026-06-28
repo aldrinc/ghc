@@ -1,0 +1,238 @@
+{
+  "data": {
+    "type": "flow",
+    "attributes": {
+      "name": "Tenor - Daily Drive Essentials Welcome Lead Nurturer - Draft 20260504185648",
+      "definition": {
+        "triggers": [
+          {
+            "type": "list",
+            "id": "T75wvB"
+          }
+        ],
+        "profile_filter": null,
+        "actions": [
+          {
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shoptenorco.com",
+                "from_label": "Dr. Adam Reese, Tenor",
+                "reply_to_email": "support@shoptenorco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "It's not just you",
+                "preview_text": "The shift most men don't name out loud",
+                "template_id": "RhsKJf",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[TENOR] DDE Welcome E01 - Orientation — Day 0"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677724"
+            },
+            "temporary_id": "104677723"
+          },
+          {
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 1,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677725"
+            },
+            "temporary_id": "104677724"
+          },
+          {
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shoptenorco.com",
+                "from_label": "Dr. Adam Reese, Tenor",
+                "reply_to_email": "support@shoptenorco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "Three things that fall together",
+                "preview_text": "Why fixing one doesn't fix the rest",
+                "template_id": "YtahLb",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[TENOR] DDE Welcome E02 - Story / Mechanism Tease — Day 1"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677726"
+            },
+            "temporary_id": "104677725"
+          },
+          {
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 2,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677728"
+            },
+            "temporary_id": "104677726"
+          },
+          {
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shoptenorco.com",
+                "from_label": "Dr. Adam Reese, Tenor",
+                "reply_to_email": "support@shoptenorco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "21 ingredients, zero secrets",
+                "preview_text": "The label most brands hope you never ask for",
+                "template_id": "SsRAC7",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[TENOR] DDE Welcome E03 - Transparency / Proof — Day 3"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677729"
+            },
+            "temporary_id": "104677728"
+          },
+          {
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 2,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677730"
+            },
+            "temporary_id": "104677729"
+          },
+          {
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shoptenorco.com",
+                "from_label": "Dr. Adam Reese, Tenor",
+                "reply_to_email": "support@shoptenorco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "The Triad most men don't know exists",
+                "preview_text": "Why three systems matter more than any single number",
+                "template_id": "W3HmD5",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[TENOR] DDE Welcome E04 - Full Mechanism + Soft Offer — Day 5"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": "104677731"
+            },
+            "temporary_id": "104677730"
+          },
+          {
+            "type": "time-delay",
+            "data": {
+              "unit": "days",
+              "value": 2,
+              "secondary_value": null,
+              "timezone": "profile",
+              "delay_until_weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday"
+              ]
+            },
+            "links": {
+              "next": "104677732"
+            },
+            "temporary_id": "104677731"
+          },
+          {
+            "type": "send-email",
+            "data": {
+              "message": {
+                "from_email": "support@shoptenorco.com",
+                "from_label": "Dr. Adam Reese, Tenor",
+                "reply_to_email": "support@shoptenorco.com",
+                "cc_email": null,
+                "bcc_email": null,
+                "subject_line": "The protocol, the guarantee, and the math",
+                "preview_text": "90 days, $1.17 a serving, empty bottles OK",
+                "template_id": "RPQxZu",
+                "smart_sending_enabled": true,
+                "transactional": false,
+                "add_tracking_params": false,
+                "custom_tracking_params": null,
+                "additional_filters": null,
+                "name": "[TENOR] DDE Welcome E05 - Full Offer + Guarantee — Day 7"
+              },
+              "status": "draft"
+            },
+            "links": {
+              "next": null
+            },
+            "temporary_id": "104677732"
+          }
+        ],
+        "entry_action_id": "104677723"
+      }
+    }
+  }
+}

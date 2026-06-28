@@ -1,0 +1,314 @@
+{
+  "package": "mars-men-glp-quiz-campaign-package-2026-05-04",
+  "source": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-static-ad-lander-grid-2026-05-04/mars-men-campaign-launch-kit.json",
+  "scope": [
+    "GLP lander",
+    "Quiz funnel"
+  ],
+  "counts": {
+    "copy_units": 11,
+    "unique_creatives": 23,
+    "copied_creative_files": 23,
+    "remixed_copy_units": 11,
+    "campaign_ready_expanded_rows": 23
+  },
+  "csv": "glp-quiz-copy-units-with-creatives.csv",
+  "creatives_dir": "creatives",
+  "copy_units": [
+    {
+      "copy_id": "COPY001",
+      "launch_slot": "GLP lander",
+      "title": "What GLP-1 Does to Your T Levels",
+      "creative_ids": [
+        "C001",
+        "C002",
+        "C004",
+        "C006",
+        "C011"
+      ],
+      "creative_files": [
+        "creatives/C001_9e8258a1f182_what-glp-1-does-to-your-t-levels.jpg",
+        "creatives/C002_f8df570293df_what-glp-1-does-to-your-t-levels.jpg",
+        "creatives/C004_800f664d3e77_what-glp-1-does-to-your-t-levels.jpg",
+        "creatives/C006_b2ce46c5e9a8_what-glp-1-does-to-your-t-levels.jpg",
+        "creatives/C011_26669e11fb36_what-glp-1-does-to-your-t-levels.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/10-reasons-glp"
+      ],
+      "source_ad_ids": [
+        "94903611",
+        "94903470",
+        "94284844",
+        "94284842",
+        "94284666",
+        "94284377",
+        "94284350",
+        "94903638",
+        "94903621",
+        "94903546",
+        "94903493",
+        "94284582",
+        "94284507",
+        "94284384",
+        "94284378",
+        "94284374",
+        "94284291",
+        "94903532",
+        "94903411",
+        "94903406",
+        "95129975",
+        "95129974"
+      ],
+      "remix_copy_id": "TENOR-COPY001",
+      "remix_title": "What GLP-1 Does to Your Drive"
+    },
+    {
+      "copy_id": "COPY002",
+      "launch_slot": "GLP lander",
+      "title": "Keep Muscle + Metabolism on GLP-1s",
+      "creative_ids": [
+        "C008",
+        "C003",
+        "C009",
+        "C007",
+        "C005",
+        "C010",
+        "C012"
+      ],
+      "creative_files": [
+        "creatives/C008_9270ea507925_keep-muscle-metabolism-on-glp-1s.jpg",
+        "creatives/C003_43431105b689_keep-muscle-metabolism-on-glp-1s.jpg",
+        "creatives/C009_7fbb027c0bfa_keep-muscle-metabolism-on-glp-1s.jpg",
+        "creatives/C007_8f5d831e6729_keep-muscle-metabolism-on-glp-1s.jpg",
+        "creatives/C005_4fd92e9dcc86_keep-muscle-metabolism-on-glp-1s.jpg",
+        "creatives/C010_89f6bd96d1dc_keep-muscle-metabolism-on-glp-1s.jpg",
+        "creatives/C012_eef387130f15_keep-muscle-metabolism-on-glp-1s.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/10-reasons-glp"
+      ],
+      "source_ad_ids": [
+        "94903681",
+        "94903631",
+        "96362526",
+        "96362512",
+        "96362501",
+        "95129903",
+        "95129831",
+        "94903835",
+        "94903796",
+        "94903342",
+        "94903337",
+        "94903329",
+        "95129805"
+      ],
+      "remix_copy_id": "TENOR-COPY002",
+      "remix_title": "Keep Your Drive Steady on GLP-1s"
+    },
+    {
+      "copy_id": "COPY003",
+      "launch_slot": "GLP lander",
+      "title": "The GLP-1 Side Effect No One Mentions",
+      "creative_ids": [
+        "C013"
+      ],
+      "creative_files": [
+        "creatives/C013_be538fae84b8_the-glp-1-side-effect-no-one-mentions.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/dr-latt-glp"
+      ],
+      "source_ad_ids": [
+        "94903594"
+      ],
+      "remix_copy_id": "TENOR-COPY003",
+      "remix_title": "The GLP-1 Side Effect No One Mentions"
+    },
+    {
+      "copy_id": "COPY011",
+      "launch_slot": "Quiz funnel",
+      "title": "Stop Losing T. Start Today.",
+      "creative_ids": [
+        "C022",
+        "C019",
+        "C020"
+      ],
+      "creative_files": [
+        "creatives/C022_b8ae6309e669_stop-losing-t-start-today.jpg",
+        "creatives/C019_0ad348f58649_stop-losing-t-start-today.jpg",
+        "creatives/C020_a69854ae5386_stop-losing-t-start-today.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94903689",
+        "94903485",
+        "94284399",
+        "94284394",
+        "94284351",
+        "95130056",
+        "95129919",
+        "95129899",
+        "95129849",
+        "96362585"
+      ],
+      "remix_copy_id": "TENOR-COPY011",
+      "remix_title": "Stop Losing Drive. Start Today."
+    },
+    {
+      "copy_id": "COPY012",
+      "launch_slot": "Quiz funnel",
+      "title": "50% Off + Free Gifts \ud83d\ude80",
+      "creative_ids": [
+        "C016"
+      ],
+      "creative_files": [
+        "creatives/C016_600c32d629a3_50-off-free-gifts.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94903454",
+        "94284482",
+        "94904005",
+        "94903676",
+        "94903334",
+        "95129874"
+      ],
+      "remix_copy_id": "TENOR-COPY012",
+      "remix_title": "Save 52% + Free $62 Welcome Kit \ud83d\ude80"
+    },
+    {
+      "copy_id": "COPY013",
+      "launch_slot": "Quiz funnel",
+      "title": "50% Off \u2014 90-Day Guarantee",
+      "creative_ids": [
+        "C017"
+      ],
+      "creative_files": [
+        "creatives/C017_bd88ee3de1b4_50-off-90-day-guarantee.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94284473",
+        "94284416",
+        "94903490",
+        "94284913",
+        "94284899",
+        "94284649"
+      ],
+      "remix_copy_id": "TENOR-COPY013",
+      "remix_title": "Save 52% \u2014 90-Day Guarantee"
+    },
+    {
+      "copy_id": "COPY014",
+      "launch_slot": "Quiz funnel",
+      "title": "50% Off \u2014 90-Day Guarantee",
+      "creative_ids": [
+        "C018"
+      ],
+      "creative_files": [
+        "creatives/C018_4904e53d1981_50-off-90-day-guarantee.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94903516",
+        "94284425",
+        "94903408",
+        "96362519"
+      ],
+      "remix_copy_id": "TENOR-COPY014",
+      "remix_title": "Save 52% \u2014 90-Day Guarantee"
+    },
+    {
+      "copy_id": "COPY015",
+      "launch_slot": "Quiz funnel",
+      "title": "90-Day Guarantee Because We Know It Works.",
+      "creative_ids": [
+        "C021"
+      ],
+      "creative_files": [
+        "creatives/C021_4f989b90bfd4_90-day-guarantee-because-we-know-it-works.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94903773",
+        "94903614",
+        "94903320"
+      ],
+      "remix_copy_id": "TENOR-COPY015",
+      "remix_title": "90-Day Guarantee. Because It Works."
+    },
+    {
+      "copy_id": "COPY016",
+      "launch_slot": "Quiz funnel",
+      "title": "50% off + Free Gifts \ud83d\ude80",
+      "creative_ids": [
+        "C023"
+      ],
+      "creative_files": [
+        "creatives/C023_41f6bdf8f198_50-off-free-gifts.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94903605",
+        "94903499"
+      ],
+      "remix_copy_id": "TENOR-COPY016",
+      "remix_title": "Save 52% + Free $62 Welcome Kit \ud83d\ude80"
+    },
+    {
+      "copy_id": "COPY017",
+      "launch_slot": "Quiz funnel",
+      "title": "90-Day Guarantee Because We Know It Works.",
+      "creative_ids": [
+        "C024"
+      ],
+      "creative_files": [
+        "creatives/C024_0db88035984e_90-day-guarantee-because-we-know-it-works.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94903387"
+      ],
+      "remix_copy_id": "TENOR-COPY017",
+      "remix_title": "90-Day Guarantee. Because It Works."
+    },
+    {
+      "copy_id": "COPY018",
+      "launch_slot": "Quiz funnel",
+      "title": "50% Off + Free Gifts \ud83d\ude80",
+      "creative_ids": [
+        "C025"
+      ],
+      "creative_files": [
+        "creatives/C025_86d6b35dc719_50-off-free-gifts.jpg"
+      ],
+      "reference_urls": [
+        "https://mengotomars.com/pages/quiz-v6"
+      ],
+      "source_ad_ids": [
+        "94903752"
+      ],
+      "remix_copy_id": "TENOR-COPY018",
+      "remix_title": "Save 52% + Free $62 Welcome Kit \ud83d\ude80"
+    }
+  ],
+  "primary_campaign_csv": "glp-quiz-copy-units-with-creatives.csv",
+  "campaign_ready_copy_units_csv": "glp-quiz-campaign-ready-copy-units.csv",
+  "campaign_ready_expanded_csv": "glp-quiz-campaign-ready-expanded.csv",
+  "remix_source_csv": "references/tenor-ad-remix-output.csv"
+}

@@ -1,0 +1,1799 @@
+{
+  "createdAt": "2026-05-02T20:20:40.774Z",
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "campaignName": "Tenor - Walk Away From TRT - 2026-05-02",
+  "batchId": "tenor-walk-away-trt-20260502",
+  "generationKey": "batch:tenor-walk-away-trt-20260502",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full",
+  "reviewDir": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02",
+  "presalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+  "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page",
+  "destinationContext": {
+    "headline": "\"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.",
+    "subheadline": "Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.",
+    "primaryProblem": "Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.",
+    "promise": "Understand the daily protocol men are trying before committing to TRT.",
+    "mechanismDisclosureLevel": "Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.",
+    "proofType": "Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.",
+    "ctaUrgency": "Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.",
+    "compliancePosture": "Matches the downstream advertorial posture and funnel stage.",
+    "assetStage": "Ad to advertorial/listicle, before the sales page.",
+    "visualEmphasis": "Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly."
+  },
+  "outputs": [
+    {
+      "key": "01-boss-babe",
+      "adId": "WA-01",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "sourceSwipeTitle": "boss_babe.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "approvedSample": true
+      },
+      "meta": {
+        "headline": "Before You Start TRT",
+        "primaryText": "Before making a long-term TRT decision, read the doctor-led article men are using to understand the daily protocol first.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-1777749983976.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "result": {
+        "assetId": "80e162c3-13a2-4584-a6ce-020daf04e55e",
+        "publicId": "51855ce4-3c86-445a-81a4-80f323660e1c",
+        "publicUrl": "https://api.moshq.app/public/assets/51855ce4-3c86-445a-81a4-80f323660e1c",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/01-boss-babe.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/01-boss-babe.jpg",
+        "workflowRunId": "a47b43ce-4944-4b6c-a1b3-77777891473e",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-2ae40acd-7e8e-4073-8711-a02a0e5dc5d7",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:8f16ba6df5dcf7fe2de46f9026f2fcc37e5ad91a9d4c1a64",
+          "asset_ids": [
+            "80e162c3-13a2-4584-a6ce-020daf04e55e"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "reusedApprovedSample": true
+      }
+    },
+    {
+      "key": "02-spanish-doctor-cta",
+      "adId": "WA-02",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+        "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "approvedSample": true
+      },
+      "meta": {
+        "headline": "Read This Before TRT",
+        "primaryText": "The TRT decision can feel bigger than one lab result. Start with the article behind Tenor's daily protocol.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-1777750039105.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "result": {
+        "assetId": "417d5bae-bd93-49e1-b0cf-6e3aaa804ae4",
+        "publicId": "dfdbd8f8-d780-459d-892b-75d31ee3c326",
+        "publicUrl": "https://api.moshq.app/public/assets/dfdbd8f8-d780-459d-892b-75d31ee3c326",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/02-spanish-doctor-cta.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/02-spanish-doctor-cta.jpg",
+        "workflowRunId": "e64fb0e9-56eb-424c-b24d-c0cff1273eb0",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-0465174b-12dc-47a4-90ed-dfe8d59f92bf",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:daf3f5633244aee6df6441865eeb9bfb296e37e897f35c4b",
+          "asset_ids": [
+            "417d5bae-bd93-49e1-b0cf-6e3aaa804ae4"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "reusedApprovedSample": true
+      }
+    },
+    {
+      "key": "03-old-school",
+      "adId": "WA-03",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "sourceSwipeTitle": "old_school.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "approvedSample": true
+      },
+      "meta": {
+        "headline": "The TRT Decision",
+        "primaryText": "Needles, monitoring, and long-term commitment are worth understanding before you decide. Read the presales article.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-1777750092777.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "result": {
+        "assetId": "9b823e1d-bf70-4232-9024-a053bde91178",
+        "publicId": "6787026a-9968-4e5a-80a4-c6a66f5a6ff8",
+        "publicUrl": "https://api.moshq.app/public/assets/6787026a-9968-4e5a-80a4-c6a66f5a6ff8",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/03-old-school.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/03-old-school.jpg",
+        "workflowRunId": "0e911136-3353-444b-9539-d669bedcb562",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-4b16bfa6-508e-4ab6-bcfa-4ed9d8c0ac18",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:914c4aefb839dfba48f71bef63b2f6a1ffaf3edc1884a526",
+          "asset_ids": [
+            "9b823e1d-bf70-4232-9024-a053bde91178"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "reusedApprovedSample": true
+      }
+    },
+    {
+      "key": "04-static-3",
+      "adId": "WA-04",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "00e357f9-7953-5d6b-8b80-18a91e8a1510",
+        "sourceSwipeTitle": "Static #3.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Walk Away From TRT?",
+        "primaryText": "A doctor-led story about the daily protocol men are reading before committing to TRT.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "00e357f9-7953-5d6b-8b80-18a91e8a1510",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-04-static-3-1777753240785.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "beddf7db-c4ee-4539-9650-59cb0554d456",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-3d69eb74-526d-4bca-8245-17d16ecf914f"
+      },
+      "result": {
+        "assetId": "881ed8fe-61a7-4bfc-afee-c483144774be",
+        "publicId": "eff74416-25b1-451f-95fc-0d940f4f0c5e",
+        "publicUrl": "https://api.moshq.app/public/assets/eff74416-25b1-451f-95fc-0d940f4f0c5e",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/04-static-3.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/04-static-3.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:dbc6982360c13b1dea8c7ddd5f18af65b60707648a4473d9",
+          "asset_ids": [
+            "881ed8fe-61a7-4bfc-afee-c483144774be"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-04-static-3.json"
+      }
+    },
+    {
+      "key": "05-seven",
+      "adId": "WA-05",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "058b868e-4568-578e-99bc-21f0491ed671",
+        "sourceSwipeTitle": "7.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Men 40+: Start Here",
+        "primaryText": "If low drive has you weighing TRT, this article explains the protocol-first path.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "058b868e-4568-578e-99bc-21f0491ed671",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-05-seven-1777753326119.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "bbcb0b32-e47f-4b0e-a99a-2ddf1db3fd01",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-322310eb-ab7d-4311-951d-4e023c5e3d18"
+      },
+      "result": {
+        "assetId": "d9470a01-b151-44e9-bb8f-2ab11d961c07",
+        "publicId": "a4ec6f6c-e1d3-48a7-9084-12e9ed82d16f",
+        "publicUrl": "https://api.moshq.app/public/assets/a4ec6f6c-e1d3-48a7-9084-12e9ed82d16f",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/05-seven.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/05-seven.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:76bbea87dfe459e715416f8877c71e8f269ac07169c2fa5a",
+          "asset_ids": [
+            "d9470a01-b151-44e9-bb8f-2ab11d961c07"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-05-seven.json"
+      }
+    },
+    {
+      "key": "06-derm-fag",
+      "adId": "WA-06",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "20c77ba2-f32c-5003-9c8f-539ba629c532",
+        "sourceSwipeTitle": "derm_fag.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Before The Needles",
+        "primaryText": "Read the article about the step men are considering before a permanent TRT routine.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "20c77ba2-f32c-5003-9c8f-539ba629c532",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-06-derm-fag-1777753383390.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "d4fa2188-1453-47ba-8e47-c45e41943113",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-458b1b7e-967e-486f-bd95-945bfd8bf95e"
+      },
+      "result": {
+        "assetId": "73c763df-a256-45f5-938d-e45d2e804990",
+        "publicId": "1f74ef3c-c481-4313-a627-7ca44b61b086",
+        "publicUrl": "https://api.moshq.app/public/assets/1f74ef3c-c481-4313-a627-7ca44b61b086",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/06-derm-fag.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/06-derm-fag.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:976efab3e5d9ab0e1f79ba4287dc191cba95c72984ef1e2d",
+          "asset_ids": [
+            "73c763df-a256-45f5-938d-e45d2e804990"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-06-derm-fag.json"
+      }
+    },
+    {
+      "key": "07-six",
+      "adId": "WA-07",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "sourceSwipeTitle": "6.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "A Better First Read",
+        "primaryText": "The destination article breaks down why some men try a daily protocol before TRT.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-07-six-1777753458771.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "4e87e538-b1d3-42ba-afde-a1d36670002e",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-b43239cb-fbff-4754-9330-a0215c448bfc"
+      },
+      "result": {
+        "assetId": "7188ade4-1645-4cd1-b2bd-020f03400f14",
+        "publicId": "ad22de02-8b1d-42ab-a2df-358e777e6ed5",
+        "publicUrl": "https://api.moshq.app/public/assets/ad22de02-8b1d-42ab-a2df-358e777e6ed5",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/07-six.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/07-six.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:68e520ec07b7785d10fc8c3d11f3730ac4125d266eae9dfe",
+          "asset_ids": [
+            "7188ade4-1645-4cd1-b2bd-020f03400f14"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-07-six.json"
+      }
+    },
+    {
+      "key": "08-fatigue",
+      "adId": "WA-08",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "sourceSwipeTitle": "fatigue.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "TRT Is A Big Call",
+        "primaryText": "Before you choose injections, read the doctor-led Tenor article built for this exact decision.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-08-fatigue-1777753523337.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "8cff581d-5c2d-4ca1-9571-2c1d93377261",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-0751d3bb-93b7-405f-bd75-bb75fcd84de0"
+      },
+      "result": {
+        "assetId": "a19147bb-b798-4c93-b31d-90c2ba6c560e",
+        "publicId": "6ec330b7-85af-41c8-bbe5-ceb66e54d28b",
+        "publicUrl": "https://api.moshq.app/public/assets/6ec330b7-85af-41c8-bbe5-ceb66e54d28b",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/08-fatigue.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/08-fatigue.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:ae6e49f06b90aa6d6c82cd8fe50ae9826326bb12f8d8c6cd",
+          "asset_ids": [
+            "a19147bb-b798-4c93-b31d-90c2ba6c560e"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-08-fatigue.json"
+      }
+    },
+    {
+      "key": "09-static-4",
+      "adId": "WA-09",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "5e0bec7e-c4de-5135-a739-32de79c28f35",
+        "sourceSwipeTitle": "Static #4.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Daily Protocol First",
+        "primaryText": "Understand the daily protocol conversation before moving into a long-term TRT relationship.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "5e0bec7e-c4de-5135-a739-32de79c28f35",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-09-static-4-1777753587972.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "957e269e-c15a-4e5c-bde1-601c4e4d865f",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-6de5faef-d36b-4657-b6b5-bdf6f03589a3"
+      },
+      "result": {
+        "assetId": "096fe195-3a27-45f1-a28e-3e258f613276",
+        "publicId": "414be95d-d85d-42a0-8b13-255e90353819",
+        "publicUrl": "https://api.moshq.app/public/assets/414be95d-d85d-42a0-8b13-255e90353819",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/09-static-4.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/09-static-4.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:90f57bad34a5657159a7f7c786f35cccd7d094788d1a541a",
+          "asset_ids": [
+            "096fe195-3a27-45f1-a28e-3e258f613276"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-09-static-4.json"
+      }
+    },
+    {
+      "key": "10-care-bag",
+      "adId": "WA-10",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+        "sourceSwipeTitle": "care_bag.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "The Article Men Read",
+        "primaryText": "A direct read for men comparing natural support, low-drive frustration, and the TRT path.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-10-care-bag-1777753652684.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "fd5bcb2e-db2f-4d71-a984-eef1cc74a59f",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-36a261d8-e92c-461c-a40c-25cc503e025f"
+      },
+      "result": {
+        "assetId": "76c8690a-ed90-4be3-810d-dfe22fc2dcf2",
+        "publicId": "5c579f5c-e71c-4dc9-9cb2-5eaed1823134",
+        "publicUrl": "https://api.moshq.app/public/assets/5c579f5c-e71c-4dc9-9cb2-5eaed1823134",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/10-care-bag.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/10-care-bag.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:b4d8c3d39bd94618914f1287ddfb70ac60fdc6b06060dc6b",
+          "asset_ids": [
+            "76c8690a-ed90-4be3-810d-dfe22fc2dcf2"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-10-care-bag.json"
+      }
+    },
+    {
+      "key": "11-eight",
+      "adId": "WA-11",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+        "sourceSwipeTitle": "8.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Not Another Booster",
+        "primaryText": "Read why the destination article frames the decision differently than a typical booster pitch.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-11-eight-1777753706757.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "257da34a-b188-4289-8098-4c7f1314f7ab",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-66ab6e8f-933f-4b57-9209-2fa5c865dd9a"
+      },
+      "result": {
+        "assetId": "c614cf97-458d-4688-8b74-3ad300595e54",
+        "publicId": "2a57ebf9-9a67-4cf2-8c56-c461599048f0",
+        "publicUrl": "https://api.moshq.app/public/assets/2a57ebf9-9a67-4cf2-8c56-c461599048f0",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/11-eight.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/11-eight.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d0b24de69ce506cce77e13af9e71d6b7f676fc95fb8e9cff",
+          "asset_ids": [
+            "c614cf97-458d-4688-8b74-3ad300595e54"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-11-eight.json"
+      }
+    },
+    {
+      "key": "12-static-1",
+      "adId": "WA-12",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "74a2f8b1-2386-5213-ac31-16ee3860a08c",
+        "sourceSwipeTitle": "Static #1.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Start With The Story",
+        "primaryText": "A doctor-led patient story introduces the TRT decision and the daily protocol men are evaluating.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "74a2f8b1-2386-5213-ac31-16ee3860a08c",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-12-static-1-1777753782132.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "52d696c5-8ab8-4407-913f-000599339474",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-d614f5b4-6ecc-45ff-9cdf-5025b30a8be4"
+      },
+      "result": {
+        "assetId": "bec14033-f8a4-4f4b-94fa-12c94046e46b",
+        "publicId": "580c7584-5bde-420b-ace1-b670a3332664",
+        "publicUrl": "https://api.moshq.app/public/assets/580c7584-5bde-420b-ace1-b670a3332664",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/12-static-1.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/12-static-1.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:857d12c4482d870abe49a628f6a298ca778358fe24472a4f",
+          "asset_ids": [
+            "bec14033-f8a4-4f4b-94fa-12c94046e46b"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-12-static-1.json"
+      }
+    },
+    {
+      "key": "13-static-2",
+      "adId": "WA-13",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "sourceSwipeTitle": "Static #2.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "TRT Before And After",
+        "primaryText": "Before choosing the needle path, read the article about what men are considering first.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-13-static-2-1777753846849.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "d893b35f-9a61-47a6-88f8-531aa9ab6073",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-ff9ef269-4313-48e0-a35e-a572c62f5935"
+      },
+      "result": {
+        "assetId": "1d271033-16a7-4285-884c-c77748bb27c1",
+        "publicId": "75d80c0e-3f3f-49dc-995f-160f1a013d39",
+        "publicUrl": "https://api.moshq.app/public/assets/75d80c0e-3f3f-49dc-995f-160f1a013d39",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/13-static-2.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/13-static-2.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:066e920e4ff46a8b80478f1d422360f808b79696a91921d0",
+          "asset_ids": [
+            "1d271033-16a7-4285-884c-c77748bb27c1"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-13-static-2.json"
+      }
+    },
+    {
+      "key": "14-eleven",
+      "adId": "WA-14",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "sourceSwipeTitle": "11.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "The Protocol Question",
+        "primaryText": "If the usual options feel incomplete, start with this Tenor article before making the call.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-14-eleven-1777754033694.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "d8957cff-de97-4269-ae58-1e6e2c770489",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-5d2e79d9-db3b-4350-bb93-bcbe1608c934"
+      },
+      "result": {
+        "assetId": "e9858314-b995-4d04-aa6e-1160f532f944",
+        "publicId": "98d5be0c-d74a-4f97-b298-935a7c48fca8",
+        "publicUrl": "https://api.moshq.app/public/assets/98d5be0c-d74a-4f97-b298-935a7c48fca8",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/14-eleven.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/14-eleven.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:0fa3216da25f0545469e6d749ee27965096aa1f9f1ddd482",
+          "asset_ids": [
+            "e9858314-b995-4d04-aa6e-1160f532f944"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-14-eleven.json"
+      }
+    },
+    {
+      "key": "15-drawing",
+      "adId": "WA-15",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "sourceSwipeTitle": "drawing.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "A 2-Minute TRT Read",
+        "primaryText": "The presales article gives context before you commit to clinic visits and injections.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-15-drawing-1777754099024.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "7b4923ff-ca31-4e63-8d8f-aba4037d41c1",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-c50428ab-581a-47b7-b218-70e4f6e2f46e"
+      },
+      "result": {
+        "assetId": "196460ee-1e45-47e5-9d91-34f4e6bdc284",
+        "publicId": "63d5563a-f0fb-4cb7-9713-064459e746d6",
+        "publicUrl": "https://api.moshq.app/public/assets/63d5563a-f0fb-4cb7-9713-064459e746d6",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/15-drawing.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/15-drawing.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:cf86cbdc86e423999bfcd4879cd380a78753398476de724e",
+          "asset_ids": [
+            "196460ee-1e45-47e5-9d91-34f4e6bdc284"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-15-drawing.json"
+      }
+    },
+    {
+      "key": "16-brush",
+      "adId": "WA-16",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a9b9b792-bea4-579a-993f-95994908d8bb",
+        "sourceSwipeTitle": "brush.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Think Before TRT",
+        "primaryText": "Read the doctor-led article explaining the decision men are making before long-term TRT.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a9b9b792-bea4-579a-993f-95994908d8bb",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-16-brush-1777754152324.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "dd54f0c7-6a12-4763-ad3e-62344d55c5cd",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-8adfce05-701f-46fc-a98f-9a7a51df979c"
+      },
+      "result": {
+        "assetId": "48c9e014-7c96-48e1-878f-b1bdf5feb256",
+        "publicId": "2ade5bf5-4908-4cf7-b21c-cbb2fac69d59",
+        "publicUrl": "https://api.moshq.app/public/assets/2ade5bf5-4908-4cf7-b21c-cbb2fac69d59",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/16-brush.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/16-brush.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:c32075b43464911e106acf2a9aa04dcb39e330ada34aec19",
+          "asset_ids": [
+            "48c9e014-7c96-48e1-878f-b1bdf5feb256"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-16-brush.json"
+      }
+    },
+    {
+      "key": "17-researchers",
+      "adId": "WA-17",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "sourceSwipeTitle": "researchers.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "The First Step",
+        "primaryText": "Before the sales page, start with the article that frames the problem, proof, and next step.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-17-researchers-1777754207175.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "def44d77-edd5-4539-8ac1-0e7767a05e20",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-7beb74d1-0353-4660-9191-4c525ca409a2"
+      },
+      "result": {
+        "assetId": "ee2be5ab-fb9d-4d86-ae46-9ed72aca5eb5",
+        "publicId": "f8cb042a-0006-4439-a3cc-b72affb74189",
+        "publicUrl": "https://api.moshq.app/public/assets/f8cb042a-0006-4439-a3cc-b72affb74189",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/17-researchers.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/17-researchers.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:a45ff268f79ff521db7032b4857559e31d918f399eeefc33",
+          "asset_ids": [
+            "ee2be5ab-fb9d-4d86-ae46-9ed72aca5eb5"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-17-researchers.json"
+      }
+    },
+    {
+      "key": "18-target-1",
+      "adId": "WA-18",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "b7787513-5b32-578e-85e3-b367207a4238",
+        "sourceSwipeTitle": "target_1.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Needles For Life?",
+        "primaryText": "The Tenor article is built around the decision men face before entering the TRT path.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b7787513-5b32-578e-85e3-b367207a4238",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-18-target-1-1777754261862.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "dec20984-9c18-4e97-b154-2d74c862eaae",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-430d9f1c-e206-48f1-b12e-c6f7e200bb07"
+      },
+      "result": {
+        "assetId": "5cfb9670-d37b-408d-a2a0-075f64b5b2cc",
+        "publicId": "ff10a819-41c8-45fd-88df-535707009406",
+        "publicUrl": "https://api.moshq.app/public/assets/ff10a819-41c8-45fd-88df-535707009406",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/18-target-1.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/18-target-1.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:52382f8881e47ad47ae66ced3dfe5efa1da8451cac380794",
+          "asset_ids": [
+            "5cfb9670-d37b-408d-a2a0-075f64b5b2cc"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-18-target-1.json"
+      }
+    },
+    {
+      "key": "19-big-text",
+      "adId": "WA-19",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "sourceSwipeTitle": "big_text.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Read The TRT Trap",
+        "primaryText": "Understand the daily protocol story before you decide what comes next.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-19-big-text-1777754337316.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "c56f0e34-bc67-4ef7-bcfe-fe2556be331b",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-43c8af31-f464-401e-a873-3a1770b5bcb9"
+      },
+      "result": {
+        "assetId": "0640ba24-14b0-435e-8681-b22bc4e67b20",
+        "publicId": "491bbd2f-3e5a-4b0b-944b-72160305e65f",
+        "publicUrl": "https://api.moshq.app/public/assets/491bbd2f-3e5a-4b0b-944b-72160305e65f",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/19-big-text.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/19-big-text.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:a637be4f34d66b2ef3ab947b426fc55e95e6d41fcc7533dd",
+          "asset_ids": [
+            "0640ba24-14b0-435e-8681-b22bc4e67b20"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-19-big-text.json"
+      }
+    },
+    {
+      "key": "20-nine",
+      "adId": "WA-20",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+        "sourceSwipeTitle": "9.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Start With Context",
+        "primaryText": "The article connects the problem, promise, and proof before presenting the Tenor offer.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-20-nine-1777754395530.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "672f7754-68d5-4ba8-8af7-78d0c1e36aa8",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-5beb2200-182c-443f-b70e-ef03b3174edb"
+      },
+      "result": {
+        "assetId": "4daf46bc-625c-4401-ba93-9c50fac0c3b1",
+        "publicId": "456f0196-456f-49c1-9e18-35755b369408",
+        "publicUrl": "https://api.moshq.app/public/assets/456f0196-456f-49c1-9e18-35755b369408",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/20-nine.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/20-nine.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:a5d8d207ec2d9c74abceb768a653f1ae4a383509511dfd47",
+          "asset_ids": [
+            "4daf46bc-625c-4401-ba93-9c50fac0c3b1"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-20-nine.json"
+      }
+    },
+    {
+      "key": "21-ten",
+      "adId": "WA-21",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+        "sourceSwipeTitle": "10.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Before You Commit",
+        "primaryText": "For men considering TRT, this article gives the decision context first.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-21-ten-1777754470930.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "e081b2dc-02f3-403e-9f39-6cd66707b934",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-e11d6124-fb7b-498a-a439-2e1eb644c560"
+      },
+      "result": {
+        "assetId": "c6dbf060-7bae-406c-8c59-ee3cd9f1bbbd",
+        "publicId": "95655ce2-90c6-4a8b-9b18-63813a57b81b",
+        "publicUrl": "https://api.moshq.app/public/assets/95655ce2-90c6-4a8b-9b18-63813a57b81b",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/21-ten.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/21-ten.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:f7333e49c6693d50c8edea0510a4b7bc12fb137224663bee",
+          "asset_ids": [
+            "c6dbf060-7bae-406c-8c59-ee3cd9f1bbbd"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-21-ten.json"
+      }
+    },
+    {
+      "key": "22-twelve",
+      "adId": "WA-22",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+        "sourceSwipeTitle": "12.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "The Daily Path",
+        "primaryText": "Read about the daily protocol men are trying before making a TRT decision.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-22-twelve-1777754535653.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "c67d15e5-8b85-44f0-8a44-192050b936c0",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-73a6ab3f-288b-41c6-b15b-d4068fcef9f5"
+      },
+      "result": {
+        "assetId": "14b932f7-f61a-4917-a8f4-dbc915451f4b",
+        "publicId": "fb95b82a-bf5d-4bba-a250-e4710d643a98",
+        "publicUrl": "https://api.moshq.app/public/assets/fb95b82a-bf5d-4bba-a250-e4710d643a98",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/22-twelve.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/22-twelve.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:77489291e77696b23bdfcb79e25dc38f4ca392ec8ed3afd1",
+          "asset_ids": [
+            "14b932f7-f61a-4917-a8f4-dbc915451f4b"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-22-twelve.json"
+      }
+    },
+    {
+      "key": "23-raise-a-winner",
+      "adId": "WA-23",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "sourceSwipeTitle": "raise_a_winner.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Doctor-Led Context",
+        "primaryText": "A doctor-led advertorial frames the TRT decision and the Tenor protocol before the offer.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-23-raise-a-winner-1777754601184.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "b9b81494-8003-4878-8811-ec9022d05f30",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-e657dea5-7041-4275-a71f-fbdf5aa9df97"
+      },
+      "result": {
+        "assetId": "939e3bd8-f4ca-4d83-9d32-19dcf13e3a66",
+        "publicId": "4ceaa5be-2f57-4412-9cfd-c2976919b069",
+        "publicUrl": "https://api.moshq.app/public/assets/4ceaa5be-2f57-4412-9cfd-c2976919b069",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/23-raise-a-winner.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/23-raise-a-winner.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:0c0f2b5f45b6dbb2c4026d6bc02ac0daf8281ecbd1cacf06",
+          "asset_ids": [
+            "939e3bd8-f4ca-4d83-9d32-19dcf13e3a66"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-23-raise-a-winner.json"
+      }
+    },
+    {
+      "key": "24-green",
+      "adId": "WA-24",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+        "sourceSwipeTitle": "green.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "One Decision Read",
+        "primaryText": "If TRT is on your mind, start with the article built to clarify the decision.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-24-green-1777754676555.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "1f6439fb-00ab-44b8-a0b9-ba997b861bbf",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-1be5bdb3-6e06-4c97-a0a8-f22427f49491"
+      },
+      "result": {
+        "assetId": "e9878d46-524e-4124-a986-749772b97e13",
+        "publicId": "a294e0bc-0688-466e-b6b5-f1f46c691987",
+        "publicUrl": "https://api.moshq.app/public/assets/a294e0bc-0688-466e-b6b5-f1f46c691987",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/24-green.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/24-green.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:b288eda6d26bc9621ecd9b263c7d9c1d3db9d52cc74beaaa",
+          "asset_ids": [
+            "e9878d46-524e-4124-a986-749772b97e13"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-24-green.json"
+      }
+    },
+    {
+      "key": "25-grocery",
+      "adId": "WA-25",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "e358e68d-730a-5f8b-9bc9-fb7742985f43",
+        "sourceSwipeTitle": "grocery.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "The Tenor Article",
+        "primaryText": "Read the Walk Away From TRT presales article before moving to the sales page.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "e358e68d-730a-5f8b-9bc9-fb7742985f43",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-25-grocery-1777754753005.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "e35047ab-e8ae-429d-b973-a44d9ee44173",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-91907f92-c80b-49fc-b9ac-ef3cd779db82"
+      },
+      "result": {
+        "assetId": "722076eb-cf2c-46f5-8d8b-893a74768591",
+        "publicId": "3ac30302-2798-45b7-96e1-091c1f7da730",
+        "publicUrl": "https://api.moshq.app/public/assets/3ac30302-2798-45b7-96e1-091c1f7da730",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/25-grocery.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/25-grocery.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:9750f1a4cb0217264319777da2ee90e918de8ed36ad547e8",
+          "asset_ids": [
+            "722076eb-cf2c-46f5-8d8b-893a74768591"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-25-grocery.json"
+      }
+    },
+    {
+      "key": "26-women-health",
+      "adId": "WA-26",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "eab14ed3-2d63-528b-8611-f93c194d2a2d",
+        "sourceSwipeTitle": "women_health.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Know The Tradeoff",
+        "primaryText": "The article walks through the tradeoff men consider before choosing TRT.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "eab14ed3-2d63-528b-8611-f93c194d2a2d",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-26-women-health-1777754818066.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "4a2236f8-150b-4a20-b402-942fbe64aed4",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-44881b42-5047-4244-baaa-70723f07aa05"
+      },
+      "result": {
+        "assetId": "9688e568-dc42-4d26-a8b0-72de56137e2f",
+        "publicId": "255ace7c-d01a-4132-a644-3ee4bf795191",
+        "publicUrl": "https://api.moshq.app/public/assets/255ace7c-d01a-4132-a644-3ee4bf795191",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/26-women-health.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/26-women-health.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:909fc3bb0b181fcdd64467e9149029cd207ba6c04ca4a48c",
+          "asset_ids": [
+            "9688e568-dc42-4d26-a8b0-72de56137e2f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-26-women-health.json"
+      }
+    },
+    {
+      "key": "27-health-cute-advertorial",
+      "adId": "WA-27",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "f1921084-1850-53af-8cc3-ae44c9691320",
+        "sourceSwipeTitle": "health_cute_advertorial.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Before Clinic Mode",
+        "primaryText": "Start with the Tenor article before committing to a long-term clinic routine.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f1921084-1850-53af-8cc3-ae44c9691320",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-27-health-cute-advertorial-1777754882982.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "d4a71111-a4f8-4683-998d-e3130c51036e",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-fe2bba09-ceb5-4b0e-96cc-62fd1cae0058"
+      },
+      "result": {
+        "assetId": "de62234d-a6a5-4c4c-ae60-027a95f09513",
+        "publicId": "d55d1103-5b1c-4cfa-bdbf-334849553463",
+        "publicUrl": "https://api.moshq.app/public/assets/d55d1103-5b1c-4cfa-bdbf-334849553463",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/27-health-cute-advertorial.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/27-health-cute-advertorial.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d48394cbd3ccd34d51c45a354ff328358f63b4c4af5f4c16",
+          "asset_ids": [
+            "de62234d-a6a5-4c4c-ae60-027a95f09513"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-27-health-cute-advertorial.json"
+      }
+    },
+    {
+      "key": "28-five",
+      "adId": "WA-28",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+        "sourceSwipeTitle": "5.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Protocol Before TRT",
+        "primaryText": "The presales page explains the protocol-first frame before the offer.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-28-five-1777754948521.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "47d1b783-a529-491a-a1fc-c86fadfd358d",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-17a47f80-7b06-4269-b428-f3c309f1c7db"
+      },
+      "result": {
+        "assetId": "e5d45b20-6354-49ae-9446-1990cbe6e9b5",
+        "publicId": "f36d1da0-683c-479c-9d1e-0f6e7b006382",
+        "publicUrl": "https://api.moshq.app/public/assets/f36d1da0-683c-479c-9d1e-0f6e7b006382",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/28-five.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/28-five.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:6c09fd6841583a2c5902963f19fb8d5c3334e6381fb574fe",
+          "asset_ids": [
+            "e5d45b20-6354-49ae-9446-1990cbe6e9b5"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-28-five.json"
+      }
+    },
+    {
+      "key": "29-fb-message-ad",
+      "adId": "WA-29",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "sourceSwipeTitle": "fb_message_ad.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Read Before Needles",
+        "primaryText": "A concise article for men comparing the TRT path with a daily protocol first.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-29-fb-message-ad-1777755002275.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "4027edd9-5810-49c1-94ff-4a8a50761a5f",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-1c2568a0-e9ef-4bf5-8e8b-71018aa6ecf5"
+      },
+      "result": {
+        "assetId": "4a98e6c6-e9cb-4c3e-ac5c-277302d670dc",
+        "publicId": "5d9aeffb-e5ec-44da-b845-a9b107b17065",
+        "publicUrl": "https://api.moshq.app/public/assets/5d9aeffb-e5ec-44da-b845-a9b107b17065",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/29-fb-message-ad.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/29-fb-message-ad.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:faa5062cc7091a5bc28708b536c3677798035affdda49041",
+          "asset_ids": [
+            "4a98e6c6-e9cb-4c3e-ac5c-277302d670dc"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-29-fb-message-ad.json"
+      }
+    },
+    {
+      "key": "30-researchers-alt",
+      "adId": "WA-30",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "sourceSwipeTitle": "researchers.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "meta": {
+        "headline": "Open The Article",
+        "primaryText": "Start with the Walk Away From TRT article, then decide whether the Tenor protocol fits.",
+        "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/walk-away-from-trt/",
+        "callToActionType": "LEARN_MORE"
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nRun marker: tenor-walk-away-trt-congruence-30-researchers-alt-1777755057172.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "022acd87-a169-4d0e-a676-2fa4c57f1de9",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-05432520-31a7-48e8-a2d2-393cb118c9f3"
+      },
+      "result": {
+        "assetId": "ae5e2163-3be3-4e4b-842b-9518d9400036",
+        "publicId": "350187ec-bcde-49a6-8af0-d547073c779f",
+        "publicUrl": "https://api.moshq.app/public/assets/350187ec-bcde-49a6-8af0-d547073c779f",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/generated-full/30-researchers-alt.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-full-launch-review-2026-05-02/generated/30-researchers-alt.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d0d77e7fe6e11dac87f5811bb6d526d17d09d16ef3ca374b",
+          "asset_ids": [
+            "ae5e2163-3be3-4e4b-842b-9518d9400036"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/workflow-full-30-researchers-alt.json"
+      }
+    }
+  ],
+  "updatedAt": "2026-05-02T20:52:21.108Z",
+  "batchStamp": {
+    "status": "ok",
+    "batchId": "tenor-walk-away-trt-20260502",
+    "assetCount": 30
+  }
+}

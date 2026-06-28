@@ -1,0 +1,72 @@
+{
+  "createdAt": "2026-05-01T19:51:16.442Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-test-2026-05-01",
+  "reviewDir": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-review-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-test-2026-05-01/generated",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "destinationContext": {
+    "headline": "Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First",
+    "subheadline": "\"Normal\" labs don't mean nothing's changed. Here's why the number your doctor uses treats a 25-year-old and an 80-year-old as the same man, and what to do before you commit to a medical relationship you can't easily walk back.",
+    "primaryProblem": "Men who do not feel like themselves anymore can be told their labs are normal, while the visible options feel like weak booster pills or a permanent TRT/needle relationship.",
+    "promise": "A daily protocol to try before committing to a long-term TRT decision.",
+    "mechanismDisclosureLevel": "Partial mechanism: the article contrasts weak one-lever boosters, TRT, and a fuller daily protocol approach.",
+    "proofType": "Editorial/advisory article with personal story, formula transparency, reported user experience, and risk-reversal offer.",
+    "ctaUrgency": "Read the article before committing to needles or a long-term TRT relationship.",
+    "assetStage": "Ad to advertorial/listicle, before the sales page."
+  },
+  "source": {
+    "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+    "sourceSwipeTitle": "researchers.jpg",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1
+  },
+  "payload": {
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1,
+    "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+    "swipeRequiresProductImage": false,
+    "swipeContextMode": "minimal",
+    "swipeBrandName": "Tenor",
+    "swipeProductName": "Tenor",
+    "swipeHook": "Solution-Aware",
+    "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: \"Normal\" labs don't mean nothing's changed. Here's why the number your doctor uses treats a 25-year-old and an 80-year-old as the same man, and what to do before you commit to a medical relationship you can't easily walk back.\nPrimary problem: Men who do not feel like themselves anymore can be told their labs are normal, while the visible options feel like weak booster pills or a permanent TRT/needle relationship.\nPromise: A daily protocol to try before committing to a long-term TRT decision.\nMechanism disclosure level: Partial mechanism: the article contrasts weak one-lever boosters, TRT, and a fuller daily protocol approach.\nProof type: Editorial/advisory article with personal story, formula transparency, reported user experience, and risk-reversal offer.\nCTA / urgency: Read the article before committing to needles or a long-term TRT relationship.\nAsset stage: Ad to advertorial/listicle, before the sales page.\n\nRun marker: tenor-advertorial-structured-congruence-01-structured-destination-congruence-1777665017537.",
+    "aspectRatio": "1:1",
+    "count": 1
+  },
+  "workflow": {
+    "workflow_run_id": "2de57d3d-4364-4ddb-a500-2872386ca785",
+    "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-668e8395-a349-4466-b2ff-c04780785655"
+  },
+  "result": {
+    "workflowRunId": "2de57d3d-4364-4ddb-a500-2872386ca785",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-668e8395-a349-4466-b2ff-c04780785655",
+    "assetId": "03948396-c62d-4eff-a25b-31e5172dbf1e",
+    "publicId": "ebfda71e-c22c-4b72-a419-9edb157cdf8b",
+    "publicUrl": "https://api.moshq.app/public/assets/ebfda71e-c22c-4b72-a419-9edb157cdf8b",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-test-2026-05-01/generated/01-structured-destination-congruence.jpg",
+    "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-structured-congruence-review-2026-05-01/generated/01-structured-destination-congruence.jpg",
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:3fce91da8a4b0d0fae411eff532d2f0cdcbde7aea94e2be7",
+      "asset_ids": [
+        "03948396-c62d-4eff-a25b-31e5172dbf1e"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    },
+    "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-structured-congruence-test-2026-05-01/workflow-01-structured-destination-congruence.json"
+  }
+}

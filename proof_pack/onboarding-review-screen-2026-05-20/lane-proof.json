@@ -1,0 +1,52 @@
+{
+  "schema": "codex.lane_proof.v1",
+  "parallelism_mode": "single_lane",
+  "reason": "Single lane was fastest and safest because these follow-up changes are scoped to one onboarding component, one CSS file, and targeted tests in a dirty worktree.",
+  "lanes": [
+    {
+      "lane_id": "main-review-ui",
+      "objective": "Implement the onboarding review/edit split and follow-up onboarding success-screen polish, then verify targeted tests and build.",
+      "role": "implementation_and_verification",
+      "mode": "single_lane",
+      "status": "passed",
+      "started_at": "2026-05-20T23:18:00Z",
+      "ended_at": "2026-05-21T01:43:56.145Z",
+      "summary": "Default review remains read-only; follow-up success screen is compact; onboarding primary actions now disable until current-step validation passes.",
+      "read_scope": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "mos/frontend/src/components/onboarding/ReviewChangesPanel.tsx",
+        "mos/frontend/src/components/onboarding/FirstRunShell.tsx"
+      ],
+      "write_scope": [
+        "mos/frontend/src/components/clients/OnboardingWizard.tsx",
+        "mos/frontend/src/components/clients/OnboardingWizard.test.tsx",
+        "docs/plans/2026-05-20-onboarding-review-screen-redesign-plan.md",
+        "proof_pack/onboarding-review-screen-2026-05-20",
+        "mos/frontend/src/styles/design-system.css",
+        "proof_pack/onboarding-review-screen-2026-05-20/setup-success-screen",
+        "proof_pack/onboarding-review-screen-2026-05-20/disabled-actions"
+      ],
+      "artifacts": [
+        "logs/frontend-onboarding-wizard-test.log",
+        "logs/frontend-build.log",
+        "logs/browser-smoke.json",
+        "onboarding-review-screen.png",
+        "plan-gate-proof.json",
+        "plan.contract.json",
+        "setup-success-screen/setup-success-screen-qa.json",
+        "disabled-actions/disabled-actions-qa.json"
+      ]
+    }
+  ],
+  "fan_in_summary": {
+    "status": "pass",
+    "integrated_by": "Codex main thread",
+    "summary": "No multi-agent fan-in required."
+  },
+  "token_time_proxy": {
+    "lane_count": 1,
+    "native_subagents": 0,
+    "local_parallel_tool_batches": 12
+  }
+}

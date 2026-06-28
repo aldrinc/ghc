@@ -43,6 +43,7 @@ from app.temporal.activities.client_onboarding_activities import (
     build_client_canon_activity,
     build_design_system_activity,
     build_metric_schema_activity,
+    mark_client_onboarding_workflow_activity,
     persist_client_onboarding_artifacts_activity,
 )
 from app.temporal.activities.precanon_research_activities import (
@@ -122,6 +123,7 @@ from app.temporal.activities.strategy_v2_activities import (
     finalize_strategy_v2_offer_winner_activity,
     finalize_strategy_v2_research_proceed_activity,
     mark_strategy_v2_failed_activity,
+    persist_strategy_v2_foundation_bundle_activity,
     prepare_strategy_v2_competitor_asset_candidates_activity,
     run_strategy_v2_copy_pipeline_activity,
     run_strategy_v2_offer_pipeline_activity,
@@ -182,6 +184,7 @@ async def main() -> None:
             build_client_canon_activity,
             build_design_system_activity,
             build_metric_schema_activity,
+            mark_client_onboarding_workflow_activity,
             persist_client_onboarding_artifacts_activity,
             fetch_onboarding_payload_activity,
             extract_competitors_table_activity,
@@ -232,6 +235,7 @@ async def main() -> None:
             build_strategy_v2_stage0_activity,
             build_strategy_v2_foundational_research_activity,
             finalize_strategy_v2_research_proceed_activity,
+            persist_strategy_v2_foundation_bundle_activity,
             prepare_strategy_v2_competitor_asset_candidates_activity,
             finalize_strategy_v2_competitor_assets_confirmation_activity,
             run_strategy_v2_voc_agent0_habitat_strategy_activity,

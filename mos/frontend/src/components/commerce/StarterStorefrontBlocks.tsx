@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { MedusaCategory, MedusaCollection, MedusaProduct } from "@/types/commerce";
 import type { SitePageType } from "@/types/funnels";
-import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/funnelRuntime";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { useCommerceRuntime } from "@/components/commerce/CommerceBlocks";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";

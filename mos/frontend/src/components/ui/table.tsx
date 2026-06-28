@@ -98,7 +98,7 @@ export const TableHeader = forwardRef<HTMLTableSectionElement, HTMLAttributes<HT
       <thead
         ref={ref}
         className={cn(
-          "bg-surface-2/60 text-left text-[12px] font-medium text-content-muted border-b border-divider",
+          "border-b border-divider bg-surface-2/80 text-left text-xs font-semibold tracking-caps text-content-muted",
           className
         )}
         {...props}
@@ -134,8 +134,8 @@ export const TableRow = forwardRef<HTMLTableRowElement, HTMLAttributes<HTMLTable
       <tr
         ref={ref}
         className={cn(
-          "outline-none focus-visible:bg-surface-2/50",
-          hover && "hover:bg-surface-2/40 transition-colors",
+          "outline-none focus-visible:bg-hover",
+          hover && "transition-colors hover:bg-hover",
           className
         )}
         {...props}

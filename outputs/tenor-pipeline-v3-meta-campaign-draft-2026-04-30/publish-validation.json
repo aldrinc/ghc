@@ -1,0 +1,146 @@
+{
+  "payload": {
+    "generationKey": "batch:tenor-pipeline-v3-meta-user-approved-addendum-20260430",
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "campaignName": "Tenor Pipeline V3 Meta Launch - 2026-04-30 - User Approved Addendum 13",
+    "campaignObjective": "OUTCOME_SALES",
+    "buyingType": "AUCTION",
+    "specialAdCategories": [],
+    "campaignDailyBudget": 10000,
+    "bucketCount": 5,
+    "bucketDestinationUrls": []
+  },
+  "response": {
+    "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+    "generationKey": "batch:tenor-pipeline-v3-meta-user-approved-addendum-20260430",
+    "ok": true,
+    "includedCount": 13,
+    "adsetCount": 5,
+    "bucketCount": 5,
+    "publishBaseUrl": "https://shop.shoptenorco.com",
+    "publishDomain": "shoptenorco.com",
+    "budgetScope": "campaign",
+    "campaignDailyBudget": 10000,
+    "bucketDestinationUrls": [],
+    "blockers": [],
+    "items": [
+      {
+        "assetId": "4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9",
+        "creativeSpecId": "011cb661-3556-47c1-bbc0-0130bf66667d",
+        "adsetSpecId": "c073d02b-92d5-443b-9e66-985fe45f8d8e",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "2bccdb26-a6ae-495b-b76a-9954c6d71d48",
+        "creativeSpecId": "8e5ef11e-eb45-42dc-b6f3-164dbcf99e40",
+        "adsetSpecId": "33a487b5-ed48-4e29-8497-7c5afa708f52",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "e06c0f25-bdfd-4be2-875a-510e28908c75",
+        "creativeSpecId": "0a7e342c-2f6e-4f44-9695-4425adf8884c",
+        "adsetSpecId": "ab6fb2f7-5c3d-45c9-9391-1d9fa0dd2b34",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "64f570c3-93b4-4283-b059-3640137f18cd",
+        "creativeSpecId": "60bb09db-19c1-44ab-9234-8223a89c5d40",
+        "adsetSpecId": "3f7cf7cb-39f2-4ad0-9658-446400e1542c",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "1cd420bb-4419-44eb-8ad7-dec45f49aeb5",
+        "creativeSpecId": "53d819b7-9e5f-4556-bfcb-34855b376544",
+        "adsetSpecId": "1d9e2b9b-e2cd-47a2-8677-c98582f89bd0",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/everything-youve-been-told-about-testosterone-support-is-based-on-half-the-science/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "896cfb58-2d82-4ae3-88b0-0ea94eacb6ca",
+        "creativeSpecId": "02f233ae-2fdd-4263-95b4-2bac77dba4de",
+        "adsetSpecId": "c073d02b-92d5-443b-9e66-985fe45f8d8e",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/94-more-morning-energy-92-more-like-yourself-the-21-ingredient-protocol-delivering-what-t-boosters-only-promised/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "4e8c716c-a303-4907-9d9e-558effa0b61d",
+        "creativeSpecId": "5c3aff7f-1df2-43e8-83c4-9a9c8f0791e7",
+        "adsetSpecId": "33a487b5-ed48-4e29-8497-7c5afa708f52",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/everything-youve-been-told-about-testosterone-support-is-based-on-half-the-science/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "f67f24bb-b915-4c47-a9af-ee3935220aa5",
+        "creativeSpecId": "03ceafd8-6d1f-4e02-8ff4-4abfc2d9751c",
+        "adsetSpecId": "ab6fb2f7-5c3d-45c9-9391-1d9fa0dd2b34",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "b23b6840-d51a-4f90-9baa-29158a8853d3",
+        "creativeSpecId": "28420186-d422-422c-914f-1cebb934dc81",
+        "adsetSpecId": "3f7cf7cb-39f2-4ad0-9658-446400e1542c",
+        "bucketIndex": 5,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/needles-for-life-the-30-000-trt-trap-and-the-daily-protocol-you-try-first/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "3e529cc4-5975-4ddc-b905-5026f107e9d6",
+        "creativeSpecId": "a46f8164-bce0-4c36-a093-c6fd56421da7",
+        "adsetSpecId": "1d9e2b9b-e2cd-47a2-8677-c98582f89bd0",
+        "bucketIndex": 4,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "efeff0d8-4b2e-4eb2-83cc-1c0935348639",
+        "creativeSpecId": "ac3b766b-568f-40c5-be8e-e92ce763855f",
+        "adsetSpecId": "c073d02b-92d5-443b-9e66-985fe45f8d8e",
+        "bucketIndex": 3,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "68e67a56-31e1-4b34-a185-24867fdbf265",
+        "creativeSpecId": "aedc7351-d692-4c70-a2dc-bdc9f5b9df18",
+        "adsetSpecId": "33a487b5-ed48-4e29-8497-7c5afa708f52",
+        "bucketIndex": 2,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/the-two-pathways-every-t-booster-ignores-and-why-thats-why-you-still-dont-feel-like-yourself/",
+        "status": "ok",
+        "blockers": []
+      },
+      {
+        "assetId": "6caaf28e-644b-44f9-b043-6a77fc1681bf",
+        "creativeSpecId": "5a0c0e28-efbb-4f2b-9ee8-b3fabe9b14fb",
+        "adsetSpecId": "ab6fb2f7-5c3d-45c9-9391-1d9fa0dd2b34",
+        "bucketIndex": 1,
+        "resolvedDestinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/your-labs-are-normal-the-30-000-lie-doctors-tell-men-over-40-and-how-to-avoid-the-trap/",
+        "status": "ok",
+        "blockers": []
+      }
+    ]
+  }
+}

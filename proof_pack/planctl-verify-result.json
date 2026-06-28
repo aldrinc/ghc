@@ -1,0 +1,26 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/rebase-local-changes-audit-2026-05-20.contract.json",
+  "verified_at": "2026-05-20T16:21:09.889132+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    "P01: no verify_commands",
+    "P02: no verify_commands",
+    "P05: no verify_commands",
+    "P06: no verify_commands",
+    "P08: no verify_commands",
+    "P09: no verify_commands",
+    "P11: no verify_commands"
+  ],
+  "run_logs": [
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-rev-list---left-right---count-HEAD...origin-main.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-rev-list---left-right---count-HEAD...origin-main.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-diff---check.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-rev-list---left-right---count-HEAD...origin-main.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-status---short---branch---untracked-files-no.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-diff---check.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-rev-list---left-right---count-HEAD...origin-main.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-status---short---branch---untracked-files-no.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/verify-20260520-112109-git-diff---check.log"
+  ]
+}

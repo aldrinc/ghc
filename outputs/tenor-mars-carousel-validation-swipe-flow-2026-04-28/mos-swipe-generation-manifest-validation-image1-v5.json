@@ -1,0 +1,58 @@
+{
+  "createdAt": "2026-04-29T02:07:55.176Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "sourcePage": "https://mengotomars.com/products/30-day-supply-starter-kit",
+  "outputs": [
+    {
+      "key": "01-tenor-product-benefit-hero-v5-filled-icons-aeonik",
+      "sourceFile": "01-mars-carousel-source.jpg",
+      "sourceAttachment": {
+        "assetId": "ecb1d553-c10b-4d94-aeb9-f8c4b6333045",
+        "publicId": "54caa18a-65cf-4c53-8276-5c18275b535c",
+        "filename": "01-mars-carousel-source.jpg",
+        "contentType": "image/jpeg",
+        "width": 672,
+        "height": 672,
+        "url": "/public/assets/54caa18a-65cf-4c53-8276-5c18275b535c"
+      },
+      "workflowRunId": "6048e135-620e-4291-b01f-65e156a99d5b",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-8c225126-0b60-433d-b551-4ccf00fe6ee4",
+      "assetId": "fd04db2d-7dfb-48d1-9e0e-c9da63a56923",
+      "publicId": "e589aea2-dd6c-4f5e-b0ca-c6e74a7e4fc1",
+      "publicUrl": "https://api.moshq.app/public/assets/e589aea2-dd6c-4f5e-b0ca-c6e74a7e4fc1",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-v5/01-tenor-product-benefit-hero-v5-filled-icons-aeonik.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/54caa18a-65cf-4c53-8276-5c18275b535c",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Get 30% Off Daily Drive Essentials",
+        "swipeAngle": "Use the attached product carousel image as a layout and hierarchy reference for a Tenor version.\n\nBrand context:\nTenor is a premium men's vitality brand for men who want a simple daily protocol rather than clinics, prescriptions, or hype supplements. The product is Daily Drive Essentials, a black 60-capsule bottle with a restrained label. Brand feel is masculine, premium, editorial, evidence-aware, and direct.\n\nVisual direction for this version:\nUse a light premium background: warm bone, off-white, stone, or soft ivory. Text should be black or near-black. Keep the black bottle central so it anchors the composition. The design should feel more blocky, graphic, and beautiful than the prior line-icon version: use confident filled shapes, strong blocks, and premium solid pictograms.\n\nTypography direction:\nUse Aeonik-style typography for all generated text outside the bottle label: clean geometric sans-serif, modern, premium, tight, confident, not condensed novelty type. The top offer badge and proof number should feel like Aeonik/Aeonik Bold.\n\nIcon direction:\nKeep the right-side benefit stack, but make the icons solid filled black pictograms, not thin outline/line logos. The icons can sit inside subtle filled stone/bone blocks, circles, or rounded squares. They should feel premium and designed, with visual weight. Avoid fragile thin strokes.\n\nProduct context:\nDaily Drive Essentials is positioned around clean and consistent energy, natural drive and libido, peak vitality and performance, exact active doses, and 2 capsules daily. Formula context includes Tongkat Ali, Zinc, Maca, L-Arginine, and Ginseng + Eleuthero. The hero proof claim to use is: 90% recommend Tenor, based on a 12-week triple-blind clinical study.\n\nPreserve from the reference:\n- centered product bottle as the hero\n- top offer badge structure, set to GET 30% OFF\n- large left-side recommendation proof module, using the 90% recommend Tenor claim\n- small footnote under the proof module referencing the 12-week triple-blind clinical study\n- right-side vertical benefit stack with small filled icons\n- strong contrast and clear mobile-first hierarchy\n- energetic but clean ecommerce carousel feel\n\nHigh-level changes:\n- make it clearly Tenor, not Mars\n- use Daily Drive Essentials as the product identity\n- adapt the proof and benefit language to Tenor's brand and product context\n- use filled/blocky black icons rather than line icons\n- use a refined light Tenor color system: bone/ivory background, black text, filled black icons, black bottle\n- keep the bottle recognizable and central\n- make the final image feel like a polished PDP carousel slide for Tenor",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:8d821f57fb8670ccbd0b2a0333d7804044a0225938504840",
+        "asset_ids": [
+          "fd04db2d-7dfb-48d1-9e0e-c9da63a56923"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

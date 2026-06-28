@@ -8,8 +8,11 @@ type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & {
   onValueChange?: (value: string) => void;
 };
 
+const SELECT_CHEVRON_BACKGROUND =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%230B0D12' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>\")";
+
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { className, options, value, onValueChange, onChange, ...props },
+  { className, options, value, onValueChange, onChange, style, ...props },
   ref
 ) {
   const groupedOptions = options.reduce<
@@ -34,11 +37,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         onValueChange?.(e.target.value);
       }}
       className={cn(
-        "h-9 w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content transition",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus",
-        "disabled:cursor-not-allowed disabled:opacity-60",
+        "h-[54px] w-full appearance-none rounded-[12px] border-[1.5px] border-input-border bg-input py-0 pl-[18px] pr-12 text-base font-medium tracking-normal text-content shadow-none transition-[border-color,box-shadow,background,color] duration-[var(--dur-fast)] ease-[var(--ease-out)]",
+        "hover:border-input-border-focus focus-visible:border-input-border-focus focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-[0_0_0_4px_var(--input-ring)]",
+        "disabled:cursor-not-allowed disabled:border-border disabled:bg-disabled disabled:text-disabled-foreground disabled:opacity-100",
         className
       )}
+      style={{
+        backgroundImage: SELECT_CHEVRON_BACKGROUND,
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "right 16px center",
+        ...style,
+      }}
       {...props}
     >
       {groupedOptions.map((entry) => {

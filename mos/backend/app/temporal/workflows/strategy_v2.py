@@ -22,6 +22,7 @@ with workflow.unsafe.imports_passed_through():
         finalize_strategy_v2_offer_winner_activity,
         finalize_strategy_v2_research_proceed_activity,
         mark_strategy_v2_failed_activity,
+        persist_strategy_v2_foundation_bundle_activity,
         prepare_strategy_v2_competitor_asset_candidates_activity,
         run_strategy_v2_copy_pipeline_activity,
         run_strategy_v2_offer_pipeline_activity,
@@ -70,6 +71,7 @@ class StrategyV2Input:
     brand_voice_notes: Optional[str] = None
     compliance_notes: Optional[str] = None
     copy_generation_mode: Optional[str] = None
+    foundation_only: bool = False
 
 
 @workflow.defn
@@ -371,6 +373,7 @@ class StrategyV2Workflow:
                     "workflow_run_id": self._workflow_run_id,
                     "stage0": stage0,
                     "onboarding_payload_id": input.onboarding_payload_id,
+                    "foundation_only": input.foundation_only,
                 },
                 schedule_to_close_timeout=timedelta(minutes=60),
                 heartbeat_timeout=timedelta(minutes=20),
@@ -388,15 +391,22 @@ class StrategyV2Workflow:
             if not isinstance(foundational_result, dict):
                 raise RuntimeError("Strategy V2 foundational research activity returned an invalid payload.")
             stage1 = foundational_result.get("stage1")
-            if not isinstance(stage1, dict):
+            if input.foundation_only:
+                if stage1 is not None and not isinstance(stage1, dict):
+                    raise RuntimeError("Strategy V2 foundation-only activity returned invalid stage1 payload.")
+            elif not isinstance(stage1, dict):
                 raise RuntimeError("Strategy V2 foundational research activity did not return stage1.")
             precanon_research = foundational_result.get("precanon_research")
             if not isinstance(precanon_research, dict):
                 raise RuntimeError("Strategy V2 foundational research activity did not return precanon_research.")
             stage1_artifact_id = foundational_result.get("stage1_artifact_id")
-            if not isinstance(stage1_artifact_id, str) or not stage1_artifact_id.strip():
+            if input.foundation_only:
+                if isinstance(stage1_artifact_id, str) and stage1_artifact_id.strip():
+                    self._artifact_refs["stage1_artifact_id"] = stage1_artifact_id
+            elif not isinstance(stage1_artifact_id, str) or not stage1_artifact_id.strip():
                 raise RuntimeError("Strategy V2 foundational research activity did not return stage1_artifact_id.")
-            self._artifact_refs["stage1_artifact_id"] = stage1_artifact_id
+            else:
+                self._artifact_refs["stage1_artifact_id"] = stage1_artifact_id
             foundational_step_payload_map_raw = foundational_result.get("step_payload_artifact_ids")
             step_payload_artifact_ids: Dict[str, str] = {}
             if isinstance(foundational_step_payload_map_raw, dict):
@@ -414,6 +424,38 @@ class StrategyV2Workflow:
                             step_key=normalized_step_key,
                             artifact_id=normalized_artifact_id,
                         )
+
+            if input.foundation_only:
+                foundation_bundle_result = await workflow.execute_activity(
+                    persist_strategy_v2_foundation_bundle_activity,
+                    {
+                        "org_id": input.org_id,
+                        "client_id": input.client_id,
+                        "product_id": input.product_id,
+                        "campaign_id": input.campaign_id,
+                        "workflow_run_id": self._workflow_run_id,
+                        "onboarding_payload_id": input.onboarding_payload_id,
+                        "stage0": stage0,
+                        "stage0_artifact_id": stage0_result.get("stage0_artifact_id"),
+                        "stage1": stage1,
+                        "stage1_artifact_id": stage1_artifact_id,
+                        "precanon_research": precanon_research,
+                        "step_payload_artifact_ids": step_payload_artifact_ids,
+                    },
+                    schedule_to_close_timeout=timedelta(minutes=5),
+                )
+                if isinstance(foundation_bundle_result, dict):
+                    foundation_bundle_artifact_id = foundation_bundle_result.get("foundation_bundle_artifact_id")
+                    if isinstance(foundation_bundle_artifact_id, str) and foundation_bundle_artifact_id.strip():
+                        self._artifact_refs["foundation_bundle_artifact_id"] = foundation_bundle_artifact_id
+                self._pending_decision_payload = None
+                self._pending_signal_type = None
+                self._current_stage = "foundation_complete"
+                return {
+                    "status": "foundation_complete",
+                    "workflow_run_id": self._workflow_run_id,
+                    "artifact_refs": self._artifact_refs,
+                }
 
             self._pending_decision_payload = {
                 "stage1": stage1,

@@ -1,0 +1,1819 @@
+{
+  "createdAt": "2026-05-03T03:08:53.296Z",
+  "reason": "No-product visual regeneration for Tenor Walk Away From TRT review.",
+  "sourceManifestPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-campaign-2026-05-02/full-launch-manifest.json",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated",
+  "reviewDir": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03",
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "campaignName": "Tenor - Walk Away From TRT - 2026-05-02",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "assetBriefId": "brief_editorial_wound_scene",
+  "destinationContext": {
+    "headline": "\"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.",
+    "subheadline": "Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.",
+    "primaryProblem": "Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.",
+    "promise": "Understand the daily protocol men are trying before committing to TRT.",
+    "mechanismDisclosureLevel": "Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.",
+    "proofType": "Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.",
+    "ctaUrgency": "Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.",
+    "compliancePosture": "Matches the downstream advertorial posture and funnel stage.",
+    "assetStage": "Ad to advertorial/listicle, before the sales page.",
+    "visualEmphasis": "Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly."
+  },
+  "noProductVisualRequirement": "Approved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.",
+  "outputs": [
+    {
+      "key": "01-boss-babe",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "sourceSwipeTitle": "boss_babe.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "approvedSample": true
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "d1de69e6-5795-5cba-9fb2-28ba5f99620f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-01-boss-babe-1777777737158.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "b48d256f-5879-412a-a17a-545162195f22",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-4a211c94-f6ef-4d26-9c60-1ad5e42cf234"
+      },
+      "result": {
+        "assetId": "e7f70304-4dc2-4c8f-9cb6-dec86867377b",
+        "publicId": "48a90224-c972-4c58-98e7-97357feb9073",
+        "publicUrl": "https://api.moshq.app/public/assets/48a90224-c972-4c58-98e7-97357feb9073",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/01-boss-babe.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/01-boss-babe.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:e2ee051ebbf10775791797a3af6f606dfdcb134c9c7f4e1e",
+          "asset_ids": [
+            "e7f70304-4dc2-4c8f-9cb6-dec86867377b"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-01-boss-babe.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "packaging",
+          "bottle"
+        ],
+        "promptExcerpt": "A professional, authoritative editorial portrait of a male doctor in his late 40s to early 50s. He has short, neatly styled salt-and-pepper hair, subtle natural skin texture (visible pores, mild forehead lines, realistic non-retouched skin), and a calm, empathetic but serious expression looking directly into the camera lens. He is wearing a tailored dark grey blazer over a crisp white crew-neck t-shirt. The background is a smooth, neutral medium-grey gradient, identical to a high-end corporate o"
+      }
+    },
+    {
+      "key": "02-spanish-doctor-cta",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+        "sourceSwipeTitle": "spanish_doctor_cta.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "approvedSample": true
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "234f2a51-3140-5e86-b982-7a3c9d406a72",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-02-spanish-doctor-cta-1777777791019.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "3e10b140-f684-4242-b0f4-5642084c2a69",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-377cd611-2a94-492b-bf49-2fc4ef3ee844"
+      },
+      "result": {
+        "assetId": "f11a3d34-d91e-419f-b96b-bbc89b4ed179",
+        "publicId": "162d6d49-cee7-40ff-8a0f-2149a7ab648b",
+        "publicUrl": "https://api.moshq.app/public/assets/162d6d49-cee7-40ff-8a0f-2149a7ab648b",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/02-spanish-doctor-cta.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/02-spanish-doctor-cta.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:2c6382f09df027ab5fcfa6ad89a16f628bf94a053f7ca5a0",
+          "asset_ids": [
+            "f11a3d34-d91e-419f-b96b-bbc89b4ed179"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-02-spanish-doctor-cta.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "pill"
+        ],
+        "promptExcerpt": "Square 1:1 aspect ratio. A candid, realistic photograph with warm, natural, slightly moody interior lighting. The setting is a comfortable clinic or home office with a beige sofa and blurred wooden shelves in the background. The central subject is a female doctor in her late 30s to early 40s with shoulder-length brown hair. She wears a white lab coat over a dark top, with a stethoscope draped around her neck. She holds a clipboard and pen, looking directly into the lens with a serious, empatheti"
+      }
+    },
+    {
+      "key": "03-old-school",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "sourceSwipeTitle": "old_school.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "approvedSample": true
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a6422035-8a65-5074-ba35-69da84cb70d5",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-03-old-school-1777777856035.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "30751b66-bf3d-4ec9-9ab2-4dcf51182f80",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-df46d114-7e1d-499c-9211-b887a51b56de"
+      },
+      "result": {
+        "assetId": "ec9c4a46-79ed-4229-a940-55d69888ea6c",
+        "publicId": "93ee6681-242e-4021-a27e-f6fff5a246cd",
+        "publicUrl": "https://api.moshq.app/public/assets/93ee6681-242e-4021-a27e-f6fff5a246cd",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/03-old-school.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/03-old-school.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:1d589ce508c2f53cd91036201cbdb244afd64ad7eea251e7",
+          "asset_ids": [
+            "ec9c4a46-79ed-4229-a940-55d69888ea6c"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-03-old-school.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle",
+          "box",
+          "pill"
+        ],
+        "promptExcerpt": "A 1970s/80s retro magazine advertorial aesthetic. The background is a warm mustard-yellow and orange vertical corduroy fabric texture. \n\nTypography Zones:\nTop banner: A cream-colored rounded rectangle with a thin navy blue border spanning the top width. Inside, bold, retro serif text in burnt orange reads: \"My Patient Walked Away From TRT For This\"\nLeft box: A cream-colored rounded rectangle with a thin navy blue border, occupying the middle-left quadrant. Inside, clean, dark navy blue sans-seri"
+      }
+    },
+    {
+      "key": "04-static-3",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "00e357f9-7953-5d6b-8b80-18a91e8a1510",
+        "sourceSwipeTitle": "Static #3.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "00e357f9-7953-5d6b-8b80-18a91e8a1510",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-04-static-3-1777777913923.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "d8fc7afb-a9e5-423a-99a4-1e4e285a1eb1",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-6819a757-1e41-40a6-b1c5-ff1684585580"
+      },
+      "result": {
+        "assetId": "032f1746-72e3-491b-bd2a-4d4e8fcf1f76",
+        "publicId": "e70a6a8a-8d91-4e69-b09d-2a6f9a0bffe3",
+        "publicUrl": "https://api.moshq.app/public/assets/e70a6a8a-8d91-4e69-b09d-2a6f9a0bffe3",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/04-static-3.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/04-static-3.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:14592d3e776d1465f3dba0d983143afed869ee660a99b674",
+          "asset_ids": [
+            "032f1746-72e3-491b-bd2a-4d4e8fcf1f76"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-04-static-3.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "pill"
+        ],
+        "promptExcerpt": "A highly detailed, photorealistic editorial ad layout. The main background visual is a close-up, shallow depth of field shot of a 40-something man's inner forearm showing a small, round, flesh-colored bandage over a vein, typical of a recent blood draw for lab work. The skin has realistic texture, natural pores, slight hair, and natural lighting. The background behind the arm is a soft, blurred, natural outdoor setting with muted greens and browns to match the original swipe's color energy. \n\nTo"
+      }
+    },
+    {
+      "key": "05-seven",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "058b868e-4568-578e-99bc-21f0491ed671",
+        "sourceSwipeTitle": "7.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "058b868e-4568-578e-99bc-21f0491ed671",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-05-seven-1777777969416.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "6b067f49-37f6-4242-a913-ee9909526a97",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-018ce4bc-73c6-4c66-b553-9f45cca3f336"
+      },
+      "result": {
+        "assetId": "9bd376be-2d25-4e8d-ad8b-df1cc3de5371",
+        "publicId": "90e33dfc-149d-4f54-8509-8bb85996a3d1",
+        "publicUrl": "https://api.moshq.app/public/assets/90e33dfc-149d-4f54-8509-8bb85996a3d1",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/05-seven.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/05-seven.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:30c4ceb68e1ef06e484024356ff87a4b507c84c01440a0b8",
+          "asset_ids": [
+            "9bd376be-2d25-4e8d-ad8b-df1cc3de5371"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-05-seven.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "bottle"
+        ],
+        "promptExcerpt": "A portrait-format, edge-to-edge social media ad image featuring a highly realistic, aspirational main portrait, a top-right circular inset, and a bottom-left text overlay block. \n\nVisual Description:\nThe main background image is a close-up, side-angle profile of a handsome, fit man in his late 40s or early 50s. He has a confident, relaxed smile and is looking slightly off-camera. He exhibits natural, honest skin texture—visible pores, subtle crow's feet, and a realistic salt-and-pepper beard. No"
+      }
+    },
+    {
+      "key": "06-derm-fag",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "20c77ba2-f32c-5003-9c8f-539ba629c532",
+        "sourceSwipeTitle": "derm_fag.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "20c77ba2-f32c-5003-9c8f-539ba629c532",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-06-derm-fag-1777778026673.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "f8ac333a-9fb7-4d54-8300-e42a964fb49a",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-490f4ddc-15ce-44b9-897f-f9de17fcc3c5"
+      },
+      "result": {
+        "assetId": "e9ab3994-d847-47e4-afc3-f19dcabeac6b",
+        "publicId": "c8ac751b-64a5-4d48-a27c-9ae53d3e0939",
+        "publicUrl": "https://api.moshq.app/public/assets/c8ac751b-64a5-4d48-a27c-9ae53d3e0939",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/06-derm-fag.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/06-derm-fag.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:c91d58713cd35e35714928242c23f2fad02bf7d5fac491d8",
+          "asset_ids": [
+            "e9ab3994-d847-47e4-afc3-f19dcabeac6b"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-06-derm-fag.json"
+      },
+      "promptAudit": {
+        "productTermHits": [],
+        "promptExcerpt": "A highly detailed, dramatic 1:1 square composition featuring an extreme close-up of a 40+ year-old man's face on the left side, emerging from a deep, inky black background. The lighting is a striking chiaroscuro effect: a sharp, vertical shaft of warm, golden light illuminates only his right eye, cheekbone, and the bridge of his nose, while the rest of his face and the entire right half of the canvas fall into pure, solid black shadow. The man's face exhibits strict realism: honest skin texture,"
+      }
+    },
+    {
+      "key": "07-six",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "sourceSwipeTitle": "6.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "32a41265-1b96-5096-b9f0-9a28b0ecef95",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-07-six-1777778092077.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "739a4d12-2ec1-4869-899c-97cacf7af817",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-7542870c-5073-49ce-8da4-db8644e4ed62"
+      },
+      "result": {
+        "assetId": "b382445f-55dd-473c-81aa-c4496dca4e7d",
+        "publicId": "55726f59-9001-401c-b6bd-4248decc9cce",
+        "publicUrl": "https://api.moshq.app/public/assets/55726f59-9001-401c-b6bd-4248decc9cce",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/07-six.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/07-six.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:813f57c1b11e8f90986b4f8fef27c5f19fc17287720f428b",
+          "asset_ids": [
+            "b382445f-55dd-473c-81aa-c4496dca4e7d"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-07-six.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle",
+          "box"
+        ],
+        "promptExcerpt": "A highly detailed, realistic portrait of a relatable, handsome man in his late 40s or early 50s, looking directly at the camera with a subtle, confident, and relaxed expression. He has honest skin texture, visible pores, slight under-eye darkness, and natural hair and beard texture with subtle greying, avoiding any plastic or hyper-airbrushed AI perfection. The lighting is natural and slightly warm. The background is a softly blurred indoor setting, resembling a home office or subtle clinical sp"
+      }
+    },
+    {
+      "key": "08-fatigue",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "sourceSwipeTitle": "fatigue.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-08-fatigue-1777778171180.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "442b9a1c-8488-472f-a338-0b4591d1d9bd",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-d617d7af-2ac1-458f-8d32-67b38b590a01"
+      },
+      "result": {
+        "assetId": "75e27e45-f18e-44f7-ad15-6970866792ba",
+        "publicId": "22f37646-39fb-4bb2-90a4-0b29c3b0e528",
+        "publicUrl": "https://api.moshq.app/public/assets/22f37646-39fb-4bb2-90a4-0b29c3b0e528",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/08-fatigue.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/08-fatigue.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:b5d24e528db2d6c107c18af9f264833b2169597296b16204",
+          "asset_ids": [
+            "75e27e45-f18e-44f7-ad15-6970866792ba"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-08-fatigue.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle"
+        ],
+        "promptExcerpt": "A portrait-oriented, edge-to-edge mobile aspect ratio image featuring a candid, unpolished photograph of an older man (late 40s to 50s) with salt-and-pepper hair and a short, textured grey beard. He is wearing a plain dark charcoal t-shirt. He is sitting outdoors on weathered stone steps. His body is angled slightly, hands loosely clasped and resting on his lap. He is looking off-camera to the left with a tired, contemplative, slightly strained expression. The lighting is natural, moody, and ove"
+      }
+    },
+    {
+      "key": "09-static-4",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "5e0bec7e-c4de-5135-a739-32de79c28f35",
+        "sourceSwipeTitle": "Static #4.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "5e0bec7e-c4de-5135-a739-32de79c28f35",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-09-static-4-1777778226636.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "5bf769cc-f2bc-41f5-8ba7-a215096880db",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-9946d931-fa21-4603-8749-092a4d97df03"
+      },
+      "result": {
+        "assetId": "14e20f4f-ea14-4ba8-8b4d-c786f8433cff",
+        "publicId": "acbf5c67-f0ef-48c5-bafb-01cd8de00d30",
+        "publicUrl": "https://api.moshq.app/public/assets/acbf5c67-f0ef-48c5-bafb-01cd8de00d30",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/09-static-4.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/09-static-4.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:1d5e7cb0c06b149f81bd4e0debdfd4e4ec6a41f09150b67e",
+          "asset_ids": [
+            "14e20f4f-ea14-4ba8-8b4d-c786f8433cff"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-09-static-4.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle",
+          "jar"
+        ],
+        "promptExcerpt": "A portrait-oriented, highly detailed digital ad image. The composition features a dark, moody, out-of-focus background with subtle warm bokeh lights, resembling a dimly lit, modern doctor's office or clinic. On the right edge, the partially cropped face of a male doctor (40s-50s) is visible, looking intently downward with a serious expression, featuring realistic skin texture and natural lighting. \n\nIn the foreground, a hand holds a sleek, vertical digital medical tablet or folded lab report. Th"
+      }
+    },
+    {
+      "key": "10-care-bag",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+        "sourceSwipeTitle": "care_bag.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "5f0ac436-31e3-5f69-8756-41b3c433b731",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-10-care-bag-1777778312023.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "a88723d4-a5c1-4994-950d-7a906bf64cab",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-a576b51d-5761-4b23-84c2-d3209bb5e9e5"
+      },
+      "result": {
+        "assetId": "5eb05f6a-7155-47da-9087-46c040ba9cb4",
+        "publicId": "1f9df22e-9f43-4efa-9991-407f4ea3f30a",
+        "publicUrl": "https://api.moshq.app/public/assets/1f9df22e-9f43-4efa-9991-407f4ea3f30a",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/10-care-bag.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/10-care-bag.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:224f7d29013c26adaea4b85629c6141db8d0755c5796298b",
+          "asset_ids": [
+            "5eb05f6a-7155-47da-9087-46c040ba9cb4"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-10-care-bag.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "pouch",
+          "packaging",
+          "bottle",
+          "pill"
+        ],
+        "promptExcerpt": "A photorealistic, direct-response lifestyle ad image with a warm, earthy, and inviting aesthetic. The composition relies on a strong depth of field. \n\nBackground (Left/Center, Out of Focus): A cozy, sunlit living room with warm earthy tones (browns, beiges, soft greys) and subtle warm bokeh from background lights. Sitting comfortably on the floor near a sofa is a healthy, energetic man in his late 40s. He is smiling, looking relieved and vibrant. Apply strict avatar realism: slight facial asymme"
+      }
+    },
+    {
+      "key": "11-eight",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+        "sourceSwipeTitle": "8.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "6111ae9b-95e0-5576-b2d7-3799f970a7e0",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-11-eight-1777778368033.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "61f2584f-03cc-4309-966a-13b6093fe76f",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-02fcfea4-782a-4f48-aeec-1f1ac80ebb59"
+      },
+      "result": {
+        "assetId": "75afd5a0-6d17-4849-84a6-d3199d3008ea",
+        "publicId": "9e64b057-4dfa-4f91-bcec-ad44d8b310d8",
+        "publicUrl": "https://api.moshq.app/public/assets/9e64b057-4dfa-4f91-bcec-ad44d8b310d8",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/11-eight.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/11-eight.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:c43a2c01a792977ead3e36ca0d342a7e7379e056445f780b",
+          "asset_ids": [
+            "75afd5a0-6d17-4849-84a6-d3199d3008ea"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-11-eight.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "pouch",
+          "packaging",
+          "bottle",
+          "tub"
+        ],
+        "promptExcerpt": "A portrait-oriented, edge-to-edge social media ad image featuring a highly realistic, candid gym scene. The lighting is natural and slightly harsh, highlighting realistic skin textures and sweat. \n\nForeground Subject: A fit, muscular 63-year-old man stands facing the camera, shirtless and sweaty, holding a dark dumbbell in his right hand (partially visible at the bottom center). He has a graying mustache, realistic skin texture with natural aging cues, slight chest hair, and a subtle, confident "
+      }
+    },
+    {
+      "key": "12-static-1",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "74a2f8b1-2386-5213-ac31-16ee3860a08c",
+        "sourceSwipeTitle": "Static #1.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "74a2f8b1-2386-5213-ac31-16ee3860a08c",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-12-static-1-1777778433199.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "3c72214c-1827-4c36-af2b-d3f41598e876",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-bfc43984-7bc2-4a9f-87ae-a7ba7b4d7bc2"
+      },
+      "result": {
+        "assetId": "e6e87409-9479-43d6-a452-1e78d3398531",
+        "publicId": "edc8892c-bcc3-4393-a272-08f69ec3fed4",
+        "publicUrl": "https://api.moshq.app/public/assets/edc8892c-bcc3-4393-a272-08f69ec3fed4",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/12-static-1.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/12-static-1.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:4d5a309ab4184fb3b67fe11fcc7487c6303050f394be52b3",
+          "asset_ids": [
+            "e6e87409-9479-43d6-a452-1e78d3398531"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-12-static-1.json"
+      },
+      "promptAudit": {
+        "productTermHits": [],
+        "promptExcerpt": "A photorealistic, top-down flat lay composition with moody, premium, high-contrast lighting. The lighting is warm and directional, coming from the top-left and casting distinct, hard shadows toward the bottom-right. The background is a dark, rustic wooden table with rich grain. In the center sits a round, light-wood cross-section (a log slice cutting board) providing a lighter framing area. Resting on the wood slice are two items angled diagonally toward the center, perfectly mimicking the place"
+      }
+    },
+    {
+      "key": "13-static-2",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "sourceSwipeTitle": "Static #2.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "99f923f8-6725-58c0-ae66-3deb0b16248f",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-13-static-2-1777778490115.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "fae76588-9fea-4b66-82ee-c4d72b4a0b83",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-9d072d9b-0b3d-44b0-9bf0-7dbffacc29f5"
+      },
+      "result": {
+        "assetId": "8c58a61e-73d9-4c2e-ab6b-80062ef238f5",
+        "publicId": "6a8c682b-64a2-47f8-9e34-fbd16b1e609b",
+        "publicUrl": "https://api.moshq.app/public/assets/6a8c682b-64a2-47f8-9e34-fbd16b1e609b",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/13-static-2.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/13-static-2.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:9e0f6faea0ff4325faf4153f0beafbcb111562212cfb4720",
+          "asset_ids": [
+            "8c58a61e-73d9-4c2e-ab6b-80062ef238f5"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-13-static-2.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle",
+          "pill"
+        ],
+        "promptExcerpt": "A portrait-oriented, highly realistic advertorial graphic with a clinical, trustworthy aesthetic. The composition features a split background: the right side shows a realistic, smiling older male doctor (50s, slight facial asymmetry, honest skin texture, natural wrinkles, no plastic skin) in a white lab coat with a stethoscope around his neck, looking directly at the camera. The left side of the background is a faded, technical blueprint-style diagram of medical lab charts and hormone graphs in "
+      }
+    },
+    {
+      "key": "14-eleven",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "sourceSwipeTitle": "11.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a23435d2-27a0-54ab-8e73-acf761834259",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-14-eleven-1777778565376.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "6facaaad-5ade-44b7-a3e7-e1ec9b1628dd",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-164cbed8-087f-45bf-9cb1-6a71775888ae"
+      },
+      "result": {
+        "assetId": "a8dc312f-ce26-4296-809c-c9eb32901cd6",
+        "publicId": "11dec522-4ea4-4775-b04f-e1a9cb773918",
+        "publicUrl": "https://api.moshq.app/public/assets/11dec522-4ea4-4775-b04f-e1a9cb773918",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/14-eleven.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/14-eleven.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:6013e8a837763dc07c3722383e334a6978ca33cc2f90f85d",
+          "asset_ids": [
+            "a8dc312f-ce26-4296-809c-c9eb32901cd6"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-14-eleven.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "pouch",
+          "bottle",
+          "jar",
+          "pill"
+        ],
+        "promptExcerpt": "A portrait-oriented, native-looking selfie of a fit, attractive man in his late 50s or early 60s. He has textured grey hair, a neatly trimmed grey beard, and is wearing round tortoiseshell glasses and white wireless earbuds. He is shirtless, showing a natural, healthy chest and collarbone with realistic skin texture, mild sun exposure, and pores—avoiding any hyper-airbrushed or glossy CGI perfection. The lighting is bright, natural outdoor sunlight creating distinct, slightly harsh shadows on hi"
+      }
+    },
+    {
+      "key": "15-drawing",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "sourceSwipeTitle": "drawing.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a760221f-61bb-5f92-b4fc-d577eb9897ba",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-15-drawing-1777778630053.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "f051cf2c-8466-4166-a4b4-c4c1d5481d00",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-9672dfe7-c24a-43bb-adaa-183b70c818d4"
+      },
+      "result": {
+        "assetId": "4f784c29-18fb-4fdc-a0af-48a834a8fe20",
+        "publicId": "dad7b03a-427d-4b63-bd7d-c203b3ba4e07",
+        "publicUrl": "https://api.moshq.app/public/assets/dad7b03a-427d-4b63-bd7d-c203b3ba4e07",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/15-drawing.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/15-drawing.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:aafa698dbf092029905b4b9c298fcee3ab2ad551430eb632",
+          "asset_ids": [
+            "4f784c29-18fb-4fdc-a0af-48a834a8fe20"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-15-drawing.json"
+      },
+      "promptAudit": {
+        "productTermHits": [],
+        "promptExcerpt": "A square 1:1 aspect ratio ad image featuring a strict 50/50 vertical split layout. \n\nLeft half: A pure white background featuring a simple, expressive black-and-white line drawing (minimalist sketch/cartoon style) of a tired, frustrated middle-aged man (40s/50s). He has slightly slumped shoulders, arms crossed, and a conflicted, exhausted expression. Three black sketch-style question marks float above his head. The drawing uses varied, organic line weights and zero color, perfectly mimicking a r"
+      }
+    },
+    {
+      "key": "16-brush",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "a9b9b792-bea4-579a-993f-95994908d8bb",
+        "sourceSwipeTitle": "brush.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "a9b9b792-bea4-579a-993f-95994908d8bb",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-16-brush-1777778674797.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "708475db-88e5-481a-b4c9-226f640006bd",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-3bdc6838-1e1a-43be-8fcc-9f7acf84ab60"
+      },
+      "result": {
+        "assetId": "aa39accf-d11f-44e6-8e73-e5c2881f9dbf",
+        "publicId": "fbc5bca2-7157-478b-9832-ed58570795a8",
+        "publicUrl": "https://api.moshq.app/public/assets/fbc5bca2-7157-478b-9832-ed58570795a8",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/16-brush.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/16-brush.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:ca6c144ba989014c827dfffd193467327db7eed1b4098ba9",
+          "asset_ids": [
+            "aa39accf-d11f-44e6-8e73-e5c2881f9dbf"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-16-brush.json"
+      },
+      "promptAudit": {
+        "productTermHits": [],
+        "promptExcerpt": "A first-person POV native mobile photo. In the center foreground, a masculine hand (showing realistic natural skin texture, subtle signs of being 40+, short clean nails) is holding a folded, official-looking medical lab report document. The document is printed on standard white paper with subtle, unreadable medical charts, graphs, and black text blocks visible on the surface, serving as a neutral editorial proxy. The background is a clean, modern bathroom featuring a white square vessel sink, a "
+      }
+    },
+    {
+      "key": "17-researchers",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "sourceSwipeTitle": "researchers.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-17-researchers-1777778739723.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "e5cad06e-ed1d-4aeb-9027-49866c00aa71",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-434201b4-148b-40a4-8b6b-8a984d1f76c4"
+      },
+      "result": {
+        "assetId": "b16cc193-4e0a-4d10-88ae-956af6110a9f",
+        "publicId": "1293d414-3013-47f6-afbd-dbb0e22bcc3d",
+        "publicUrl": "https://api.moshq.app/public/assets/1293d414-3013-47f6-afbd-dbb0e22bcc3d",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/17-researchers.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/17-researchers.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:7f8aa80fb3c0830ef91ee583ec7641091dbd992196e9450a",
+          "asset_ids": [
+            "b16cc193-4e0a-4d10-88ae-956af6110a9f"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-17-researchers.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "pouch",
+          "bottle"
+        ],
+        "promptExcerpt": "A realistic, candid 1:1 square composition of a male doctor (mid-40s) standing in a high-tech clinical setting. The doctor has natural, unretouched skin texture (visible pores, slight under-eye darkness, mild T-zone shine, slight facial asymmetry) and is wearing a crisp white lab coat over a blue patterned button-down shirt, with a black stethoscope draped around his neck. He is looking off-camera to the left with his mouth slightly parted mid-thought, his right hand raised in a gentle, open-pal"
+      }
+    },
+    {
+      "key": "19-big-text",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "sourceSwipeTitle": "big_text.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b849e92a-1a3d-5a7f-bec9-0c4f028a2d25",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-19-big-text-1777778849103.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "19d79277-53e3-42ee-acc5-0c59eba2209d",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-29c58c41-0aeb-4750-94a6-6df1f14076a8"
+      },
+      "result": {
+        "assetId": "040aa5e4-88df-4592-92d3-ae93c25d04c6",
+        "publicId": "77861396-fe27-4b51-936c-faf23860a568",
+        "publicUrl": "https://api.moshq.app/public/assets/77861396-fe27-4b51-936c-faf23860a568",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/19-big-text.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/19-big-text.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:c1a9353ea7b6e72d59b4f39943fb8c52e4f70ff3b36f5728",
+          "asset_ids": [
+            "040aa5e4-88df-4592-92d3-ae93c25d04c6"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-19-big-text.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle"
+        ],
+        "promptExcerpt": "A minimalist, text-only square graphic. The background is solid black with a very subtle, fine digital grain texture. There are no images, no gradients, no borders, no human subjects, and absolutely no product packaging or supplement bottles. The composition relies entirely on stark, high-contrast typography.\n\nTypography Zones:\nMain Text Block (Center): Positioned in the center of the upper two-thirds of the canvas. The text is a bold, white, sans-serif font (similar to Helvetica Bold or Arial B"
+      }
+    },
+    {
+      "key": "20-nine",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+        "sourceSwipeTitle": "9.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b8d55c9d-f521-59b5-a1a0-a8aca5167cad",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-20-nine-1777778893580.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "f36ff02a-92ee-4042-a4a8-bfd182fb7aa3",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-0e748901-6bf8-4f7f-acd1-3409fdf2709a"
+      },
+      "result": {
+        "assetId": "d0347d7d-475b-4c07-92a3-377f0db0cdce",
+        "publicId": "27bfd4b1-cbbc-4293-b360-a2a094bcc189",
+        "publicUrl": "https://api.moshq.app/public/assets/27bfd4b1-cbbc-4293-b360-a2a094bcc189",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/20-nine.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/20-nine.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:4c4b6260fba171e63c12ad0514192281551b8c25f7b9d38c",
+          "asset_ids": [
+            "d0347d7d-475b-4c07-92a3-377f0db0cdce"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-20-nine.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "pouch",
+          "bottle",
+          "jar",
+          "pill"
+        ],
+        "promptExcerpt": "A bright, high-contrast portrait-oriented social media ad. The background is a sunny beach scene with a bright blue sky, scattered fluffy clouds, and distant coastal buildings with palm trees. In the right-center foreground stands a fit, shirtless older man with silver hair and a short silver beard, wearing black swim trunks. He is looking thoughtfully off-camera to the right. The lighting is natural and bright, casting sharp, realistic shadows on the sand. The man's skin has realistic texture, "
+      }
+    },
+    {
+      "key": "21-ten",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+        "sourceSwipeTitle": "10.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "ca28769d-e1b3-5a34-9f55-f0bd70bb2c14",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-21-ten-1777778948346.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "16f33d81-a45f-4309-b329-10664e67db36",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-1e04d52b-b17c-42d0-9843-8e27b0d27634"
+      },
+      "result": {
+        "assetId": "e80e8d6b-c0e9-4e00-8697-261e4059a7a7",
+        "publicId": "b8e8288e-deaf-4615-8bf7-84c86f3c407a",
+        "publicUrl": "https://api.moshq.app/public/assets/b8e8288e-deaf-4615-8bf7-84c86f3c407a",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/21-ten.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/21-ten.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:0e475733d5a813f55f87201c5e435d2446d1ff58180bb729",
+          "asset_ids": [
+            "e80e8d6b-c0e9-4e00-8697-261e4059a7a7"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-21-ten.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle",
+          "tub"
+        ],
+        "promptExcerpt": "Portrait-oriented native social media capture. The background is a vibrant tropical beach scene with lush green hills, tall palm trees, a clear blue sky, and small distant figures wading in the ocean water. The lighting is bright, natural, and sunlit. On the right side of the composition stands a fit, shirtless older man with white hair and a neatly trimmed white beard, wearing black swim trunks and a dark wristwatch. He is looking slightly off-camera with a relaxed, confident expression. His sk"
+      }
+    },
+    {
+      "key": "22-twelve",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+        "sourceSwipeTitle": "12.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-22-twelve-1777779003622.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "21f20825-96a4-4938-beee-921a08333d01",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-7373f32d-6d4e-4778-97e8-555418328a4a"
+      },
+      "result": {
+        "assetId": "960ee5a4-05fe-4600-9751-ba528440c4f0",
+        "publicId": "5c493c78-7ffc-441a-a2a7-0577537e3bb7",
+        "publicUrl": "https://api.moshq.app/public/assets/5c493c78-7ffc-441a-a2a7-0577537e3bb7",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/22-twelve.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/22-twelve.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:6b4adf0ad538d134dc50befe8475a4a449a2574649bd42f0",
+          "asset_ids": [
+            "960ee5a4-05fe-4600-9751-ba528440c4f0"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-22-twelve.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "jar",
+          "box"
+        ],
+        "promptExcerpt": "A portrait-oriented, high-contrast photograph of a fit, energetic man in his late 50s with natural salt-and-pepper hair and realistic skin texture (visible pores, natural age lines, slight asymmetry). He is wearing a simple grey athletic t-shirt. He is smiling confidently with direct eye contact at the camera, flexing his right bicep to show healthy muscle tone. The background is a slightly blurred, naturally lit gym environment. In his left hand, positioned exactly where a product jar would be,"
+      }
+    },
+    {
+      "key": "23-raise-a-winner",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "sourceSwipeTitle": "raise_a_winner.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "cfc68913-9b14-5b4a-a4ef-bb5ccbe602de",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-23-raise-a-winner-1777779058329.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "a581a161-6e85-4c2d-8d49-ce58f166ca84",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-4aa28bd3-62b4-4f08-9561-6e18a91f9a7c"
+      },
+      "result": {
+        "assetId": "c591bbdb-cbad-4b0d-ab93-fda14a5060eb",
+        "publicId": "4420dcad-9166-4b71-afd3-55dd91d404db",
+        "publicUrl": "https://api.moshq.app/public/assets/4420dcad-9166-4b71-afd3-55dd91d404db",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/23-raise-a-winner.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/23-raise-a-winner.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:f09c5967f5c5ddfbfd1bd59dbccbbc75c2a776acf7b7f0fc",
+          "asset_ids": [
+            "c591bbdb-cbad-4b0d-ab93-fda14a5060eb"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-23-raise-a-winner.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle"
+        ],
+        "promptExcerpt": "A highly detailed, photorealistic image of a dark, dramatic auditorium stage setting, perfectly preserving the high-contrast, authoritative visual energy of the original swipe. The background features a deeply shadowed, blurred audience, creating a \"TED Talk\" presentation atmosphere. A single, bright, cool-toned spotlight shines directly down on the center of the stage. \n\nStanding in the exact center of the stage is a distinguished, fit man in his early 50s with subtle salt-and-pepper hair, wear"
+      }
+    },
+    {
+      "key": "24-green",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+        "sourceSwipeTitle": "green.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "e2ff843d-e853-55eb-b306-4398900615ef",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-24-green-1777779124158.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "68918a52-e799-4f73-8abd-e0ea1d856a4a",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-fd250472-00d5-4dc7-a4dd-ccc098749c0d"
+      },
+      "result": {
+        "assetId": "1d4820f1-72b1-4808-ac7a-55456bc4721d",
+        "publicId": "ce596259-3e75-4dc5-b575-dd5ea85b1f05",
+        "publicUrl": "https://api.moshq.app/public/assets/ce596259-3e75-4dc5-b575-dd5ea85b1f05",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/24-green.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/24-green.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:2766817dea7baff1af483325cce0adc273161c168340ef5e",
+          "asset_ids": [
+            "1d4820f1-72b1-4808-ac7a-55456bc4721d"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-24-green.json"
+      },
+      "promptAudit": {
+        "productTermHits": [],
+        "promptExcerpt": "A highly detailed macro photograph of glowing biological cellular structures, featuring translucent neon green membranes and bright golden-yellow glowing oval nodes connected by fibrous strands. The background is a deep, dark black with floating glowing particles and soft bokeh, creating a cinematic, high-contrast, and mysterious scientific aesthetic. The composition is edge-to-edge with no borders.\n\nOverlay text is positioned exactly as follows:\nIn the top left corner, small, subtle, light gray"
+      }
+    },
+    {
+      "key": "25-grocery",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "e358e68d-730a-5f8b-9bc9-fb7742985f43",
+        "sourceSwipeTitle": "grocery.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "e358e68d-730a-5f8b-9bc9-fb7742985f43",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-25-grocery-1777779167664.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "b828fce8-d82c-41c5-868c-64dffc253dff",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-82f0bd91-2383-4119-a9a6-f26b4ca4cc72"
+      },
+      "result": {
+        "assetId": "5f1a8328-ea3e-4864-b4a5-505fa2b666f8",
+        "publicId": "957d0bbb-6989-491e-8f42-4feac8907a85",
+        "publicUrl": "https://api.moshq.app/public/assets/957d0bbb-6989-491e-8f42-4feac8907a85",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/25-grocery.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/25-grocery.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:d4660d1ccc3ef58d320723913a3d01a8f2363b1b79d93a45",
+          "asset_ids": [
+            "5f1a8328-ea3e-4864-b4a5-505fa2b666f8"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-25-grocery.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement"
+        ],
+        "promptExcerpt": "A minimalist, text-only manifesto graphic design with a solid cream/off-white background. No photography, no human subjects, no physical products, and no 3D elements. The layout relies entirely on high-contrast dark grey/black typography with generous margins and clean negative space, exactly mirroring an editorial print advertisement. \n\nTypography Zones and Layout Relationships:\nTop Left (Headline): Large, bold, dark grey sans-serif text, left-aligned. \nLine 1: \"You've been settling.\"\nLine 2: \""
+      }
+    },
+    {
+      "key": "26-women-health",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "eab14ed3-2d63-528b-8611-f93c194d2a2d",
+        "sourceSwipeTitle": "women_health.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "eab14ed3-2d63-528b-8611-f93c194d2a2d",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-26-women-health-1777779232685.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "17583eb1-8e7e-4fb4-877d-805c432dd88b",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-6b94de8e-2305-479f-a0e7-3aba2f821ff8"
+      },
+      "result": {
+        "assetId": "884d0ee3-175f-4535-9ac8-06f0011cdd4d",
+        "publicId": "1a860c8c-2ec7-4b81-b244-0d1bf3337f9e",
+        "publicUrl": "https://api.moshq.app/public/assets/1a860c8c-2ec7-4b81-b244-0d1bf3337f9e",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/26-women-health.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/26-women-health.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:b17e933e61662fa02b68cfe20880c1c42240bbabc6a7bf60",
+          "asset_ids": [
+            "884d0ee3-175f-4535-9ac8-06f0011cdd4d"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-26-women-health.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "bottle"
+        ],
+        "promptExcerpt": "A square 1:1 split-screen digital ad layout. The composition is divided exactly in half horizontally. \n\nTop Half (50%): A gritty, high-contrast, slightly grainy black-and-white documentary-style photograph. It is a close-up, first-person perspective looking down at a middle-aged man's weathered hands holding a crumpled medical lab report document. The hands show realistic texture, slight veins, and natural aging. The background is a slightly out-of-focus clinical floor and the edge of an exam ta"
+      }
+    },
+    {
+      "key": "29-fb-message-ad",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "sourceSwipeTitle": "fb_message_ad.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f30c4cb6-de5d-5423-a6de-e36fa9fdb24e",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-29-fb-message-ad-1777779428429.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "b880c267-6945-4eff-a9fc-aa3f2e58b843",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-e99f0f6a-bb03-4bfe-b76a-4406a5be304d"
+      },
+      "result": {
+        "assetId": "e6d7cdf7-87b7-463a-963e-13eb9af52295",
+        "publicId": "8b0cfeb8-f49d-4817-8077-c2649d29829d",
+        "publicUrl": "https://api.moshq.app/public/assets/8b0cfeb8-f49d-4817-8077-c2649d29829d",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/29-fb-message-ad.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/29-fb-message-ad.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:127856d8eaf027f17c471a53579dfdc51f0fdf61b42e7043",
+          "asset_ids": [
+            "e6d7cdf7-87b7-463a-963e-13eb9af52295"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-29-fb-message-ad.json"
+      },
+      "promptAudit": {
+        "productTermHits": [],
+        "promptExcerpt": "A native Facebook mobile screen capture of a comment thread on a solid white background. The image must be a tall portrait edge-to-edge screenshot with no extra background outside the white Facebook interface.\n\nTop section: A large, light blue rounded rectangular comment bubble. Inside, top left is a small circular profile picture of a realistic, everyday middle-aged man with slight facial texture and natural lighting. Next to it, bold dark text: \"David Reynolds\". Below this, standard dark gray "
+      }
+    },
+    {
+      "key": "30-researchers-alt",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "sourceSwipeTitle": "researchers.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\n\nRun marker: tenor-walk-away-trt-no-product-30-researchers-alt-1777779494596.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "e73829ab-2e12-46d7-87db-d281c4754c4a",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-fdf8cb3c-041c-4f30-86b5-39a6416e1d83"
+      },
+      "result": {
+        "assetId": "40459718-6ee6-49c3-9f46-2cc2bb21ea87",
+        "publicId": "0b8b3585-c13d-43f0-9483-30b93707ace5",
+        "publicUrl": "https://api.moshq.app/public/assets/0b8b3585-c13d-43f0-9483-30b93707ace5",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/30-researchers-alt.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/30-researchers-alt.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:23799205aded8ea75fa2d5fc04eed25b03216bd043fab4d8",
+          "asset_ids": [
+            "40459718-6ee6-49c3-9f46-2cc2bb21ea87"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-30-researchers-alt.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "pouch",
+          "bottle",
+          "pill"
+        ],
+        "promptExcerpt": "A realistic, candid medium shot of a male doctor (early 40s, natural skin texture, slight facial asymmetry, subtle under-eye darkness, no beauty filters) positioned on the right side of the frame. He is wearing a crisp white lab coat over a light blue button-down shirt, with a black stethoscope draped around his neck. He is looking off-camera to the left, his mouth slightly parted as if mid-explanation, with his right hand raised in a relaxed, open-palm gesture. The background is a large, out-of"
+      }
+    },
+    {
+      "key": "18-target-1",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "b7787513-5b32-578e-85e3-b367207a4238",
+        "sourceSwipeTitle": "target_1.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "b7787513-5b32-578e-85e3-b367207a4238",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\nSource-specific visual requirement: For this target/report-style source, do not render product boxes, cartons, bottles, jars, pouches, packages, or staged packshot columns. Replace any product-stack area with a flat editorial report card, abstract evidence icons, doctor headshot, lab-sheet graphic, or clean negative space.\n\nRun marker: tenor-walk-away-trt-no-product-18-target-1-1777779630139.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "99b8bfb1-cf04-408c-8b42-91ae3ef2b663",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-a4478746-574f-4d73-ab27-00468744c580"
+      },
+      "result": {
+        "assetId": "ce896546-a471-4aa6-a57b-692ab37ec1fe",
+        "publicId": "574ab3a5-9bac-4e69-b41f-61faacd0a878",
+        "publicUrl": "https://api.moshq.app/public/assets/574ab3a5-9bac-4e69-b41f-61faacd0a878",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/18-target-1.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/18-target-1.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:1a58f2bbc29cc97d02822bae2373d84121ffb744bcb61a68",
+          "asset_ids": [
+            "ce896546-a471-4aa6-a57b-692ab37ec1fe"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-18-target-1.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "packaging",
+          "bottle",
+          "jar",
+          "tub",
+          "pill"
+        ],
+        "promptExcerpt": "A clean, bright, high-contrast digital ad composition on a pure white background with a soft, warm pinkish-red radial glow emanating from the center. \n\nTop Typography Zone: A massive, bold, royal blue serif headline centered at the top, split into three stacked lines. The text reads exactly:\n\"THE LAB RESULTS\"\n\"THAT MADE MY\"\n\"HANDS SHAKE\"\n\nMiddle Visual Zone: A staggered arrangement of three flat, rectangular medical lab report cards (white paper documents with subtle printed lines and abstract c"
+      }
+    },
+    {
+      "key": "27-health-cute-advertorial",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "f1921084-1850-53af-8cc3-ae44c9691320",
+        "sourceSwipeTitle": "health_cute_advertorial.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f1921084-1850-53af-8cc3-ae44c9691320",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\nSource-specific visual requirement: For this advertorial-style source, do not render any bottle-shaped silhouette, product mascot, container, pouch, jar, package, or object that could read as a supplement product. Replace the central object with an abstract non-product editorial symbol, winter landscape, document, report page, or neutral visual metaphor.\n\nRun marker: tenor-walk-away-trt-no-product-27-health-cute-advertorial-1777779695264.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "052bc9c0-2dd7-4e51-855d-bd6093a7a6e4",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-8851d6f9-5bb1-4db7-a424-45f5fa64e5b3"
+      },
+      "result": {
+        "assetId": "d237fb05-4945-4c0d-be66-92529527735c",
+        "publicId": "8308b5e2-abd8-4e5e-a9e2-2f77a8d976d8",
+        "publicUrl": "https://api.moshq.app/public/assets/8308b5e2-abd8-4e5e-a9e2-2f77a8d976d8",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/27-health-cute-advertorial.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/27-health-cute-advertorial.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:f336fffe88fbba68b896f7178f7a5782c43f461e272ed8c8",
+          "asset_ids": [
+            "d237fb05-4945-4c0d-be66-92529527735c"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-27-health-cute-advertorial.json"
+      },
+      "promptAudit": {
+        "productTermHits": [],
+        "promptExcerpt": "A precise recreation of a Meta/Facebook link ad format. The composition is split horizontally: the top 55% is a hero image, and the bottom 45% is a solid white link preview card containing text.\n\nHERO IMAGE (Top 55%):\nA serene, realistic winter landscape covered in bright white snow. On the far left, a bare, textured winter tree trunk with branches reaching inward. The background is a softly blurred, frosty forest scene with gentle winter light. Small, crisp white snowflakes are falling througho"
+      }
+    },
+    {
+      "key": "28-five",
+      "awarenessLevel": "Solution-Aware",
+      "source": {
+        "companySwipeId": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+        "sourceSwipeTitle": "5.png",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "f2d7c0da-d4ee-5636-80fc-5f80ac67ff8c",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Walk Away From TRT article, not a physical supplement product",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: \"I Watched My Patient Walk Away From TRT.\" 90 Days Later, His Labs Made My Hands Shake.\nSubheadline: Board-certified MD reveals the four-factor cascade most doctors miss — and the daily protocol thousands of men 40+ are using to feel like themselves again, without the needles.\nPrimary problem: Men 40+ who feel like they are fading and feel stuck between underdosed natural products and the long-term cost, monitoring, injections, crashes, and dependency of TRT.\nPromise: Understand the daily protocol men are trying before committing to TRT.\nMechanism disclosure level: Partial mechanism; the destination article introduces the four-factor cascade behind low drive and why one-lever testosterone boosters are incomplete.\nProof type: Doctor-led advertorial using patient story, lab-result narrative, formula transparency, reported user experience, guarantee, and offer.\nCTA / urgency: Article-read CTA leading into claiming the protocol, with current offer framing around Save 30%, free welcome gifts, free shipping, and a 90-day guarantee.\nCompliance posture: Matches the downstream advertorial posture and funnel stage.\nAsset stage: Ad to advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the visual carry more of the ad so the image can be evaluated clearly.\n\nApproved visual requirement:\nApproved visual requirement for this campaign: no product reveal. Do not show any Tenor product, supplement bottle, pouch, jar, tub, box, pack, packshot, product label, capsule, gummy, pill, fake branded supplement container, or physical packaged product anywhere in the image. If the source swipe contains product packaging or a packshot area, preserve the source structure by replacing that region with a non-product editorial element such as a doctor/patient portrait, article/report card, neutral document, notebook, badge, abstract texture, empty negative space, or other non-product visual proxy. Keep the ad congruent with the destination article and awareness level without revealing the physical product or mechanism.\nSource-specific visual requirement: For this source, do not render white product boxes, cartons, bottles, pouches, supplement packs, product displays, or any staged product-like object. Replace the product zone with an article/report visual, folded lab document, neutral clinical card, stethoscope, or clean negative space.\n\nRun marker: tenor-walk-away-trt-no-product-28-five-1777779771158.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "4e7f02eb-5c99-444d-981d-044584e09fa9",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-1bdf331d-15b3-4092-8ec8-75356eaca3e5"
+      },
+      "result": {
+        "assetId": "037981bd-40c2-49aa-9f40-2bc5bd130075",
+        "publicId": "4f20349b-2201-4760-ad89-f3b6a36a9d2d",
+        "publicUrl": "https://api.moshq.app/public/assets/4f20349b-2201-4760-ad89-f3b6a36a9d2d",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/generated/28-five.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-walk-away-trt-no-product-review-2026-05-03/generated/28-five.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:8cad3cb58f20b9d6240a7d376a9a4ab2cfbdd06372a976c3",
+          "asset_ids": [
+            "037981bd-40c2-49aa-9f40-2bc5bd130075"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-walk-away-trt-no-product-regeneration-2026-05-03/workflow-28-five.json"
+      },
+      "promptAudit": {
+        "productTermHits": [
+          "supplement",
+          "pouch",
+          "bottle"
+        ],
+        "promptExcerpt": "A high-resolution, brightly lit studio product shot on a clean, light grey seamless background. The composition is split into distinct visual zones. \n\nOn the left side, standing perfectly upright, is a fresh, textured green cucumber. Resting exactly at the base of the cucumber are two whole, textured brown walnuts, creating a clear, scroll-stopping visual metaphor. \n\nIn the center-right, occupying the exact spatial footprint where a product pouch would normally sit, is a standard 8.5x11 medical "
+      }
+    }
+  ],
+  "updatedAt": "2026-05-03T03:47:43.621Z",
+  "batchId": "tenor-walk-away-trt-no-product-20260503",
+  "generationKey": "batch:tenor-walk-away-trt-no-product-20260503",
+  "batchStamp": {
+    "status": "ok",
+    "batchId": "tenor-walk-away-trt-no-product-20260503",
+    "assetCount": 30
+  }
+}

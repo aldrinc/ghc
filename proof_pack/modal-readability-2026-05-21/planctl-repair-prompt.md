@@ -1,0 +1,1188 @@
+# Plan Repair Prompt
+
+Goal: repair the implementation until the plan contract passes.
+
+Plan ID: `2026-05-21-modal-readability-plan`
+Contract: `/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-21-modal-readability-plan.md`
+Repair JSON: `/Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/planctl-repair.json`
+
+Rules:
+- Read the original plan and contract before editing.
+- Fix only the failing or brittle items.
+- Update item status, artifacts, and notes in the contract.
+- Run verification again with `planctl verify <contract> --run`.
+
+Errors:
+- none
+
+Warnings:
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P01: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P02: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P03: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P04: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P05: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P06: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P07: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P08: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P09: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P10: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P11: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P12: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P13: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P14: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P15: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P16: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P17: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P18: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P19: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P20: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P21: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P22: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P23: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P24: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P25: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P26: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P27: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P28: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P29: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P30: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P31: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P32: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P33: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P34: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P35: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P36: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P37: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P38: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P39: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P40: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P41: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P42: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P43: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P44: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P45: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P46: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P47: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P48: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P49: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P50: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P51: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P52: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P53: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P54: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P55: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P56: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P57: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P58: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P59: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P60: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P61: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P62: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P63: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P64: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P65: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P66: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P67: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P68: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P69: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P70: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P71: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P72: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P73: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P74: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P75: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P76: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P77: no verify_commands
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:187: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:203: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:207: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:210: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:216: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:275: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:281: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:312: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/pages/dev/ComponentReviewPage.tsx:485: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:494: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:535: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:605: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/campaigns/SwipeCollectionSelector.tsx:667: brittle marker `placeholder`
+- /Users/aldrinclement/Documents/programming/marketi/proof_pack/modal-readability-2026-05-21/test-unit.log:427: brittle marker `Not implemented`
+- P78: no verify_commands

@@ -1,0 +1,186 @@
+{
+  "campaignId": "0a9470aa-97be-4cc2-9099-a30ae8d1daf4",
+  "generationKey": "tenor-pipeline-v3-meta-20260430",
+  "manifestPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-meta-campaign-draft-2026-04-30/generated-manifest.json",
+  "createdAt": "2026-04-30T04:25:41.539Z",
+  "creativeSpecs": {
+    "created": [
+      {
+        "adId": "AV-A1",
+        "assetId": "11a360ce-56e0-4fdc-b174-49d806b86aac",
+        "creativeSpecId": "be91316b-a1e9-475d-ab2d-a7a949842594"
+      },
+      {
+        "adId": "AV-A2",
+        "assetId": "feec87db-763e-4713-ab2c-e0d50c412330",
+        "creativeSpecId": "f55bc6e7-b644-42fd-8c7a-6c23e984d3d6"
+      },
+      {
+        "adId": "AV-A3",
+        "assetId": "6caaf28e-644b-44f9-b043-6a77fc1681bf",
+        "creativeSpecId": "5a0c0e28-efbb-4f2b-9ee8-b3fabe9b14fb"
+      },
+      {
+        "adId": "AV-A4",
+        "assetId": "0b299b87-bbb2-42ce-8d89-c59b786a7db8",
+        "creativeSpecId": "014ac461-23c8-4c35-b3a7-1f4ff5360e6f"
+      },
+      {
+        "adId": "AV-B1",
+        "assetId": "68e67a56-31e1-4b34-a185-24867fdbf265",
+        "creativeSpecId": "aedc7351-d692-4c70-a2dc-bdc9f5b9df18"
+      },
+      {
+        "adId": "AV-B2",
+        "assetId": "efeff0d8-4b2e-4eb2-83cc-1c0935348639",
+        "creativeSpecId": "ac3b766b-568f-40c5-be8e-e92ce763855f"
+      },
+      {
+        "adId": "AV-B3",
+        "assetId": "3e529cc4-5975-4ddc-b905-5026f107e9d6",
+        "creativeSpecId": "a46f8164-bce0-4c36-a093-c6fd56421da7"
+      },
+      {
+        "adId": "AV-B4",
+        "assetId": "0c8410d4-46d0-4e99-b297-e912a7de9c10",
+        "creativeSpecId": "401ffc3c-f93d-4b6f-a541-52ff0b0caf3a"
+      },
+      {
+        "adId": "AV-C1",
+        "assetId": "ee72ed2f-d294-4ce8-8a51-8c4f51bb0805",
+        "creativeSpecId": "030a311a-3c93-4b26-b733-fef409a48870"
+      },
+      {
+        "adId": "AV-C2",
+        "assetId": "9f7e7454-f7ce-48f7-af36-1ecd74e917c4",
+        "creativeSpecId": "ba744474-017b-4da0-b39f-ee2a808a5a2c"
+      },
+      {
+        "adId": "AV-C3",
+        "assetId": "b23b6840-d51a-4f90-9baa-29158a8853d3",
+        "creativeSpecId": "28420186-d422-422c-914f-1cebb934dc81"
+      },
+      {
+        "adId": "AV-C4",
+        "assetId": "f67f24bb-b915-4c47-a9af-ee3935220aa5",
+        "creativeSpecId": "03ceafd8-6d1f-4e02-8ff4-4abfc2d9751c"
+      },
+      {
+        "adId": "L1",
+        "assetId": "4e8c716c-a303-4907-9d9e-558effa0b61d",
+        "creativeSpecId": "5c3aff7f-1df2-43e8-83c4-9a9c8f0791e7"
+      },
+      {
+        "adId": "L2",
+        "assetId": "3c90769c-ac9a-4a38-8ba2-66ea0d694e11",
+        "creativeSpecId": "c3e10c5a-824a-4f7e-a3e9-57365b1d955e"
+      },
+      {
+        "adId": "L3",
+        "assetId": "f7b974f8-0d85-4572-95ef-940896b0777a",
+        "creativeSpecId": "252d380d-5b6e-4210-9442-9ec6ecf3bef0"
+      },
+      {
+        "adId": "L4",
+        "assetId": "cdc714a0-90d2-4324-82b6-975125f3659d",
+        "creativeSpecId": "b73dea1c-7a09-4952-bef2-f97da46cbff0"
+      },
+      {
+        "adId": "L5",
+        "assetId": "896cfb58-2d82-4ae3-88b0-0ea94eacb6ca",
+        "creativeSpecId": "02f233ae-2fdd-4263-95b4-2bac77dba4de"
+      },
+      {
+        "adId": "L6",
+        "assetId": "1cd420bb-4419-44eb-8ad7-dec45f49aeb5",
+        "creativeSpecId": "53d819b7-9e5f-4556-bfcb-34855b376544"
+      },
+      {
+        "adId": "L7",
+        "assetId": "77376256-392b-4c93-a40e-1627bfdef0ee",
+        "creativeSpecId": "c4f2f10e-bf2c-4133-a152-42f71cc84747"
+      },
+      {
+        "adId": "L8",
+        "assetId": "ff4f3189-6a46-4eb0-a18e-27f761aef4c2",
+        "creativeSpecId": "baf109b6-7ccb-48fd-a582-7ae9066859c2"
+      },
+      {
+        "adId": "L9",
+        "assetId": "14997762-da57-49ee-8027-13f1078fe212",
+        "creativeSpecId": "80964096-4564-484e-86bb-849d99f54cab"
+      },
+      {
+        "adId": "L10",
+        "assetId": "9c0d289b-df7c-4671-bf75-45f56bd8c82b",
+        "creativeSpecId": "8849af8b-29ea-4bb5-ac32-bf542bbe76ad"
+      },
+      {
+        "adId": "L11",
+        "assetId": "c1b12aba-2a76-4992-aad2-77959a369b72",
+        "creativeSpecId": "187d87c5-dde3-40ed-8747-c9eba87a9358"
+      },
+      {
+        "adId": "L12",
+        "assetId": "9fed8f51-32e5-44d8-9cf0-c70b559f57c3",
+        "creativeSpecId": "bdb86330-21ba-4e0d-8c90-fec1e620af9e"
+      },
+      {
+        "adId": "PDP1",
+        "assetId": "64f570c3-93b4-4283-b059-3640137f18cd",
+        "creativeSpecId": "60bb09db-19c1-44ab-9234-8223a89c5d40"
+      },
+      {
+        "adId": "PDP2",
+        "assetId": "0565daa9-1712-4f0e-8f95-84f448d1a8fc",
+        "creativeSpecId": "ea9b1919-e046-41cf-a83a-c860bbc4bd72"
+      },
+      {
+        "adId": "PDP3",
+        "assetId": "e06c0f25-bdfd-4be2-875a-510e28908c75",
+        "creativeSpecId": "0a7e342c-2f6e-4f44-9695-4425adf8884c"
+      },
+      {
+        "adId": "PDP4",
+        "assetId": "2bccdb26-a6ae-495b-b76a-9954c6d71d48",
+        "creativeSpecId": "8e5ef11e-eb45-42dc-b6f3-164dbcf99e40"
+      },
+      {
+        "adId": "PDP5",
+        "assetId": "4f2a18e8-761c-4cfc-9b17-a5f5fbf458e9",
+        "creativeSpecId": "011cb661-3556-47c1-bbc0-0130bf66667d"
+      },
+      {
+        "adId": "PDP6",
+        "assetId": "aa7e9828-df76-4866-a87d-1a076d0494d9",
+        "creativeSpecId": "2b200960-d362-4a25-a03f-6393762e0bfd"
+      }
+    ],
+    "verified": []
+  },
+  "adsetSpecs": {
+    "created": [
+      {
+        "bucketIndex": 1,
+        "adsetSpecId": "ab6fb2f7-5c3d-45c9-9391-1d9fa0dd2b34"
+      },
+      {
+        "bucketIndex": 2,
+        "adsetSpecId": "33a487b5-ed48-4e29-8497-7c5afa708f52"
+      },
+      {
+        "bucketIndex": 3,
+        "adsetSpecId": "c073d02b-92d5-443b-9e66-985fe45f8d8e"
+      },
+      {
+        "bucketIndex": 4,
+        "adsetSpecId": "1d9e2b9b-e2cd-47a2-8677-c98582f89bd0"
+      },
+      {
+        "bucketIndex": 5,
+        "adsetSpecId": "3f7cf7cb-39f2-4ad0-9658-446400e1542c"
+      }
+    ],
+    "verified": []
+  }
+}

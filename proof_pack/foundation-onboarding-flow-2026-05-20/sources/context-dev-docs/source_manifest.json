@@ -1,0 +1,89 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "context-dev-docs",
+  "created_at": "2026-05-20T20:26:51.122108+00:00",
+  "source_type": "docs",
+  "source": "https://docs.context.dev/",
+  "operator_notes": "Context.dev docs used to refine existing-business brand scraping plan.",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/llms.txt",
+      "kind": "raw_files",
+      "sha256": "12b4e972aa56d5aeaf11d84c23198faf94d8f313fabad6010fcea80b90bc2e9f",
+      "bytes": 9713,
+      "captured_at": "2026-05-20T20:26:54.775262+00:00",
+      "source": "https://docs.context.dev/llms.txt",
+      "notes": "Documentation index."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/onboarding-flows.html",
+      "kind": "raw_files",
+      "sha256": "1d9fd635871bcf523ad96b832508c401f8f52baa48a833b38182d8f93f5fa0f9",
+      "bytes": 350897,
+      "captured_at": "2026-05-20T20:26:58.341225+00:00",
+      "source": "https://docs.context.dev/guides/use-cases/onboarding-flows",
+      "notes": "Prefilled onboarding flow guidance."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/query-website-data-using-ai.html",
+      "kind": "raw_files",
+      "sha256": "8b8751e927d331fd0be9512f3eaaa25933d116d2913e5dfac961894d2c656d43",
+      "bytes": 348260,
+      "captured_at": "2026-05-20T20:27:02.012557+00:00",
+      "source": "https://docs.context.dev/api-reference/web-extraction/query-website-data-using-ai",
+      "notes": "AI query endpoint contract."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/retrieve-brand-data-by-domain.html",
+      "kind": "raw_files",
+      "sha256": "625d0042ce7e3d75d33320ee88d1b17bea027f72475ae2ee6a07690cc26a7f91",
+      "bytes": 401237,
+      "captured_at": "2026-05-20T20:27:05.567208+00:00",
+      "source": "https://docs.context.dev/api-reference/brand-intelligence/retrieve-brand-data-by-domain",
+      "notes": "Brand retrieve endpoint contract."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/extract-products-from-a-brands-website.html",
+      "kind": "raw_files",
+      "sha256": "884f9e24da0005ce00ec45332516178b4be3b43793de756997c68ecb816cce10",
+      "bytes": 339240,
+      "captured_at": "2026-05-20T20:27:09.255870+00:00",
+      "source": "https://docs.context.dev/api-reference/web-extraction/extract-products-from-a-brands-website",
+      "notes": "AI product extraction endpoint contract."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/scrape-markdown.html",
+      "kind": "raw_files",
+      "sha256": "d0caa0e5811a94c10529c6a619333d8f3fa5a079cb5f0d4771906867ec504293",
+      "bytes": 362630,
+      "captured_at": "2026-05-20T20:27:12.821314+00:00",
+      "source": "https://docs.context.dev/api-reference/web-scraping/scrape-markdown",
+      "notes": "Scrape markdown endpoint contract."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/prefetch-brand-data-for-a-domain.html",
+      "kind": "raw_files",
+      "sha256": "fec291ff1366ef9040da9c54d86ae2372c49c97f3b5dc67c80c0682897cb30a0",
+      "bytes": 328716,
+      "captured_at": "2026-05-20T20:27:28.629316+00:00",
+      "source": "https://docs.context.dev/api-reference/utility/prefetch-brand-data-for-a-domain",
+      "notes": "Domain prefetch endpoint contract."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundation-onboarding-flow-2026-05-20/sources/context-dev-docs/raw/openapi.documented-29f9fc263f.yml",
+      "kind": "raw_files",
+      "sha256": "96d0a8e3e51e91ce7d4b38b7a3fdb16ec6f67f19679452848ff2c14f3ea92f4c",
+      "bytes": 258488,
+      "captured_at": "2026-05-20T20:37:35.292904+00:00",
+      "source": "https://docs.context.dev/",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-20T22:28:16.429365+00:00",
+    "errors": []
+  }
+}

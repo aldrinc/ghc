@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "generated_at": "2026-05-21T01:43:38.533Z",
+  "objective": "Validate onboarding primary actions are disabled until current form validation passes.",
+  "files": {
+    "wizard": "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx",
+    "test": "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.test.tsx"
+  },
+  "checks": {
+    "url_validation_helper_exists": true,
+    "step_validity_gate_exists": true,
+    "continue_disabled_until_valid": true,
+    "create_disabled_until_valid": true,
+    "review_done_disabled_until_valid": true,
+    "empty_continue_tested": true,
+    "invalid_url_tested": true,
+    "review_done_tested": true
+  },
+  "failed": []
+}

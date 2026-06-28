@@ -1,0 +1,75 @@
+{
+  "source": "local testimonial renderer using locally generated portrait avatars",
+  "synthetic": true,
+  "productionChanged": false,
+  "sourceManifest": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-ambassador-testimonial-local-2026-04-27_23-39-38/manifest.json",
+  "outputImage": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-ambassador-testimonial-avatar-local-2026-04-28_13-13-09/tenor-ambassador-testimonial-with-avatars.png",
+  "testimonial": {
+    "name": "Marcus Ellison",
+    "verified": true,
+    "rating": 5,
+    "review": "Three months in and the difference in my daily energy is night and day. I used to hit a wall around 2 PM every afternoon\u2014now I push through my workouts and still have gas in the tank for my kids after dinner. Tenor fits right into my routine without any jitters or crash.",
+    "persona": "38-year-old father of two who works in construction management and trains at a local gym four mornings a week; looking for steady energy and vitality support that doesn't interfere with his demanding schedule.",
+    "avatarPrompt": "Realistic candid portrait of a fit 38-year-old man with a short beard and sun-weathered skin, wearing a plain dark henley shirt, warm natural lighting, neutral background, no logos or text, slight smile, confident expression.",
+    "heroImagePrompt": "A realistic lifestyle scene of a fit man in his late thirties doing dumbbell rows in a well-lit garage gym early in the morning, golden sunrise light streaming through an open garage door, gym equipment in the background, energetic and focused mood, no brand logos visible.",
+    "mediaPrompts": [
+      "Close-up of a man's hand holding two supplement capsules next to a glass of water on a clean kitchen counter in morning light",
+      "A neatly organized gym bag on a wooden bench with a shaker bottle, towel, and the product bottle visible inside",
+      "A man in athletic wear stretching outdoors in a suburban backyard at dawn, looking energized and focused"
+    ],
+    "reply": {
+      "name": "Jordan Whitfield",
+      "persona": "32-year-old personal trainer and wellness enthusiast who recently started recommending vitality supplements to his male clients over 35.",
+      "text": "Same experience here, Marcus. I started taking it about six weeks ago and the consistency is what stands out\u2014no spikes, no crashes, just a solid baseline of drive throughout the day. My recovery between sessions feels noticeably smoother too.",
+      "avatarPrompt": "Realistic candid portrait of a lean 32-year-old man with a clean fade haircut, wearing a plain gray athletic t-shirt, bright indoor lighting, neutral gym-like background, friendly approachable expression, no logos or text.",
+      "time": "3d",
+      "reactionCount": 7
+    },
+    "meta": {
+      "location": "Austin, TX",
+      "date": "2026-03-18"
+    }
+  },
+  "avatars": [
+    {
+      "kind": "primary",
+      "name": "Marcus Ellison",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-ambassador-testimonial-avatar-local-2026-04-28_13-13-09/primary-avatar.png"
+    },
+    {
+      "kind": "reply",
+      "name": "Jordan Whitfield",
+      "path": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-ambassador-testimonial-avatar-local-2026-04-28_13-13-09/reply-avatar.png"
+    }
+  ],
+  "renderPayload": {
+    "template": "social_comment",
+    "header": {
+      "title": "All comments",
+      "showSortIcon": true
+    },
+    "comments": [
+      {
+        "name": "Marcus Ellison",
+        "text": "Three months in and the difference in my daily energy is night and day. I used to hit a wall around 2 PM every afternoon\u2014now I push through my workouts and still have gas in the tank for my kids after dinner. Tenor fits right into my routine without any jitters or crash.",
+        "meta": {
+          "time": "2026-03-18"
+        },
+        "reactionCount": 11,
+        "replies": [
+          {
+            "name": "Jordan Whitfield",
+            "text": "Same experience here, Marcus. I started taking it about six weeks ago and the consistency is what stands out\u2014no spikes, no crashes, just a solid baseline of drive throughout the day. My recovery between sessions feels noticeably smoother too.",
+            "meta": {
+              "time": "3d"
+            },
+            "reactionCount": 7,
+            "avatarUrl": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-ambassador-testimonial-avatar-local-2026-04-28_13-13-09/reply-avatar.png"
+          }
+        ],
+        "viewRepliesText": "View 1 reply",
+        "avatarUrl": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-ambassador-testimonial-avatar-local-2026-04-28_13-13-09/primary-avatar.png"
+      }
+    ]
+  }
+}

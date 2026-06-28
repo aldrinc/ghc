@@ -1,0 +1,217 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "foundational-step01-deerflow-default",
+  "created_at": "2026-05-21T19:35:51.978154+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack/foundational-step01-deerflow-default-2026-05-21",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Add backend settings so Strategy V2 foundational Step 01 defaults to DeerFlow/DSV4 Pro and can be forced back to GPT with an explicit provider flag.",
+      "source_line": 3,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Default provider is deerflow.",
+        "Default DeerFlow model is deepseek-v4-pro.",
+        "GPT can be forced with STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER=gpt."
+      ],
+      "verify_commands": [
+        "rg -q 'STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER: str = \"deerflow\"' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/config.py",
+        "rg -q 'STRATEGY_V2_FOUNDATIONAL_STEP01_DEERFLOW_MODEL: str = \"deepseek-v4-pro\"' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/config.py",
+        "rg -q 'STRATEGY_V2_FOUNDATIONAL_STEP01_PROVIDER=gpt' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/direct-assertions.log"
+      ],
+      "notes": "Done. Provider default is DeerFlow/DSV4 Pro; GPT requires an explicit flag."
+    },
+    {
+      "id": "P02",
+      "objective": "Add a MOS-owned DeerFlow Step 01 sidecar runner that sends the already-rendered production prompt through DeerFlow with web search, web fetch, calculator, thinking enabled, and no output token cap.",
+      "source_line": 4,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/services/deerflow_foundational.py",
+        "mos/backend/scripts/run_deerflow_foundational_step.py"
+      ],
+      "acceptance": [
+        "MOS wrapper exists and executes the DeerFlow sidecar runner.",
+        "Sidecar runner exposes model, config path, prompt input, output path, thinking, tool usage capture, and no max output cap.",
+        "Runner help command works locally."
+      ],
+      "verify_commands": [
+        "test -f /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/services/deerflow_foundational.py",
+        "test -f /Users/aldrinclement/Documents/programming/marketi/mos/backend/scripts/run_deerflow_foundational_step.py",
+        "rg -q 'no_output_token_cap' /Users/aldrinclement/Documents/programming/marketi/mos/backend/scripts/run_deerflow_foundational_step.py",
+        "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run python scripts/run_deerflow_foundational_step.py --help >/dev/null"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "mos/backend/app/services/deerflow_foundational.py",
+        "mos/backend/scripts/run_deerflow_foundational_step.py",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/py-compile.log"
+      ],
+      "notes": "Done. The wrapper loads sidecar env only into the subprocess and does not print secrets."
+    },
+    {
+      "id": "P03",
+      "objective": "Wire only foundational Step 01 to the DeerFlow provider path; leave foundational Steps 03, 04, and 06 on the existing GPT/deep-research path.",
+      "source_line": 5,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py"
+      ],
+      "acceptance": [
+        "Both Step 01 execution paths call _run_foundational_step01.",
+        "No Step 03, Step 04, or Step 06 callsite is routed to DeerFlow."
+      ],
+      "verify_commands": [
+        "rg -q 'step01 = _run_foundational_step01' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "rg -q 'foundational_step_01_deerflow' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "rg -q '_FOUNDATIONAL_STEP03_MODEL' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "rg -q '_FOUNDATIONAL_STEP04_MODEL' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "rg -q '_FOUNDATIONAL_STEP06_MODEL' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/direct-assertions.log"
+      ],
+      "notes": "Done. Only foundational Step 01 gets DeerFlow default routing."
+    },
+    {
+      "id": "P04",
+      "objective": "Fail loudly when DeerFlow sidecar prerequisites are missing; do not silently fall back to GPT.",
+      "source_line": 6,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/services/deerflow_foundational.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py"
+      ],
+      "acceptance": [
+        "Missing sidecar/config/runner/env/nonzero output raises DeerFlowFoundationalError.",
+        "Activity maps DeerFlow errors to StrategyV2ExternalDependencyError.",
+        "Remediation message says to set GPT provider explicitly; no automatic fallback exists."
+      ],
+      "verify_commands": [
+        "rg -q 'DeerFlowFoundationalError' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/services/deerflow_foundational.py",
+        "rg -q 'is missing' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/services/deerflow_foundational.py",
+        "rg -q 'StrategyV2ExternalDependencyError' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "rg -q 'explicit GPT run' /Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "mos/backend/app/services/deerflow_foundational.py",
+        "mos/backend/app/temporal/activities/strategy_v2_activities.py",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/direct-assertions.log"
+      ],
+      "notes": "Done. Missing sidecar test passes in direct assertions."
+    },
+    {
+      "id": "P05",
+      "objective": "Add focused tests for default provider config, GPT override behavior, DeerFlow routing, and missing sidecar failure.",
+      "source_line": 7,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/tests/test_strategy_v2_foundational_step01_provider.py",
+        "mos/backend/tests/test_config_env_precedence.py",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/verify_step01_provider.py"
+      ],
+      "acceptance": [
+        "Focused direct assertions pass without hitting the project-wide DB migration fixture.",
+        "Pytest blocker is recorded with exact logs."
+      ],
+      "verify_commands": [
+        "rg -q 'direct step01 provider assertions passed' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/direct-assertions.log",
+        "rg -q 'connection to server at \"localhost\"' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/pytest-postgres.log",
+        "rg -q 'CREATE EXTENSION IF NOT EXISTS' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/pytest-sqlite.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "mos/backend/tests/test_strategy_v2_foundational_step01_provider.py",
+        "mos/backend/tests/test_config_env_precedence.py",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/verify_step01_provider.py",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/direct-assertions.log",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/pytest-postgres.log",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/pytest-sqlite.log"
+      ],
+      "notes": "Done. Focused assertions pass. Pytest is blocked by local DB/Alembic bootstrap, not by these provider assertions."
+    },
+    {
+      "id": "P06",
+      "objective": "Record cost math from the tested run and verify implementation locally.",
+      "source_line": 8,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/run-cost.md",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/sources/pricing/source_manifest.json",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/provcheck-run-cost.log"
+      ],
+      "acceptance": [
+        "Run cost uses deduped DeerFlow usage metadata.",
+        "Pricing sources are captured and verified.",
+        "Ruff, py_compile, direct assertions, capturectl, and provcheck pass."
+      ],
+      "verify_commands": [
+        "rg -q 'DeepSeek cost: \\*\\*\\$0.0416\\*\\*' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/run-cost.md",
+        "rg -q 'Best measured estimate' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/run-cost.md",
+        "rg -q 'status: pass' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/capturectl-pricing-verify.log",
+        "rg -q 'status: pass' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/provcheck-run-cost.log",
+        "rg -q 'All checks passed' /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/ruff.log"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/run-cost.md",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/sources/pricing/source_manifest.json",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/capturectl-pricing-verify.log",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/provcheck-run-cost.log",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/ruff.log",
+        "proof_pack/foundational-step01-deerflow-default-2026-05-21/logs/py-compile.log"
+      ],
+      "notes": "Done. Cost report records measured and conservative no-cache bounds."
+    }
+  ],
+  "global_verify_commands": [
+    "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run python -m py_compile app/services/deerflow_foundational.py scripts/run_deerflow_foundational_step.py app/temporal/activities/strategy_v2_activities.py tests/test_strategy_v2_foundational_step01_provider.py tests/test_config_env_precedence.py",
+    "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && uv run ruff check app/services/deerflow_foundational.py scripts/run_deerflow_foundational_step.py tests/test_strategy_v2_foundational_step01_provider.py",
+    "cd /Users/aldrinclement/Documents/programming/marketi/mos/backend && DATABASE_URL=sqlite:///./.tmp/direct-step01-provider.db uv run python /Users/aldrinclement/Documents/programming/marketi/proof_pack/foundational-step01-deerflow-default-2026-05-21/verify_step01_provider.py"
+  ],
+  "global_acceptance": [
+    "Foundational Step 01 defaults to DeerFlow DSV4 Pro.",
+    "GPT path remains available only by explicit flag.",
+    "Missing DeerFlow sidecar fails loudly with no fallback.",
+    "Cost report and pricing source manifest are captured."
+  ]
+}

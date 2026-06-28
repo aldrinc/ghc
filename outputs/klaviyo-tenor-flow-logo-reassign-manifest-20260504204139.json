@@ -1,0 +1,81 @@
+{
+  "created_at": "2026-05-04T20:41:51.934Z",
+  "flow_id": "Vy4zyb",
+  "results": [
+    {
+      "action_id": "105690567",
+      "source_template_id": "RhsKJf",
+      "before_template_id": "WfD7Yw",
+      "after_template_id": "WfD7Yw",
+      "reassigned": false,
+      "subject": "It's not just you",
+      "status": "draft",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 01 - It's not just you",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "html_bytes": 3616
+    },
+    {
+      "action_id": "105690569",
+      "source_template_id": "YtahLb",
+      "before_template_id": "XSSfjT",
+      "after_template_id": "S4WNrD",
+      "reassigned": true,
+      "subject": "Three things that fall together",
+      "status": "draft",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 02 - Three things that fall together",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4360
+    },
+    {
+      "action_id": "105690571",
+      "source_template_id": "SsRAC7",
+      "before_template_id": "Rfyvzc",
+      "after_template_id": "WJA9Z5",
+      "reassigned": true,
+      "subject": "21 ingredients, zero secrets",
+      "status": "draft",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 03 - 21 ingredients, zero secrets",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "html_bytes": 3955
+    },
+    {
+      "action_id": "105690573",
+      "source_template_id": "W3HmD5",
+      "before_template_id": "Yrg3B8",
+      "after_template_id": "RgFf8e",
+      "reassigned": true,
+      "subject": "The Triad most men don't know exists",
+      "status": "draft",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 04 - The Triad most men don't know exists",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4330
+    },
+    {
+      "action_id": "105690576",
+      "source_template_id": "RPQxZu",
+      "before_template_id": "RMWhQr",
+      "after_template_id": "SYtShj",
+      "reassigned": true,
+      "subject": "The protocol, the guarantee, and the math",
+      "status": "draft",
+      "template_name": "[Tenor] DDE Welcome 5+2 20260504185333 - Core 05 - The protocol, the guarantee, and the math",
+      "editor_type": "CODE",
+      "has_wordmark": true,
+      "has_old_text_header": false,
+      "has_unsubscribe": true,
+      "html_bytes": 4362
+    }
+  ]
+}

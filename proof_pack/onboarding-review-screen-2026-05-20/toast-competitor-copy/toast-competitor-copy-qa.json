@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-05-21T00:45:00.500Z",
+  "competitorScreen": {
+    "heading": "Any competitors your agent should know about?",
+    "helperText": "One per line",
+    "removedCopy": "Leave blank if you do not have any yet.",
+    "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy/competitor-copy.png"
+  },
+  "toast": {
+    "type": "info",
+    "expectedBackground": "rgb(47, 102, 234)",
+    "expectedBorderRadius": "12px",
+    "measured": {
+      "backgroundColor": "rgb(47, 102, 234)",
+      "borderRadius": "12px",
+      "width": 380,
+      "height": 76
+    },
+    "screenshot": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-review-screen-2026-05-20/toast-competitor-copy/toast-info.png"
+  }
+}

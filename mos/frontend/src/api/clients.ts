@@ -408,6 +408,25 @@ export type ClientShopifyThemeBrandAuditResponse = {
   isReady: boolean;
 };
 
+export type FoundationReadinessStatus =
+  | "foundation_pending"
+  | "foundation_failed"
+  | "foundation_ready";
+
+export type ClientFoundationReadiness = {
+  status: FoundationReadinessStatus;
+  should_gate_overview: boolean;
+  reason: string;
+  strategy_workflow_run_id?: string | null;
+  strategy_workflow_status?: string | null;
+  onboarding_workflow_run_id?: string | null;
+  onboarding_workflow_status?: string | null;
+  required_step_keys: string[];
+  present_step_keys: string[];
+  missing_step_keys: string[];
+  checked_at: string;
+};
+
 export function useClients() {
   const { get } = useApiClient();
   return useQuery<Client[]>({
@@ -422,6 +441,25 @@ export function useClient(clientId?: string) {
     queryKey: ["clients", clientId],
     queryFn: () => get(`/clients/${clientId}`),
     enabled: Boolean(clientId),
+  });
+}
+
+export function useClientFoundationReadiness(
+  clientId?: string,
+  productId?: string,
+  options?: { enabled?: boolean; refetchIntervalMs?: number }
+) {
+  const { get } = useApiClient();
+  const enabled = Boolean(clientId && productId) && (options?.enabled ?? true);
+  const intervalMs = options?.refetchIntervalMs ?? 15000;
+
+  return useQuery<ClientFoundationReadiness>({
+    queryKey: ["clients", "foundation-readiness", clientId, productId],
+    queryFn: () =>
+      get(`/clients/${clientId}/foundation-readiness?productId=${encodeURIComponent(productId || "")}`),
+    enabled,
+    refetchInterval: (query) =>
+      query.state.data?.status === "foundation_pending" ? intervalMs : false,
   });
 }
 
@@ -1087,15 +1125,18 @@ export function useAuditClientShopifyThemeBrand(clientId?: string) {
   });
 }
 
-export function useCreateClient() {
+export function useCreateClient(options?: { showSuccessToast?: boolean }) {
   const { post } = useApiClient();
   const queryClient = useQueryClient();
+  const showSuccessToast = options?.showSuccessToast ?? true;
 
   return useMutation({
     mutationFn: (payload: { name: string; industry?: string; strategyV2Enabled?: boolean }) =>
       post<Client>("/clients", payload),
     onSuccess: () => {
-      toast.success("Client created");
+      if (showSuccessToast) {
+        toast.success("Workspace created");
+      }
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     },
     onError: (err: ApiError | Error) => {
@@ -1113,12 +1154,93 @@ export function useUpdateClient() {
     mutationFn: ({ clientId, payload }: { clientId: string; payload: Record<string, unknown> }) =>
       request<Client>(`/clients/${clientId}`, { method: "PATCH", body: JSON.stringify(payload) }),
     onSuccess: (_data, vars) => {
-      toast.success("Client updated");
+      toast.success("Workspace updated");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       queryClient.invalidateQueries({ queryKey: ["clients", vars.clientId] });
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to update client";
+      toast.error(message);
+    },
+  });
+}
+
+export type MarketingAgentSetupPayload = {
+  business_type: "new" | "existing";
+  input_mode?: "manual_seed" | "source_extract" | "context_dev_reviewed";
+  business_url?: string;
+  business_name?: string;
+  business_model?: string;
+  offering_kind?: "product" | "service" | "software" | "course" | "lead_generation" | "marketplace" | "other";
+  offering_type?: string;
+  offering_name?: string;
+  offering_description?: string;
+  product_category?: string;
+  category?: string;
+  price?: string;
+  starting_rate?: string;
+  pricing_model?: string;
+  charge_model?: string;
+  competitor_urls?: string[];
+  compliance_notes?: string;
+  context_dev_summary?: Record<string, unknown>;
+  extraction_review?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type MarketingAgentSetupResponse = {
+  workflow_run_id: string;
+  temporal_workflow_id: string;
+  product_id: string;
+  product_name?: string;
+  default_offer_id?: string;
+  pricing_status?: "concrete" | "later" | "needs_concrete_price";
+};
+
+export type MarketingAgentExtractionResponse = {
+  provider: "context_dev";
+  domain: string;
+  business_url: string;
+  competitor_urls: string[];
+  raw_artifact_id?: string;
+  fields: Record<string, {
+    value: unknown;
+    provenance: string;
+    provider: string;
+    endpoint: string;
+    raw_path: string;
+    confidence: string;
+    evidence?: string | null;
+  }>;
+  requests: Record<string, unknown>;
+};
+
+export function useExtractMarketingAgentContext() {
+  const { post } = useApiClient();
+
+  return useMutation({
+    mutationFn: ({ clientId, payload }: { clientId: string; payload: { business_url: string; competitor_urls?: string[] } }) =>
+      post<MarketingAgentExtractionResponse>(`/clients/${clientId}/marketing-agent/extract`, payload),
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to inspect business website";
+      toast.error(message);
+    },
+  });
+}
+
+export function useStartMarketingAgentSetup() {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ clientId, payload }: { clientId: string; payload: MarketingAgentSetupPayload }) =>
+      post<MarketingAgentSetupResponse>(`/clients/${clientId}/marketing-agent/setup`, payload),
+    onSuccess: () => {
+      toast.success("Workspace setup started");
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to start workspace setup";
       toast.error(message);
     },
   });

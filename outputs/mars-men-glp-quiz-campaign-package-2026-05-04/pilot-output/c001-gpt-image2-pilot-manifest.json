@@ -1,0 +1,83 @@
+{
+  "createdAt": "2026-05-05T00:37:28.833Z",
+  "packageDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04",
+  "sourceCsv": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/glp-quiz-campaign-ready-expanded.csv",
+  "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "source": {
+    "creativeId": "C001",
+    "copyId": "TENOR-COPY001",
+    "creativeFile": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/creatives/C001_9e8258a1f182_what-glp-1-does-to-your-t-levels.jpg",
+    "expectedSha256": "9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b",
+    "stagedSha256": "9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b",
+    "stagedAttachment": {
+      "assetId": "a58c4c01-ce51-41c8-9e3b-e07773736360",
+      "publicId": "3b19383c-8ac4-4f63-8782-e06c350d557b",
+      "publicUrl": "https://api.moshq.app/public/assets/3b19383c-8ac4-4f63-8782-e06c350d557b",
+      "width": 1080,
+      "height": 1920,
+      "contentType": "image/jpeg"
+    }
+  },
+  "generation": {
+    "stageOneModel": "gemini-3.1-pro-preview",
+    "renderModelId": "gpt-image-2",
+    "workflowRunId": "3939646c-d959-4435-9ef1-f415b03ea93d",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-3ff5811c-741b-4dc2-8050-46506dea14bc-49e84d71-19d3-4bae-b4df-5f3730f755a8",
+    "workflowUrl": "https://moshq.app/workflows/3939646c-d959-4435-9ef1-f415b03ea93d",
+    "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/pilot-output/c001-gpt-image2-workflow-detail.json",
+    "workflowPayloadOut": {
+      "job_id": "openai:c0d5d40c5cc06ba18f6fe1f58d0809ae5d2c0949cf849852a540f265f9221913",
+      "asset_ids": [
+        "f7bf9821-16f5-4c2b-a563-ab7e33c9dbc4"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "gpt-image-2",
+      "swipe_render_provider": "openai",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  },
+  "output": {
+    "assetId": "f7bf9821-16f5-4c2b-a563-ab7e33c9dbc4",
+    "publicId": "8f40b908-323c-4d07-8c24-2ed1b89c983f",
+    "publicUrl": "https://api.moshq.app/public/assets/8f40b908-323c-4d07-8c24-2ed1b89c983f",
+    "contentType": "image/png",
+    "width": 1024,
+    "height": 1824,
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/pilot-output/generated/C001-gpt-image2.png",
+    "bytes": 3071062,
+    "sha256": "14db04c5adff8972b3a2d3ea972f79308731fd0fc79687fc6ddd40fa142536fb",
+    "aiMetadata": {
+      "swipePromptModel": "gemini-3.1-pro-preview",
+      "swipeRenderModelIdRequested": "gpt-image-2",
+      "swipeRenderModelIdUsed": "gpt-image-2",
+      "swipeRenderProvider": "openai",
+      "swipePromptImageSha256": "9e8258a1f18266606a0ae97cd85c2ada8200275f03b6f658984e9ca8d09f762b",
+      "swipePromptImageSourceUrl": "https://api.moshq.app/public/assets/3b19383c-8ac4-4f63-8782-e06c350d557b",
+      "remoteJobId": "openai:c0d5d40c5cc06ba18f6fe1f58d0809ae5d2c0949cf849852a540f265f9221913"
+    }
+  },
+  "payload": {
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "campaignId": "3ff5811c-741b-4dc2-8050-46506dea14bc",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 0,
+    "swipeImageUrl": "https://api.moshq.app/public/assets/3b19383c-8ac4-4f63-8782-e06c350d557b",
+    "swipeRequiresProductImage": false,
+    "swipeContextMode": "minimal",
+    "swipeBrandName": "Tenor",
+    "swipeProductName": "Daily Drive Essentials",
+    "swipeHook": "What GLP-1 Does to Your Drive",
+    "swipeAngle": "Launch slot: GLP lander\nSource creative: C001 / What GLP-1 Does to Your T Levels\nRemix copy: TENOR-COPY001 / What GLP-1 Does to Your Drive\nDestination: GLP / 10-reasons-glp",
+    "model": "gemini-3.1-pro-preview",
+    "renderModelId": "gpt-image-2",
+    "aspectRatio": "9:16",
+    "count": 1
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "deerflow-foundational-steps03-04-1to1",
+  "created_at": "2026-05-21T19:56:44.601511+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21",
+  "proof_dir": "proof_pack",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Reconstruct the production Step 03 input from the canonical template, production Stage 0, and GPT Step 01 artifact.",
+      "source_line": 3,
+      "status": "done",
+      "expected_files": [
+        "outputs/rendered-step03-prompt.md",
+        "outputs/rendered-step03-prompt.meta.json"
+      ],
+      "acceptance": [
+        "Rendered Step 03 prompt exists.",
+        "Prompt metadata records canonical Step 03 source path and GPT Step 01 artifact.",
+        "Step 06 is not run."
+      ],
+      "verify_commands": [
+        "test -s outputs/rendered-step03-prompt.md",
+        "jq -e '.prompt_source_path | contains(\"03_deep_research_meta_prompt_v2.md\")' outputs/rendered-step03-prompt.meta.json",
+        "jq -e '.gpt_step01_artifact | contains(\"9349e0ba\")' outputs/rendered-step03-prompt.meta.json",
+        "jq -e '.step06_run == false' outputs/dsv4-foundational-03-04-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/rendered-step03-prompt.md",
+        "outputs/rendered-step03-prompt.meta.json"
+      ],
+      "notes": "Done. Exact production ADS_CONTEXT raw value was not available in export; reconstruction delta is recorded in metadata."
+    },
+    {
+      "id": "P02",
+      "objective": "Run Step 03 through the existing DeerFlow sidecar with DSV4 Pro, thinking enabled, tools available, and no output-token cap.",
+      "source_line": 4,
+      "status": "done",
+      "expected_files": [
+        "outputs/dsv4-step03-raw.md",
+        "outputs/dsv4-step03-summary.md",
+        "outputs/dsv4-step03-content.md",
+        "outputs/dsv4-step03-run.meta.json"
+      ],
+      "acceptance": [
+        "Step 03 run completed.",
+        "No output token cap was configured.",
+        "Step 03 produced non-empty summary/content."
+      ],
+      "verify_commands": [
+        "jq -e '.status == \"completed\" and .no_output_token_cap == true' outputs/dsv4-step03-run.meta.json",
+        "test -s outputs/dsv4-step03-summary.md",
+        "test -s outputs/dsv4-step03-content.md"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/dsv4-step03-raw.md",
+        "outputs/dsv4-step03-summary.md",
+        "outputs/dsv4-step03-content.md",
+        "outputs/dsv4-step03-run.meta.json"
+      ],
+      "notes": "Done. Step 03 completed in 181.532 seconds and cost about $0.0092 promo pricing."
+    },
+    {
+      "id": "P03",
+      "objective": "Extract the generated `<STEP4_PROMPT>` from DSV4 Step 03.",
+      "source_line": 5,
+      "status": "done",
+      "expected_files": [
+        "outputs/dsv4-step03-step4-prompt.md"
+      ],
+      "acceptance": [
+        "Step 04 prompt exists and is non-empty.",
+        "Validation records the prompt size."
+      ],
+      "verify_commands": [
+        "test -s outputs/dsv4-step03-step4-prompt.md",
+        "jq -e '.step03.step4_prompt_chars > 10000' outputs/dsv4-foundational-03-04-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/dsv4-step03-step4-prompt.md"
+      ],
+      "notes": "Done. Generated Step 04 prompt was 20,187 chars."
+    },
+    {
+      "id": "P04",
+      "objective": "Run Step 04 through the existing DeerFlow sidecar using the DSV4-generated Step 04 prompt.",
+      "source_line": 6,
+      "status": "done",
+      "expected_files": [
+        "runs/dsv4-foundational-03-04-1to1/step-04/events.jsonl",
+        "runs/dsv4-foundational-03-04-1to1/step-04/raw.md",
+        "runs/dsv4-foundational-03-04-1to1/step-04/run-meta.json",
+        "runs-continuation/dsv4-foundational-03-04-1to1/step-04/run-meta.json"
+      ],
+      "acceptance": [
+        "Step 04 run executed through DeerFlow.",
+        "Step 04 failure mode is recorded.",
+        "Same-thread continuation was attempted and recorded.",
+        "No Step 06 run was executed."
+      ],
+      "verify_commands": [
+        "jq -e '.status == \"completed\" and .tool_counts.web_search == 69 and .tool_counts.web_fetch == 17' runs/dsv4-foundational-03-04-1to1/step-04/run-meta.json",
+        "rg -q 'I now have enough data to produce the comprehensive report' runs/dsv4-foundational-03-04-1to1/step-04/raw.md",
+        "jq -e '.step04.status == \"fail\" and .step04_continuation.status == \"fail\"' outputs/dsv4-foundational-03-04-validation.json",
+        "jq -e '.step06_run == false' outputs/dsv4-foundational-03-04-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "runs/dsv4-foundational-03-04-1to1/step-04/events.jsonl",
+        "runs/dsv4-foundational-03-04-1to1/step-04/raw.md",
+        "runs/dsv4-foundational-03-04-1to1/step-04/run-meta.json",
+        "runs-continuation/dsv4-foundational-03-04-1to1/step-04/events.jsonl",
+        "runs-continuation/dsv4-foundational-03-04-1to1/step-04/run-meta.json"
+      ],
+      "notes": "Done with failed output quality. Step 04 researched but did not emit the required tagged report; continuation also failed."
+    },
+    {
+      "id": "P05",
+      "objective": "Compare DSV4 Step 03/04 outputs against the production GPT Step 03/04 artifacts.",
+      "source_line": 7,
+      "status": "done",
+      "expected_files": [
+        "outputs/dsv4-vs-gpt-foundational-03-04-comparison.md",
+        "outputs/dsv4-foundational-03-04-validation.json"
+      ],
+      "acceptance": [
+        "Comparison states Step 03 pass.",
+        "Comparison states Step 04 fail.",
+        "Comparison states not to default Step 04 to DSV4/DeerFlow yet."
+      ],
+      "verify_commands": [
+        "rg -q 'Step 03: \\*\\*PASS\\*\\*' outputs/dsv4-vs-gpt-foundational-03-04-comparison.md",
+        "rg -q 'Step 04: \\*\\*FAIL\\*\\*' outputs/dsv4-vs-gpt-foundational-03-04-comparison.md",
+        "rg -q 'Do \\*\\*not\\*\\* default Step 04' outputs/dsv4-vs-gpt-foundational-03-04-comparison.md",
+        "jq -e '.pass == false' outputs/dsv4-foundational-03-04-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "outputs/dsv4-vs-gpt-foundational-03-04-comparison.md",
+        "outputs/dsv4-foundational-03-04-validation.json",
+        "provcheck-comparison.log"
+      ],
+      "notes": "Done. Comparison recommends Step 03 testing can continue, Step 04 needs harness repair before defaulting."
+    },
+    {
+      "id": "P06",
+      "objective": "Capture tool/source evidence, usage, cost, validation metrics, and proof artifacts.",
+      "source_line": 8,
+      "status": "done",
+      "expected_files": [
+        "sources/run-evidence/source_manifest.json",
+        "capturectl-verify.log",
+        "provcheck-comparison.log"
+      ],
+      "acceptance": [
+        "Source manifest verification passes.",
+        "Provenance check passes.",
+        "Cost is recorded in validation JSON."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify sources/run-evidence/source_manifest.json",
+        "rg -q 'status: pass' capturectl-verify.log",
+        "rg -q 'status: pass' provcheck-comparison.log",
+        "jq -e '.costs.total_promo_usd > 0 and .costs.total_promo_usd < 1' outputs/dsv4-foundational-03-04-validation.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "sources/run-evidence/source_manifest.json",
+        "capturectl-verify.log",
+        "provcheck-comparison.log"
+      ],
+      "notes": "Done. Total measured promo test cost was about $0.1262."
+    }
+  ],
+  "global_verify_commands": [
+    "uv run python -m py_compile run_steps03_04_dsv4.py continue_step04_dsv4.py postprocess_steps03_04.py",
+    "uv run ruff check run_steps03_04_dsv4.py continue_step04_dsv4.py postprocess_steps03_04.py"
+  ],
+  "global_acceptance": [
+    "Only foundational 03 and 04 were run in this benchmark.",
+    "Foundational 06 was not run.",
+    "Step 03 passed.",
+    "Step 04 failure is captured rather than rerun silently."
+  ]
+}

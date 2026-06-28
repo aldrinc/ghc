@@ -1,0 +1,22 @@
+{
+  "createdAt": "2026-04-29T03:12:42.533Z",
+  "workflowRunId": "05e9d970-9a4e-4c3d-8b09-81843bea1a27",
+  "assetId": "329c0091-4081-4d22-853a-b2f3cf2d8031",
+  "publicId": "f3729577-1439-45ab-8b12-497f0639d472",
+  "publicUrl": "https://api.moshq.app/public/assets/f3729577-1439-45ab-8b12-497f0639d472",
+  "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-08-supplement-facts/08-tenor-supplement-facts-mos.jpg",
+  "workflowPayloadOut": {
+    "job_id": "embedded-freestyle:97e684be8d850c1d87f45b04b1c72c5bd9a483a0355f04a3",
+    "asset_ids": [
+      "329c0091-4081-4d22-853a-b2f3cf2d8031"
+    ],
+    "stores_attached": 0,
+    "swipe_context_mode": "minimal",
+    "swipe_prompt_model": "gemini-3.1-pro-preview",
+    "gemini_rag_doc_keys": [],
+    "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+    "swipe_render_provider": "creative_service",
+    "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+    "gemini_rag_bundle_doc_keys": []
+  }
+}

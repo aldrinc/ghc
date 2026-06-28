@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Proof Dashboard</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172026; background: #f7f8fa; }
+    header { padding: 24px 28px; background: #172026; color: white; }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    h2 { margin: 26px 0 10px; font-size: 17px; }
+    main { padding: 22px 28px 36px; max-width: 1180px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .card { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 14px; }
+    .label { color: #5b6875; font-size: 12px; text-transform: uppercase; }
+    .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pass { background: #d9f4e4; color: #146c3c; }
+    .fail { background: #ffe1df; color: #9c231e; }
+    .warn { background: #fff1c7; color: #7b5600; }
+    .neutral { background: #e9edf2; color: #4b5663; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d9dee5; border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e7ebef; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #eef2f6; font-size: 12px; color: #394653; }
+    tr:last-child td { border-bottom: 0; }
+    code { background: #eef2f6; padding: 1px 4px; border-radius: 4px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Codex Proof Dashboard</h1>
+    <div>Onboarding Foundation Step Scope</div>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="card"><div class="label">Plan Contract</div><div class="value"><span class="pill pass">pass</span></div></div>
+      <div class="card"><div class="label">Source Manifest</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Provenance</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Planning Gate</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Plan Questions</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Parallelism</div><div class="value"><span class="pill neutral">unknown</span></div></div>
+      <div class="card"><div class="label">Lanes</div><div class="value">0</div></div>
+      <div class="card"><div class="label">Proof Files</div><div class="value">21</div></div>
+    </section>
+
+    <h2>Plan Items</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Status</th><th>Objective</th><th>Expected Files</th><th>Artifacts</th></tr></thead>
+      <tbody><tr><td>P01</td><td><span class='pill pass'>done</span></td><td>Pass `foundation_only` into the foundational research activity.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P02</td><td><span class='pill pass'>done</span></td><td>For `foundation_only=true`, run and persist only steps `01`, `03`, and `04`.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P03</td><td><span class='pill pass'>done</span></td><td>Skip Stage 1 translation for foundation-only bundles because the current Stage 1 translator depends on Step 06 avatar brief data.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P04</td><td><span class='pill pass'>done</span></td><td>Keep the full Strategy V2 path unchanged: it still runs Step 06 where downstream stages need avatar context.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P05</td><td><span class='pill pass'>done</span></td><td>Update readiness to require only `01`, `03`, and `04`.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P06</td><td><span class='pill pass'>done</span></td><td>Update onboarding UI ETA text to match the new DSV4-heavy flow.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P07</td><td><span class='pill pass'>done</span></td><td>Onboarding foundation-only activity never calls Step 06.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P08</td><td><span class='pill pass'>done</span></td><td>Readiness returns ready when `01`, `03`, and `04` are present.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P09</td><td><span class='pill pass'>done</span></td><td>Full Strategy V2 still requires Step 06.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P10</td><td><span class='pill warn'>blocked</span></td><td>Focused backend tests pass.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P11</td><td><span class='pill pass'>done</span></td><td>Frontend typecheck/lint for touched files passes where available.</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P12</td><td><span class='pill pass'>done</span></td><td>`python -m py_compile mos/backend/app/routers/clients.py mos/backend/app/temporal/workflows/strategy_v2.py mos/backend/app/temporal/activities/strategy_v2_activities.py`</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P13</td><td><span class='pill warn'>blocked</span></td><td>`pytest mos/backend/tests/test_api.py::test_foundation_readiness_ready_when_bundle_complete mos/backend/tests/test_strategy_v2_workflow_ordering.py::test_strategy_v2_foundation_only_finishes_after_foundational_bundle -q`</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr>
+<tr><td>P14</td><td><span class='pill warn'>blocked</span></td><td>`ruff check mos/backend/app/routers/clients.py mos/backend/app/temporal/workflows/strategy_v2.py mos/backend/app/temporal/activities/strategy_v2_activities.py mos/backend/tests/test_api.py mos/backend/tests/test_strategy_v2_workflow_ordering.py`</td><td>mos/backend/app/routers/clients.py, mos/backend/app/temporal/workflows/strategy_v2.py, mos/backend/app/temporal/activities/strategy_v2_activities.py, mos/frontend/src/components/clients/OnboardingWizard.tsx, mos/frontend/src/pages/workflows/WorkflowDetailPage.tsx, mos/backend/tests/test_api.py, mos/backend/tests/test_strategy_v2_workflow_ordering.py, docs/plans/2026-05-21-onboarding-foundation-step-scope-plan.md, proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md, mos/backend/app/config.py, mos/backend/.env.example</td><td>proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</td></tr></tbody>
+    </table>
+
+    <h2>Plan Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Plan Warnings</h2>
+    <div class="card"><ul><li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P01: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P02: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P03: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P04: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P05: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P06: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P07: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P08: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P09: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P11: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>P12: no verify_commands</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/routers/clients.py:11382: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:204: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2736: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:2738: brittle marker `TBD`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7778: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7877: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:7990: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/backend/app/temporal/activities/strategy_v2_activities.py:19204: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1420: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1650: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1672: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2003: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2167: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2198: brittle marker `placeholder`</li>
+<li>/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:2309: brittle marker `placeholder`</li></ul></div>
+
+    <h2>Provenance Errors</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Blocked Source Items</h2>
+    <div class="card"><ul><li>none</li></ul></div>
+
+    <h2>Planning Gate Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> unknown</div>
+      <div><strong>Skill loaded:</strong> </div>
+      <div><strong>Questions:</strong> 0</div>
+      <div><strong>Question rationale:</strong> </div>
+      <div><strong>Owner:</strong> </div>
+      <div><strong>Review:</strong> </div>
+      <div><strong>Stop:</strong> </div>
+    </div>
+    <table>
+      <thead><tr><th>Artifact</th><th>Path</th><th>Summary</th></tr></thead>
+      <tbody><tr><td colspan='3'>No planning gate proof loaded.</td></tr></tbody>
+    </table>
+
+    <h2>Parallel Lane Proof</h2>
+    <div class="card">
+      <div><strong>Mode:</strong> unknown</div>
+      <div><strong>Reason:</strong> </div>
+      <div><strong>Fan-in:</strong> unknown</div>
+      <ul><li>none</li></ul>
+    </div>
+    <table>
+      <thead><tr><th>Lane</th><th>Role</th><th>Mode</th><th>Status</th><th>Write Scope</th><th>Artifacts</th><th>Summary</th></tr></thead>
+      <tbody><tr><td colspan='7'>No lane proof loaded.</td></tr></tbody>
+    </table>
+
+    <h2>Proof Files</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Type</th><th>Path</th></tr></thead>
+      <tbody><tr><td>planctl-repair-prompt.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/planctl-repair-prompt.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/planctl-repair-prompt.md</a></td></tr>
+<tr><td>planctl-repair.json</td><td>.json</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/planctl-repair.json'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/planctl-repair.json</a></td></tr>
+<tr><td>verification.md</td><td>.md</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verification.md</a></td></tr>
+<tr><td>verify-20260521-171242-python--m-py_compile-mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171242-python--m-py_compile-mos-backend-app-routers-clients.py-mos-backend-app-temporal.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171242-python--m-py_compile-mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</a></td></tr>
+<tr><td>verify-20260521-171243-npm-run-build---prefix-mos-frontend.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171243-npm-run-build---prefix-mos-frontend.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171243-npm-run-build---prefix-mos-frontend.log</a></td></tr>
+<tr><td>verify-20260521-171255-git-diff---check----mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171255-git-diff---check----mos-backend-app-routers-clients.py-mos-backend-app-temporal.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171255-git-diff---check----mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</a></td></tr>
+<tr><td>verify-20260521-171415-npm-run-build---prefix-mos-frontend.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171415-npm-run-build---prefix-mos-frontend.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171415-npm-run-build---prefix-mos-frontend.log</a></td></tr>
+<tr><td>verify-20260521-171415-python--m-py_compile-mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171415-python--m-py_compile-mos-backend-app-routers-clients.py-mos-backend-app-temporal.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171415-python--m-py_compile-mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</a></td></tr>
+<tr><td>verify-20260521-171428-git-diff---check----mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171428-git-diff---check----mos-backend-app-routers-clients.py-mos-backend-app-temporal.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171428-git-diff---check----mos-backend-app-routers-clients.py-mos-backend-app-temporal.log</a></td></tr>
+<tr><td>verify-20260521-171547-npm-run-build---prefix-mos-frontend.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171547-npm-run-build---prefix-mos-frontend.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171547-npm-run-build---prefix-mos-frontend.log</a></td></tr>
+<tr><td>verify-20260521-171547-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171547-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171547-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</a></td></tr>
+<tr><td>verify-20260521-171600-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171600-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171600-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</a></td></tr>
+<tr><td>verify-20260521-171639-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171639-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171639-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</a></td></tr>
+<tr><td>verify-20260521-171640-npm-run-build---prefix-mos-frontend.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171640-npm-run-build---prefix-mos-frontend.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171640-npm-run-build---prefix-mos-frontend.log</a></td></tr>
+<tr><td>verify-20260521-171652-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171652-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171652-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</a></td></tr>
+<tr><td>verify-20260521-171748-npm-run-build---prefix-mos-frontend.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171748-npm-run-build---prefix-mos-frontend.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171748-npm-run-build---prefix-mos-frontend.log</a></td></tr>
+<tr><td>verify-20260521-171748-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171748-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171748-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</a></td></tr>
+<tr><td>verify-20260521-171801-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171801-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-171801-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</a></td></tr>
+<tr><td>verify-20260521-172509-npm-run-build---prefix-mos-frontend.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-172509-npm-run-build---prefix-mos-frontend.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-172509-npm-run-build---prefix-mos-frontend.log</a></td></tr>
+<tr><td>verify-20260521-172509-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-172509-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-172509-python--m-py_compile-mos-backend-app-config.py-mos-backend-app-routers-clients.p.log</a></td></tr>
+<tr><td>verify-20260521-172522-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</td><td>.log</td><td><a href='file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-172522-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log'>/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-foundation-step-scope-2026-05-21/verify-20260521-172522-git-diff---check----mos-backend-.env.example-mos-backend-app-config.py-mos-backe.log</a></td></tr></tbody>
+    </table>
+  </main>
+</body>
+</html>

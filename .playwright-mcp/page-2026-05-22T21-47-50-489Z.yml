@@ -1,0 +1,222 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e439]:
+      - generic [ref=e440]:
+        - list [ref=e441]:
+          - listitem [ref=e442]:
+            - button "H Higgsfield Workspace" [ref=e444] [cursor=pointer]:
+              - generic [ref=e445]: H
+              - generic [ref=e446]:
+                - generic [ref=e447]: Higgsfield
+                - generic [ref=e448]: Workspace
+              - img [ref=e449]
+        - generic [ref=e454]: Strategy complete — ready to launch
+      - generic [ref=e455]:
+        - generic [ref=e456]:
+          - generic [ref=e457]: Workspace
+          - list [ref=e458]:
+            - listitem [ref=e459]:
+              - button "Overview" [ref=e461] [cursor=pointer]:
+                - img [ref=e463]
+                - generic [ref=e468]: Overview
+            - listitem [ref=e469]:
+              - button "Strategy" [ref=e471] [cursor=pointer]:
+                - img [ref=e473]
+                - generic [ref=e476]: Strategy
+            - listitem [ref=e477]:
+              - button "Brand" [ref=e479] [cursor=pointer]:
+                - img [ref=e481]
+                - generic [ref=e484]: Brand
+            - listitem [ref=e485]:
+              - button "Sites" [ref=e487] [cursor=pointer]:
+                - img [ref=e489]
+                - generic [ref=e493]: Sites
+            - listitem [ref=e494]:
+              - button "Commerce" [ref=e496] [cursor=pointer]:
+                - img [ref=e498]
+                - generic [ref=e501]: Commerce
+            - listitem [ref=e502]:
+              - button "Products" [ref=e504] [cursor=pointer]:
+                - img [ref=e506]
+                - generic [ref=e510]: Products
+        - generic [ref=e511]:
+          - generic [ref=e512]: Research
+          - list [ref=e513]:
+            - listitem [ref=e514]:
+              - button "Documents" [ref=e516] [cursor=pointer]:
+                - img [ref=e518]
+                - generic [ref=e521]: Documents
+            - listitem [ref=e522]:
+              - button "Ads & Brands" [ref=e524] [cursor=pointer]:
+                - img [ref=e526]
+                - generic [ref=e529]: Ads & Brands
+            - listitem [ref=e530]:
+              - button "Funnels" [ref=e532] [cursor=pointer]:
+                - img [ref=e534]
+                - generic [ref=e536]: Funnels
+        - generic [ref=e537]:
+          - generic [ref=e538]: Execution
+          - list [ref=e539]:
+            - listitem [ref=e540]:
+              - button "Campaigns" [ref=e542] [cursor=pointer]:
+                - img [ref=e544]
+                - generic [ref=e548]: Campaigns
+            - listitem [ref=e549]:
+              - button "Analytics" [ref=e551] [cursor=pointer]:
+                - img [ref=e553]
+                - generic [ref=e555]: Analytics
+            - listitem [ref=e556]:
+              - button "Postiz" [ref=e558] [cursor=pointer]:
+                - img [ref=e560]
+                - generic [ref=e563]: Postiz
+            - listitem [ref=e564]:
+              - button "Social Agents" [ref=e566] [cursor=pointer]:
+                - img [ref=e568]
+                - generic [ref=e571]: Social Agents
+        - generic [ref=e572]:
+          - generic [ref=e573]: AI
+          - list [ref=e574]:
+            - listitem [ref=e575]:
+              - button "Assistant Chat" [ref=e577] [cursor=pointer]:
+                - img [ref=e579]
+                - generic [ref=e581]: Assistant Chat
+        - generic [ref=e582]:
+          - generic [ref=e583]: Assets
+          - list [ref=e584]:
+            - listitem [ref=e585]:
+              - button "Creative Library" [ref=e587] [cursor=pointer]:
+                - img [ref=e589]
+                - generic [ref=e595]: Creative Library
+            - listitem [ref=e596]:
+              - button "Meta Ads" [ref=e598] [cursor=pointer]:
+                - img [ref=e600]
+                - generic [ref=e603]: Meta Ads
+      - list [ref=e605]:
+        - listitem [ref=e606]:
+          - button "Aldrin Clement Aldrin Clement aldrin.clement@gmail.com" [ref=e618] [cursor=pointer]:
+            - img "Aldrin Clement" [ref=e619]
+            - generic [ref=e611]:
+              - generic [ref=e612]: Aldrin Clement
+              - generic [ref=e613]: aldrin.clement@gmail.com
+            - img [ref=e614]
+      - button "Toggle Sidebar" [ref=e617] [cursor=pointer]
+    - main [ref=e183]:
+      - generic [ref=e184]:
+        - generic [ref=e185]:
+          - button "Toggle Sidebar" [ref=e186] [cursor=pointer]:
+            - img
+            - generic [ref=e187]: Toggle Sidebar
+          - navigation "breadcrumb" [ref=e188]:
+            - list [ref=e189]:
+              - listitem [ref=e190]:
+                - link "Workspaces" [ref=e191] [cursor=pointer]:
+                  - /url: /workspaces
+              - listitem [ref=e192]:
+                - img [ref=e193]
+              - listitem [ref=e195]:
+                - link "Social Agents" [disabled] [ref=e196]
+        - generic [ref=e197]:
+          - generic [ref=e198]: Workspace Product
+          - combobox [ref=e199]:
+            - option "Select workspace product"
+            - option "Higgsfield AI Platform" [selected]
+      - generic [ref=e201]:
+        - generic [ref=e203]:
+          - generic [ref=e204]:
+            - heading "Marketing Agent" [level=2] [ref=e218]
+            - paragraph [ref=e206]: Approval-gated TikTok carousel work for Higgsfield.
+          - link "Postiz" [ref=e220] [cursor=pointer]:
+            - /url: /workspaces/execution/postiz
+            - img
+            - text: Postiz
+        - generic [ref=e221]:
+          - generic [ref=e222]:
+            - generic [ref=e223]:
+              - img [ref=e224]
+              - text: Postiz needs channels
+            - generic [ref=e227]: 0 channels, 0 profiles
+          - button "Approvals 0" [ref=e228] [cursor=pointer]:
+            - img
+            - text: Approvals
+            - generic [ref=e229]: "0"
+          - button "Channels" [ref=e230] [cursor=pointer]:
+            - img
+            - text: Channels
+        - generic [ref=e231]:
+          - generic [ref=e232]:
+            - generic [ref=e234]:
+              - generic [ref=e235]:
+                - generic [ref=e236]:
+                  - generic [ref=e237]: Step 1 of 2
+                  - generic [ref=e238]: Needs mission
+                - heading "Set mission" [level=2] [ref=e407]
+              - generic [ref=e240]:
+                - button "Setup screen" [active] [pressed] [ref=e241] [cursor=pointer]:
+                  - generic [ref=e242]: Setup
+                  - generic [ref=e243]: Needs mission
+                - button "Review screen" [ref=e244] [cursor=pointer]:
+                  - generic [ref=e245]: Review
+                  - generic [ref=e246]: Test needed
+            - generic [ref=e408]:
+              - generic [ref=e409]:
+                - generic [ref=e410]:
+                  - generic [ref=e411]:
+                    - generic [ref=e412]: Name
+                    - textbox "Agent name" [ref=e413]: TikTok Carousel Growth Loop
+                  - generic [ref=e414]:
+                    - generic [ref=e415]: Saved mission
+                    - combobox "Saved mission" [ref=e416]:
+                      - option "No missions yet" [disabled] [selected]
+                  - generic [ref=e417]:
+                    - generic [ref=e418]: Mission
+                    - textbox "Agent mission" [ref=e419]: Find carousel hooks that create source-backed conversions.
+                - generic [ref=e420]:
+                  - generic [ref=e421]:
+                    - generic [ref=e422]: Current
+                    - generic [ref=e423]: Needed
+                  - generic [ref=e424]: No mission saved.
+              - generic [ref=e425]:
+                - generic [ref=e426]:
+                  - generic [ref=e427]:
+                    - heading "Success signal" [level=3] [ref=e428]
+                    - generic [ref=e429]: Optional until you connect live results.
+                  - generic [ref=e430]: Not linked
+                - generic [ref=e431]:
+                  - textbox "Signal provider" [ref=e432]: custom_webhook
+                  - textbox "Signal name" [ref=e433]: Primary conversion event
+                  - textbox "Goal events" [ref=e434]: trial_started purchase_completed
+                  - button "Save signal" [disabled]:
+                    - img
+                    - text: Save signal
+              - button "Continue" [ref=e435] [cursor=pointer]:
+                - img
+                - text: Continue
+          - complementary [ref=e276]:
+            - generic [ref=e277]:
+              - generic [ref=e278]:
+                - generic [ref=e279]: Agent
+                - heading "TikTok carousel" [level=2] [ref=e280]
+              - generic [ref=e281]: Postiz
+            - generic [ref=e282]:
+              - generic [ref=e283]: Needs channel
+              - generic [ref=e284]: Approval required
+            - generic [ref=e285]:
+              - generic [ref=e286]:
+                - generic [ref=e287]: Mission
+                - generic [ref=e288]: TikTok Carousel Growth Loop
+              - generic [ref=e289]:
+                - generic [ref=e290]: Channel
+                - generic [ref=e291]: No channel
+              - generic [ref=e292]:
+                - generic [ref=e293]: Draft
+                - generic [ref=e294]: Not created
+              - generic [ref=e295]:
+                - generic [ref=e296]: Assets
+                - generic [ref=e297]: 0/6
+            - generic [ref=e298]:
+              - generic [ref=e299]: Goal
+              - paragraph [ref=e300]: Find carousel hooks that create source-backed conversions.
+            - generic [ref=e301]:
+              - generic [ref=e302]: Next
+              - generic [ref=e303]: Set the mission.
+  - region "Notifications"

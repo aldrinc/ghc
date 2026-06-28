@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-05-21T01:24:01.514Z",
+  "widths": {
+    "button": {
+      "left": 224,
+      "right": 944,
+      "width": 720
+    },
+    "classList": "w-full max-w-[520px] space-y-7 mos-onboarding-task space-y-7",
+    "form": {
+      "left": 224,
+      "right": 944,
+      "width": 720
+    },
+    "input": {
+      "left": 224,
+      "right": 944,
+      "width": 720
+    },
+    "progress": {
+      "left": 224,
+      "right": 944,
+      "width": 720
+    },
+    "task": {
+      "left": 224,
+      "right": 944,
+      "width": 720
+    },
+    "title": {
+      "left": 224,
+      "right": 944,
+      "width": 720
+    }
+  }
+}

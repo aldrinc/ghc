@@ -1,0 +1,35 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/plan.contract.json",
+  "verified_at": "2026-05-21T14:53:10.801102+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/styles/design-system.css:604: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1027: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1151: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1168: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1359: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1425: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1445: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1531: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1027: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1151: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1168: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1359: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1425: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1445: brittle marker `placeholder`",
+    "/Users/aldrinclement/Documents/programming/marketi/mos/frontend/src/components/clients/OnboardingWizard.tsx:1531: brittle marker `placeholder`"
+  ],
+  "run_logs": [
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095253-cd-mos-frontend-npm-test------run-src-components-clients-OnboardingWizard.test.t.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095257-cd-mos-frontend-npm-run-build.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095310-test--f-proof_pack-onboarding-color-icons-2026-05-21-color-icons-qa.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/onboarding-color-icons-2026-05-21/verify-20260521-095310-Users-aldrinclement-.codex-bin-lanecheck-proof_pack-onboarding-color-icons-2026.log"
+  ]
+}

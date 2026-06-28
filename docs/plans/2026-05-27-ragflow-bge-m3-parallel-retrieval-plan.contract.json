@@ -1,0 +1,357 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "ragflow-bge-m3-parallel-retrieval",
+  "created_at": "2026-05-27T15:49:52.441009+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-27-ragflow-bge-m3-parallel-retrieval-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "proof_pack",
+  "plan_gate_required": true,
+  "plan_gate_proof": "proof_pack/plan-gate-proof-ragflow.json",
+  "lane_evidence_required": true,
+  "lane_proof": "proof_pack/lane-proof.json",
+  "parallelism_mode": "local_parallel_tools",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "Add backend configuration for an explicit RAGFlow path, including enablement, base URL, API key, default dataset IDs, optional rerank ID, retrieval tuning, and generation model.",
+      "source_line": 5,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/config.py",
+        "mos/backend/.env.example"
+      ],
+      "acceptance": [
+        "Backend settings expose explicit RAGFlow retrieval and generation knobs.",
+        "Default RAGFlow retrieval is disabled until an operator opts in.",
+        "Dataset and document IDs parse from comma-separated env values."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/ragflow-bge-m3-retrieval/implementation-summary.md",
+        "proof_pack/ragflow-bge-m3-retrieval/verification-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "Add a RAGFlow retrieval service that calls `POST /api/v1/retrieval`, validates configuration, normalizes chunks/citations, and fails loudly when required config or datasets are missing.",
+      "source_line": 6,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/services/ragflow_retrieval.py"
+      ],
+      "acceptance": [
+        "Service posts to `/api/v1/retrieval` with bearer auth.",
+        "Service passes `rerank_id` when configured or requested.",
+        "Service raises clear config errors instead of falling back to Gemini or Claude."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/ragflow-bge-m3-retrieval/implementation-summary.md",
+        "proof_pack/ragflow-bge-m3-retrieval/verification-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "objective": "Add `/ragflow/retrieve` and `/ragflow/chat/stream` endpoints that mirror existing Gemini/Claude assistant surfaces without falling back to vendor retrieval.",
+      "source_line": 7,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/routers/ragflow.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/routers/__init__.py"
+      ],
+      "acceptance": [
+        "`/ragflow/config` hides API key material.",
+        "`/ragflow/retrieve` returns normalized chunks and citations.",
+        "`/ragflow/chat/stream` emits retrieval, text, and done SSE events using the configured DeepSeek-compatible model."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/ragflow-bge-m3-retrieval/implementation-summary.md",
+        "proof_pack/ragflow-bge-m3-retrieval/verification-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "Add backend tests for config validation, RAGFlow request payloads, response normalization, and router behavior.",
+      "source_line": 8,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/tests/test_ragflow_retrieval.py"
+      ],
+      "acceptance": [
+        "Focused RAGFlow tests cover request payloads, missing dataset errors, HTTP request shape, chunk normalization, endpoint responses, SSE streaming, and API-key hiding."
+      ],
+      "verify_commands": [
+        "cd mos/backend && .venv/bin/pytest tests/test_ragflow_retrieval.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/ragflow-bge-m3-retrieval/verification-summary.md"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "objective": "Update operator-facing env documentation so local BGE-M3 embedding and rerank setup is discoverable without changing existing Gemini/Claude paths.",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/.env.example",
+        "docs/plans/2026-05-27-ragflow-bge-m3-parallel-retrieval-plan.md"
+      ],
+      "acceptance": [
+        "Env documentation states that BGE-M3 embedding setup belongs in RAGFlow dataset configuration.",
+        "Env documentation tells the operator where to configure the RAGFlow reranker ID."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "proof_pack/ragflow-bge-m3-retrieval/implementation-summary.md",
+        "captures/ragflow-bge-m3-retrieval/source_manifest.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "objective": "Produce proof artifacts: source manifest, lane proof, command logs, plan contract verification, and proof dashboard.",
+      "source_line": 10,
+      "status": "done",
+      "expected_files": [
+        "captures/ragflow-bge-m3-retrieval/source_manifest.json",
+        "proof_pack/lane-proof.json",
+        "proof_pack/plan-gate-proof-ragflow.json",
+        "proof_pack/index.html",
+        "proof_pack/ragflow-bge-m3-retrieval/ragflow-local-smoke-result.json",
+        "proof_pack/ragflow-bge-m3-retrieval/mos-backend-ragflow-deepseek-smoke-result.json"
+      ],
+      "acceptance": [
+        "Source manifest verifies.",
+        "Plan gate verifies.",
+        "Lane proof verifies.",
+        "Plan contract verifies with local commands.",
+        "Local RAGFlow smoke proves BGE-M3 indexed retrieval returns the sentinel chunk.",
+        "MOS backend smoke proves live RAGFlow retrieval plus DeepSeek streaming returns the sentinel answer."
+      ],
+      "verify_commands": [
+        "/Users/aldrinclement/.codex/bin/capturectl verify captures/ragflow-bge-m3-retrieval/source_manifest.json",
+        "/Users/aldrinclement/.codex/bin/plangatecheck proof_pack/plan-gate-proof-ragflow.json",
+        "/Users/aldrinclement/.codex/bin/lanecheck proof_pack/lane-proof.json",
+        "jq -e '.status == \"PASS\" and .embedding_model == \"bge-m3@Ollama\" and (.retrieval.chunks | length) >= 1 and ((.retrieval | tostring) | contains(\"MOS_RAGFLOW_BGE_M3_LOCAL_VECTOR_BRIDGE_20260527\"))' proof_pack/ragflow-bge-m3-retrieval/ragflow-local-smoke-result.json",
+        "jq -e '.status == \"PASS\" and .model == \"deepseek:deepseek-v4-pro\" and .retrieval_sentinel_found == true and .answer_sentinel_found == true' proof_pack/ragflow-bge-m3-retrieval/mos-backend-ragflow-deepseek-smoke-result.json"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "captures/ragflow-bge-m3-retrieval/source_manifest.json",
+        "proof_pack/lane-proof.json",
+        "proof_pack/index.html",
+        "proof_pack/ragflow-bge-m3-retrieval/verification-summary.md",
+        "proof_pack/ragflow-bge-m3-retrieval/ragflow-local-smoke-result.json",
+        "proof_pack/ragflow-bge-m3-retrieval/mos-backend-ragflow-deepseek-smoke-result.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "parallelizable: yes, but native sub-agents are blocked by active tool policy.",
+      "source_line": 13,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/lane-proof.json"
+      ],
+      "acceptance": [
+        "Lane proof records local parallel tool mode and native sub-agent block reason."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "lane_evidence"
+      ],
+      "artifacts": [
+        "proof_pack/lane-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P08",
+      "objective": "parallelization map: local parallel reads/source capture; main thread owns implementation and verification.",
+      "source_line": 14,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/lane-proof.json"
+      ],
+      "acceptance": [
+        "Lane proof records source capture, repo inspection, implementation, and verification lanes."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "lane_evidence"
+      ],
+      "artifacts": [
+        "proof_pack/lane-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P09",
+      "objective": "expected speed gain: local parallel tools reduce read/source-capture time without risking overlapping writes.",
+      "source_line": 15,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/lane-proof.json"
+      ],
+      "acceptance": [
+        "Lane proof has no overlapping write ownership conflicts."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "lane_evidence"
+      ],
+      "artifacts": [
+        "proof_pack/lane-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P10",
+      "objective": "token spend justification: no native sub-agents used.",
+      "source_line": 16,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/lane-proof.json"
+      ],
+      "acceptance": [
+        "Lane proof token/time proxy records native sub-agent block and local verification mode."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "lane_evidence"
+      ],
+      "artifacts": [
+        "proof_pack/lane-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P11",
+      "objective": "write ownership: main thread only for backend service/router/config/tests/docs.",
+      "source_line": 17,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/lane-proof.json"
+      ],
+      "acceptance": [
+        "Lane proof records one implementation write owner."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "lane_evidence"
+      ],
+      "artifacts": [
+        "proof_pack/lane-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P12",
+      "objective": "fan-in plan: main thread integrates and verifies.",
+      "source_line": 18,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/lane-proof.json"
+      ],
+      "acceptance": [
+        "Lane proof fan-in summary status is pass."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "lane_evidence"
+      ],
+      "artifacts": [
+        "proof_pack/lane-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P13",
+      "objective": "validation owner: main thread.",
+      "source_line": 19,
+      "status": "done",
+      "expected_files": [
+        "proof_pack/lane-proof.json"
+      ],
+      "acceptance": [
+        "Lane proof records main-thread verification."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "lane_evidence"
+      ],
+      "artifacts": [
+        "proof_pack/lane-proof.json"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P14",
+      "objective": "meta-tooling opportunity: if more RAG providers are added, extract a shared retrieval-provider interface after this first path is proven.",
+      "source_line": 20,
+      "status": "done",
+      "expected_files": [
+        "docs/plans/2026-05-27-ragflow-bge-m3-parallel-retrieval-plan.md"
+      ],
+      "acceptance": [
+        "Meta-tooling opportunity is documented in the plan and deferred until a second provider path exists."
+      ],
+      "verify_commands": [],
+      "proof_required": [
+        "diff_summary"
+      ],
+      "artifacts": [
+        "docs/plans/2026-05-27-ragflow-bge-m3-parallel-retrieval-plan.md"
+      ],
+      "notes": ""
+    }
+  ],
+  "global_verify_commands": [
+    "cd mos/backend && .venv/bin/python -m compileall app/services/ragflow_retrieval.py app/routers/ragflow.py app/config.py app/main.py",
+    "cd mos/backend && .venv/bin/ruff check app/services/ragflow_retrieval.py app/routers/ragflow.py tests/test_ragflow_retrieval.py",
+    "cd mos/backend && .venv/bin/pytest tests/test_api.py",
+    "/Users/aldrinclement/.codex/bin/provcheck docs/plans/2026-05-27-ragflow-bge-m3-parallel-retrieval-plan.md"
+  ],
+  "global_acceptance": [
+    "RAGFlow path is parallel to Gemini and Claude.",
+    "No fallback to Gemini, Claude, or another retrieval provider is introduced.",
+    "DeepSeek remains the generation layer behind explicit model config.",
+    "RAGFlow retrieval supports local BGE-M3 embedding/rerank configuration through RAGFlow itself."
+  ]
+}

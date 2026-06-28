@@ -34,7 +34,7 @@ import {
 
 function TemplateCardSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-surface-2 px-4 py-4">
+    <div className="ds-card ds-card--sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 space-y-2">
           <Skeleton className="h-3 w-20" />
@@ -49,7 +49,7 @@ function TemplateCardSkeleton() {
 
 function SiteRowSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+    <div className="ds-card ds-card--sm">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-2">
           <Skeleton className="h-4 w-40" />
@@ -292,8 +292,8 @@ export function SitesPage() {
                         setShowCreateForm(true);
                       }}
                       className={cn(
-                        "rounded-xl border px-4 py-3 text-left transition-colors",
-                        "border-border bg-surface-2 hover:border-accent/40 hover:bg-surface"
+                        "ds-card ds-card--sm text-left transition-colors",
+                        "hover:border-accent/40 hover:bg-surface"
                       )}
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -322,8 +322,8 @@ export function SitesPage() {
                       aria-label={`Select ${template.name} template`}
                       onClick={() => navigate(`/workspaces/sites/templates/${template.id}`)}
                       className={cn(
-                        "rounded-xl border px-4 py-3 text-left transition-colors",
-                        "border-border bg-surface-2 hover:border-accent/40 hover:bg-surface"
+                        "ds-card ds-card--sm text-left transition-colors",
+                        "hover:border-accent/40 hover:bg-surface"
                       )}
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -378,8 +378,8 @@ export function SitesPage() {
                     aria-label={`View site: ${site.name}`}
                     onClick={() => navigate(`/workspaces/sites/${site.id}`)}
                     className={cn(
-                      "w-full rounded-xl border px-4 py-3 text-left transition-colors",
-                      "border-border bg-surface-2 hover:border-accent/40 hover:bg-surface"
+                      "ds-card ds-card--sm w-full text-left transition-colors",
+                      "hover:border-accent/40 hover:bg-surface"
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -434,8 +434,8 @@ export function SitesPage() {
                     aria-label={`View import: ${imp.title || imp.sourceHostname || imp.sourceUrl}`}
                     onClick={() => navigate(`/workspaces/sites/imports/${imp.id}`)}
                     className={cn(
-                      "w-full rounded-xl border px-4 py-3 text-left transition-colors",
-                      "border-border bg-surface-2 hover:border-accent/40 hover:bg-surface"
+                      "ds-card ds-card--sm w-full text-left transition-colors",
+                      "hover:border-accent/40 hover:bg-surface"
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">

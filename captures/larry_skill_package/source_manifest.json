@@ -1,0 +1,26 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "larry_skill_package",
+  "created_at": "2026-05-22T19:01:35.572447+00:00",
+  "source_type": "archive",
+  "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+  "operator_notes": "",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_skill_package/raw/larry-1.0.0-fd31d4e64f.zip",
+      "kind": "raw_files",
+      "sha256": "0fd445b583e663345324047dd1561478966d5fbf9f372a4b6b67506a334c80c1",
+      "bytes": 50997,
+      "captured_at": "2026-05-22T19:01:35.682898+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-22T19:25:22.560061+00:00",
+    "errors": []
+  }
+}

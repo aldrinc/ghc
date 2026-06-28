@@ -1,0 +1,139 @@
+{
+  "createdAt": "2026-05-01T18:17:32.265Z",
+  "articlePath": "/Users/aldrinclement/Documents/programming/nuvo-sense/mars-men-original-clone/index.html",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-congruence-test-2026-05-01",
+  "reviewDir": "/Users/aldrinclement/Downloads/tenor-advertorial-congruence-test-review-2026-05-01",
+  "generatedDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-congruence-test-2026-05-01/generated",
+  "sourceTemplateDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-congruence-test-2026-05-01/source-template",
+  "workspace": {
+    "workspaceName": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460"
+  },
+  "destinationContext": {
+    "headline": "Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First",
+    "subheadline": "\"Normal\" labs don't mean nothing's changed. Here's why the number your doctor uses treats a 25-year-old and an 80-year-old as the same man, and what to do before you commit to a medical relationship you can't easily walk back.",
+    "primaryProblem": "Men who do not feel like themselves anymore can be told their labs are normal, while the only visible options feel like weak booster pills or a permanent TRT/needle relationship."
+  },
+  "validationIntent": {
+    "awarenessLevel": "Solution-Aware",
+    "variants": [
+      "destination context only",
+      "destination context plus congruence note"
+    ],
+    "creativeGuidanceAddedByOperator": false
+  },
+  "outputs": [
+    {
+      "key": "01-destination-context-only",
+      "awarenessLevel": "Solution-Aware",
+      "includeCongruenceNote": false,
+      "source": {
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "sourceSwipeTitle": "researchers.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nThis ad links to the following downstream article:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: \"Normal\" labs don't mean nothing's changed. Here's why the number your doctor uses treats a 25-year-old and an 80-year-old as the same man, and what to do before you commit to a medical relationship you can't easily walk back.\nPrimary problem: Men who do not feel like themselves anymore can be told their labs are normal, while the only visible options feel like weak booster pills or a permanent TRT/needle relationship.\n\nRun marker: tenor-advertorial-congruence-01-destination-context-only-1777659318843.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "863b41fa-809c-4ff9-95fb-dde06ea0e038",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e39b31c0-41d2-4411-8278-56bcc4b56ffa"
+      },
+      "result": {
+        "workflowRunId": "863b41fa-809c-4ff9-95fb-dde06ea0e038",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e39b31c0-41d2-4411-8278-56bcc4b56ffa",
+        "assetId": "1c726350-ab5b-4f65-9de9-c512ceb4d8c4",
+        "publicId": "0e93cd18-37a5-4072-97ce-01e6eac6c2ad",
+        "publicUrl": "https://api.moshq.app/public/assets/0e93cd18-37a5-4072-97ce-01e6eac6c2ad",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-congruence-test-2026-05-01/generated/01-destination-context-only.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-congruence-test-review-2026-05-01/generated/01-destination-context-only.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:5fac11cabb4bcc4b5afe287aaaa67b4344b5e95d122341c6",
+          "asset_ids": [
+            "1c726350-ab5b-4f65-9de9-c512ceb4d8c4"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-congruence-test-2026-05-01/workflow-01-destination-context-only.json"
+      }
+    },
+    {
+      "key": "02-destination-context-plus-congruence-note",
+      "awarenessLevel": "Solution-Aware",
+      "includeCongruenceNote": true,
+      "source": {
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "sourceSwipeTitle": "researchers.jpg",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1
+      },
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_wound_scene",
+        "requirementIndex": 1,
+        "companySwipeId": "adda0368-a6ef-5263-ae5c-1eef39732696",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Tenor",
+        "swipeHook": "Solution-Aware",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nThis ad links to the following downstream article:\nHeadline: Needles for Life — The $30,000 TRT Trap And The Daily Protocol You Try First\nSubheadline: \"Normal\" labs don't mean nothing's changed. Here's why the number your doctor uses treats a 25-year-old and an 80-year-old as the same man, and what to do before you commit to a medical relationship you can't easily walk back.\nPrimary problem: Men who do not feel like themselves anymore can be told their labs are normal, while the only visible options feel like weak booster pills or a permanent TRT/needle relationship.\n\nAd-destination congruence: The ad should feel congruent with this destination article context.\n\nRun marker: tenor-advertorial-congruence-02-destination-context-plus-congruence-note-1777659391418.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflow": {
+        "workflow_run_id": "f43e2449-4edb-4a60-be63-99a87fdcbfd4",
+        "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-2d881731-bfe0-40e4-97fc-2dd48ab2a612"
+      },
+      "result": {
+        "workflowRunId": "f43e2449-4edb-4a60-be63-99a87fdcbfd4",
+        "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-2d881731-bfe0-40e4-97fc-2dd48ab2a612",
+        "assetId": "9e3b9a3b-a737-4e6e-938f-d06ece9ad855",
+        "publicId": "ab9ea095-3769-4dc9-85bd-8096c11ea225",
+        "publicUrl": "https://api.moshq.app/public/assets/ab9ea095-3769-4dc9-85bd-8096c11ea225",
+        "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-congruence-test-2026-05-01/generated/02-destination-context-plus-congruence-note.jpg",
+        "reviewPath": "/Users/aldrinclement/Downloads/tenor-advertorial-congruence-test-review-2026-05-01/generated/02-destination-context-plus-congruence-note.jpg",
+        "workflowPayloadOut": {
+          "job_id": "embedded-freestyle:3dc9646a3d6be07c878cb6b364dc2d4ec3f67eb1f83131d1",
+          "asset_ids": [
+            "9e3b9a3b-a737-4e6e-938f-d06ece9ad855"
+          ],
+          "stores_attached": 0,
+          "swipe_context_mode": "minimal",
+          "swipe_prompt_model": "gemini-3.1-pro-preview",
+          "gemini_rag_doc_keys": [],
+          "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+          "swipe_render_provider": "creative_service",
+          "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+          "gemini_rag_bundle_doc_keys": []
+        },
+        "workflowDetailPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-congruence-test-2026-05-01/workflow-02-destination-context-plus-congruence-note.json"
+      }
+    }
+  ]
+}

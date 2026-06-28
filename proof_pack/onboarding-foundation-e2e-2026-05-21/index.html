@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Onboarding Foundation E2E Proof</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #172026;
+      --muted: #65717c;
+      --line: #d9dee5;
+      --ok: #0f7a4f;
+      --warn: #9a5b00;
+      --bad: #aa2b2b;
+      --accent: #2454d6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(246, 247, 249, 0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 20px; }
+    h1, h2, h3 { margin: 0; letter-spacing: 0; }
+    h1 { font-size: 24px; }
+    h2 { font-size: 17px; margin-bottom: 10px; }
+    h3 { font-size: 14px; margin-bottom: 6px; }
+    p { margin: 0; color: var(--muted); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .grid { display: grid; gap: 14px; }
+    .top-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 16px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .value { margin-top: 4px; font-size: 18px; font-weight: 700; }
+    .label { color: var(--muted); font-size: 12px; font-weight: 650; text-transform: uppercase; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .pill.ok { color: var(--ok); background: #e7f6ef; border-color: #b7e3cf; }
+    .pill.warn { color: var(--warn); background: #fff4df; border-color: #f0cf92; }
+    .pill.bad { color: var(--bad); background: #fff0f0; border-color: #edb8b8; }
+    main .wrap { padding-top: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+    code {
+      font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #eef1f5;
+      border-radius: 5px;
+      padding: 2px 5px;
+      word-break: break-word;
+    }
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    figure { margin: 0; }
+    figcaption { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+    }
+    .shot-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .shot-grid a {
+      display: block;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      color: var(--ink);
+      font-size: 12px;
+    }
+    .note { border-left: 4px solid var(--warn); }
+    .section { margin-top: 14px; }
+    @media (max-width: 860px) {
+      .top-grid, .screens, .shot-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Onboarding Foundation E2E Proof</h1>
+      <p>Final UI-driven new-business run using DSV4 foundation docs 01, 03, and 04 only.</p>
+      <div class="top-grid grid">
+        <div class="card">
+          <div class="label">Result</div>
+          <div class="value"><span class="pill ok">UI unlocked</span></div>
+        </div>
+        <div class="card">
+          <div class="label">Strategy runtime</div>
+          <div class="value">26m41.31s</div>
+        </div>
+        <div class="card">
+          <div class="label">Foundation steps</div>
+          <div class="value">01, 03, 04</div>
+        </div>
+        <div class="card">
+          <div class="label">Step 06</div>
+          <div class="value"><span class="pill ok">Not run</span></div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main>
+    <div class="wrap grid">
+      <section class="card">
+        <h2>Run Identity</h2>
+        <table>
+          <tbody>
+            <tr><th>Workspace</th><td>Aurora Sleep Lab E2E Final 202605220030</td></tr>
+            <tr><th>Product</th><td>LumaRest Magnesium Cocoa</td></tr>
+            <tr><th>Client ID</th><td><code>33cfaf6c-efb5-40db-9e72-bc16b8fc8df0</code></td></tr>
+            <tr><th>Product ID</th><td><code>304d295c-4edd-4593-8b96-55bded3d3678</code></td></tr>
+            <tr><th>Strategy run</th><td><code>2b6d775c-528c-46b9-92ca-05f869dbedf6</code></td></tr>
+            <tr><th>Foundation bundle</th><td><code>639b11f1-7bb2-41f0-8e3e-143a4457e453</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Acceptance</h2>
+        <table>
+          <thead>
+            <tr><th>Check</th><th>Status</th><th>Evidence</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>New-business route submits through actual UI</td><td><span class="pill ok">Pass</span></td><td>Final screenshots 34-46 show the route, product details, review, submit, and wait screen.</td></tr>
+            <tr><td>Progress/wait UI is visible after submit</td><td><span class="pill ok">Pass</span></td><td><a href="screenshots/46-final-success-wait-progress.png">46-final-success-wait-progress.png</a></td></tr>
+            <tr><td>Foundation docs complete and unlock workspace</td><td><span class="pill ok">Pass</span></td><td><a href="screenshots/47-final-foundation-ready.png">47-final-foundation-ready.png</a>; final URL <code>/workspaces/foundation-ready</code></td></tr>
+            <tr><td>Only foundation steps 01, 03, 04 persisted</td><td><span class="pill ok">Pass</span></td><td>Bundle keys: <code>v2-02.foundation.01</code>, <code>v2-02.foundation.03</code>, <code>v2-02.foundation.04</code></td></tr>
+            <tr><td>Step 06 excluded</td><td><span class="pill ok">Pass</span></td><td>No <code>v2-02.foundation.06</code> artifact in the final bundle.</td></tr>
+            <tr><td>Parent onboarding DB run status</td><td><span class="pill warn">Fixed after run</span></td><td>Temporal parent completed, but current DB row stayed <code>running</code> from the old fire-and-forget parent. Code now waits for Strategy V2 and marks completed/failed for future runs.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Key Screens</h2>
+        <div class="screens">
+          <figure>
+            <a href="screenshots/46-final-success-wait-progress.png">
+              <img src="screenshots/46-final-success-wait-progress.png" alt="Setup wait progress screen">
+            </a>
+            <figcaption>Wait/progress screen after submit. User sees ETA and setup state.</figcaption>
+          </figure>
+          <figure>
+            <a href="screenshots/47-final-foundation-ready.png">
+              <img src="screenshots/47-final-foundation-ready.png" alt="Foundation ready screen">
+            </a>
+            <figcaption>Final unlock screen after foundation bundle persisted.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Final Run Screenshots</h2>
+        <div class="shot-grid">
+          <a href="screenshots/34-final-workspaces.png">34 Workspaces</a>
+          <a href="screenshots/35-final-modal-opened.png">35 Modal opened</a>
+          <a href="screenshots/36-final-workspace-name.png">36 Workspace name</a>
+          <a href="screenshots/37-final-business-route.png">37 New business route</a>
+          <a href="screenshots/38-final-business-model.png">38 Business model</a>
+          <a href="screenshots/39-final-product-name.png">39 Product name</a>
+          <a href="screenshots/40-final-buyer-outcome.png">40 Buyer outcome</a>
+          <a href="screenshots/41-final-pricing.png">41 Pricing</a>
+          <a href="screenshots/42-final-pricing-filled.png">42 Pricing filled</a>
+          <a href="screenshots/43-final-competitors.png">43 Competitors</a>
+          <a href="screenshots/44-final-competitors-filled.png">44 Competitors filled</a>
+          <a href="screenshots/45-final-review.png">45 Review</a>
+          <a href="screenshots/46-final-success-wait-progress.png">46 Wait progress</a>
+          <a href="screenshots/47-final-foundation-ready.png">47 Foundation ready</a>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Validation</h2>
+        <table>
+          <tbody>
+            <tr><th>Python compile</th><td><span class="pill ok">Pass</span> backend workflow/activity/config/LLM/router files</td></tr>
+            <tr><th>Pytest</th><td><span class="pill ok">Pass</span> <code>tests/test_client_onboarding_v2_ordering.py</code> and <code>tests/test_strategy_v2_workflow_ordering.py</code>: 6 passed</td></tr>
+            <tr><th>Diff check</th><td><span class="pill ok">Pass</span> targeted touched files</td></tr>
+            <tr><th>Poll log</th><td><a href="foundation-final-poll.log">foundation-final-poll.log</a></td></tr>
+            <tr><th>Summary JSON</th><td><a href="e2e-summary.json">e2e-summary.json</a></td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

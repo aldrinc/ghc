@@ -1,0 +1,58 @@
+{
+  "createdAt": "2026-04-30T01:34:02.865Z",
+  "sourceFile": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-06-free-gifts/06-tenor-free-gifts-reference-board-v3-pill-caddy-zoom.jpg",
+  "sourceAttachment": {
+    "assetId": "6247c800-412b-4083-ab01-5847add67e63",
+    "publicId": "c36947c9-f699-4a70-af1d-6ddbfa9b0fbf",
+    "filename": "06-tenor-free-gifts-reference-board-v3-pill-caddy-zoom.jpg",
+    "contentType": "image/jpeg",
+    "width": 2048,
+    "height": 2048,
+    "url": "/public/assets/c36947c9-f699-4a70-af1d-6ddbfa9b0fbf"
+  },
+  "note": "Uploaded one composite reference board: Mars Men source 06 for composition plus actual Tenor product/gift images for object accuracy.",
+  "stagingFunnelId": "be65d76e-ced9-4948-9465-18723c8446fd",
+  "stagingPageId": "ab3102f4-a179-410a-9eb0-66aa3020cafc",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "output": {
+    "key": "06-tenor-free-gifts-main-product-first-4-v3",
+    "workflowRunId": "bef04629-11aa-47f5-bd7b-8ea9eccf270e",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-5e63918f-2655-466a-96b9-9cfc46d924d1",
+    "assetId": "383cf9a9-3791-4544-83a7-f614be2ee580",
+    "publicId": "2b9d0f96-9c89-4623-8aa4-a0f96a9276ee",
+    "publicUrl": "https://api.moshq.app/public/assets/2b9d0f96-9c89-4623-8aa4-a0f96a9276ee",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-mars-carousel-validation-swipe-flow-2026-04-28/generated-tenor-06-free-gifts/06-tenor-free-gifts-main-product-first-4-v3.jpg",
+    "payload": {
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+      "assetBriefId": "brief_editorial_wound_scene",
+      "requirementIndex": 0,
+      "swipeImageUrl": "https://api.moshq.app/public/assets/c36947c9-f699-4a70-af1d-6ddbfa9b0fbf",
+      "swipeRequiresProductImage": true,
+      "swipeContextMode": "minimal",
+      "swipeBrandName": "Tenor",
+      "swipeProductName": "Daily Drive Essentials",
+      "swipeHook": "What's Included: Your Free Gifts",
+      "swipeAngle": "Use the attached V3 reference board as the complete visual input. The Mars Men source 06 panel controls the final layout/composition. The V2 output panel controls the approved Tenor styling and the already-approved hat, shaker bottle, and gym towel direction. The enlarged pill caddy photo in the bottom half controls the pill caddy object and must be followed closely. Do not reproduce the reference-board layout in the final output; create one finished 1:1 PDP carousel slide.\n\nPreserve the Mars source composition: bold WHAT'S INCLUDED headline at the top, YOUR FREE GIFTS subheadline, large main product block on the left, plus sign in the center, and four gift cards on the right with FREE ribbons.\n\nAdapt the content for Tenor. Brand: Tenor. Product: Daily Drive Essentials, premium black men's vitality supplement bottle, 60 capsules, testosterone and vitality support. Keep the product as the main left-side object. Use Tenor's premium light carousel direction: warm off-white / stone background, black or near-black Aeonik-style typography, filled/blocky UI elements, restrained warm neutral accent, polished PDP carousel quality. Do not make the design red-heavy.\n\nGift content: include exactly these four Tenor gifts: Pill Caddy ($19 value), Shaker Bottle ($18 value), Baseball Cap ($25 value), and Gym Towel ($18 value). Show these as four gift cards on the right. Keep FREE ribbons. Do not include Duffle Bag, Stainless Steel Bottle, apps, watches, ebooks, travel tins, or any Mars Men items.\n\nCritical V3 correction: replace only the pill caddy with the enlarged bottom reference. It must be the actual long black weekly organizer with rounded half-cylinder end caps, seven curved day lids across the top, a slightly wavy lower front edge, and a white TENOR wordmark on the lower front. Do not render it as a rounded oval/capsule case, a hard rectangular block, a small generic case, or a box. Keep the baseball cap as a black cap with clear white Tenor text. Keep the shaker bottle and gym towel direction from V2.\n\nOffer context: Save 30% + Free Welcome Gifts. Bonus gifts are for new subscribers and ship with scheduled subscription orders. Make the slide feel like a clean Tenor product carousel image, not a copied Mars Men design.",
+      "aspectRatio": "1:1",
+      "count": 1
+    },
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:71c91c0bec3c2bfa1f1fb3a28062464f408dc2534cf24de8",
+      "asset_ids": [
+        "383cf9a9-3791-4544-83a7-f614be2ee580"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  }
+}

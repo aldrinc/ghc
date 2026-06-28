@@ -1,0 +1,81 @@
+{
+  "createdAt": "2026-05-06T19:52:29.481Z",
+  "campaignAction": "reused-valid-delivery-campaign",
+  "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+  "campaign": {
+    "id": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "product_id": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "channels": [
+      "facebook"
+    ],
+    "status": "draft",
+    "objective_type": "sales",
+    "baseline": null,
+    "budget_min": 100,
+    "default_swipe_collection_id": null,
+    "name": "Tenor - GLP + Quiz - GPT Image 2 - 2026-05-05",
+    "org_id": "d539fd3c-6a8a-4c78-a744-e2ee27b24eca",
+    "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "asset_brief_types": [
+      "image"
+    ],
+    "goal_description": "Launch the supplied Tenor GLP + quiz Meta campaign package.",
+    "numeric_target": null,
+    "timeframe_days": null,
+    "budget_max": 100,
+    "created_at": "2026-05-05T00:56:14.500094+00:00"
+  },
+  "creativeContext": {
+    "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "provider": "manual",
+    "creativeContextArtifactId": "e1565b8f-46b5-4af0-9c42-e6d2a98fa88e",
+    "experimentSpecArtifactId": "9ca5ae56-bf4d-4a1c-80e7-d6f522b31387",
+    "artifactIds": {
+      "campaign_loaded_angles": "2581a61b-23ea-4eaa-8ead-08a4aa1bacf4",
+      "campaign_loaded_offer": "9fb1783d-c07d-4247-a1d3-927cdff3b114",
+      "campaign_loaded_copy": "2b0dbf43-a028-41e4-b6c3-0554d6655474",
+      "campaign_loaded_copy_context": "0670ec5d-585c-4f95-8788-cf00ac741318",
+      "campaign_creative_context": "e1565b8f-46b5-4af0-9c42-e6d2a98fa88e"
+    },
+    "uploadedDocKeys": [
+      "campaign_loaded_angles",
+      "campaign_loaded_offer",
+      "campaign_loaded_copy",
+      "campaign_loaded_copy_context",
+      "campaign_creative_context",
+      "experiment_specs:426afe15-ac66-436c-910d-2a1259597bf3"
+    ],
+    "checkedAt": "2026-05-06T19:51:53.962513+00:00"
+  },
+  "assetBriefSeed": {
+    "status": "updated",
+    "artifactId": "dff48434-34ca-423d-87b1-8e12e385237a",
+    "briefIds": [
+      "brief_glp_listicle_swipe_image2",
+      "brief_quiz_funnel_swipe_image2"
+    ]
+  },
+  "delivery": {
+    "id": "4eea156d-750b-44a7-97a1-d067a8e7f04c",
+    "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "deliveryMode": "external_urls",
+    "preSalesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+    "salesUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/?selling_plan=2948432039",
+    "checkoutUrl": null,
+    "thankYouUrl": null,
+    "validationStatus": "valid",
+    "validationError": null,
+    "validatedAt": "2026-05-05T00:56:50.445843+00:00",
+    "createdAt": "2026-05-05T00:56:14.514584+00:00",
+    "updatedAt": "2026-05-05T00:56:50.445852+00:00"
+  },
+  "deliveryValidation": {
+    "validationStatus": "valid",
+    "validationError": null,
+    "validatedAt": "2026-05-05T00:56:50.445843+00:00",
+    "source": "existing-campaign-delivery-record"
+  },
+  "generationKey": "batch:tenor-glp-quiz-problem-aware-expansion-20260506",
+  "batchId": "tenor-glp-quiz-problem-aware-expansion-20260506"
+}

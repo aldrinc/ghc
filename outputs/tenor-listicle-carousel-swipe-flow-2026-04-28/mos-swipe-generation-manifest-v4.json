@@ -1,0 +1,59 @@
+{
+  "createdAt": "2026-04-28T19:37:38.792Z",
+  "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+  "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+  "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+  "stagingFunnelId": "be65d76e-ced9-4948-9465-18723c8446fd",
+  "stagingPageId": "ab3102f4-a179-410a-9eb0-66aa3020cafc",
+  "outputs": [
+    {
+      "key": "01-product-hero-v4-simple-brand",
+      "sourceFile": "01-tenor-product-hero-source-v4.jpg",
+      "sourceAttachment": {
+        "assetId": "cfa677e5-55f7-42a9-8217-c0c5ef77ce22",
+        "publicId": "eeb62668-2f79-4e2e-8f11-205fcf64e478",
+        "filename": "01-tenor-product-hero-source-v4.jpg",
+        "contentType": "image/jpeg",
+        "width": 1024,
+        "height": 1024,
+        "url": "/public/assets/eeb62668-2f79-4e2e-8f11-205fcf64e478"
+      },
+      "workflowRunId": "0910c490-2588-45dc-ae26-c5c3c39f4d1a",
+      "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e50500c3-2bf1-4dd1-8259-10bcd3c3630b",
+      "assetId": "1d164afd-1f66-443e-81b7-1d3fdd9931ac",
+      "publicId": "a85db7aa-448f-48ff-b82a-92f2c515791d",
+      "publicUrl": "https://api.moshq.app/public/assets/a85db7aa-448f-48ff-b82a-92f2c515791d",
+      "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-listicle-carousel-swipe-flow-2026-04-28/generated-v4/01-product-hero-v4-simple-brand.jpg",
+      "payload": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+        "assetBriefId": "brief_editorial_mechanism_reveal",
+        "requirementIndex": 2,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/eeb62668-2f79-4e2e-8f11-205fcf64e478",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Simple Tenor branded product hero",
+        "swipeAngle": "Create a square Tenor carousel product hero using the attached source swipe as the composition target. Keep it very simple and brand-led: centered updated black Daily Drive Essentials bottle, warm ivory / bone background, soft premium studio lighting, matte shadow, subtle black/charcoal depth, and one restrained ember-red brand accent. Do not add any headline, captions, benefit labels, badges, icons with text, or typography outside the product bottle label itself. Do not show fruit, vegetables, roots, leaves, botanicals, ingredient objects, capsules, pills, powder, sachets, scoops, science diagrams, orbit rings, radial grids, or decorative clutter. Match Tenor branding: clean, masculine, premium, minimal, editorial, black bottle with red accent, neutral background. No IM8 branding and no celebrity language.",
+        "aspectRatio": "1:1",
+        "count": 1
+      },
+      "workflowPayloadOut": {
+        "job_id": "embedded-freestyle:9bb07d3f86d9b4931b99301be065e15aaf198d6b696bddd1",
+        "asset_ids": [
+          "1d164afd-1f66-443e-81b7-1d3fdd9931ac"
+        ],
+        "stores_attached": 0,
+        "swipe_context_mode": "minimal",
+        "swipe_prompt_model": "gemini-3.1-pro-preview",
+        "gemini_rag_doc_keys": [],
+        "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+        "swipe_render_provider": "creative_service",
+        "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+        "gemini_rag_bundle_doc_keys": []
+      }
+    }
+  ]
+}

@@ -15,7 +15,7 @@ const { themeState } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/funnels/puckConfig', () => ({
+vi.mock('@/funnels/funnelRuntime', () => ({
   useFunnelRuntime: () => ({
     productSlug: 'b8f94ba2',
     funnelSlug: 'honest-herbalist',

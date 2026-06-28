@@ -1,0 +1,143 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "larry_agent_workflow",
+  "created_at": "2026-05-22T14:15:14.640166+00:00",
+  "source_type": "zip",
+  "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+  "operator_notes": "Larry skill package supplied by user for TikTok carousel and app conversion agent workflow design.",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/_meta-f2357ccb69.json",
+      "kind": "raw_files",
+      "sha256": "e2f81c6ec013a34758564e102b6b464219d1450737c2648af905b2a63c6635c7",
+      "bytes": 124,
+      "captured_at": "2026-05-22T14:15:18.031261+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/competitor-research.md",
+      "kind": "raw_files",
+      "sha256": "311e5b834dbe2f71e491097ac593a0acf242fa400dcd81c9d24f78f470f61aa3",
+      "bytes": 3685,
+      "captured_at": "2026-05-22T14:15:18.098468+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/app-categories.md",
+      "kind": "raw_files",
+      "sha256": "2fc1191d854165a447991878e22f6b409942b3a60dd3e7fd9e6f255fab2838f0",
+      "bytes": 2170,
+      "captured_at": "2026-05-22T14:15:18.172026+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/analytics-loop.md",
+      "kind": "raw_files",
+      "sha256": "9cc6c263edf7accfc18190e597b6d39bc24044ea151ce984494d71d4b74acdc9",
+      "bytes": 5431,
+      "captured_at": "2026-05-22T14:15:18.243406+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/slide-structure.md",
+      "kind": "raw_files",
+      "sha256": "3977e95f00f533677a88b81032ae3a420afaa24b047eaca11b4b32e6b32e16e8",
+      "bytes": 4328,
+      "captured_at": "2026-05-22T14:15:18.319820+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/revenuecat-integration.md",
+      "kind": "raw_files",
+      "sha256": "40206619b733359b599f9b5257ae1e39c85a2da33ebf3dbd633c4237f588a096",
+      "bytes": 3687,
+      "captured_at": "2026-05-22T14:15:18.394996+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/onboarding.js",
+      "kind": "raw_files",
+      "sha256": "6f31ff7acd874cc9bc80dcaa7bbaec3377f37213c421e50a07a43b7b0b4aaea3",
+      "bytes": 7304,
+      "captured_at": "2026-05-22T14:15:18.469623+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/post-to-tiktok.js",
+      "kind": "raw_files",
+      "sha256": "249dc2d1027cfa33e19d9518f09676cb3114424be9b8633075d2290e91e9330d",
+      "bytes": 3441,
+      "captured_at": "2026-05-22T14:15:18.541075+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/add-text-overlay.js",
+      "kind": "raw_files",
+      "sha256": "57e3178b6266cd466c909cda5dd88c393fc87a550d3a8ee083a1ddd5e6058ab4",
+      "bytes": 6053,
+      "captured_at": "2026-05-22T14:15:18.616091+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/daily-report.js",
+      "kind": "raw_files",
+      "sha256": "d972b77b59ec11d2ea4017527741ad9e71576f75c9b03662bcbc4624c1a7fd00",
+      "bytes": 24801,
+      "captured_at": "2026-05-22T14:15:18.690279+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/check-analytics.js",
+      "kind": "raw_files",
+      "sha256": "d450268cce3c289c8777d2cffa3ee9e1be55a55da88b01c84e6ebe31acb85a34",
+      "bytes": 9369,
+      "captured_at": "2026-05-22T14:15:18.761283+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/generate-slides.js",
+      "kind": "raw_files",
+      "sha256": "93fe2a3f4298a74f411bd3af8a6a6b826b340e9bd6f157a8d85d19d76f71d1a1",
+      "bytes": 8737,
+      "captured_at": "2026-05-22T14:15:18.831464+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/competitor-research.js",
+      "kind": "raw_files",
+      "sha256": "62b00a92b6436b8586fbb7d7aa80d6daaa370a9a320716009166fa119d306126",
+      "bytes": 3233,
+      "captured_at": "2026-05-22T14:15:18.899299+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/captures/larry_agent_workflow/raw/SKILL-ebadb8e96a.md",
+      "kind": "raw_files",
+      "sha256": "1b5e2fc930b3abeb123543b8d6accbbb49132af524dd1f3398f47a00a9478914",
+      "bytes": 47211,
+      "captured_at": "2026-05-22T14:15:18.969313+00:00",
+      "source": "/Users/aldrinclement/Downloads/larry-1.0.0 (1).zip",
+      "notes": "Extracted Larry skill package file"
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-22T16:47:23.415471+00:00",
+    "errors": []
+  }
+}

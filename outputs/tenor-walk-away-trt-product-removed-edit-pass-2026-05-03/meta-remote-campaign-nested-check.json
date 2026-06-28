@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "status": 500,
+  "text": "{\"detail\":\"Internal server error.\"}"
+}

@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-22T00:00:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "docs/plans/2026-05-22-meta-ads-social-agent-prd.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user asked for a reviewable PRD, not implementation. Existing captured source material, repo context, and the user's explicit constraints were sufficient to produce a draft with open review decisions rather than blocking on new questions.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "planning/goal.md",
+      "summary": "Reviewable PRD goal for Meta ads and social posting agents."
+    },
+    "problem_log": {
+      "path": "planning/problem-log.md",
+      "summary": "Observable product and architecture gaps."
+    },
+    "root_cause_diagnosis": {
+      "path": "planning/root-cause.md",
+      "summary": "mOS lacks a first-class connected-account and action-control layer."
+    },
+    "current_machine": {
+      "path": "planning/current-machine.md",
+      "summary": "Current Meta/Hermes/social-posting pieces."
+    },
+    "designed_machine": {
+      "path": "planning/designed-machine.md",
+      "summary": "Target connection, snapshot, proposal, approval, execution loop."
+    },
+    "worst_day_test": {
+      "path": "planning/worst-day.md",
+      "summary": "Failure modes and safe failure rules."
+    },
+    "leading_lagging_metrics": {
+      "path": "planning/metrics.md",
+      "summary": "Leading and lagging metrics without fabricated targets."
+    },
+    "owner_date_review": {
+      "path": "planning/owner-review.md",
+      "summary": "Owner, draft date, review point, next step."
+    },
+    "stop_condition": {
+      "path": "planning/stop-condition.md",
+      "summary": "Planning completion criteria."
+    }
+  },
+  "owner": "Aldrin / mOS",
+  "review_date": "2026-05-22",
+  "stop_condition": "PRD and proof artifacts exist, plangatecheck passes, and implementation has not started."
+}

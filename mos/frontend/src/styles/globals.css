@@ -7,7 +7,7 @@
     color: var(--text);
     background-color: var(--bg);
     font-family: var(--font-sans);
-    line-height: var(--leading-normal);
+    line-height: var(--lh-relaxed);
     font-size: var(--text-base);
   }
 
@@ -18,8 +18,10 @@
     color: var(--text);
     font-family: var(--font-sans);
     font-size: var(--text-base);
-    line-height: var(--leading-normal);
+    line-height: var(--lh-relaxed);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     position: relative; /* Required for Base UI dialog backdrops on iOS Safari */
   }
 
@@ -39,26 +41,35 @@
   h3 {
     margin: 0;
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: 400;
     letter-spacing: var(--tracking-display);
     line-height: var(--leading-display);
     color: var(--text);
+    text-wrap: balance;
+  }
+
+  h1 em,
+  h2 em,
+  h3 em {
+    font-style: italic;
+    font-weight: 400;
   }
 
   h1 {
-    font-size: var(--text-2xl);
+    font-size: var(--text-3xl);
   }
 
   h2 {
-    font-size: var(--text-xl);
+    font-size: var(--text-2xl);
   }
 
   h3 {
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
   }
 
   p {
     margin: 0;
+    text-wrap: pretty;
   }
 
   a {
@@ -86,5 +97,21 @@
 
   :focus:not(:focus-visible) {
     outline: none;
+  }
+
+  ::selection {
+    background: var(--selection);
+    color: var(--selection-foreground);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

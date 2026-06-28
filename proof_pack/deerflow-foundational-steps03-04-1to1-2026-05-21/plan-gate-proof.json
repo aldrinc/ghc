@@ -1,0 +1,49 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "retrofit",
+  "created_at": "2026-05-21T20:20:00Z",
+  "daliogoals_skill_loaded": true,
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user clarified not to run Step 06. Existing production prompts, GPT artifacts, and DeerFlow sidecar were available locally.",
+  "owner": "Codex execution agent",
+  "review_date": "2026-05-21",
+  "stop_condition": "Stop after Steps 03/04 are run or fail with exact artifacts, comparison, source manifest, provenance, and plan contract verification.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "plan-gate.md",
+      "summary": "Defines the measurable 03/04 DSV4 benchmark goal."
+    },
+    "problem_log": {
+      "path": "plan-gate.md",
+      "summary": "Records the need to prove Step 04 before defaulting."
+    },
+    "root_cause_diagnosis": {
+      "path": "plan-gate.md",
+      "summary": "Names generic one-call research+synthesis as the likely Step 04 failure risk."
+    },
+    "current_machine": {
+      "path": "plan-gate.md",
+      "summary": "Documents GPT artifact baseline and Step 04 brittleness."
+    },
+    "designed_machine": {
+      "path": "plan-gate.md",
+      "summary": "Documents scoped 03/04 run, evidence capture, and stop rules."
+    },
+    "worst_day_test": {
+      "path": "plan-gate.md",
+      "summary": "Captures the actual failure: paid research without final tagged report."
+    },
+    "leading_lagging_metrics": {
+      "path": "plan-gate.md",
+      "summary": "Defines output-shape, source, cost, latency, and default-readiness metrics."
+    },
+    "owner_date_review": {
+      "path": "plan-gate.md",
+      "summary": "Names owner, date, and review point."
+    },
+    "stop_condition": {
+      "path": "plan-gate.md",
+      "summary": "Defines verification gates."
+    }
+  }
+}

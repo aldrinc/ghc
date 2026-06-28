@@ -83,11 +83,6 @@ const FOUNDATIONAL_DOC_SPECS = [
     title: "Deep Research Corpus",
     fallbackSubtitle: "Foundational Step 04 full markdown",
   },
-  {
-    stepSuffix: "06",
-    title: "Avatar Brief",
-    fallbackSubtitle: "Foundational Step 06 full markdown",
-  },
 ] as const;
 
 function strategyV2SignalPath(signal: StrategyV2PendingSignal): string {
@@ -521,7 +516,7 @@ export function StrategyV2ReviewWorkspace({
     if (!pendingSignal) return [] as string[];
     if (pendingSignal === "strategy_v2_proceed_research") {
       return [
-        "Read the full Competitor Research, Meta-Prompt, Deep Research, and Avatar Brief files.",
+        "Read the full Competitor Research, Meta-Prompt, and Deep Research files.",
         "Verify category and segment coherence across foundational outputs before proceeding.",
         "Confirm evidence depth and traceability are sufficient to enter competitor asset review.",
       ];
@@ -980,8 +975,8 @@ export function StrategyV2ReviewWorkspace({
       disabled={!canDownloadFoundationalZip || downloadWorkflowResearchZip.isPending}
       title={
         canDownloadFoundationalZip
-          ? "Download the four foundational strategy docs as a ZIP."
-          : "Available after all four foundational docs finish persisting."
+          ? "Download the foundational strategy docs as a ZIP."
+          : "Available after all foundational docs finish persisting."
       }
     >
       {downloadWorkflowResearchZip.isPending ? (
@@ -1246,8 +1241,7 @@ export function StrategyV2ReviewWorkspace({
                 <div>
                   <div className="text-sm font-semibold text-content">Foundational docs</div>
                   <div className="text-xs text-content-muted">
-                    Stage 1 full files expected by source of truth: competitor research, meta-prompt, deep research, and
-                    avatar brief.
+                    Foundation-only files expected by source of truth: competitor research, meta-prompt, and deep research.
                   </div>
                 </div>
                 {renderFoundationalZipButton()}

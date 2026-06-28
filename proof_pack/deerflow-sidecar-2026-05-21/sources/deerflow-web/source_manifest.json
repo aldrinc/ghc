@@ -1,0 +1,35 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "deerflow-web",
+  "created_at": "2026-05-21T18:07:22.547272+00:00",
+  "source_type": "web",
+  "source": "DeerFlow Step01 smoke web_search/web_fetch",
+  "operator_notes": "",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events-831235c32e.jsonl",
+      "kind": "raw_files",
+      "sha256": "d2084c6ebf0369b18adcadb885c9ee85304267339f8049915a49f7eb5151da09",
+      "bytes": 520728,
+      "captured_at": "2026-05-21T18:07:22.626471+00:00",
+      "source": "DeerFlow Step01 smoke web_search/web_fetch",
+      "notes": ""
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence-d3bd74ed67.json",
+      "kind": "raw_files",
+      "sha256": "15bd1efa83e5366d390fc5210a8808baf103a98f1e226448d260754533d6c8c7",
+      "bytes": 12933,
+      "captured_at": "2026-05-21T18:07:22.712485+00:00",
+      "source": "DeerFlow Step01 smoke web_search/web_fetch",
+      "notes": ""
+    }
+  ],
+  "derived_files": [],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-21T18:07:22.793938+00:00",
+    "errors": []
+  }
+}

@@ -482,7 +482,7 @@ export function SwipeCollectionSelector({
       <DialogRoot open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogTitle>Create swipe collection</DialogTitle>
-          <DialogDescription className="mt-1">
+          <DialogDescription>
             Start a curated collection for campaign-specific swipe selection.
           </DialogDescription>
           <div className="mt-4 space-y-4">
@@ -517,7 +517,7 @@ export function SwipeCollectionSelector({
       <DialogRoot open={cloneOpen} onOpenChange={setCloneOpen}>
         <DialogContent>
           <DialogTitle>Clone swipe collection</DialogTitle>
-          <DialogDescription className="mt-1">
+          <DialogDescription>
             Clone the current collection into a writable set before curating it.
           </DialogDescription>
           <div className="mt-4 space-y-4">
@@ -555,7 +555,7 @@ export function SwipeCollectionSelector({
       <DialogRoot open={manageOpen} onOpenChange={setManageOpen}>
         <DialogContent className="max-w-6xl">
           <DialogTitle>Manage swipe collection</DialogTitle>
-          <DialogDescription className="mt-1">
+          <DialogDescription>
             Review the exact swipes that creative production will use for this campaign.
           </DialogDescription>
 

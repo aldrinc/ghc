@@ -1,0 +1,2 @@
+docs/plans/2026-04-22-multi-presales-variants-plan.md
+outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/run_problem_aware_full_campaign.mjs

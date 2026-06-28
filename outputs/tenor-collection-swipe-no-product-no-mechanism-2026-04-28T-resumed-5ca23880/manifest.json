@@ -1,0 +1,48 @@
+{
+  "createdAt": "2026-04-28T17:52:01.083Z",
+  "resumedFromWorkflowRunId": "5ca23880-b1c4-4a84-a15d-f28128742d44",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-collection-swipe-no-product-no-mechanism-2026-04-28T-resumed-5ca23880",
+  "source": {
+    "collectionId": "b89e89f4-2565-4b5d-afd1-195532613bfb",
+    "collectionName": "Tenor initial swipe collection",
+    "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+    "sourceSwipeTitle": "fatigue.jpg",
+    "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/fatigue.jpg",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1
+  },
+  "requestAttributes": {
+    "companySwipeId": "3a342736-0437-53dc-a84b-16a50b3c03e6",
+    "swipeRequiresProductImage": false,
+    "swipeContextMode": "minimal",
+    "swipeBrandName": "Tenor",
+    "swipeProductName": "Tenor",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1
+  },
+  "result": {
+    "workflowRunId": "5ca23880-b1c4-4a84-a15d-f28128742d44",
+    "assetId": "24966fae-f9a5-4171-8e09-959f4b51fa5b",
+    "publicId": "776ad9c7-6a33-43a2-9315-22c211d6fc83",
+    "publicUrl": "https://api.moshq.app/public/assets/776ad9c7-6a33-43a2-9315-22c211d6fc83",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-collection-swipe-no-product-no-mechanism-2026-04-28T-resumed-5ca23880/01-fatigue-collection-no-product-no-mechanism.jpg",
+    "contentType": "image/jpeg",
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:43ff1ff18aada84cab65e2b3dbfef29117fda7ec2aa3141f",
+      "asset_ids": [
+        "24966fae-f9a5-4171-8e09-959f4b51fa5b"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  }
+}

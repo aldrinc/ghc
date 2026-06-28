@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-22T00:00:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-social-agents-agent-command-center-options.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user specified the product goal, the current surface, the confusion problem, the desired complete refactor, and the available right section. Live browser observation plus current SocialAgentsPage code supplied enough evidence to produce options without blocking on clarification.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Goal is to design the Social Agents UI around setting up and managing a bounded marketing agent."
+    },
+    "problem_log": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Problem is backend-shaped IA and underused persistent context."
+    },
+    "root_cause_diagnosis": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Root cause is information architecture organized around internal data objects, not the customer's agent-management job."
+    },
+    "current_machine": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Current machine asks users to operate program/source/experiment/variant/media/handoff machinery."
+    },
+    "designed_machine": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Designed machine is an Agent Command Center with single-purpose setup screens, a persistent Agent Dossier, and MOS-native visual direction."
+    },
+    "worst_day_test": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Worst-day test covers missing channels/source/media and pending approval while preserving one clear next action."
+    },
+    "leading_lagging_metrics": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Metrics cover one CTA, single-purpose screens, right rail status, tests, browser proof, and first Postiz handoff."
+    },
+    "owner_date_review": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Owner is Codex main thread, dated 2026-05-22, with review after implementation verification."
+    },
+    "stop_condition": {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/proof_pack/2026-05-22-social-agents-agent-command-center-options/plan-gate.md",
+      "summary": "Planning stops when plangatecheck passes and the user has concise options, recommendation, and a verified standalone visual mock."
+    }
+  },
+  "owner": "Codex main thread",
+  "review_date": "2026-05-22",
+  "stop_condition": "Plan is final only after plangatecheck passes and the standalone visual mock is verified."
+}

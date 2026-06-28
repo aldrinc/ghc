@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Select } from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { normalizeSwipeToAssetReviewItem } from "@/lib/assetReviewNormalizers";
 import type { AssetReviewItem } from "@/types/assetReview";
@@ -112,15 +113,11 @@ export function SwipesPage() {
   if (!workspace) {
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold text-content">GetHookd review inbox</h2>
-            <p className="text-sm text-content-muted">
-              Select a workspace to review GetHookd swipes for that workspace.
-            </p>
-          </div>
-        </div>
-        <Callout variant="default" size="sm" title="Workspace required">
+        <PageHeader
+          title="GetHookd review inbox"
+          description="Select a workspace to review GetHookd swipes for that workspace."
+        />
+        <Callout variant="neutral" size="sm" title="Workspace required">
           Choose a workspace from the sidebar before opening GetHookd Collections.
         </Callout>
       </div>
@@ -129,44 +126,39 @@ export function SwipesPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-content">GetHookd review inbox</h2>
-          <p className="text-sm text-content-muted">
-            Review nightly-synced reference ads for {workspace.name}, then promote approved items into
-            launchable collections.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="neutral">{stats.total} raw imported</Badge>
-          <Badge tone="success">{stats.reviewable} exact statics</Badge>
-          <Badge tone="neutral">{stats.duplicates} duplicates collapsed</Badge>
-          <Badge tone="neutral">{stats.excluded} excluded non-static</Badge>
-          <Badge tone="neutral">{stats.returned} in review set</Badge>
-          <Badge tone="warning">{stats.pending} pending</Badge>
-          <Badge tone="success">{stats.approved} approved</Badge>
-          <Badge tone="danger">{stats.rejected} rejected</Badge>
-          <Badge tone="warning">{stats.stale} stale</Badge>
-        </div>
-      </div>
+      <PageHeader
+        title="GetHookd review inbox"
+        description={`Review nightly-synced reference ads for ${workspace.name}, then promote approved items into launchable collections.`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Badge tone="neutral">{stats.total} raw imported</Badge>
+            <Badge tone="success">{stats.reviewable} exact statics</Badge>
+            <Badge tone="neutral">{stats.duplicates} duplicates collapsed</Badge>
+            <Badge tone="neutral">{stats.excluded} excluded non-static</Badge>
+            <Badge tone="neutral">{stats.returned} in review set</Badge>
+            <Badge tone="warning">{stats.pending} pending</Badge>
+            <Badge tone="success">{stats.approved} approved</Badge>
+            <Badge tone="danger">{stats.rejected} rejected</Badge>
+            <Badge tone="warning">{stats.stale} stale</Badge>
+          </div>
+        }
+      />
 
       {summary.latestRunId ? (
-        <Callout variant="default" size="sm" title="Latest GetHookd run">
+        <Callout variant="neutral" size="sm" title="Latest GetHookd run">
           Showing the top {summary.returnedCount} exact static images from the latest workspace sync.
           Imported {summary.rawImportedCount} raw ads, kept {summary.eligibleStaticImageCount} exact
           statics, collapsed {summary.duplicateCollapsedCount} duplicates, excluded{" "}
           {summary.excludedNonStaticCount} non-static ads.
         </Callout>
       ) : (
-        <Callout variant="default" size="sm" title="No GetHookd sync yet">
+        <Callout variant="neutral" size="sm" title="No GetHookd sync yet">
           Run a GetHookd sync for this workspace before opening the review inbox.
         </Callout>
       )}
 
-      {/* Bulk action bar */}
       {selectedIds.size > 0 ? (
-        <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4">
+        <div className="ds-card ds-card--sm border-accent/25 bg-info-bg">
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-content">
               <span className="font-semibold">{selectedIds.size}</span> selected
@@ -236,7 +228,7 @@ export function SwipesPage() {
 
       {/* Grid */}
       {isLoading ? (
-        <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">
+        <div className="ds-empty-surface text-sm text-content-muted">
           Loading swipes…
         </div>
       ) : (

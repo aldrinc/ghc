@@ -1,0 +1,33 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/plan.contract.json",
+  "verified_at": "2026-05-24T21:50:59.339550+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [],
+  "run_logs": [
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-Users-aldrinclement-.codex-bin-capturectl-verify-source-source_manifest.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-test--s-videos-peptideprice-foundational-onboarding-full.webm.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-test--s-videos-peptideprice-foundational-onboarding.webm.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-test--s-videos-part-2-ui-download.webm.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-jq--e-.setup.client_id-and-.setup.product_id-and-.setup.onboarding_workflow_run_.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-jq--e-.readiness.status-foundation_ready-and-.readiness.missing_step_keys-length.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-test--s-downloads-peptideprice-foundational-docs.zip.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-unzip--t-downloads-peptideprice-foundational-docs.zip.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165058-bash--lc-diff--u-printf-s-n-v2-02.foundation.01-strategy-v2-foundational-step-01.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-test--s-downloads-foundational-docs-v2-02.foundation.01-strategy-v2-foundational.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-test--s-downloads-foundational-docs-v2-02.foundation.03-strategy-v2-foundational.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-test--s-downloads-foundational-docs-v2-02.foundation.04-strategy-v2-foundational.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-test--s-index.html.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-Users-aldrinclement-.codex-bin-capturectl-verify-source-source_manifest.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-curl--fsS-http-localhost-8008-health.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-curl--fsS-http-localhost-8008-health-db.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-nc--z-127.0.0.1-7235.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-jq--e-.readiness.status-foundation_ready-and-.readiness.reason-foundation_bundle.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-unzip--l-downloads-peptideprice-foundational-docs.zip.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-unzip--t-downloads-peptideprice-foundational-docs.zip.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-test--s-plan.contract.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-jq--e-.competitor_urls-length-0-run-summary.json.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-grep--R--E-agent_fabricated---allow-estimate-allow_estimate-run-summary.json-so.log",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/peptideprice-foundational-onboarding-2026-05-24/verify-20260524-165059-jq--e-.evidence.source_manifest-and-.extraction_response_observed.provider-and-..log"
+  ]
+}

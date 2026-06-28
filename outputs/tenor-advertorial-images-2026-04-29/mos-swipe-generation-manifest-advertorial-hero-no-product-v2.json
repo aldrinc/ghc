@@ -1,0 +1,39 @@
+{
+  "createdAt": "2026-04-29T19:16:41.911Z",
+  "output": {
+    "workflowRunId": "f7d79eee-b38c-4cf2-8963-29997daab227",
+    "assetId": "65572b45-be37-4443-8966-3ba07dff5edc",
+    "publicId": "0d1d65b9-5395-41b9-ab5f-9f4424496d13",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-advertorial-images-2026-04-29/generated-no-product-v2/01-hero-normal-labs.jpg",
+    "payload": {
+      "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+      "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+      "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+      "assetBriefId": "brief_editorial_mechanism_reveal",
+      "requirementIndex": 2,
+      "swipeImageUrl": "https://api.moshq.app/public/assets/b72b23f8-7e49-4726-a729-6fdb2c19729b",
+      "swipeRequiresProductImage": false,
+      "swipeContextMode": "minimal",
+      "swipeBrandName": "Tenor",
+      "swipeProductName": "Daily Drive Essentials",
+      "swipeHook": "Quiet morning lab report",
+      "swipeAngle": "Hard compliance constraint: do not show any supplement product or product-adjacent object. No bottle, jar, box, label, supplement facts panel, capsules, pills, powders, scoops, sachets, packaging, branded object, logo, or readable product text. Also no words, letters, numbers, captions, headlines, lab values, or readable marks anywhere in the image. Wide premium editorial hero image: warm off-white stone surface, soft morning light, blurred paper/lab-report shape with only abstract unreadable lines, quiet driveway/morning atmosphere. Photorealistic, restrained, article-native, no graphic overlay.",
+      "aspectRatio": "21:9",
+      "count": 1
+    },
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:a22262fc5e89801b0cbcb2ad1e81bb19397745d9e0190e0d",
+      "asset_ids": [
+        "65572b45-be37-4443-8966-3ba07dff5edc"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  }
+}

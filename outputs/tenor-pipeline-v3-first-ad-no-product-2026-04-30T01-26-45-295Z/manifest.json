@@ -1,0 +1,84 @@
+{
+  "createdAt": "2026-04-30T01:28:00.368Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-first-ad-no-product-2026-04-30T01-26-45-295Z",
+  "runMarker": "pipeline-v3-first-execution-AV-A2-no-product-default-collection",
+  "pipeline": {
+    "root": "/Users/aldrinclement/Downloads/pipeline-run-v3",
+    "metaAdsPath": "/Users/aldrinclement/Downloads/pipeline-run-v3/phase-9-ads/meta-ads.md",
+    "selectedAd": {
+      "id": "AV-A2",
+      "variant": "Curiosity",
+      "primaryText": "300 to 1,000. That's the testosterone reference range — a 700-point spread. You can lose two-thirds of your T and still be told your labs are \"normal.\" Here's what the reference range doesn't tell you — and what actually matters. [Link]",
+      "hook": "300 to 1,000. That's the testosterone reference range — a 700-point spread. You can lose two-thirds of your T and still be told you (125) PASS",
+      "headline": "The 700-Point Spread",
+      "destination": "advertorial-variant-a.md",
+      "hookType": "Curiosity",
+      "format": "Single image — lab report visual",
+      "rawMarkdown": "### AD AV-A2 — Curiosity\n**Primary Text:** 300 to 1,000. That's the testosterone reference range — a 700-point spread. You can lose two-thirds of your T and still be told your labs are \"normal.\" Here's what the reference range doesn't tell you — and what actually matters. [Link]\n**Hook (first 125 chars):** 300 to 1,000. That's the testosterone reference range — a 700-point spread. You can lose two-thirds of your T and still be told you (125) PASS\n**Headline:** The 700-Point Spread (22 chars)\n**Destination:** advertorial-variant-a.md\n**Hook Type:** Curiosity\n**Format:** Single image — lab report visual"
+    }
+  },
+  "workspace": {
+    "brand": "Tenor",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1
+  },
+  "source": {
+    "collectionId": "25b6115f-d5c5-4ddb-ada6-aba9ff704927",
+    "collectionName": "Default",
+    "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+    "sourceSwipeTitle": "12.png",
+    "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/12.png",
+    "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-first-ad-no-product-2026-04-30T01-26-45-295Z/source-default-collection-12.png"
+  },
+  "payload": {
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1,
+    "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+    "swipeRequiresProductImage": false,
+    "swipeContextMode": "minimal",
+    "swipeBrandName": "Tenor",
+    "swipeProductName": "withheld visual product",
+    "swipeHook": "The 700-Point Spread",
+    "swipeAngle": "RUN_MARKER: pipeline-v3-first-execution-AV-A2-no-product-default-collection. Use pipeline v3 Meta ad AV-A2 as the copy and destination context. Primary Text: 300 to 1,000. That's the testosterone reference range — a 700-point spread. You can lose two-thirds of your T and still be told your labs are \"normal.\" Here's what the reference range doesn't tell you — and what actually matters. [Link] Meta Headline: The 700-Point Spread. Destination: advertorial-variant-a.md (advertorial cold traffic; final URL pending). Format direction from pipeline: Single image — lab report visual. Adapt the selected Default collection swipe as the visual design reference. The source has a visible product container; preserve the product-shot/testimonial layout logic, but remove the product reveal completely. No product shown anywhere: no bottle, jar, tub, pouch, package, label, capsule, pill, supplement facts panel, ingredient panel, gift stack, price, guarantee badge, rating, or purchase cue. Replace any product zone with non-product story cues only: a folded lab report, paperwork, coffee mug, empty hands, domestic morning light, kitchen counter, notebook, or negative space. Do not substitute another product or container. Keep the creative as a problem tease, not a product reveal. Do not show ingredients, doses, protocol architecture, comparison grid, chart, checklist, supplement label, or explanation of how the solution works. Readable on-image copy should use only this short visual copy: THE 700-POINT SPREAD; NORMAL ISN'T YOUR BASELINE; READ THE NOTE. Keep Tenor as a small brand mark only if needed. Use the Tenor editorial palette: bone, graphite, and one restrained warm red accent. Mature male subject, domestic natural light, reflective mood, not gym-bro or celebratory.",
+    "aspectRatio": "1:1",
+    "count": 1
+  },
+  "workflow": {
+    "workflow_run_id": "342e7874-57a1-4032-8de3-31b02bfca3af",
+    "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e059353a-fe7a-4a83-8355-d3d045e448d3"
+  },
+  "result": {
+    "workflowRunId": "342e7874-57a1-4032-8de3-31b02bfca3af",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-e059353a-fe7a-4a83-8355-d3d045e448d3",
+    "assetId": "29f1b67f-1e10-415f-9b65-eaffb57d5d71",
+    "publicId": "75f2d87d-cd1f-4929-a485-eebe327cdc9f",
+    "publicUrl": "https://api.moshq.app/public/assets/75f2d87d-cd1f-4929-a485-eebe327cdc9f",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-pipeline-v3-first-ad-no-product-2026-04-30T01-26-45-295Z/01-av-a2-default-swipe-no-product.jpg",
+    "contentType": "image/jpeg",
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:8c581757410b3ff1bb0cb2d08dd5841b786ca4366769eb63",
+      "asset_ids": [
+        "29f1b67f-1e10-415f-9b65-eaffb57d5d71"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  },
+  "validationIntent": {
+    "noProductShown": true,
+    "finalUrlsPending": true,
+    "destinationPlaceholder": "advertorial-variant-a.md"
+  }
+}

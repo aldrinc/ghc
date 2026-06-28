@@ -1,0 +1,67 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-21T18:00:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "PLAN.md",
+  "questions_asked": [
+    {
+      "question": "What should happen instead of dropping users into workspace overview immediately after onboarding?",
+      "answer_source": "user"
+    },
+    {
+      "question": "What readiness condition should gate the transition?",
+      "answer_source": "user"
+    },
+    {
+      "question": "What destination should users see once readiness is satisfied?",
+      "answer_source": "user"
+    },
+    {
+      "question": "Where is the premature routing currently triggered in code?",
+      "answer_source": "codebase"
+    }
+  ],
+  "question_sufficiency_rationale": "User intent is explicit on gating and target behavior, and code inspection provided concrete root cause and implementation boundaries without additional product ambiguity.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "goal.md",
+      "summary": "Measurable onboarding routing outcome."
+    },
+    "problem_log": {
+      "path": "problem-log.md",
+      "summary": "Observable failures in current onboarding routing."
+    },
+    "root_cause_diagnosis": {
+      "path": "root-cause.md",
+      "summary": "Wrong lifecycle signal drives redirect."
+    },
+    "current_machine": {
+      "path": "current-machine.md",
+      "summary": "Parent workflow completion currently controls navigation."
+    },
+    "designed_machine": {
+      "path": "designed-machine.md",
+      "summary": "Canonical readiness state controls setup-to-ready transition."
+    },
+    "worst_day_test": {
+      "path": "worst-day.md",
+      "summary": "Long-running/flaky foundation execution resilience behavior."
+    },
+    "leading_lagging_metrics": {
+      "path": "metrics.md",
+      "summary": "Leading and lagging success measures for readiness gating."
+    },
+    "owner_date_review": {
+      "path": "owner-review.md",
+      "summary": "Owner, date, and explicit review checkpoint."
+    },
+    "stop_condition": {
+      "path": "stop-condition.md",
+      "summary": "Plan completion boundary before implementation starts."
+    }
+  },
+  "owner": "main",
+  "review_date": "2026-05-21",
+  "stop_condition": "Plan is final only after plangatecheck passes."
+}

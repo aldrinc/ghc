@@ -1,0 +1,127 @@
+{
+  "pass": false,
+  "scope": [
+    "01 already tested",
+    "03",
+    "04"
+  ],
+  "step06_run": false,
+  "step03": {
+    "status": "pass",
+    "elapsed_seconds": 181.532,
+    "event_count": 5248,
+    "step4_prompt_chars": 20187,
+    "summary_chars": 1269,
+    "content_chars": 312,
+    "gpt_summary_chars": 1200,
+    "gpt_content_chars": 14474,
+    "tool_counts": {}
+  },
+  "step04": {
+    "status": "fail",
+    "failure": "DeerFlow DSV4 gathered research but final answer was only a status sentence, not tagged SUMMARY/CONTENT.",
+    "raw_output": "I now have enough data to produce the comprehensive report. Let me write it now.",
+    "raw_chars": 81,
+    "elapsed_seconds": 513.256,
+    "event_count": 724,
+    "tool_counts": {
+      "web_search": 69,
+      "unknown": 86,
+      "web_fetch": 17
+    },
+    "events_summary": {
+      "event_lines": 724,
+      "ended": true,
+      "tool_counts": {
+        "web_search": 69,
+        "unknown": 86,
+        "web_fetch": 17
+      },
+      "ai_chars_by_id": {
+        "lc_run--019e4c1f-85f5-78a0-9c52-07bc3e0ce0fa": 264,
+        "lc_run--019e4c1f-d4b7-7a53-847e-9fda19f117ab": 94,
+        "lc_run--019e4c24-766b-72b3-afb2-0dc4bef7ad0f": 169,
+        "lc_run--019e4c25-01a6-7850-8f96-d61c51db771d": 132,
+        "lc_run--019e4c25-286f-7cb2-97e9-73f44e201e03": 96,
+        "lc_run--019e4c25-48c5-7351-a375-58808553bf73": 68,
+        "lc_run--019e4c25-6584-77e0-98d9-052e5728b615": 132,
+        "lc_run--019e4c26-25ce-7be1-8591-6cd39ebb7405": 59,
+        "lc_run--019e4c26-49d3-7b01-8ec9-60487fa788c5": 70,
+        "lc_run--019e4c26-674b-7eb3-b18a-8332c301343c": 68,
+        "lc_run--019e4c26-806a-7e80-bcc2-7b09d922d41f": 93,
+        "lc_run--019e4c26-9e70-7f63-b0bc-2e8ab5320b75": 45,
+        "lc_run--019e4c26-bafc-7f90-b3f2-0c6f545d76d5": 72,
+        "lc_run--019e4c26-faf2-7611-bf29-8457fba05db6": 69,
+        "lc_run--019e4c27-13f5-77b1-8118-66ee6bd8ce7d": 140,
+        "lc_run--019e4c27-2fbb-7cb2-b5d7-09bfd86fab09": 126,
+        "lc_run--019e4c27-4b4f-7e72-8447-34048f4f22ee": 80
+      }
+    },
+    "gpt_summary_chars": 1800,
+    "gpt_content_chars": 290,
+    "gpt_raw_doc_chars": 291
+  },
+  "step04_continuation": {
+    "status": "fail",
+    "failure": "Same-thread continuation returned empty raw output after tool/clarification activity.",
+    "raw_output": "",
+    "raw_chars": 1,
+    "elapsed_seconds": 34.744,
+    "event_count": 34,
+    "tool_counts": {
+      "ls": 5,
+      "unknown": 6,
+      "ask_clarification": 1
+    },
+    "events_summary": {
+      "event_lines": 34,
+      "ended": true,
+      "tool_counts": {
+        "ls": 5,
+        "unknown": 6,
+        "ask_clarification": 1
+      },
+      "ai_chars_by_id": {}
+    }
+  },
+  "costs": {
+    "step03": {
+      "input_tokens": 13676,
+      "output_tokens": 5578,
+      "cache_read": 3712,
+      "cache_miss_input_tokens": 9964,
+      "serper_searches": 0,
+      "deepseek_promo_usd": 0.009200656,
+      "deepseek_list_usd": 0.036802624,
+      "serper_usd": 0.0,
+      "promo_total_usd": 0.009200656,
+      "list_total_usd": 0.036802624
+    },
+    "step04_failed": {
+      "input_tokens": 1749776,
+      "output_tokens": 9350,
+      "cache_read": 1674880,
+      "cache_miss_input_tokens": 74896,
+      "serper_searches": 69,
+      "deepseek_promo_usd": 0.0467857,
+      "deepseek_list_usd": 0.1871428,
+      "serper_usd": 0.069,
+      "promo_total_usd": 0.1157857,
+      "list_total_usd": 0.2561428
+    },
+    "step04_continuation_failed": {
+      "input_tokens": 15324,
+      "output_tokens": 1055,
+      "cache_read": 14848,
+      "cache_miss_input_tokens": 476,
+      "serper_searches": 0,
+      "deepseek_promo_usd": 0.001178734,
+      "deepseek_list_usd": 0.004714936,
+      "serper_usd": 0.0,
+      "promo_total_usd": 0.001178734,
+      "list_total_usd": 0.004714936
+    },
+    "total_promo_usd": 0.12616509,
+    "total_list_usd": 0.29766036
+  }
+}

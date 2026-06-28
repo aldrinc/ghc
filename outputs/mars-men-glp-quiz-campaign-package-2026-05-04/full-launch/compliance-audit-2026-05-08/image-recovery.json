@@ -1,0 +1,128 @@
+[
+  {
+    "key": "curated-13-glp-1x1",
+    "public": "https://api.moshq.app/public/assets/5159b584-b919-4180-a765-283dad846987",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-13-glp-1x1.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-13-glp-1x1.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-13-glp-4x5",
+    "public": "https://api.moshq.app/public/assets/b868aa7d-691b-459f-831b-ef12f44d122e",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-13-glp-4x5.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-13-glp-4x5.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-13-glp-9x16",
+    "public": "https://api.moshq.app/public/assets/6c24c070-c672-4e4d-91b5-3fe08ee241d0",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-13-glp-9x16.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-13-glp-9x16.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-16-glp-1x1",
+    "public": "https://api.moshq.app/public/assets/d4f33169-953b-412c-9a1a-0c11ea9daf75",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-16-glp-1x1.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-16-glp-1x1.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-16-glp-4x5",
+    "public": "https://api.moshq.app/public/assets/b48a8221-e207-4f96-9cbe-c6a3ef9136c7",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-16-glp-4x5.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-16-glp-4x5.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-16-glp-9x16",
+    "public": "https://api.moshq.app/public/assets/dd497e1f-4c3d-4f8d-9ac0-36a4170cabe9",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-16-glp-9x16.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-16-glp-9x16.png",
+    "status": "copied_local"
+  },
+  {
+    "key": "curated-17-glp-1x1",
+    "public": "https://api.moshq.app/public/assets/bdf00c89-7459-4d72-8447-00a613df91de",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-17-glp-1x1.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-17-glp-1x1.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-17-glp-4x5",
+    "public": "https://api.moshq.app/public/assets/0c6f8108-cde0-4397-9d3c-a12d6e9ecc28",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-17-glp-4x5.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-17-glp-4x5.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-17-glp-9x16",
+    "public": "https://api.moshq.app/public/assets/acee2221-b5d9-4ca4-937a-c262417bd902",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-17-glp-9x16.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-17-glp-9x16.png",
+    "status": "copied_local"
+  },
+  {
+    "key": "curated-02-quiz-1x1",
+    "public": "https://api.moshq.app/public/assets/109207be-0a0f-4d7b-8670-a9dcf371d611",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-02-quiz-1x1.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-02-quiz-1x1.png",
+    "status": "copied_local"
+  },
+  {
+    "key": "curated-02-quiz-4x5",
+    "public": "https://api.moshq.app/public/assets/57b220c7-dc3e-41f3-8f80-417ea240ecea",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-02-quiz-4x5.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-02-quiz-4x5.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-02-quiz-9x16",
+    "public": "https://api.moshq.app/public/assets/c1822722-cf7b-4066-a7e6-a2b2d0bd7bd1",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-02-quiz-9x16.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-02-quiz-9x16.png",
+    "status": "copied_local"
+  },
+  {
+    "key": "curated-17-quiz-1x1",
+    "public": "https://api.moshq.app/public/assets/42fd71f1-679a-4483-afeb-e7e7d276b0d0",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-17-quiz-1x1.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-17-quiz-1x1.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-17-quiz-4x5",
+    "public": "https://api.moshq.app/public/assets/84a0de07-ba13-4a46-ab13-8cbfd977ac82",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-17-quiz-4x5.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-17-quiz-4x5.png",
+    "status": "copied_local"
+  },
+  {
+    "key": "curated-17-quiz-9x16",
+    "public": "http://127.0.0.1:18080/public/assets/d4a09ce1-13da-4636-a979-85b086462b69",
+    "local": null,
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-17-quiz-9x16.png",
+    "status": "public_error_HTTPConnectionPool(host='127.0.0.1', port=18080): Max retries exceeded with url: /public/assets/d4a09ce1-13da-4636-a979-85b086462b69 (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=18080): Failed to establish a new connection: [Errno 61] Connection refused\"))"
+  },
+  {
+    "key": "curated-24-quiz-1x1",
+    "public": "https://api.moshq.app/public/assets/7b1c108c-a1a0-43f2-ae22-2506565d0f4f",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-24-quiz-1x1.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-24-quiz-1x1.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-24-quiz-4x5",
+    "public": "https://api.moshq.app/public/assets/0485a2c2-0000-44ee-af2f-9da96448cc1f",
+    "local": null,
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-24-quiz-4x5.png",
+    "status": "public_http_502_166"
+  },
+  {
+    "key": "curated-24-quiz-9x16",
+    "public": "https://api.moshq.app/public/assets/716c7ea4-0b84-4fa8-8a0e-5f7273f54e4d",
+    "local": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/problem-aware-full-campaign/generated/curated-24-quiz-9x16.png",
+    "dst": "outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/compliance-audit-2026-05-08/images/curated-24-quiz-9x16.png",
+    "status": "copied_local"
+  }
+]

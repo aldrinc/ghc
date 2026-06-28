@@ -1,0 +1,19 @@
+{
+  "contract": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/plan.contract.json",
+  "verified_at": "2026-05-21T18:09:22.426750+00:00",
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    "P01: no verify_commands",
+    "P02: no verify_commands",
+    "P03: no verify_commands",
+    "P04: no verify_commands",
+    "P05: no verify_commands",
+    "P06: no verify_commands",
+    "P07: no verify_commands",
+    "P08: no verify_commands",
+    "P09: no verify_commands",
+    "P10: no verify_commands"
+  ],
+  "run_logs": []
+}

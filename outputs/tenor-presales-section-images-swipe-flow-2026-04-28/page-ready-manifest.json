@@ -1,0 +1,70 @@
+{
+  "createdAt": "2026-04-28T21:54:18.989Z",
+  "sourceManifest": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/mos-swipe-generation-manifest.json",
+  "note": "MOS returned 1200x896 images; final page-ready versions were center-cropped to exact 4:3 and resized to 1536x1152.",
+  "outputs": [
+    {
+      "key": "01-wake-before-alarm",
+      "workflowRunId": "5ff1cb1c-6b45-4b6c-9bae-bf3343c91297",
+      "assetId": "86817f69-0d27-44d1-8282-f21ae30a9ac3",
+      "publicId": "c90b7525-99be-4fa8-90fe-810bf1380ba2",
+      "downloadedPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated/01-wake-before-alarm.jpg",
+      "pageReadyPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated-1536x1152/01-wake-before-alarm.jpg",
+      "prompt": "Global style for every image: 4:3 landscape editorial image for a Tenor presales page. Premium editorial health/longevity photography. Warm off-white / stone background, black objects, subtle deep red accent. Natural window light, clean shadows, restrained contrast. No embedded text, no charts, no fake UI, no visible brand claims, no readable labels. Avoid doctors, needles, hospitals, shirtless gym tropes, before/after imagery, pills, medical packaging, exaggerated transformation imagery, logos, watermarks, and ad-copy overlays.\n\nSection image request: Photorealistic editorial image of a man in his late 40s waking naturally in a calm bedroom at sunrise, sitting on the edge of the bed with clear energy and a relaxed expression. Warm morning light, neutral bedding, black bedside table, glass of water, minimal premium interiors, subtle deep red accent object. Mood: rested, grounded, ready. No text, no logos, no medical imagery.\n\nUse the attached source image only as a loose composition reference. Generate a polished photorealistic editorial image, not an illustration, not a graphic card, and not an ad with text. Preserve the requested 4:3 landscape crop and leave clean negative space where appropriate."
+    },
+    {
+      "key": "02-joints-stop-being-loudest",
+      "workflowRunId": "5d58fff9-5aa2-4f0a-bc8c-a4d90159bdf6",
+      "assetId": "462035bc-a249-4fd5-9a54-5943efce63f0",
+      "publicId": "969df4a2-beb8-4f55-b1f2-e584d6e3237c",
+      "downloadedPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated/02-joints-stop-being-loudest.jpg",
+      "pageReadyPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated-1536x1152/02-joints-stop-being-loudest.jpg",
+      "prompt": "Global style for every image: 4:3 landscape editorial image for a Tenor presales page. Premium editorial health/longevity photography. Warm off-white / stone background, black objects, subtle deep red accent. Natural window light, clean shadows, restrained contrast. No embedded text, no charts, no fake UI, no visible brand claims, no readable labels. Avoid doctors, needles, hospitals, shirtless gym tropes, before/after imagery, pills, medical packaging, exaggerated transformation imagery, logos, watermarks, and ad-copy overlays.\n\nSection image request: Photorealistic editorial image of a fit but realistic man in his 40s tying his shoes near the front door before a morning walk, relaxed posture, no visible pain, natural mobility implied. Clean home entryway, warm neutral walls, soft daylight, black sneakers, subtle deep red accent. Mood: movement feels normal again. No gym, no injury braces, no medical claims, no text.\n\nUse the attached source image only as a loose composition reference. Generate a polished photorealistic editorial image, not an illustration, not a graphic card, and not an ad with text. Preserve the requested 4:3 landscape crop and leave clean negative space where appropriate."
+    },
+    {
+      "key": "03-sleep-through-night",
+      "workflowRunId": "b7a32de0-d607-4739-accc-d34215dc5015",
+      "assetId": "51836691-f1a1-4ee8-be72-bf3bb6fcfc64",
+      "publicId": "df6f9efe-b0b4-4852-97af-1cdb756864c8",
+      "downloadedPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated/03-sleep-through-night.jpg",
+      "pageReadyPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated-1536x1152/03-sleep-through-night.jpg",
+      "prompt": "Global style for every image: 4:3 landscape editorial image for a Tenor presales page. Premium editorial health/longevity photography. Warm off-white / stone background, black objects, subtle deep red accent. Natural window light, clean shadows, restrained contrast. No embedded text, no charts, no fake UI, no visible brand claims, no readable labels. Avoid doctors, needles, hospitals, shirtless gym tropes, before/after imagery, pills, medical packaging, exaggerated transformation imagery, logos, watermarks, and ad-copy overlays.\n\nSection image request: Photorealistic editorial image of a quiet bedroom at dawn after a full night of sleep: neatly rumpled sheets, soft morning light through curtains, bedside book, water glass, phone face down, calm neutral palette. Human presence implied but not centered. Mood: deep rest, calm nervous system, restorative sleep. No pills on the table, no text, no alarm clock close-up.\n\nUse the attached source image only as a loose composition reference. Generate a polished photorealistic editorial image, not an illustration, not a graphic card, and not an ad with text. Preserve the requested 4:3 landscape crop and leave clean negative space where appropriate."
+    },
+    {
+      "key": "04-two-pm-crash-disappears",
+      "workflowRunId": "49e0077f-b609-4278-9fa1-62c4fe4369c8",
+      "assetId": "14ef8bd1-2544-47a5-8161-021b32e0fc4f",
+      "publicId": "80204472-3969-444a-9561-877385853adb",
+      "downloadedPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated/04-two-pm-crash-disappears.jpg",
+      "pageReadyPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated-1536x1152/04-two-pm-crash-disappears.jpg",
+      "prompt": "Global style for every image: 4:3 landscape editorial image for a Tenor presales page. Premium editorial health/longevity photography. Warm off-white / stone background, black objects, subtle deep red accent. Natural window light, clean shadows, restrained contrast. No embedded text, no charts, no fake UI, no visible brand claims, no readable labels. Avoid doctors, needles, hospitals, shirtless gym tropes, before/after imagery, pills, medical packaging, exaggerated transformation imagery, logos, watermarks, and ad-copy overlays.\n\nSection image request: Photorealistic editorial image of a man in his late 40s working at a clean desk in afternoon light, focused and composed, laptop open, coffee cup pushed aside or empty in the background, glass of water nearby. Warm stone background, black desk accessories, subtle deep red notebook accent. Mood: steady afternoon energy, mental clarity. No office clutter, no caffeine ad feeling, no text.\n\nUse the attached source image only as a loose composition reference. Generate a polished photorealistic editorial image, not an illustration, not a graphic card, and not an ad with text. Preserve the requested 4:3 landscape crop and leave clean negative space where appropriate."
+    },
+    {
+      "key": "05-catch-your-reflection",
+      "workflowRunId": "92f37010-63d7-48b4-b444-8994ceb61a5a",
+      "assetId": "3efb7390-801d-4d74-8c42-6b56479c76ee",
+      "publicId": "9d330cb4-627c-4ea7-85b1-1520a430eaa3",
+      "downloadedPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated/05-catch-your-reflection.jpg",
+      "pageReadyPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated-1536x1152/05-catch-your-reflection.jpg",
+      "prompt": "Global style for every image: 4:3 landscape editorial image for a Tenor presales page. Premium editorial health/longevity photography. Warm off-white / stone background, black objects, subtle deep red accent. Natural window light, clean shadows, restrained contrast. No embedded text, no charts, no fake UI, no visible brand claims, no readable labels. Avoid doctors, needles, hospitals, shirtless gym tropes, before/after imagery, pills, medical packaging, exaggerated transformation imagery, logos, watermarks, and ad-copy overlays.\n\nSection image request: Photorealistic editorial image of a man in his late 40s looking at his reflection in a bathroom or hallway mirror, subtle confidence, better posture, clean natural skin, understated expression. Premium neutral interior, soft daylight, black-framed mirror, warm off-white tones, small deep red accent. Mood: noticing a real shift without vanity. No exaggerated transformation, no beauty-ad retouching, no text.\n\nUse the attached source image only as a loose composition reference. Generate a polished photorealistic editorial image, not an illustration, not a graphic card, and not an ad with text. Preserve the requested 4:3 landscape crop and leave clean negative space where appropriate."
+    },
+    {
+      "key": "06-stop-managing-symptoms",
+      "workflowRunId": "80db501d-75c7-472b-8aa9-2b65e691dc29",
+      "assetId": "518ec273-1041-472f-9dca-25a04e2c733b",
+      "publicId": "5ce23047-c67a-46e5-8c85-bc4a5bab381a",
+      "downloadedPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated/06-stop-managing-symptoms.jpg",
+      "pageReadyPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated-1536x1152/06-stop-managing-symptoms.jpg",
+      "prompt": "Global style for every image: 4:3 landscape editorial image for a Tenor presales page. Premium editorial health/longevity photography. Warm off-white / stone background, black objects, subtle deep red accent. Natural window light, clean shadows, restrained contrast. No embedded text, no charts, no fake UI, no visible brand claims, no readable labels. Avoid doctors, needles, hospitals, shirtless gym tropes, before/after imagery, pills, medical packaging, exaggerated transformation imagery, logos, watermarks, and ad-copy overlays.\n\nSection image request: Photorealistic editorial still life of a clean morning routine surface: one black supplement bottle silhouette without readable label, water glass, simple breakfast plate, notebook, and keys arranged neatly on a warm stone countertop. Mood: one simple daily protocol replacing clutter. Keep it premium, minimal, masculine, organized. No readable brand text, no piles of pills, no medical packaging.\n\nUse the attached source image only as a loose composition reference. Generate a polished photorealistic editorial image, not an illustration, not a graphic card, and not an ad with text. Preserve the requested 4:3 landscape crop and leave clean negative space where appropriate."
+    },
+    {
+      "key": "07-signaling-triad-science",
+      "workflowRunId": "107f7b0d-47c6-4cba-a789-ae8102aa13d1",
+      "assetId": "7c054180-b105-4b5f-baf7-9ee8e174fdf9",
+      "publicId": "79947dca-6012-40c6-8ca4-270b96a95d52",
+      "downloadedPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated/07-signaling-triad-science.jpg",
+      "pageReadyPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-presales-section-images-swipe-flow-2026-04-28/generated-1536x1152/07-signaling-triad-science.jpg",
+      "prompt": "Global style for every image: 4:3 landscape editorial image for a Tenor presales page. Premium editorial health/longevity photography. Warm off-white / stone background, black objects, subtle deep red accent. Natural window light, clean shadows, restrained contrast. No embedded text, no charts, no fake UI, no visible brand claims, no readable labels. Avoid doctors, needles, hospitals, shirtless gym tropes, before/after imagery, pills, medical packaging, exaggerated transformation imagery, logos, watermarks, and ad-copy overlays.\n\nSection image request: Premium editorial scientific still life showing three abstract biological pathways represented through subtle physical objects: black glass bottle silhouette, mineral stones, botanical ingredients, and a clean notebook arranged on a warm off-white lab-style surface. Sophisticated, restrained, evidence-based mood. Deep red accent line or object. No diagrams, no molecule text, no fake labels, no claims.\n\nUse the attached source image only as a loose composition reference. Generate a polished photorealistic editorial image, not an illustration, not a graphic card, and not an ad with text. Preserve the requested 4:3 landscape crop and leave clean negative space where appropriate."
+    }
+  ]
+}

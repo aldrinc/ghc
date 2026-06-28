@@ -1,0 +1,491 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "Codex Proof Dashboard" [level=1] [ref=e3]
+    - generic [ref=e4]: DeerFlow Sidecar Step01 Smoke
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: Plan Contract
+        - generic [ref=e10]: pass
+      - generic [ref=e11]:
+        - generic [ref=e12]: Source Manifest
+        - generic [ref=e14]: pass
+      - generic [ref=e15]:
+        - generic [ref=e16]: Provenance
+        - generic [ref=e18]: pass
+      - generic [ref=e19]:
+        - generic [ref=e20]: Planning Gate
+        - generic [ref=e22]: unknown
+      - generic [ref=e23]:
+        - generic [ref=e24]: Plan Questions
+        - generic [ref=e25]: "0"
+      - generic [ref=e26]:
+        - generic [ref=e27]: Parallelism
+        - generic [ref=e29]: unknown
+      - generic [ref=e30]:
+        - generic [ref=e31]: Lanes
+        - generic [ref=e32]: "0"
+      - generic [ref=e33]:
+        - generic [ref=e34]: Proof Files
+        - generic [ref=e35]: "51"
+    - heading "Plan Items" [level=2] [ref=e36]
+    - table [ref=e37]:
+      - rowgroup [ref=e38]:
+        - row "ID Status Objective Expected Files Artifacts" [ref=e39]:
+          - columnheader "ID" [ref=e40]
+          - columnheader "Status" [ref=e41]
+          - columnheader "Objective" [ref=e42]
+          - columnheader "Expected Files" [ref=e43]
+          - columnheader "Artifacts" [ref=e44]
+      - rowgroup [ref=e45]:
+        - row [ref=e46]:
+          - cell "P01" [ref=e47]
+          - cell "done" [ref=e48]:
+            - generic [ref=e49]: done
+          - 'cell "DeerFlow source is present under `.local/deer-flow`." [ref=e50]'
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e51]
+          - cell [ref=e52]
+        - row [ref=e53]:
+          - cell "P02" [ref=e54]
+          - cell "done" [ref=e55]:
+            - generic [ref=e56]: done
+          - cell "Native DeerFlow config and run path are inspected." [ref=e57]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e58]
+          - cell [ref=e59]
+        - row [ref=e60]:
+          - cell "P03" [ref=e61]
+          - cell "done" [ref=e62]:
+            - generic [ref=e63]: done
+          - cell "A local-only sidecar config or wrapper exists outside tracked code." [ref=e64]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e65]
+          - cell [ref=e66]
+        - row [ref=e67]:
+          - cell "P04" [ref=e68]
+          - cell "done" [ref=e69]:
+            - generic [ref=e70]: done
+          - cell "A small Step 01 smoke run executes, or the blocker is captured with exact logs." [ref=e71]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e72]
+          - cell [ref=e73]
+        - row [ref=e74]:
+          - cell "P05" [ref=e75]
+          - cell "done" [ref=e76]:
+            - generic [ref=e77]: done
+          - cell "Proof artifacts record command output, config shape, and run status." [ref=e78]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e79]
+          - cell [ref=e80]
+        - row [ref=e81]:
+          - cell "P06" [ref=e82]
+          - cell "done" [ref=e83]:
+            - generic [ref=e84]: done
+          - 'cell "Clone or refresh DeerFlow into `.local/deer-flow`." [ref=e85]'
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e86]
+          - cell [ref=e87]
+        - row [ref=e88]:
+          - cell "P07" [ref=e89]
+          - cell "done" [ref=e90]:
+            - generic [ref=e91]: done
+          - cell "Inspect model, search, crawler, and sandbox configuration." [ref=e92]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e93]
+          - cell [ref=e94]
+        - row [ref=e95]:
+          - cell "P08" [ref=e96]
+          - cell "done" [ref=e97]:
+            - generic [ref=e98]: done
+          - cell "Configure DeepSeek V4 Pro, Serper, and Jina for local execution only." [ref=e99]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e100]
+          - cell [ref=e101]
+        - row [ref=e102]:
+          - cell "P09" [ref=e103]
+          - cell "done" [ref=e104]:
+            - generic [ref=e105]: done
+          - cell "Run a minimal Step 01 sidecar smoke test." [ref=e106]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e107]
+          - cell [ref=e108]
+        - row [ref=e109]:
+          - cell "P10" [ref=e110]
+          - cell "done" [ref=e111]:
+            - generic [ref=e112]: done
+          - cell "Verify the proof pack and summarize readiness." [ref=e113]
+          - cell ".local/deer-flow, .local/deer-flow/config.yaml, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py, proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py, proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md, proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e114]
+          - cell [ref=e115]
+    - heading "Plan Errors" [level=2] [ref=e116]
+    - list [ref=e118]:
+      - listitem [ref=e119]: none
+    - heading "Plan Warnings" [level=2] [ref=e120]
+    - list [ref=e122]:
+      - listitem [ref=e123]: "P01: no verify_commands"
+      - listitem [ref=e124]: "P02: no verify_commands"
+      - listitem [ref=e125]: "P03: no verify_commands"
+      - listitem [ref=e126]: "P04: no verify_commands"
+      - listitem [ref=e127]: "P05: no verify_commands"
+      - listitem [ref=e128]: "P06: no verify_commands"
+      - listitem [ref=e129]: "P07: no verify_commands"
+      - listitem [ref=e130]: "P08: no verify_commands"
+      - listitem [ref=e131]: "P09: no verify_commands"
+      - listitem [ref=e132]: "P10: no verify_commands"
+    - heading "Provenance Errors" [level=2] [ref=e133]
+    - list [ref=e135]:
+      - listitem [ref=e136]: none
+    - heading "Blocked Source Items" [level=2] [ref=e137]
+    - list [ref=e139]:
+      - listitem [ref=e140]: none
+    - heading "Planning Gate Proof" [level=2] [ref=e141]
+    - generic [ref=e142]:
+      - generic [ref=e143]:
+        - strong [ref=e144]: "Mode:"
+        - text: unknown
+      - strong [ref=e146]: "Skill loaded:"
+      - generic [ref=e147]:
+        - strong [ref=e148]: "Questions:"
+        - text: "0"
+      - strong [ref=e150]: "Question rationale:"
+      - strong [ref=e152]: "Owner:"
+      - strong [ref=e154]: "Review:"
+      - strong [ref=e156]: "Stop:"
+    - table [ref=e157]:
+      - rowgroup [ref=e158]:
+        - row "Artifact Path Summary" [ref=e159]:
+          - columnheader "Artifact" [ref=e160]
+          - columnheader "Path" [ref=e161]
+          - columnheader "Summary" [ref=e162]
+      - rowgroup [ref=e163]:
+        - row "No planning gate proof loaded." [ref=e164]:
+          - cell "No planning gate proof loaded." [ref=e165]
+    - heading "Parallel Lane Proof" [level=2] [ref=e166]
+    - generic [ref=e167]:
+      - generic [ref=e168]:
+        - strong [ref=e169]: "Mode:"
+        - text: unknown
+      - strong [ref=e171]: "Reason:"
+      - generic [ref=e172]:
+        - strong [ref=e173]: "Fan-in:"
+        - text: unknown
+      - list [ref=e174]:
+        - listitem [ref=e175]: none
+    - table [ref=e176]:
+      - rowgroup [ref=e177]:
+        - row "Lane Role Mode Status Write Scope Artifacts Summary" [ref=e178]:
+          - columnheader "Lane" [ref=e179]
+          - columnheader "Role" [ref=e180]
+          - columnheader "Mode" [ref=e181]
+          - columnheader "Status" [ref=e182]
+          - columnheader "Write Scope" [ref=e183]
+          - columnheader "Artifacts" [ref=e184]
+          - columnheader "Summary" [ref=e185]
+      - rowgroup [ref=e186]:
+        - row "No lane proof loaded." [ref=e187]:
+          - cell "No lane proof loaded." [ref=e188]
+    - heading "Proof Files" [level=2] [ref=e189]
+    - table [ref=e190]:
+      - rowgroup [ref=e191]:
+        - row "Name Type Path" [ref=e192]:
+          - columnheader "Name" [ref=e193]
+          - columnheader "Type" [ref=e194]
+          - columnheader "Path" [ref=e195]
+      - rowgroup [ref=e196]:
+        - row "brew-cleanup.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/brew-cleanup.log" [ref=e197]:
+          - cell "brew-cleanup.log" [ref=e198]
+          - cell ".log" [ref=e199]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/brew-cleanup.log" [ref=e200]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/brew-cleanup.log" [ref=e201] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/brew-cleanup.log
+        - row "deerflow-sidecar-plan.md .md /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/deerflow-sidecar-plan.md" [ref=e202]:
+          - cell "deerflow-sidecar-plan.md" [ref=e203]
+          - cell ".md" [ref=e204]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/deerflow-sidecar-plan.md" [ref=e205]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/deerflow-sidecar-plan.md" [ref=e206] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/deerflow-sidecar-plan.md
+        - row "df-after-install-fail.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-install-fail.log" [ref=e207]:
+          - cell "df-after-install-fail.log" [ref=e208]
+          - cell ".log" [ref=e209]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-install-fail.log" [ref=e210]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-install-fail.log" [ref=e211] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-install-fail.log
+        - row "df-after-retry-fail.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-retry-fail.log" [ref=e212]:
+          - cell "df-after-retry-fail.log" [ref=e213]
+          - cell ".log" [ref=e214]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-retry-fail.log" [ref=e215]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-retry-fail.log" [ref=e216] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/df-after-retry-fail.log
+        - row "docker-info.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/docker-info.log" [ref=e217]:
+          - cell "docker-info.log" [ref=e218]
+          - cell ".log" [ref=e219]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/docker-info.log" [ref=e220]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/docker-info.log" [ref=e221] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/docker-info.log
+        - row "du-after-install-fail.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-install-fail.log" [ref=e222]:
+          - cell "du-after-install-fail.log" [ref=e223]
+          - cell ".log" [ref=e224]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-install-fail.log" [ref=e225]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-install-fail.log" [ref=e226] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-install-fail.log
+        - row "du-after-retry-fail.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-retry-fail.log" [ref=e227]:
+          - cell "du-after-retry-fail.log" [ref=e228]
+          - cell ".log" [ref=e229]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-retry-fail.log" [ref=e230]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-retry-fail.log" [ref=e231] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/du-after-retry-fail.log
+        - row "env-file-permissions.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/env-file-permissions.log" [ref=e232]:
+          - cell "env-file-permissions.log" [ref=e233]
+          - cell ".log" [ref=e234]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/env-file-permissions.log" [ref=e235]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/env-file-permissions.log" [ref=e236] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/env-file-permissions.log
+        - row "git-clone.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/git-clone.log" [ref=e237]:
+          - cell "git-clone.log" [ref=e238]
+          - cell ".log" [ref=e239]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/git-clone.log" [ref=e240]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/git-clone.log" [ref=e241] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/git-clone.log
+        - row "capturectl-add-events.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-events.log" [ref=e242]:
+          - cell "capturectl-add-events.log" [ref=e243]
+          - cell ".log" [ref=e244]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-events.log" [ref=e245]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-events.log" [ref=e246] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-events.log
+        - row "capturectl-add-evidence.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-evidence.log" [ref=e247]:
+          - cell "capturectl-add-evidence.log" [ref=e248]
+          - cell ".log" [ref=e249]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-evidence.log" [ref=e250]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-evidence.log" [ref=e251] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-add-evidence.log
+        - row "capturectl-init.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-init.log" [ref=e252]:
+          - cell "capturectl-init.log" [ref=e253]
+          - cell ".log" [ref=e254]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-init.log" [ref=e255]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-init.log" [ref=e256] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-init.log
+        - row "capturectl-verify.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log" [ref=e257]:
+          - cell "capturectl-verify.log" [ref=e258]
+          - cell ".log" [ref=e259]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log" [ref=e260]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log" [ref=e261] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/capturectl-verify.log
+        - row "deerflow-step01-final-only-run.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log" [ref=e262]:
+          - cell "deerflow-step01-final-only-run.log" [ref=e263]
+          - cell ".log" [ref=e264]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log" [ref=e265]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log" [ref=e266] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-final-only-run.log
+        - row "deerflow-step01-smoke-run.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log" [ref=e267]:
+          - cell "deerflow-step01-smoke-run.log" [ref=e268]
+          - cell ".log" [ref=e269]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log" [ref=e270]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log" [ref=e271] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/deerflow-step01-smoke-run.log
+        - row "planctl-verify.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/planctl-verify.log" [ref=e272]:
+          - cell "planctl-verify.log" [ref=e273]
+          - cell ".log" [ref=e274]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/planctl-verify.log" [ref=e275]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/planctl-verify.log" [ref=e276] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/planctl-verify.log
+        - row "proofdash.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log" [ref=e277]:
+          - cell "proofdash.log" [ref=e278]
+          - cell ".log" [ref=e279]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log" [ref=e280]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log" [ref=e281] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/proofdash.log
+        - row "provcheck-final-only.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json" [ref=e282]:
+          - cell "provcheck-final-only.json" [ref=e283]
+          - cell ".json" [ref=e284]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json" [ref=e285]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json" [ref=e286] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.json
+        - row "provcheck-final-only.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log" [ref=e287]:
+          - cell "provcheck-final-only.log" [ref=e288]
+          - cell ".log" [ref=e289]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log" [ref=e290]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log" [ref=e291] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/logs/provcheck-final-only.log
+        - row "make-check.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-check.log" [ref=e292]:
+          - cell "make-check.log" [ref=e293]
+          - cell ".log" [ref=e294]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-check.log" [ref=e295]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-check.log" [ref=e296] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-check.log
+        - row "make-doctor-fixed.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log" [ref=e297]:
+          - cell "make-doctor-fixed.log" [ref=e298]
+          - cell ".log" [ref=e299]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log" [ref=e300]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log" [ref=e301] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor-fixed.log
+        - row "make-doctor.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor.log" [ref=e302]:
+          - cell "make-doctor.log" [ref=e303]
+          - cell ".log" [ref=e304]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor.log" [ref=e305]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor.log" [ref=e306] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/make-doctor.log
+        - row "npm-cache-clean.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-clean.log" [ref=e307]:
+          - cell "npm-cache-clean.log" [ref=e308]
+          - cell ".log" [ref=e309]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-clean.log" [ref=e310]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-clean.log" [ref=e311] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-clean.log
+        - row "npm-cache-user-owned-delete.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-user-owned-delete.log" [ref=e312]:
+          - cell "npm-cache-user-owned-delete.log" [ref=e313]
+          - cell ".log" [ref=e314]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-user-owned-delete.log" [ref=e315]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-user-owned-delete.log" [ref=e316] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/npm-cache-user-owned-delete.log
+        - row "citation-smoke-check.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json" [ref=e317]:
+          - cell "citation-smoke-check.json" [ref=e318]
+          - cell ".json" [ref=e319]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json" [ref=e320]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json" [ref=e321] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/citation-smoke-check.json
+        - row "deerflow-sidecar-assessment.md .md /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md" [ref=e322]:
+          - cell "deerflow-sidecar-assessment.md" [ref=e323]
+          - cell ".md" [ref=e324]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md" [ref=e325]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md" [ref=e326] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-sidecar-assessment.md
+        - row "deerflow-step01-final-only-event-summary.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-event-summary.json" [ref=e327]:
+          - cell "deerflow-step01-final-only-event-summary.json" [ref=e328]
+          - cell ".json" [ref=e329]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-event-summary.json" [ref=e330]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-event-summary.json" [ref=e331] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-event-summary.json
+        - row "deerflow-step01-final-only-events.jsonl .jsonl /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl" [ref=e332]:
+          - cell "deerflow-step01-final-only-events.jsonl" [ref=e333]
+          - cell ".jsonl" [ref=e334]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl" [ref=e335]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl" [ref=e336] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-events.jsonl
+        - row "deerflow-step01-final-only-meta.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-meta.json" [ref=e337]:
+          - cell "deerflow-step01-final-only-meta.json" [ref=e338]
+          - cell ".json" [ref=e339]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-meta.json" [ref=e340]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-meta.json" [ref=e341] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-meta.json
+        - row "deerflow-step01-final-only-tool-evidence.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json" [ref=e342]:
+          - cell "deerflow-step01-final-only-tool-evidence.json" [ref=e343]
+          - cell ".json" [ref=e344]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json" [ref=e345]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json" [ref=e346] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only-tool-evidence.json
+        - row "deerflow-step01-final-only.cleaned.md .md /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md" [ref=e347]:
+          - cell "deerflow-step01-final-only.cleaned.md" [ref=e348]
+          - cell ".md" [ref=e349]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md" [ref=e350]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md" [ref=e351] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.cleaned.md
+        - row "deerflow-step01-final-only.md .md /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md" [ref=e352]:
+          - cell "deerflow-step01-final-only.md" [ref=e353]
+          - cell ".md" [ref=e354]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md" [ref=e355]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md" [ref=e356] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-final-only.md
+        - row "deerflow-step01-smoke-event-summary.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-event-summary.json" [ref=e357]:
+          - cell "deerflow-step01-smoke-event-summary.json" [ref=e358]
+          - cell ".json" [ref=e359]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-event-summary.json" [ref=e360]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-event-summary.json" [ref=e361] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-event-summary.json
+        - row "deerflow-step01-smoke-events.jsonl .jsonl /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl" [ref=e362]:
+          - cell "deerflow-step01-smoke-events.jsonl" [ref=e363]
+          - cell ".jsonl" [ref=e364]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl" [ref=e365]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl" [ref=e366] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-events.jsonl
+        - row "deerflow-step01-smoke-last-values.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-last-values.json" [ref=e367]:
+          - cell "deerflow-step01-smoke-last-values.json" [ref=e368]
+          - cell ".json" [ref=e369]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-last-values.json" [ref=e370]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-last-values.json" [ref=e371] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-last-values.json
+        - row "deerflow-step01-smoke-partial.md .md /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-partial.md" [ref=e372]:
+          - cell "deerflow-step01-smoke-partial.md" [ref=e373]
+          - cell ".md" [ref=e374]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-partial.md" [ref=e375]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-partial.md" [ref=e376] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/outputs/deerflow-step01-smoke-partial.md
+        - row "plan.contract.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/plan.contract.json" [ref=e377]:
+          - cell "plan.contract.json" [ref=e378]
+          - cell ".json" [ref=e379]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/plan.contract.json" [ref=e380]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/plan.contract.json" [ref=e381] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/plan.contract.json
+        - row "planctl-repair-prompt.md .md /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair-prompt.md" [ref=e382]:
+          - cell "planctl-repair-prompt.md" [ref=e383]
+          - cell ".md" [ref=e384]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair-prompt.md" [ref=e385]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair-prompt.md" [ref=e386] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair-prompt.md
+        - row "planctl-repair.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair.json" [ref=e387]:
+          - cell "planctl-repair.json" [ref=e388]
+          - cell ".json" [ref=e389]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair.json" [ref=e390]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair.json" [ref=e391] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/planctl-repair.json
+        - row "ps-stuck-run.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/ps-stuck-run.log" [ref=e392]:
+          - cell "ps-stuck-run.log" [ref=e393]
+          - cell ".log" [ref=e394]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/ps-stuck-run.log" [ref=e395]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/ps-stuck-run.log" [ref=e396] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/ps-stuck-run.log
+        - row "run_deerflow_step01_final_only.py .py /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py" [ref=e397]:
+          - cell "run_deerflow_step01_final_only.py" [ref=e398]
+          - cell ".py" [ref=e399]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py" [ref=e400]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py" [ref=e401] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_final_only.py
+        - row "run_deerflow_step01_smoke.py .py /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py" [ref=e402]:
+          - cell "run_deerflow_step01_smoke.py" [ref=e403]
+          - cell ".py" [ref=e404]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py" [ref=e405]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py" [ref=e406] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/run_deerflow_step01_smoke.py
+        - row "deerflow-step01-final-only-events-831235c32e.jsonl .jsonl /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events-831235c32e.jsonl" [ref=e407]:
+          - cell "deerflow-step01-final-only-events-831235c32e.jsonl" [ref=e408]
+          - cell ".jsonl" [ref=e409]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events-831235c32e.jsonl" [ref=e410]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events-831235c32e.jsonl" [ref=e411] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events-831235c32e.jsonl
+        - row "deerflow-step01-final-only-events.jsonl .jsonl /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events.jsonl" [ref=e412]:
+          - cell "deerflow-step01-final-only-events.jsonl" [ref=e413]
+          - cell ".jsonl" [ref=e414]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events.jsonl" [ref=e415]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events.jsonl" [ref=e416] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-events.jsonl
+        - row "deerflow-step01-final-only-tool-evidence-d3bd74ed67.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence-d3bd74ed67.json" [ref=e417]:
+          - cell "deerflow-step01-final-only-tool-evidence-d3bd74ed67.json" [ref=e418]
+          - cell ".json" [ref=e419]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence-d3bd74ed67.json" [ref=e420]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence-d3bd74ed67.json" [ref=e421] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence-d3bd74ed67.json
+        - row "deerflow-step01-final-only-tool-evidence.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence.json" [ref=e422]:
+          - cell "deerflow-step01-final-only-tool-evidence.json" [ref=e423]
+          - cell ".json" [ref=e424]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence.json" [ref=e425]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence.json" [ref=e426] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/raw/deerflow-step01-final-only-tool-evidence.json
+        - row "source_manifest.json .json /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e427]:
+          - cell "source_manifest.json" [ref=e428]
+          - cell ".json" [ref=e429]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e430]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json" [ref=e431] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/sources/deerflow-web/source_manifest.json
+        - row "uv-cache-clean.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-cache-clean.log" [ref=e432]:
+          - cell "uv-cache-clean.log" [ref=e433]
+          - cell ".log" [ref=e434]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-cache-clean.log" [ref=e435]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-cache-clean.log" [ref=e436] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-cache-clean.log
+        - row "uv-sync-final.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log" [ref=e437]:
+          - cell "uv-sync-final.log" [ref=e438]
+          - cell ".log" [ref=e439]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log" [ref=e440]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log" [ref=e441] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-final.log
+        - row "uv-sync-retry.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-retry.log" [ref=e442]:
+          - cell "uv-sync-retry.log" [ref=e443]
+          - cell ".log" [ref=e444]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-retry.log" [ref=e445]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-retry.log" [ref=e446] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync-retry.log
+        - row "uv-sync.log .log /Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync.log" [ref=e447]:
+          - cell "uv-sync.log" [ref=e448]
+          - cell ".log" [ref=e449]
+          - cell "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync.log" [ref=e450]:
+            - link "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync.log" [ref=e451] [cursor=pointer]:
+              - /url: file:///Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-sidecar-2026-05-21/uv-sync.log

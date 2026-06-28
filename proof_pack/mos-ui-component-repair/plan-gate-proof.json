@@ -1,0 +1,50 @@
+{
+  "schema": "codex.plan_gate_proof.v1",
+  "mode": "full",
+  "created_at": "2026-05-20T20:56:00Z",
+  "daliogoals_skill_loaded": true,
+  "source_plan": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+  "questions_asked": [],
+  "question_sufficiency_rationale": "The user supplied the core failure: UI was not reviewed correctly in-browser and components need a full review/update. The next step is discoverable through the live Chrome session and codebase, so no clarification is needed before repair execution.",
+  "artifacts": {
+    "goal_artifact": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "Repair MOS shared components through browser-first review."
+    },
+    "problem_log": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "First migration passed code checks but skipped deep visual review."
+    },
+    "root_cause_diagnosis": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "No first-party component review surface existed, so primitive defects were hidden across routes."
+    },
+    "current_machine": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "Scattered route validation and primitive edits without isolated visual coverage."
+    },
+    "designed_machine": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "Chrome audit, component review route, primitive repair, representative screenshots, executable checks."
+    },
+    "worst_day_test": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "Desktop and narrow-width component review plus route screenshots catch density, overlap, and hierarchy failures."
+    },
+    "leading_lagging_metrics": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "Screenshots, browser audit, build/test, semantic checks, and borrowed-name scan."
+    },
+    "owner_date_review": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "Codex main agent owns the repair on 2026-05-20."
+    },
+    "stop_condition": {
+      "path": "../../docs/plans/2026-05-20-mos-ui-component-repair-plan.md",
+      "summary": "Stop when component route, representative routes, checks, and contract pass or blockers are documented."
+    }
+  },
+  "owner": "Codex main agent",
+  "review_date": "2026-05-20",
+  "stop_condition": "Repair is complete when Chrome screenshots, component review coverage, build/test logs, and planctl verification pass."
+}

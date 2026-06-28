@@ -13,7 +13,7 @@ vi.mock("@/components/design-system/DesignSystemProvider", () => ({
   useDesignSystemTokens: () => null,
 }));
 
-vi.mock("@/funnels/puckConfig", () => ({
+vi.mock("@/funnels/funnelRuntime", () => ({
   useFunnelRuntime: () => useFunnelRuntimeMock(),
   resolveRuntimePagePath: resolveRuntimePagePathMock,
 }));

@@ -1,0 +1,10 @@
+mos/backend/alembic/versions/0085_gethookd_sync_docs_alignment.py
+mos/backend/alembic/versions/0086_meta_management_report_artifact.py
+mos/backend/alembic/versions/0087_site_funnel_variants.py
+mos/backend/app/services/meta_management_reports.py
+mos/backend/app/services/tenor_import_adapter.py
+mos/backend/marketi.db
+mos/backend/scripts/load_tenor_creative_context.py
+mos/backend/tests/test_swipe_asset_formats.py
+mos/backend/tests/test_tenor_import_adapter.py
+mos/frontend/src/api/swipes.test.ts

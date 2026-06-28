@@ -1,0 +1,60 @@
+{
+  "createdAt": "2026-04-28T17:56:55.826Z",
+  "outputDir": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-collection-product-shot-no-product-no-mechanism-2026-04-28T17-55-48-867Z",
+  "source": {
+    "collectionId": "b89e89f4-2565-4b5d-afd1-195532613bfb",
+    "collectionName": "Tenor initial swipe collection",
+    "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+    "sourceSwipeTitle": "12.png",
+    "sourceSwipeMediaUrl": "https://hel1.your-objectstorage.com/ghc-media/dev/company-swipes/d539fd3c-6a8a-4c78-a744-e2ee27b24eca/default_initial_swipes_v1/12.png",
+    "sourceLocalPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-collection-swipe-product-shot-source/12.png",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1
+  },
+  "payload": {
+    "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+    "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+    "campaignId": "a5af5e49-1eb8-4fb4-8029-d3d2006114e9",
+    "assetBriefId": "brief_editorial_wound_scene",
+    "requirementIndex": 1,
+    "companySwipeId": "cf80710e-7fc0-5323-9a3f-9c49fb8c3b80",
+    "swipeRequiresProductImage": false,
+    "swipeContextMode": "minimal",
+    "swipeBrandName": "Tenor",
+    "swipeProductName": "Tenor",
+    "swipeHook": "\"In the normal range\" is the most expensive sentence in men's health.",
+    "swipeAngle": "Adapt the selected collection swipe as a blind problem-tease ad for the existing normal-range gap angle. The source swipe has a product container held in the center; preserve the testimonial/product-shot layout logic but remove the product reveal completely. Replace the product zone with non-product story cues only: empty hands, a folded lab report, a coffee mug, morning light, or negative space. Do not substitute another package or container. Compliance creative direction: do not showcase or name the product. No product bottle, jar, tub, package, label, capsule, pills, supplement shelf, formula, ingredient list, dose, price, guarantee, ratings, or purchase language. Do not reveal mechanism. No cascade, lever, hormone pathway, protocol, TRT explanation, ingredient science, chart, table, checklist, comparison grid, or explanation of how any solution works. Do not copy the source claim about more drive/focus, do not use age proof, percent claims, shilajit, gummies, or testimonial outcome claims. Use only this readable copy: WHAT IS DRAINING MY ENERGY?; MY LABS SAID NORMAL.; I STILL HIT A WALL EVERY AFTERNOON.; READ THE NOTE. Use Tenor only as a small brand mark if needed. Preserve the existing Tenor editorial palette: bone, graphite, and one restrained warm red accent. Keep the man real, older, reflective, not flexing, not gym-bro, not celebratory.",
+    "aspectRatio": "1:1",
+    "count": 1
+  },
+  "workflow": {
+    "workflow_run_id": "fcdfa287-5b44-4911-b138-0b2ff04cd40a",
+    "temporal_workflow_id": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-0aed93c8-7ef8-4d8c-a7d4-7dac489a9513"
+  },
+  "result": {
+    "workflowRunId": "fcdfa287-5b44-4911-b138-0b2ff04cd40a",
+    "temporalWorkflowId": "swipe-image-ad-d539fd3c-6a8a-4c78-a744-e2ee27b24eca-a5af5e49-1eb8-4fb4-8029-d3d2006114e9-0aed93c8-7ef8-4d8c-a7d4-7dac489a9513",
+    "assetId": "2c10cefe-2236-40c1-8257-41962cdbe165",
+    "publicId": "c9633248-27b6-4385-a017-4f1447b9a99a",
+    "publicUrl": "https://api.moshq.app/public/assets/c9633248-27b6-4385-a017-4f1447b9a99a",
+    "localPath": "/Users/aldrinclement/Documents/programming/marketi/outputs/tenor-collection-product-shot-no-product-no-mechanism-2026-04-28T17-55-48-867Z/01-product-shot-source-no-product-no-mechanism.jpg",
+    "contentType": "image/jpeg",
+    "workflowPayloadOut": {
+      "job_id": "embedded-freestyle:e12f0eb08450607ba44ad7e66bb2f81d5346579d7873efd4",
+      "asset_ids": [
+        "2c10cefe-2236-40c1-8257-41962cdbe165"
+      ],
+      "stores_attached": 0,
+      "swipe_context_mode": "minimal",
+      "swipe_prompt_model": "gemini-3.1-pro-preview",
+      "gemini_rag_doc_keys": [],
+      "swipe_render_model_id": "models/gemini-3.1-flash-image-preview",
+      "swipe_render_provider": "creative_service",
+      "prompt_template_sha256": "1a2507d6fb6ddf0ad92767eea9355397b03a8e91851c9ffa468af5bb77a4f085",
+      "gemini_rag_bundle_doc_keys": []
+    }
+  }
+}

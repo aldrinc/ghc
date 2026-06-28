@@ -1,0 +1,57 @@
+W
+Select a workspace
+Workspace
+Workspace
+Overview
+Strategy
+Brand
+Sites
+Commerce
+Products
+Research
+Documents
+Ads & Brands
+Funnels
+Execution
+Campaigns
+Analytics
+Postiz
+Social Agents
+AI
+Assistant Chat
+Assets
+Creative Library
+Meta Ads
+Aldrin Clement
+aldrin.clement@gmail.com
+Toggle Sidebar
+Workspaces
+Strategy
+Workspace Product
+Select a workspace first
+Workflow detail
+
+Inspect research artifacts for §-31.
+
+Actions
+Run overview
+ID: 089af43d-49c4-4e1d-a4ec-1fb1426561fc
+Failed
+Kind
+client_onboarding
+Workspace
+9dcf9467-bc72-4be1-a2f5-1f7386171e45
+Product
+§-31
+Started
+5/24/2026, 3:53:34 PM
+Finished
+5/24/2026, 3:54:04 PM
+Review & gates
+Onboarding is automatic and does not require approvals.
+No action required. This run will proceed automatically as activities complete.
+Activity log
+Recent workflow events and signals.
+Step	Status	When	Error
+client_onboarding	failed	5/24/2026, 3:54:04 PM	Child Workflow execution failed
+client_onboarding	started	5/24/2026, 3:53:34 PM	—

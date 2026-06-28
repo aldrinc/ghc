@@ -1,0 +1,1862 @@
+{
+  "schema": "planctl.contract.v1",
+  "plan_id": "2026-05-22-connected-social-tiktok-implementation-plan",
+  "created_at": "2026-05-22T14:57:17.748384+00:00",
+  "source_plan": "/Users/aldrinclement/Documents/programming/marketi/docs/plans/2026-05-22-connected-social-tiktok-implementation-plan.md",
+  "root": "/Users/aldrinclement/Documents/programming/marketi",
+  "proof_dir": "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation",
+  "items": [
+    {
+      "id": "P01",
+      "objective": "`docs/plans/2026-05-22-meta-ads-social-agent-prd.md`",
+      "source_line": 8,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P02",
+      "objective": "`docs/plans/2026-05-22-larry-tiktok-carousel-agent-prd.md`",
+      "source_line": 9,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P03",
+      "objective": "Connected Social Agents.",
+      "source_line": 15,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P04",
+      "objective": "TikTok Carousel Agent.",
+      "source_line": 16,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P05",
+      "objective": "Shared `agent_action_proposals` table and CRUD/approval endpoints.",
+      "source_line": 24,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P06",
+      "objective": "Connected social provider inventory/snapshot tables sufficient for future Meta/Postiz assets.",
+      "source_line": 25,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P07",
+      "objective": "Content growth program tables for TikTok carousel experiments and conversion sources.",
+      "source_line": 26,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P08",
+      "objective": "Backend schemas/repositories/routes for creating programs, experiments, variants, slide drafts, approval records, and read-only listings.",
+      "source_line": 27,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P09",
+      "objective": "Postiz client extensions for analytics and release-id reconciliation surfaces.",
+      "source_line": 28,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P10",
+      "objective": "Hermes runtime profiles:",
+      "source_line": 29,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P11",
+      "objective": "`meta-ads-manager`",
+      "source_line": 30,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P12",
+      "objective": "`social-media-manager`",
+      "source_line": 31,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P13",
+      "objective": "`tiktok-carousel-growth-manager`",
+      "source_line": 32,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P14",
+      "objective": "Targeted tests for schema/API behavior and adapter payload construction where practical.",
+      "source_line": 33,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P15",
+      "objective": "Live Meta OAuth app approval flow.",
+      "source_line": 37,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": "Non-goal preserved: not implemented and no production/external/model-changing action was taken."
+    },
+    {
+      "id": "P16",
+      "objective": "Full frontend builder/calendar UI.",
+      "source_line": 38,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": "Non-goal preserved: not implemented and no production/external/model-changing action was taken."
+    },
+    {
+      "id": "P17",
+      "objective": "Direct TikTok publishing outside Postiz.",
+      "source_line": 39,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": "Non-goal preserved: not implemented and no production/external/model-changing action was taken."
+    },
+    {
+      "id": "P18",
+      "objective": "Autonomous posting/spend changes.",
+      "source_line": 40,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": "Non-goal preserved: not implemented and no production/external/model-changing action was taken."
+    },
+    {
+      "id": "P19",
+      "objective": "Model/provider changes.",
+      "source_line": 41,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": "Non-goal preserved: not implemented and no production/external/model-changing action was taken."
+    },
+    {
+      "id": "P20",
+      "objective": "Production deployment or service restart.",
+      "source_line": 42,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": "Non-goal preserved: not implemented and no production/external/model-changing action was taken."
+    },
+    {
+      "id": "P21",
+      "objective": "New migration defines tables and indexes.",
+      "source_line": 46,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P22",
+      "objective": "FastAPI app imports and includes new routers.",
+      "source_line": 47,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P23",
+      "objective": "New schemas validate API payloads without fake data.",
+      "source_line": 48,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P24",
+      "objective": "Runtime registry exposes three new profiles.",
+      "source_line": 49,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P25",
+      "objective": "Tests pass for the new backend slices.",
+      "source_line": 50,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P26",
+      "objective": "`planctl verify` passes.",
+      "source_line": 51,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P27",
+      "objective": "`cd mos/backend && uv run pytest tests/test_connected_social_agents.py tests/test_tiktok_growth_programs.py`",
+      "source_line": 55,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P28",
+      "objective": "`/Users/aldrinclement/.codex/bin/planctl verify docs/plans/2026-05-22-connected-social-tiktok-implementation-plan.contract.json`",
+      "source_line": 56,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P29",
+      "objective": "`mos/backend/app/db/models.py`",
+      "source_line": 60,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P30",
+      "objective": "`mos/backend/alembic/versions/0098_connected_social_growth_agents.py`",
+      "source_line": 61,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P31",
+      "objective": "`mos/backend/app/schemas/connected_social.py`",
+      "source_line": 62,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P32",
+      "objective": "`mos/backend/app/schemas/growth_programs.py`",
+      "source_line": 63,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P33",
+      "objective": "`mos/backend/app/db/repositories/connected_social.py`",
+      "source_line": 64,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P34",
+      "objective": "`mos/backend/app/db/repositories/growth_programs.py`",
+      "source_line": 65,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P35",
+      "objective": "`mos/backend/app/routers/connected_social.py`",
+      "source_line": 66,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P36",
+      "objective": "`mos/backend/app/routers/growth_programs.py`",
+      "source_line": 67,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P37",
+      "objective": "`mos/backend/app/main.py`",
+      "source_line": 68,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P38",
+      "objective": "`mos/backend/app/services/postiz_client.py`",
+      "source_line": 69,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P39",
+      "objective": "`mos/backend/app/services/skills_runtime_registry.py`",
+      "source_line": 70,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P40",
+      "objective": "`mos/backend/tests/test_connected_social_agents.py`",
+      "source_line": 71,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P41",
+      "objective": "`mos/backend/tests/test_tiktok_growth_programs.py`",
+      "source_line": 72,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P42",
+      "objective": "Data model and migration.",
+      "source_line": 80,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P43",
+      "objective": "Schemas/repositories/routes.",
+      "source_line": 81,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P44",
+      "objective": "Postiz adapter extensions.",
+      "source_line": 82,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P45",
+      "objective": "Runtime profile registration.",
+      "source_line": 83,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P46",
+      "objective": "Tests and proof.",
+      "source_line": 84,
+      "status": "done",
+      "expected_files": [
+        "mos/backend/app/db/models.py",
+        "mos/backend/alembic/versions/0098_connected_social_growth_agents.py",
+        "mos/backend/app/schemas/connected_social.py",
+        "mos/backend/app/schemas/growth_programs.py",
+        "mos/backend/app/db/repositories/connected_social.py",
+        "mos/backend/app/db/repositories/growth_programs.py",
+        "mos/backend/app/routers/connected_social.py",
+        "mos/backend/app/routers/growth_programs.py",
+        "mos/backend/app/main.py",
+        "mos/backend/app/services/postiz_client.py",
+        "mos/backend/app/services/skills_runtime_registry.py",
+        "mos/backend/tests/test_connected_social_agents.py",
+        "mos/backend/tests/test_tiktok_growth_programs.py"
+      ],
+      "acceptance": [
+        "Implemented or explicitly preserved as out-of-scope for this foundation pass.",
+        "Covered by targeted backend tests or import/migration-head checks."
+      ],
+      "verify_commands": [
+        "test -s docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "test -f mos/backend/alembic/versions/0098_connected_social_growth_agents.py"
+      ],
+      "proof_required": [
+        "diff_summary",
+        "test_output",
+        "artifact_paths"
+      ],
+      "artifacts": [
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/test-output.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/py-compile.log",
+        "docs/plans/proof_pack/2026-05-22-connected-social-tiktok-implementation/alembic-heads.log"
+      ],
+      "notes": ""
+    }
+  ],
+  "global_verify_commands": [
+    "cd mos/backend && uv run pytest tests/test_connected_social_agents.py tests/test_tiktok_growth_programs.py",
+    "cd mos/backend && uv run python -m py_compile app/routers/connected_social.py app/routers/growth_programs.py app/schemas/connected_social.py app/schemas/growth_programs.py app/db/repositories/connected_social.py app/db/repositories/growth_programs.py app/services/postiz_client.py app/services/skills_runtime_registry.py",
+    "cd mos/backend && uv run alembic heads"
+  ],
+  "global_acceptance": [
+    "Connected Social Agents backend foundation is additive and app imports include the new router.",
+    "TikTok Carousel Agent backend foundation supports growth programs, experiments, six-slide variants, approval, publication intents, and conversion events.",
+    "Postiz adapter exposes analytics and release-id reconciliation methods without performing live calls in tests.",
+    "Hermes runtime registry exposes meta-ads-manager, social-media-manager, and tiktok-carousel-growth-manager profiles.",
+    "No live external writes, production deployment, production restart, model change, or direct TikTok publishing was performed."
+  ]
+}

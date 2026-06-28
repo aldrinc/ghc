@@ -1,0 +1,92 @@
+{
+  "sourceManifest": "/Users/aldrinclement/Documents/programming/marketi/outputs/mars-men-glp-quiz-campaign-package-2026-05-04/full-launch/full-launch-manifest.json",
+  "createdAt": "2026-05-05T13:33:15.577Z",
+  "note": "Review artifact only. This has not been attached to MOS or used to regenerate creatives.",
+  "destinationCongruenceMap": [
+    {
+      "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+      "launchSlot": "GLP lander",
+      "rowCount": 13,
+      "rowKeys": [
+        "01-TENOR-COPY001-C001",
+        "02-TENOR-COPY001-C002",
+        "03-TENOR-COPY001-C004",
+        "04-TENOR-COPY001-C006",
+        "05-TENOR-COPY001-C011",
+        "06-TENOR-COPY002-C008",
+        "07-TENOR-COPY002-C003",
+        "08-TENOR-COPY002-C009",
+        "09-TENOR-COPY002-C007",
+        "10-TENOR-COPY002-C005",
+        "11-TENOR-COPY002-C010",
+        "12-TENOR-COPY002-C012",
+        "13-TENOR-COPY003-C013"
+      ],
+      "congruenceBlock": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly."
+    },
+    {
+      "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+      "launchSlot": "Quiz funnel",
+      "rowCount": 10,
+      "rowKeys": [
+        "14-TENOR-COPY011-C022",
+        "15-TENOR-COPY011-C019",
+        "16-TENOR-COPY011-C020",
+        "17-TENOR-COPY012-C016",
+        "18-TENOR-COPY013-C017",
+        "19-TENOR-COPY014-C018",
+        "20-TENOR-COPY015-C021",
+        "21-TENOR-COPY016-C023",
+        "22-TENOR-COPY017-C024",
+        "23-TENOR-COPY018-C025"
+      ],
+      "congruenceBlock": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: Quiz\nSubheadline: A guided funnel for men who feel their energy, drive, focus, stamina, or recovery has changed and want to identify the next step.\nPrimary problem: Men do not feel like themselves anymore and need a lower-friction way to connect symptoms, lifestyle, and product fit before reaching the sales page.\nPromise: A quiz-guided path that helps the visitor understand whether Daily Drive Essentials is a fit before the protocol offer.\nMechanism disclosure level: Light mechanism; the quiz presale should qualify the visitor around energy, drive, focus, stamina, recovery, and daily protocol fit without turning the ad into a full product page.\nProof type: Interactive quiz funnel supported by transparent formula cues, reported user experience, offer clarity, and risk reversal downstream.\nCTA / urgency: Quiz/protocol CTA that moves the visitor from symptom recognition into the Daily Drive Essentials recommendation path.\nCompliance posture: Matches the downstream quiz posture and funnel stage.\nAsset stage: Ad to quiz presale, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly."
+    }
+  ],
+  "representativeGenerationInputs": [
+    {
+      "rowKey": "01-TENOR-COPY001-C001",
+      "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/10-reasons-glp/",
+      "generationInput": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_glp_listicle_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/89a1cac9-07f0-43e7-bf46-7178a14b00f4",
+        "swipeRequiresProductImage": false,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "What GLP-1 Does to Your Drive",
+        "swipeAngle": "Awareness level: Solution-Aware\n\nDownstream destination context:\nHeadline: 10 Reasons GLP\nSubheadline: Men on GLP-1s should understand what rapid weight loss can quietly drain before choosing the next step.\nPrimary problem: Men using GLP-1s may lose weight while feeling flatter, foggier, less driven, or concerned about lean tissue, metabolism, energy, stamina, and recovery.\nPromise: An editorial presale explaining why men on GLP-1s are adding a two-capsule Daily Drive Essentials protocol to support energy, drive, stamina, and recovery before the sales page.\nMechanism disclosure level: Partial mechanism; the destination article introduces how rapid weight loss can affect stress response, lean tissue, metabolism, and drive, while the sales page carries the full product detail.\nProof type: Editorial/listicle using GLP-specific education, founder/doctor-style advisory copy, formula transparency, reported user experience, and risk reversal.\nCTA / urgency: Article-read/protocol CTA before proceeding to the Daily Drive Essentials offer.\nCompliance posture: Matches the downstream advertorial/listicle posture and funnel stage.\nAsset stage: Ad to GLP advertorial/listicle, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      }
+    },
+    {
+      "rowKey": "14-TENOR-COPY011-C022",
+      "destinationUrl": "https://shoptenorco.com/8b89a76d/daily-drive-essentials/quiz/",
+      "generationInput": {
+        "clientId": "70124684-505f-48af-a25c-5f7a79601fa0",
+        "productId": "8b89a76d-069c-41a6-be38-b7e4f4483460",
+        "campaignId": "426afe15-ac66-436c-910d-2a1259597bf3",
+        "assetBriefId": "brief_quiz_funnel_swipe_image2",
+        "requirementIndex": 0,
+        "swipeImageUrl": "https://api.moshq.app/public/assets/41bd5884-a13d-4f4a-8518-3141b605b98d",
+        "swipeRequiresProductImage": true,
+        "swipeContextMode": "minimal",
+        "swipeBrandName": "Tenor",
+        "swipeProductName": "Daily Drive Essentials",
+        "swipeHook": "Stop Losing Drive. Start Today.",
+        "swipeAngle": "Awareness level: Problem-Aware\n\nDownstream destination context:\nHeadline: Quiz\nSubheadline: A guided funnel for men who feel their energy, drive, focus, stamina, or recovery has changed and want to identify the next step.\nPrimary problem: Men do not feel like themselves anymore and need a lower-friction way to connect symptoms, lifestyle, and product fit before reaching the sales page.\nPromise: A quiz-guided path that helps the visitor understand whether Daily Drive Essentials is a fit before the protocol offer.\nMechanism disclosure level: Light mechanism; the quiz presale should qualify the visitor around energy, drive, focus, stamina, recovery, and daily protocol fit without turning the ad into a full product page.\nProof type: Interactive quiz funnel supported by transparent formula cues, reported user experience, offer clarity, and risk reversal downstream.\nCTA / urgency: Quiz/protocol CTA that moves the visitor from symptom recognition into the Daily Drive Essentials recommendation path.\nCompliance posture: Matches the downstream quiz posture and funnel stage.\nAsset stage: Ad to quiz presale, before the sales page.\nVisual emphasis: Less text-heavy; let the swipe creative composition and product/benefit visual carry more of the ad so the image can be evaluated clearly.",
+        "model": "gemini-3.1-pro-preview",
+        "renderModelId": "gpt-image-2",
+        "aspectRatio": "9:16",
+        "count": 1
+      }
+    }
+  ]
+}

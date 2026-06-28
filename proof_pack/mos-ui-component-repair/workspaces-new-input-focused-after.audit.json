@@ -1,0 +1,20 @@
+{
+  "body": "Back to workspaces\nWhat should we call this workspace?\n\nUse the business name or a working name. You can change it later.\n\nContinue",
+  "borderColor": "color(srgb 0.0431373 0.0509804 0.0705882)",
+  "borderRadius": "12px",
+  "borderWidth": "1px",
+  "boxShadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) 0px 0px 0px 0px, rgba(11, 13, 18, 0.07) 0px 0px 0px 4px",
+  "firstRunFocus": "#0b0d12",
+  "firstRunRing": "rgba(11, 13, 18, 0.07)",
+  "inputRing": "rgba(11, 13, 18, 0.07)",
+  "outline": "rgba(0, 0, 0, 0) solid 2px",
+  "placeholder": "Enter the business or workspace name",
+  "rect": {
+    "height": 54,
+    "width": 430,
+    "x": 841,
+    "y": 602
+  },
+  "tag": "INPUT",
+  "url": "http://localhost:5275/workspaces/new"
+}

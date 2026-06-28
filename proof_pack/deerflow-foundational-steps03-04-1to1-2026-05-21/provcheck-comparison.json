@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "errors": [],
+  "warnings": [
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/outputs/dsv4-vs-gpt-foundational-03-04-comparison.md:13: factual-looking value lacks nearby source/provenance",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/outputs/dsv4-vs-gpt-foundational-03-04-comparison.md:31: factual-looking value lacks nearby source/provenance",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/outputs/dsv4-vs-gpt-foundational-03-04-comparison.md:32: factual-looking value lacks nearby source/provenance",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/outputs/dsv4-vs-gpt-foundational-03-04-comparison.md:33: factual-looking value lacks nearby source/provenance",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/outputs/dsv4-vs-gpt-foundational-03-04-comparison.md:34: factual-looking value lacks nearby source/provenance",
+    "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-foundational-steps03-04-1to1-2026-05-21/outputs/dsv4-vs-gpt-foundational-03-04-comparison.md:35: factual-looking value lacks nearby source/provenance"
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "schema": "capturectl.manifest.v1",
+  "capture_id": "deerflow-web",
+  "created_at": "2026-05-21T18:42:25.916895+00:00",
+  "source_type": "web",
+  "source": "DeerFlow DSV4 Pro Strategy V2 Step 1 web/tool evidence",
+  "operator_notes": "Strategy V2 Step 1 run with DSV4 Pro through DeerFlow; raw tool/event evidence and derived source lists.",
+  "raw_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/sources/deerflow-web/raw/deerflow-dsv4-step01-events.jsonl",
+      "kind": "raw_files",
+      "sha256": "2b8163711839957f11baf347e01bf8d652db76b1a27721496082702fc7f5fa77",
+      "bytes": 9216470,
+      "captured_at": "2026-05-21T18:42:35.967018+00:00",
+      "source": "DeerFlow event stream",
+      "notes": "Full event stream including tool calls and model output chunks."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/sources/deerflow-web/raw/deerflow-dsv4-step01-raw.md",
+      "kind": "raw_files",
+      "sha256": "51cb4086acd369aa5cf256a49a4ca6cf5997f5dce9ab52329b21fc80d6a258da",
+      "bytes": 36687,
+      "captured_at": "2026-05-21T18:42:36.058847+00:00",
+      "source": "DeerFlow final report",
+      "notes": "Raw tagged output returned by DSV4 Pro."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/sources/deerflow-web/raw/rendered-strategy-v2-step01-prompt.md",
+      "kind": "raw_files",
+      "sha256": "2e70542cd1b0b52f04ecf97e3cf74599a70a7236c18a5ceb3359937d5a40e6ce",
+      "bytes": 9274,
+      "captured_at": "2026-05-21T18:42:36.138299+00:00",
+      "source": "Rendered Strategy V2 Step 1 prompt",
+      "notes": "Exact prompt sent to DeerFlow, including tagged output guardrail."
+    }
+  ],
+  "derived_files": [
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/sources/deerflow-web/derived/deerflow-tool-calls.json",
+      "kind": "derived_files",
+      "sha256": "f53058fea734ae0b22eef45bfec46fa67356b392b4fd8587cfd25d2ea7555592",
+      "bytes": 177739,
+      "captured_at": "2026-05-21T18:42:36.214127+00:00",
+      "source": "Postprocessed DeerFlow event stream",
+      "notes": "Extracted tool-call log."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/sources/deerflow-web/derived/deerflow-source-urls.json",
+      "kind": "derived_files",
+      "sha256": "b8058f3a9ae11eddf8482bb2149c6914a3a35d95c3617fcbe815e0bf045b5cd8",
+      "bytes": 28757,
+      "captured_at": "2026-05-21T18:42:36.291964+00:00",
+      "source": "Postprocessed DeerFlow output and events",
+      "notes": "Unique URLs and citation URLs from the run."
+    },
+    {
+      "path": "/Users/aldrinclement/Documents/programming/marketi/proof_pack/deerflow-step01-1to1-2026-05-21/sources/deerflow-web/derived/dsv4-vs-gpt-step01-comparison.md",
+      "kind": "derived_files",
+      "sha256": "ad92b7b9a15ea89f6a83a6b11d8e5df1d1af08ea29f08681bb4bd64e514cf4f7",
+      "bytes": 3925,
+      "captured_at": "2026-05-21T18:46:57.305994+00:00",
+      "source": "DSV4/GPT artifact comparison",
+      "notes": "Comparison built from production GPT export, DeerFlow run meta, and validation artifacts."
+    }
+  ],
+  "blocked_items": [],
+  "verification": {
+    "status": "pass",
+    "verified_at": "2026-05-21T18:47:12.596454+00:00",
+    "errors": []
+  }
+}
