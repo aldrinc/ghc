@@ -272,13 +272,26 @@ _STANDALONE_COMPRESSED_IMAGE_MIN_BYTES = 64 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_BYTES = 4 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_RATIO = 0.03
 _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES = 16 * 1024
-# The deployer should make an HTML artifact deployable, not silently redesign or optimize it.
-# Keep optimization off until the optimization pipeline and validator are rebuilt as a stable,
-# explicit pre-deploy transform.
-_STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION = False
-_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 0
-_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 0
-_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 0
+
+
+def _html_deploy_optimization_enabled_from_env() -> bool:
+    raw = str(os.getenv("DEPLOY_HTML_DEPLOY_OPTIMIZATION_ENABLED") or "").strip().lower()
+    if not raw:
+        return True
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(
+        "DEPLOY_HTML_DEPLOY_OPTIMIZATION_ENABLED must be a boolean value, "
+        f"received {raw!r}."
+    )
+
+
+_STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION = _html_deploy_optimization_enabled_from_env()
+_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 16
+_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 16
+_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 48
 _STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS = 2500
 _STANDALONE_MODERN_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -11673,7 +11686,7 @@ print(json.dumps(report, sort_keys=True))
             standalone_image_sources=standalone_image_sources,
             context_label=context_label,
         )
-        if _STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION and page_stage != "sales":
+        if _STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION:
             image_rewrite_baseline_html = html_document
             html_document = self._rewrite_standalone_imported_html_compressed_images(
                 site_dir=site_dir,
@@ -11694,12 +11707,18 @@ print(json.dumps(report, sort_keys=True))
                 page_stage=page_stage,
             )
             if not _is_presales_stage(page_stage) and html_document != image_rewrite_baseline_html:
-                self._validate_html_deploy_visual_parity(
-                    before_html=image_rewrite_baseline_html,
-                    after_html=html_document,
-                    standalone_served_assets=standalone_served_assets,
-                    context_label=context_label,
-                )
+                try:
+                    self._validate_html_deploy_visual_parity(
+                        before_html=image_rewrite_baseline_html,
+                        after_html=html_document,
+                        standalone_served_assets=standalone_served_assets,
+                        context_label=context_label,
+                    )
+                except ValueError as exc:
+                    if "visual parity failed" not in str(exc):
+                        raise
+                    print(f"Warning: {exc} Reverting to baseline imported HTML for {context_label}.")
+                    html_document = image_rewrite_baseline_html
         if _STANDALONE_ENABLE_HTML_DEPLOY_OPTIMIZATION:
             html_document = _optimize_standalone_imported_html_document(html_document)
             render_optimization_css = _build_standalone_render_optimization_css(

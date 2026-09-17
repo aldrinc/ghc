@@ -4731,17 +4731,6 @@ def _run_html_deploy_optimization_validation_sync(
         return None
 
     candidate_release_id = str(validation_plan.get("candidate_release_id") or "").strip()
-    return {
-        "status": "disabled",
-        "candidateReleaseId": candidate_release_id or None,
-        "reason": (
-            "HTML deploy optimization and optimization validation are disabled. "
-            "Release readiness is gated by artifact asset closure, browser resource validation, "
-            "tracking validation, Meta delivery, and PostHog live readback."
-        ),
-        "pages": [],
-    }
-
     pages: list[dict[str, Any]] = []
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         for target in _html_deploy_validation_targets(validation_plan=validation_plan):
@@ -4954,15 +4943,32 @@ def _run_html_deploy_lighthouse_validation_sync(
 ) -> dict[str, Any] | None:
     if validation_plan.get("render_mode") != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
         return None
+    if not _html_deploy_lighthouse_enabled(validation_plan=validation_plan):
+        return {
+            "status": "not_applicable",
+            "candidateReleaseId": validation_plan.get("candidate_release_id"),
+            "reason": (
+                "HTML deploy Lighthouse validation is not applicable without "
+                "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED and a candidate release id."
+            ),
+            "audits": [],
+        }
+    urls = _html_deploy_lighthouse_urls(validation_plan=validation_plan)
+    if not urls:
+        raise DeployError("HTML deploy Lighthouse validation requires at least one page URL.")
+
+    audits: list[dict[str, Any]] = []
+    for url in urls:
+        for profile in ("mobile", "desktop"):
+            audits.append(_run_single_html_deploy_lighthouse_audit(url=url, profile=profile))
     return {
-        "status": "disabled",
+        "status": "passed",
         "candidateReleaseId": validation_plan.get("candidate_release_id"),
-        "reason": (
-            "HTML deploy Lighthouse validation is disabled with the optimization validator. "
-            "Performance validation will be rebuilt separately so missing local Lighthouse tooling "
-            "cannot block production-ready analytics and artifact validation."
-        ),
-        "audits": [],
+        "thresholds": {
+            "mobile": _html_deploy_lighthouse_threshold(profile="mobile"),
+            "desktop": _html_deploy_lighthouse_threshold(profile="desktop"),
+        },
+        "audits": audits,
     }
 
 

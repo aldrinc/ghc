@@ -49,6 +49,21 @@ def _set_imported_html_page_stage(
         manifest["htmlArtifactKind"] = artifact_kind
 
 
+def test_html_deploy_optimization_enabled_from_env(monkeypatch):
+    monkeypatch.delenv("DEPLOY_HTML_DEPLOY_OPTIMIZATION_ENABLED", raising=False)
+    assert deployer_module._html_deploy_optimization_enabled_from_env() is True
+
+    monkeypatch.setenv("DEPLOY_HTML_DEPLOY_OPTIMIZATION_ENABLED", "false")
+    assert deployer_module._html_deploy_optimization_enabled_from_env() is False
+
+    monkeypatch.setenv("DEPLOY_HTML_DEPLOY_OPTIMIZATION_ENABLED", "1")
+    assert deployer_module._html_deploy_optimization_enabled_from_env() is True
+
+    monkeypatch.setenv("DEPLOY_HTML_DEPLOY_OPTIMIZATION_ENABLED", "sometimes")
+    with pytest.raises(ValueError, match="must be a boolean value"):
+        deployer_module._html_deploy_optimization_enabled_from_env()
+
+
 def _make_png_bytes(*, width: int, height: int, color: tuple[int, int, int, int]) -> bytes:
     buffer = io.BytesIO()
     Image.new("RGBA", (width, height), color).save(buffer, format="PNG")
@@ -2576,6 +2591,42 @@ def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_sa
 """
     app = _artifact_app(render_mode="html_deploy", html_document=html_document)
     _set_imported_html_page_stage(app, stage="pre_sales", artifact_kind="listicle")
+    noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
+    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
+        "contentType": "image/jpeg",
+        "sizeBytes": len(noisy_jpeg),
+        "bytesBase64": base64.b64encode(noisy_jpeg).decode("ascii"),
+    }
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 1)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+    monkeypatch.setattr(
+        deployer,
+        "_validate_html_deploy_visual_parity",
+        lambda **_: None,
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert "/_standalone-assets/compressed/" in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
+
+
+def test_funnel_artifact_site_rewrites_sales_images_to_compressed_routes(monkeypatch):
+    _enable_html_deploy_optimization(monkeypatch)
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="html_deploy", html_document=html_document)
+    _set_imported_html_page_stage(app, stage="sales", artifact_kind="sales")
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
     app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
         "contentType": "image/jpeg",

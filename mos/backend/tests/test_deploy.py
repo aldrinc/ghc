@@ -5153,10 +5153,19 @@ def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatc
     )
 
     assert result is not None
-    assert result["status"] == "disabled"
-    assert result["candidateReleaseId"] == "candidate-123"
-    assert result["audits"] == []
-    assert calls == []
+    assert result["status"] == "passed"
+    assert result["thresholds"] == {"mobile": 85.0, "desktop": 85.0}
+    assert [audit["profile"] for audit in result["audits"]] == [
+        "mobile",
+        "desktop",
+        "mobile",
+        "desktop",
+    ]
+    assert all(
+        "mos_deploy_candidate_release=candidate-123" in audit["url"] for audit in result["audits"]
+    )
+    assert len(calls) == 4
+    assert any("--preset=desktop" in call for call in calls)
 
 
 def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch):
@@ -5193,16 +5202,14 @@ def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch
     )
     monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
 
-    result = deploy_service._run_html_deploy_lighthouse_validation_sync(
-        validation_plan={
-            "render_mode": "html_deploy",
-            "candidate_release_id": "candidate-123",
-            "pages_to_validate": [{"url": "https://shop.example.com/sales-page/"}],
-        }
-    )
-
-    assert result is not None
-    assert result["status"] == "disabled"
+    with pytest.raises(deploy_service.DeployError, match="below required 85.00"):
+        deploy_service._run_html_deploy_lighthouse_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [{"url": "https://shop.example.com/sales-page/"}],
+            }
+        )
 
 
 class _HtmlDeployOptimizationFakeResponse:
@@ -5311,10 +5318,20 @@ def test_run_html_deploy_optimization_validation_checks_candidate_pages(monkeypa
     )
 
     assert result is not None
-    assert result["status"] == "disabled"
+    assert result["status"] == "passed"
     assert result["candidateReleaseId"] == "candidate-123"
-    assert result["pages"] == []
-    assert requested_urls == []
+    assert len(result["pages"]) == 2
+    assert result["pages"][0]["renderOptimizationCss"] is True
+    assert result["pages"][0]["tailwindRuntimeRemoved"] is True
+    assert result["pages"][0]["legacyIm8ScriptsRemoved"] is True
+    assert result["pages"][0]["rasterImageCount"] == 2
+    assert result["pages"][0]["responsiveImageCount"] >= 2
+    assert result["pages"][0]["lazyImageCount"] == 1
+    assert result["pages"][0]["highPriorityImageCount"] == 1
+    assert result["pages"][0]["imagePreloadCount"] == 1
+    assert result["pages"][0]["fontPreloadCount"] == 1
+    page_requests = [url for url in requested_urls if "/assets/" not in url]
+    assert all("mos_deploy_candidate_release=candidate-123" in url for url in page_requests)
 
 
 def test_html_deploy_validation_targets_include_tracked_presales_sales_handoff_url():
@@ -5454,23 +5471,21 @@ def test_run_html_deploy_optimization_validation_checks_tracked_sales_handoff_re
         "html_artifact_kind": "sales",
     }
 
-    result = deploy_service._run_html_deploy_optimization_validation_sync(
-        validation_plan={
-            "render_mode": "html_deploy",
-            "candidate_release_id": "candidate-123",
-            "pages_to_validate": [pre_sales_page, sales_page],
-            "path_plans": [
-                {
-                    "start_page": pre_sales_page,
-                    "sales_page": sales_page,
-                    "pre_sales_click_selectors": ["#to-sales"],
-                }
-            ],
-        }
-    )
-
-    assert result is not None
-    assert result["status"] == "disabled"
+    with pytest.raises(deploy_service.DeployError, match="source_page_type=quiz_presell"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [pre_sales_page, sales_page],
+                "path_plans": [
+                    {
+                        "start_page": pre_sales_page,
+                        "sales_page": sales_page,
+                        "pre_sales_click_selectors": ["#to-sales"],
+                    }
+                ],
+            }
+        )
 
 
 def test_run_html_deploy_optimization_validation_fails_without_render_marker(monkeypatch):
@@ -5491,22 +5506,20 @@ def test_run_html_deploy_optimization_validation_fails_without_render_marker(mon
 
     monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
 
-    result = deploy_service._run_html_deploy_optimization_validation_sync(
-        validation_plan={
-            "render_mode": "html_deploy",
-            "candidate_release_id": "candidate-123",
-            "pages_to_validate": [
-                {
-                    "url": "https://shop.example.com/sales-page/",
-                    "stage": "sales",
-                    "html_artifact_kind": "sales",
-                }
-            ],
-        }
-    )
-
-    assert result is not None
-    assert result["status"] == "disabled"
+    with pytest.raises(deploy_service.DeployError, match="missing data-mos-render-optimization"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [
+                    {
+                        "url": "https://shop.example.com/sales-page/",
+                        "stage": "sales",
+                        "html_artifact_kind": "sales",
+                    }
+                ],
+            }
+        )
 
 
 def test_run_html_deploy_optimization_validation_fails_broken_image(monkeypatch):
@@ -5530,22 +5543,20 @@ def test_run_html_deploy_optimization_validation_fails_broken_image(monkeypatch)
 
     monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
 
-    result = deploy_service._run_html_deploy_optimization_validation_sync(
-        validation_plan={
-            "render_mode": "html_deploy",
-            "candidate_release_id": "candidate-123",
-            "pages_to_validate": [
-                {
-                    "url": "https://shop.example.com/listicle/",
-                    "stage": "pre_sales",
-                    "html_artifact_kind": "listicle",
-                }
-            ],
-        }
-    )
-
-    assert result is not None
-    assert result["status"] == "disabled"
+    with pytest.raises(deploy_service.DeployError, match="image assets did not resolve"):
+        deploy_service._run_html_deploy_optimization_validation_sync(
+            validation_plan={
+                "render_mode": "html_deploy",
+                "candidate_release_id": "candidate-123",
+                "pages_to_validate": [
+                    {
+                        "url": "https://shop.example.com/listicle/",
+                        "stage": "pre_sales",
+                        "html_artifact_kind": "listicle",
+                    }
+                ],
+            }
+        )
 
 
 @pytest.mark.asyncio
