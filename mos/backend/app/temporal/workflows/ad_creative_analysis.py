@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
@@ -52,7 +53,7 @@ class AdsCreativeAnalysisWorkflow:
             ad_ids = ad_ids[:effective_max]
 
         concurrency = input.concurrency or DEFAULT_BREAKDOWN_CONCURRENCY
-        semaphore = workflow.asyncio.Semaphore(max(1, concurrency))
+        semaphore = asyncio.Semaphore(max(1, concurrency))
 
         results: List[Dict[str, Any]] = []
 
@@ -94,7 +95,7 @@ class AdsCreativeAnalysisWorkflow:
                     }
                 )
 
-        tasks = [workflow.asyncio.create_task(_run_for_ad(ad_id)) for ad_id in ad_ids]
+        tasks = [asyncio.create_task(_run_for_ad(ad_id)) for ad_id in ad_ids]
         await workflow.wait(tasks)
 
         succeeded = 0

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
@@ -202,7 +203,7 @@ class CampaignFunnelGenerationWorkflow:
 
         batch_results: list[dict[str, Any] | None] = [None] * len(variant_specs)
 
-        semaphore = workflow.asyncio.Semaphore(max(1, variant_activity_concurrency))
+        semaphore = asyncio.Semaphore(max(1, variant_activity_concurrency))
 
         async def _run_variant_activity(variant_index: int, per_variant_spec: dict[str, Any]) -> None:
             async with semaphore:
@@ -231,7 +232,7 @@ class CampaignFunnelGenerationWorkflow:
                 batch_results[variant_index] = batch_result
 
         tasks = [
-            workflow.asyncio.create_task(_run_variant_activity(idx, spec))
+            asyncio.create_task(_run_variant_activity(idx, spec))
             for idx, spec in enumerate(variant_specs)
         ]
         await workflow.wait(tasks)
