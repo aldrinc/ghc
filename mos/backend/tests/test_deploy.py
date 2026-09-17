@@ -26,6 +26,9 @@ from app.db.models import (
 )
 from app.db.enums import AssetSourceEnum, AssetStatusEnum
 from app.services import deploy as deploy_service
+from app.services.html_deploy_validation import lighthouse as html_deploy_lighthouse_module
+from app.services.html_deploy_validation import optimization as html_deploy_optimization_module
+from app.services.html_deploy_validation import targets as html_deploy_targets_module
 from cloudhand.adapters import deployer as deployer_adapter
 from tests.conftest import TEST_ORG_ID
 
@@ -5121,7 +5124,7 @@ def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatc
             ),
             encoding="utf-8",
         )
-        return deploy_service.subprocess.CompletedProcess(args, 0, "", "")
+        return html_deploy_lighthouse_module.subprocess.CompletedProcess(args, 0, "", "")
 
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED", True)
     monkeypatch.setattr(
@@ -5139,7 +5142,7 @@ def test_run_html_deploy_lighthouse_validation_audits_candidate_pages(monkeypatc
         "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_DESKTOP_MIN_SCORE",
         85.0,
     )
-    monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
+    monkeypatch.setattr(html_deploy_lighthouse_module.subprocess, "run", _fake_run)
 
     result = deploy_service._run_html_deploy_lighthouse_validation_sync(
         validation_plan={
@@ -5182,7 +5185,7 @@ def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch
             ),
             encoding="utf-8",
         )
-        return deploy_service.subprocess.CompletedProcess(args, 0, "", "")
+        return html_deploy_lighthouse_module.subprocess.CompletedProcess(args, 0, "", "")
 
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_ENABLED", True)
     monkeypatch.setattr(
@@ -5200,7 +5203,7 @@ def test_run_html_deploy_lighthouse_validation_fails_under_threshold(monkeypatch
         "DEPLOY_HTML_DEPLOY_LIGHTHOUSE_DESKTOP_MIN_SCORE",
         85.0,
     )
-    monkeypatch.setattr(deploy_service.subprocess, "run", _fake_run)
+    monkeypatch.setattr(html_deploy_lighthouse_module.subprocess, "run", _fake_run)
 
     with pytest.raises(deploy_service.DeployError, match="below required 85.00"):
         deploy_service._run_html_deploy_lighthouse_validation_sync(
@@ -5296,7 +5299,7 @@ def test_run_html_deploy_optimization_validation_checks_candidate_pages(monkeypa
                 return _HtmlDeployOptimizationFakeResponse(content_type="image/webp")
             return _HtmlDeployOptimizationFakeResponse(text=_optimized_html_fixture())
 
-    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(html_deploy_optimization_module.httpx, "Client", FakeClient)
 
     result = deploy_service._run_html_deploy_optimization_validation_sync(
         validation_plan={
@@ -5346,7 +5349,7 @@ def test_html_deploy_validation_targets_include_tracked_presales_sales_handoff_u
         "html_artifact_kind": "sales",
     }
 
-    targets = deploy_service._html_deploy_validation_targets(
+    targets = html_deploy_targets_module.html_deploy_validation_targets(
         validation_plan={
             "render_mode": "html_deploy",
             "candidate_release_id": "candidate-123",
@@ -5458,7 +5461,7 @@ def test_run_html_deploy_optimization_validation_checks_tracked_sales_handoff_re
                 )
             return _HtmlDeployOptimizationFakeResponse(text=html)
 
-    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(html_deploy_optimization_module.httpx, "Client", FakeClient)
 
     pre_sales_page = {
         "url": "https://shop.example.com/quiz/",
@@ -5504,7 +5507,7 @@ def test_run_html_deploy_optimization_validation_fails_without_render_marker(mon
                 text="<!doctype html><html><body>No optimization markers</body></html>"
             )
 
-    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(html_deploy_optimization_module.httpx, "Client", FakeClient)
 
     with pytest.raises(deploy_service.DeployError, match="missing data-mos-render-optimization"):
         deploy_service._run_html_deploy_optimization_validation_sync(
@@ -5541,7 +5544,7 @@ def test_run_html_deploy_optimization_validation_fails_broken_image(monkeypatch)
                 )
             return _HtmlDeployOptimizationFakeResponse(text=_optimized_html_fixture())
 
-    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(html_deploy_optimization_module.httpx, "Client", FakeClient)
 
     with pytest.raises(deploy_service.DeployError, match="image assets did not resolve"):
         deploy_service._run_html_deploy_optimization_validation_sync(
@@ -6807,7 +6810,7 @@ def test_validate_posthog_live_readback_polls_until_sales_aliases_land(monkeypat
     monkeypatch.setattr(
         deploy_service.settings, "DEPLOY_TRACKING_VALIDATION_POSTHOG_READBACK_POLL_SECONDS", 0.5
     )
-    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(html_deploy_optimization_module.httpx, "Client", FakeClient)
     monkeypatch.setattr(
         deploy_service.time, "sleep", lambda seconds: calls.append(("sleep", seconds))
     )
@@ -7282,7 +7285,7 @@ def test_validate_deployed_tracking_html_checks_direct_meta_pixel_bootstrap(monk
                 )
             return FakeResponse(str(url))
 
-    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(html_deploy_optimization_module.httpx, "Client", FakeClient)
 
     deploy_service._validate_deployed_tracking_html(
         validation_plan={
@@ -7321,7 +7324,7 @@ def test_validate_deployed_tracking_html_rejects_legacy_mars_references(monkeypa
         def get(self, url, **kwargs):
             return FakeResponse()
 
-    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+    monkeypatch.setattr(html_deploy_optimization_module.httpx, "Client", FakeClient)
 
     with pytest.raises(deploy_service.DeployError, match="forbidden legacy references"):
         deploy_service._validate_deployed_tracking_html(
